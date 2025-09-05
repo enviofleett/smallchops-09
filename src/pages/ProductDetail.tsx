@@ -19,6 +19,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ResponsiveGrid } from '@/components/layout/ResponsiveGrid';
+import { ResponsiveCard } from '@/components/layout/ResponsiveCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
@@ -306,12 +309,12 @@ const ProductDetail = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 sm:py-8">
+      <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         {/* Product Main Section */}
-        <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 mb-8 sm:mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 mb-6 sm:mb-8 lg:mb-12">
           {/* Product Image - Mobile optimized */}
           <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-full sm:w-4/5 mx-auto">
+            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-full max-w-md mx-auto lg:max-w-none">
               <img
                 src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=480&h=480&fit=crop'}
                 alt={product.name}
@@ -321,15 +324,15 @@ const ProductDetail = () => {
           </div>
 
           {/* Product Details */}
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-4 sm:space-y-5 lg:space-y-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-2">{product.name}</h1>
-              <div className="flex items-center gap-4 mb-4">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 leading-tight">{product.name}</h1>
+              <div className="flex items-center gap-3 sm:gap-4 mb-4 flex-wrap">
                 <StarRating 
                   rating={productRatings?.ratingSummary?.average_rating || 0} 
                   size="md"
                 />
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs sm:text-sm text-muted-foreground">
                   ({productRatings?.ratingSummary?.total_reviews || 0} review{productRatings?.ratingSummary?.total_reviews !== 1 ? 's' : ''})
                 </span>
               </div>
@@ -337,16 +340,16 @@ const ProductDetail = () => {
 
             {/* Promotion Banner */}
             {product.active_promotion && (
-              <div className="bg-gradient-to-r from-destructive to-orange-500 text-destructive-foreground px-4 py-3 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-lg">🔥 {getPromotionBadge()}</span>
-                    <p className="text-sm mt-1 opacity-90">Limited time offer - don't miss out!</p>
+              <div className="bg-gradient-to-r from-destructive to-orange-500 text-destructive-foreground px-3 sm:px-4 py-2 sm:py-3 rounded-lg">
+                <div className="flex items-center justify-between flex-col sm:flex-row gap-2 sm:gap-0">
+                  <div className="text-center sm:text-left">
+                    <span className="font-bold text-base sm:text-lg">🔥 {getPromotionBadge()}</span>
+                    <p className="text-xs sm:text-sm mt-1 opacity-90">Limited time offer - don't miss out!</p>
                   </div>
                   {getPromotionTimeLeft() && (
-                    <div className="text-right">
-                      <div className="flex items-center gap-1 text-sm">
-                        <Timer className="h-4 w-4" />
+                    <div className="text-center sm:text-right">
+                      <div className="flex items-center gap-1 text-xs sm:text-sm justify-center sm:justify-end">
+                        <Timer className="h-3 w-3 sm:h-4 sm:w-4" />
                         {getPromotionTimeLeft()}
                       </div>
                     </div>
@@ -368,16 +371,16 @@ const ProductDetail = () => {
 
             {/* Description */}
             <div>
-              <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description || '') }} />
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description || '') }} />
             </div>
 
             {/* Features */}
             {product.features && product.features.length > 0 && (
               <div>
-                <h3 className="font-semibold mb-2">What's included:</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                <h3 className="font-semibold text-sm sm:text-base mb-2">What's included:</h3>
+                <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-muted-foreground pl-2">
                   {product.features.map((feature, index) => (
-                    <li key={index}>{feature}</li>
+                    <li key={index} className="leading-relaxed">{feature}</li>
                   ))}
                 </ul>
               </div>
@@ -394,11 +397,11 @@ const ProductDetail = () => {
             )}
 
             {/* Quantity and Add to Cart */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium">Quantity:</span>
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                <span className="text-xs sm:text-sm font-medium">Quantity:</span>
                 {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     (Min: {product.minimum_order_quantity})
                   </span>
                 )}
@@ -408,36 +411,39 @@ const ProductDetail = () => {
                     size="sm"
                     onClick={() => setQuantity(Math.max(getMinimumQuantity(), quantity - 1))}
                     disabled={quantity <= getMinimumQuantity()}
+                    className="h-8 w-8 p-0"
                   >
-                    <Minus className="h-4 w-4" />
+                    <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
-                  <span className="px-4 py-2 min-w-[60px] text-center">{quantity}</span>
+                  <span className="px-3 sm:px-4 py-2 min-w-[50px] sm:min-w-[60px] text-center text-sm">{quantity}</span>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setQuantity(quantity + 1)}
+                    className="h-8 w-8 p-0"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col gap-3">
                 <Button 
                   onClick={handleAddToCart}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white order-2 sm:order-1"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                   size="lg"
                 >
-                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Add to Cart
                 </Button>
-                <FavoriteButton
-                  isFavorite={isFavorite}
-                  isLoading={favoriteLoading}
-                  onToggle={toggleFavorite}
-                  size="lg"
-                  className="order-1 sm:order-2 self-center sm:self-auto"
-                />
+                <div className="flex justify-center">
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    isLoading={favoriteLoading}
+                    onToggle={toggleFavorite}
+                    size="lg"
+                  />
+                </div>
               </div>
 
               {/* Support Information */}
@@ -448,13 +454,13 @@ const ProductDetail = () => {
 
             {/* Social Sharing */}
             <div className="space-y-3">
-              <h3 className="font-semibold">Share this product:</h3>
-              <div className="flex gap-2">
+              <h3 className="font-semibold text-sm sm:text-base">Share this product:</h3>
+              <div className="grid grid-cols-2 sm:flex gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('telegram')}
-                  className="text-blue-500 border-blue-500 hover:bg-blue-50"
+                  className="text-blue-500 border-blue-500 hover:bg-blue-50 text-xs sm:text-sm"
                 >
                   Telegram
                 </Button>
@@ -462,7 +468,7 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('twitter')}
-                  className="text-blue-400 border-blue-400 hover:bg-blue-50"
+                  className="text-blue-400 border-blue-400 hover:bg-blue-50 text-xs sm:text-sm"
                 >
                   Twitter
                 </Button>
@@ -470,7 +476,7 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('whatsapp')}
-                  className="text-green-500 border-green-500 hover:bg-green-50"
+                  className="text-green-500 border-green-500 hover:bg-green-50 text-xs sm:text-sm"
                 >
                   WhatsApp
                 </Button>
@@ -478,9 +484,10 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('other')}
+                  className="text-xs sm:text-sm"
                 >
-                  <Share className="h-4 w-4 mr-1" />
-                  Other
+                  <Share className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  Copy Link
                 </Button>
               </div>
             </div>
@@ -488,60 +495,65 @@ const ProductDetail = () => {
         </div>
 
         {/* Reviews Section */}
-        <div className="space-y-6 mb-8">
+        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold">Customer Reviews</h3>
+            <h3 className="text-xl sm:text-2xl font-bold">Customer Reviews</h3>
           </div>
 
           {/* Rating Summary */}
-          <Card>
-            <CardContent className="p-6">
-              {productRatings.ratingSummary ? (
-                <RatingSummaryComponent summary={productRatings.ratingSummary} />
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No ratings yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ResponsiveCard>
+            {productRatings.ratingSummary ? (
+              <RatingSummaryComponent summary={productRatings.ratingSummary} />
+            ) : (
+              <div className="text-center py-6 sm:py-8">
+                <p className="text-muted-foreground text-sm sm:text-base">No ratings yet</p>
+              </div>
+            )}
+          </ResponsiveCard>
 
           {/* Review Form */}
-          <ReviewForm
-            onSubmit={() => {}}
-            isSubmitting={false}
-          />
+          <ResponsiveCard title="Write a Review">
+            <ReviewForm
+              onSubmit={() => {}}
+              isSubmitting={false}
+            />
+          </ResponsiveCard>
 
           {/* Reviews List */}
-          <ReviewsList
-            reviews={productRatings.reviews || []}
-            onToggleHelpfulness={() => {}}
-            isUpdatingHelpfulness={false}
-          />
+          <ResponsiveCard title="All Reviews">
+            <ReviewsList
+              reviews={productRatings.reviews || []}
+              onToggleHelpfulness={() => {}}
+              isUpdatingHelpfulness={false}
+            />
+          </ResponsiveCard>
         </div>
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div>
-            <h3 className="text-2xl font-bold mb-6">You might also like</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">You might also like</h3>
+            <ResponsiveGrid columns={2} gap="sm" minItemWidth="200px" autoFit={true}>
               {relatedProducts.map((relatedProduct) => (
-                <Card 
+                <div 
                   key={relatedProduct.id} 
-                  className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                  className="cursor-pointer group"
                   onClick={() => navigate(`/product/${relatedProduct.id}`)}
                 >
-                  <div className="aspect-square overflow-hidden">
-                    <img
-                      src={relatedProduct.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
-                      alt={relatedProduct.name}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform"
-                    />
-                  </div>
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold mb-2">{relatedProduct.name}</h4>
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
+                  <ResponsiveCard 
+                    className="overflow-hidden hover:shadow-lg transition-shadow h-full"
+                    interactive
+                  >
+                    <div className="aspect-square overflow-hidden mb-3">
+                      <img
+                        src={relatedProduct.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
+                        alt={relatedProduct.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm sm:text-base line-clamp-2 leading-snug">{relatedProduct.name}</h4>
+                      <div className="flex flex-col gap-2">
                         <PriceDisplay
                           originalPrice={relatedProduct.price}
                           discountedPrice={relatedProduct.discounted_price}
@@ -552,32 +564,36 @@ const ProductDetail = () => {
                           <DiscountBadge 
                             discountPercentage={relatedProduct.discount_percentage || 0}
                             size="sm"
-                            className="mt-1"
                           />
                         )}
+                        <Button 
+                          size="sm" 
+                          className="w-full mt-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addItem({
+                              id: relatedProduct.id,
+                              name: relatedProduct.name,
+                              price: relatedProduct.discounted_price || relatedProduct.price,
+                              original_price: relatedProduct.price,
+                              discount_amount: relatedProduct.discount_amount,
+                              vat_rate: 7.5,
+                              image_url: relatedProduct.image_url,
+                            });
+                            toast({
+                              title: "Added to Cart",
+                              description: `${relatedProduct.name} added successfully`,
+                            });
+                          }}
+                        >
+                          Add to Cart
+                        </Button>
                       </div>
-                      <Button 
-                        size="sm" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addItem({
-                            id: relatedProduct.id,
-                            name: relatedProduct.name,
-                            price: relatedProduct.discounted_price || relatedProduct.price,
-                            original_price: relatedProduct.price,
-                            discount_amount: relatedProduct.discount_amount,
-                            vat_rate: 7.5,
-                            image_url: relatedProduct.image_url,
-                          });
-                        }}
-                      >
-                        Add to Cart
-                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </ResponsiveCard>
+                </div>
               ))}
-            </div>
+            </ResponsiveGrid>
           </div>
         )}
       </div>

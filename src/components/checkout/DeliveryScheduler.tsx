@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -7,11 +7,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CalendarIcon, Clock, AlertTriangle, Info } from 'lucide-react';
 import { deliverySchedulingService, DeliverySlot, DeliveryTimeSlot } from '@/utils/deliveryScheduling';
 import { isAfter, addDays, addMonths, isBefore, startOfDay, endOfDay, differenceInDays, isWeekend } from 'date-fns';
-import { useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
 import { HorizontalDatePicker } from './HorizontalDatePicker';
+import { useQuery } from '@tanstack/react-query';
+import { CacheOptimizer } from '@/utils/optimizedQuery';
 
 // Production-ready constants
 const DELIVERY_BOOKING_CONSTANTS = {
@@ -34,7 +35,7 @@ interface DeliverySchedulerProps {
   showHeader?: boolean;
   variant?: 'calendar' | 'horizontal';
 }
-export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
+export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
   selectedDate,
   selectedTimeSlot,
   onScheduleChange,
@@ -42,11 +43,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   showHeader = true,
   variant = 'calendar'
 }) => {
-  console.log('🚀 DeliveryScheduler component initializing');
-  const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
   const [selectedDateSlots, setSelectedDateSlots] = useState<DeliveryTimeSlot[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(selectedDate ? parseISO(selectedDate) : undefined);
 
   // Production-ready date validation functions
@@ -121,46 +118,21 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
 
     return false;
   }, [dateValidation]);
-  useEffect(() => {
-    loadAvailableSlots();
-  }, []);
-  useEffect(() => {
-    if (calendarDate) {
-      const dateStr = format(calendarDate, 'yyyy-MM-dd');
-      const daySlots = availableSlots.find(slot => slot.date === dateStr);
-      setSelectedDateSlots(daySlots?.time_slots || []);
-    } else {
-      setSelectedDateSlots([]);
-    }
-  }, [calendarDate, availableSlots]);
-  const loadAvailableSlots = useCallback(async () => {
-    try {
-      console.log('📋 Loading delivery slots with new production API...');
-      setLoading(true);
-      setError(null);
-      
-      // Use the new 6-month range instead of 30 days
-      const startDate = dateValidation.minDate;
-      const endDate = dateValidation.maxDate;
-      
-      console.log('🕐 Getting slots from production API for 6-month range:', {
-        start: format(startDate, 'yyyy-MM-dd'),
-        end: format(endDate, 'yyyy-MM-dd')
-      });
-      
-      // Use the new production delivery booking API
+  // Optimized query with caching
+  const { data: availableSlots = [], isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ['delivery-slots', format(dateValidation.minDate, 'yyyy-MM-dd'), format(dateValidation.maxDate, 'yyyy-MM-dd')],
+    queryFn: async () => {
       const { deliveryBookingAPI } = await import('@/api/deliveryBookingApi');
       
       const response = await deliveryBookingAPI.getAvailableSlots({
-        start_date: deliveryBookingAPI.formatDateForAPI(startDate),
-        end_date: deliveryBookingAPI.formatDateForAPI(endDate)
+        start_date: deliveryBookingAPI.formatDateForAPI(dateValidation.minDate),
+        end_date: deliveryBookingAPI.formatDateForAPI(dateValidation.maxDate)
       });
       
-      console.log('✅ Production delivery slots loaded:', response.slots.length);
+      console.log('✅ Delivery slots received:', response.slots.length, 'slots');
       console.log('📊 Business days available:', response.business_days, 'of', response.total_days, 'total days');
       
-      // Convert the new API format to existing format for compatibility
-      const convertedSlots: DeliverySlot[] = response.slots.map(slot => ({
+      return response.slots.map(slot => ({
         date: slot.date,
         is_business_day: slot.is_business_day,
         is_holiday: slot.is_holiday,
@@ -172,20 +144,25 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
           reason: timeSlot.reason
         }))
       }));
-      
-      setAvailableSlots(convertedSlots);
-      
-      if (convertedSlots.length === 0) {
-        setError('No delivery slots available for the next 6 months. Please contact support.');
-      }
-    } catch (err) {
-      console.error('❌ Failed to load delivery slots:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load available delivery slots';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
+    },
+    staleTime: 15 * 60 * 1000, // 15 minutes cache for static data
+    refetchInterval: false, // Disable auto-refetch
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: 'always',
+    retry: 2,
+  });
+
+  const error = queryError?.message || null;
+
+  useEffect(() => {
+    if (calendarDate) {
+      const dateStr = format(calendarDate, 'yyyy-MM-dd');
+      const daySlots = availableSlots.find(slot => slot.date === dateStr);
+      setSelectedDateSlots(daySlots?.time_slots || []);
+    } else {
+      setSelectedDateSlots([]);
     }
-  }, [dateValidation]);
+  }, [calendarDate, availableSlots]);
 
   // Legacy date modifier functions for existing slot data
   const getDateModifiers = (date: Date) => {
@@ -229,9 +206,20 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
                 Choose Delivery Date & Time
               </CardTitle>
             </CardHeader>}
-          <CardContent>
-            <div className="flex items-center justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <CardContent className="space-y-6">
+            {/* Fast-loading skeleton */}
+            <div className="space-y-4">
+              <div className="h-4 bg-muted animate-pulse rounded w-1/3"></div>
+              <div className="h-3 bg-muted animate-pulse rounded w-2/3"></div>
+            </div>
+            <div className="w-full h-64 bg-muted animate-pulse rounded-lg"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-muted animate-pulse rounded w-1/4"></div>
+              <div className="grid grid-cols-3 gap-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-12 bg-muted animate-pulse rounded"></div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -246,7 +234,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 {error}
-                <Button variant="outline" size="sm" onClick={loadAvailableSlots} className="ml-2">
+                <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
                   Retry
                 </Button>
               </AlertDescription>
@@ -318,7 +306,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               {error}
-              <Button variant="outline" size="sm" onClick={loadAvailableSlots} className="ml-2">
+              <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
                 Retry
               </Button>
             </AlertDescription>
@@ -551,5 +539,5 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         )}
       </CardContent>
       </Card>
-    </DeliverySchedulingErrorBoundary>;
-};
+      </DeliverySchedulingErrorBoundary>;
+});

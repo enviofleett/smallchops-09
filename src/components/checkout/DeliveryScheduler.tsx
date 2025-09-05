@@ -346,13 +346,13 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
             </div>
           </div>
 
-          {/* Mobile-optimized calendar container */}
-          <div className="w-full bg-background rounded-lg border border-border/50 p-2 sm:p-4">
+          {/* Mobile-optimized calendar container - production ready */}
+          <div className="w-full bg-background rounded-lg border border-border/50 p-1 sm:p-2 md:p-4 overflow-hidden">
             <LazyCalendar
               selectedDate={calendarDate}
               onDateSelect={handleDateSelect}
               isDateAvailable={isDateAvailable}
-              className="w-full"
+              className="w-full min-w-0"
             />
           </div>
 

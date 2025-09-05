@@ -100,21 +100,17 @@ export const ProgressiveLoader = ({
   // Show timeout error if loading takes too long
   if (showTimeoutError && isLoading) {
     return (
-      <Card className="p-6 border-amber-200 bg-amber-50">
+      <Card className="p-6">
         <div className="text-center space-y-4">
-          <AlertCircle className="h-12 w-12 text-amber-600 mx-auto animate-pulse" />
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-amber-900">Taking longer than expected</h3>
-            <p className="text-amber-700 max-w-md mx-auto">
-              The content is taking longer to load than usual. This might be due to network connectivity or server response time.
+          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
+          <div>
+            <h3 className="text-lg font-semibold">Taking longer than expected</h3>
+            <p className="text-muted-foreground">
+              The content is taking longer to load than usual. This might be due to network issues.
             </p>
           </div>
           {retryFn && (
-            <Button 
-              onClick={retryFn} 
-              variant="outline" 
-              className="flex items-center gap-2 border-amber-300 text-amber-700 hover:bg-amber-100"
-            >
+            <Button onClick={retryFn} variant="outline" className="flex items-center gap-2">
               <RefreshCw className="h-4 w-4" />
               Try Again
             </Button>
@@ -134,12 +130,7 @@ export const ProgressiveLoader = ({
         return {
           title: 'Service Temporarily Unavailable',
           description: 'Our data service is currently experiencing issues. Please try again in a few moments.',
-          variant: 'warning' as const,
-          bgColor: 'bg-amber-50 border-amber-200',
-          textColor: 'text-amber-900',
-          descColor: 'text-amber-700',
-          iconColor: 'text-amber-600',
-          buttonClass: 'border-amber-300 text-amber-700 hover:bg-amber-100'
+          variant: 'warning' as const
         };
       }
       
@@ -147,12 +138,7 @@ export const ProgressiveLoader = ({
         return {
           title: 'Connection Problem',
           description: 'Please check your internet connection and try again.',
-          variant: 'warning' as const,
-          bgColor: 'bg-blue-50 border-blue-200',
-          textColor: 'text-blue-900',
-          descColor: 'text-blue-700',
-          iconColor: 'text-blue-600',
-          buttonClass: 'border-blue-300 text-blue-700 hover:bg-blue-100'
+          variant: 'warning' as const
         };
       }
       
@@ -160,12 +146,7 @@ export const ProgressiveLoader = ({
         return {
           title: 'Request Timed Out',
           description: 'The request is taking longer than expected. Please try again.',
-          variant: 'warning' as const,
-          bgColor: 'bg-orange-50 border-orange-200',
-          textColor: 'text-orange-900',
-          descColor: 'text-orange-700',
-          iconColor: 'text-orange-600',
-          buttonClass: 'border-orange-300 text-orange-700 hover:bg-orange-100'
+          variant: 'warning' as const
         };
       }
       
@@ -173,33 +154,25 @@ export const ProgressiveLoader = ({
       return {
         title: 'Unable to Load Data',
         description: 'Something went wrong while loading this content. Our team has been notified.',
-        variant: 'error' as const,
-        bgColor: 'bg-red-50 border-red-200',
-        textColor: 'text-red-900',
-        descColor: 'text-red-700',
-        iconColor: 'text-red-600',
-        buttonClass: 'border-red-300 text-red-700 hover:bg-red-100'
+        variant: 'error' as const
       };
     };
 
     const errorInfo = getErrorInfo(error);
+    const iconColor = errorInfo.variant === 'warning' ? 'text-amber-500' : 'text-destructive';
 
     return (
-      <Card className={`p-6 ${errorInfo.bgColor}`}>
+      <Card className="p-6">
         <div className="text-center space-y-4">
-          <AlertCircle className={`h-12 w-12 ${errorInfo.iconColor} mx-auto animate-pulse`} />
-          <div className="space-y-2">
-            <h3 className={`text-lg font-semibold ${errorInfo.textColor}`}>{errorInfo.title}</h3>
-            <p className={`${errorInfo.descColor} max-w-md mx-auto`}>
+          <AlertCircle className={`h-12 w-12 ${iconColor} mx-auto`} />
+          <div>
+            <h3 className="text-lg font-semibold">{errorInfo.title}</h3>
+            <p className="text-muted-foreground">
               {errorInfo.description}
             </p>
           </div>
           {retryFn && (
-            <Button 
-              onClick={retryFn} 
-              variant="outline" 
-              className={`flex items-center gap-2 ${errorInfo.buttonClass}`}
-            >
+            <Button onClick={retryFn} variant="outline" className="flex items-center gap-2">
               <RefreshCw className="h-4 w-4" />
               Try Again
             </Button>

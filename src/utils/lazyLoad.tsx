@@ -23,8 +23,8 @@ export function withLazyLoading<T extends ComponentType<any>>(
   importFunc: () => Promise<{ default: T }>,
   fallback: ComponentType = LoadingSpinner,
   useFastLoader = false,
-  timeout = 5000, // 5 seconds timeout for production
-  maxRetries = 1 // Single retry for production speed
+  timeout = 10000, // 10 seconds timeout
+  maxRetries = 2 // Reduced retries to fail faster
 ) {
   const LazyComponent = lazy(() => {
     let retryCount = 0;

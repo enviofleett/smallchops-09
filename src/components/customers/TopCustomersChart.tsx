@@ -25,13 +25,7 @@ interface TopCustomersChartProps {
 }
 
 export const TopCustomersChart = ({ customers, type, title }: TopCustomersChartProps) => {
-  // Filter to only show paid customers (those with totalSpent > 0)
-  const paidCustomers = customers.filter(customer => {
-    const totalSpent = customer.spending || customer.totalSpent || customer.total_spent || 0;
-    return totalSpent > 0;
-  });
-
-  const data = paidCustomers.slice(0, 5).map(customer => {
+  const data = customers.slice(0, 5).map(customer => {
     // Handle multiple API formats
     const customerName = customer.customer_name || customer.name || 'Unknown';
     const totalOrders = customer.orders || customer.totalOrders || customer.total_orders || 0;
@@ -48,7 +42,7 @@ export const TopCustomersChart = ({ customers, type, title }: TopCustomersChartP
     return type === 'spending' ? `₦${value.toLocaleString()}` : value.toString();
   };
 
-  if (paidCustomers.length === 0) {
+  if (customers.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -60,7 +54,7 @@ export const TopCustomersChart = ({ customers, type, title }: TopCustomersChartP
         <CardContent>
           <div className="text-center py-8">
             <Users className="mx-auto h-12 w-12 opacity-50 mb-4" />
-            <p className="text-muted-foreground">No paid customers available</p>
+            <p className="text-muted-foreground">No customer data available</p>
           </div>
         </CardContent>
       </Card>

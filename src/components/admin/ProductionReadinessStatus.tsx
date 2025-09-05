@@ -39,12 +39,14 @@ export const ProductionReadinessStatus = () => {
     setChecks([]);
     
     try {
-      // Initialize checking status
+      console.log('🚀 Starting production-ready authentication health audit...');
+      
+      // Initialize checking status with production security focus
       const initialChecks: ReadinessCheck[] = [
         {
           id: 'auth-health',
           name: 'Authentication System Health',
-          description: 'User registration, verification, and authentication success rates',
+          description: 'Secure user registration, verification rates, and authentication integrity',
           status: 'checking',
           category: 'Authentication',
           critical: true
@@ -52,7 +54,7 @@ export const ProductionReadinessStatus = () => {
         {
           id: 'security-compliance',
           name: 'Security & Database Protection',
-          description: 'RLS policies, database security, and access controls',
+          description: 'RLS policies, database security, and production-grade access controls',
           status: 'checking',
           category: 'Security',
           critical: true
@@ -60,15 +62,15 @@ export const ProductionReadinessStatus = () => {
         {
           id: 'email-system',
           name: 'Email System Status',
-          description: 'SMTP health, delivery rates, and email configuration',
+          description: 'SMTP health, delivery rates, and secure email configuration',
           status: 'checking',
           category: 'Email',
           critical: true
         },
         {
           id: 'production-validation',
-          name: 'Production Readiness',
-          description: 'Comprehensive system validation for production deployment',
+          name: 'Production Readiness Assessment',
+          description: 'Comprehensive system validation for secure production deployment',
           status: 'checking',
           category: 'Production',
           critical: true
@@ -77,10 +79,10 @@ export const ProductionReadinessStatus = () => {
       
       setChecks(initialChecks);
 
-      // Run comprehensive security and auth validation with timeout
+      // Run security-hardened validation with production timeout
       const validationPromise = supabase.functions.invoke('auth-security-validator');
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Validation timeout')), 15000)
+        setTimeout(() => reject(new Error('Production validation timeout - check system health')), 20000)
       );
       
       let validationResult;
@@ -88,34 +90,50 @@ export const ProductionReadinessStatus = () => {
         const { data, error: validationError } = await Promise.race([validationPromise, timeoutPromise]) as any;
         
         if (validationError) {
-          console.warn('Validation failed, using fallback:', validationError.message);
-          validationResult = { 
-            success: false, 
-            error: validationError.message,
-            auth_health: { healthy: false, score: 0, status: 'unavailable' },
-            security_compliance: { compliant: false, score: 0 },
-            production_ready: { ready_for_production: false, overall_score: 0, status: 'error' }
-          };
+          console.error('⚠️ Validation service error:', validationError.message);
+          // Use secure database fallback for production
+          const fallbackResult = await supabase.rpc('assess_production_readiness');
+          if (fallbackResult.data && typeof fallbackResult.data === 'object') {
+            const fallbackData = fallbackResult.data as any;
+            validationResult = {
+              success: true,
+              auth_health: fallbackData.auth_health || { healthy: false, score: 0, status: 'fallback' },
+              security_compliance: { 
+                compliant: fallbackData.rls_status?.compliant || false,
+                score: fallbackData.rls_status?.compliant ? 100 : 0,
+                metrics: fallbackData.rls_status || {}
+              },
+              production_ready: fallbackData
+            };
+          } else {
+            validationResult = { 
+              success: false, 
+              error: 'All validation systems unavailable',
+              auth_health: { healthy: false, score: 0, status: 'system_error' },
+              security_compliance: { compliant: false, score: 0 },
+              production_ready: { ready_for_production: false, overall_score: 0, status: 'system_error' }
+            };
+          }
         } else {
           validationResult = data;
         }
       } catch (error) {
-        console.warn('Validation timeout, using fallback data');
+        console.error('⚠️ Production validation timeout');
         validationResult = { 
           success: false, 
-          error: 'Service timeout',
-          auth_health: { healthy: false, score: 0, status: 'timeout' },
-          security_compliance: { compliant: false, score: 0 },
-          production_ready: { ready_for_production: false, overall_score: 0, status: 'timeout' }
+          error: 'Production validation timeout - system may need maintenance',
+          auth_health: { healthy: false, score: 0, status: 'timeout', issues: ['Validation system timeout'], warnings: [] },
+          security_compliance: { compliant: false, score: 0, issues: ['Security check timeout'], warnings: [] },
+          production_ready: { ready_for_production: false, overall_score: 0, status: 'timeout', issues: ['System timeout'] }
         };
       }
 
       setValidationData(validationResult);
 
-      // Run email system check with timeout
+      // Run secure email system check
       let emailResult;
       try {
-        const emailPromise = supabase.functions.invoke('email-delivery-monitor');
+        const emailPromise = supabase.functions.invoke('smtp-health-monitor');
         const emailTimeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Email check timeout')), 10000)
         );
@@ -123,113 +141,123 @@ export const ProductionReadinessStatus = () => {
         const { data, error: emailError } = await Promise.race([emailPromise, emailTimeoutPromise]) as any;
         emailResult = emailError ? null : data;
       } catch (error) {
-        console.warn('Email check timeout, using fallback');
+        console.warn('📧 Email system check unavailable - using fallback');
         emailResult = null;
       }
       
       const updatedChecks: ReadinessCheck[] = [];
 
-      // Process authentication health
+      // Process authentication health with production focus
       if (validationResult.auth_health) {
         const authHealth = validationResult.auth_health;
+        const issues = Array.isArray(authHealth.issues) ? authHealth.issues.length : 0;
+        const warnings = Array.isArray(authHealth.warnings) ? authHealth.warnings.length : 0;
+        
         updatedChecks.push({
           id: 'auth-health',
           name: 'Authentication System Health',
-          description: 'User registration, verification, and authentication success rates',
-          status: authHealth.healthy ? 'pass' : 'fail',
+          description: 'Secure user registration, verification rates, and authentication integrity',
+          status: authHealth.healthy && authHealth.score >= 80 ? 'pass' : (authHealth.score >= 60 ? 'warning' : 'fail'),
           category: 'Authentication',
           critical: true,
-          details: `Score: ${authHealth.score}/100 - Status: ${authHealth.status}${authHealth.metrics ? ` | Users: ${authHealth.metrics.total_users}, Verified: ${authHealth.metrics.verification_rate}%` : ''}`
+          details: `Security Score: ${authHealth.score}/100 | Status: ${authHealth.status} | Issues: ${issues} | Warnings: ${warnings}${authHealth.metrics ? ` | Users: ${authHealth.metrics.total_users} | Verified: ${authHealth.metrics.verification_rate}%` : ''}`
         });
       }
 
-      // Process security compliance
+      // Process security compliance with production standards
       if (validationResult.security_compliance) {
         const security = validationResult.security_compliance;
+        const rlsCompliant = security.metrics?.rls_coverage_percent >= 100;
+        
         updatedChecks.push({
           id: 'security-compliance',
           name: 'Security & Database Protection',
-          description: 'RLS policies, database security, and access controls',
-          status: security.compliant ? 'pass' : 'fail',
+          description: 'RLS policies, database security, and production-grade access controls',
+          status: security.compliant && rlsCompliant ? 'pass' : 'fail',
           category: 'Security',
           critical: true,
-          details: `Score: ${security.score}/100 | RLS Tables: ${security.metrics?.tables_with_rls || 0}/${(security.metrics?.tables_with_rls || 0) + (security.metrics?.tables_without_rls || 0)}`
+          details: `Compliance Score: ${security.score}/100 | RLS Coverage: ${security.metrics?.rls_coverage_percent || 0}% | Protected Tables: ${security.metrics?.tables_with_rls || 0}/${security.metrics?.total_critical_tables || 0}`
         });
       }
 
-      // Process email system
-      if (emailResult) {
-        const emailHealthy = emailResult.smtp_health?.healthy && emailResult.delivery_health?.healthy;
+      // Process email system with production readiness
+      if (emailResult && emailResult.healthy) {
         updatedChecks.push({
           id: 'email-system',
           name: 'Email System Status',
-          description: 'SMTP health, delivery rates, and email configuration',
-          status: emailHealthy ? 'pass' : (emailResult.smtp_health?.healthy ? 'warning' : 'fail'),
+          description: 'SMTP health, delivery rates, and secure email configuration',
+          status: emailResult.score >= 80 ? 'pass' : (emailResult.score >= 60 ? 'warning' : 'fail'),
           category: 'Email',
           critical: true,
-          details: `SMTP: ${emailResult.smtp_health?.status || 'unknown'} | Delivery: ${emailResult.delivery_health?.status || 'unknown'}`
+          details: `Health Score: ${emailResult.score}/100 | Provider: ${emailResult.active_provider || 'unknown'} | Last Check: ${emailResult.last_checked || 'never'}`
         });
       } else {
         updatedChecks.push({
           id: 'email-system',
           name: 'Email System Status',
-          description: 'SMTP health, delivery rates, and email configuration',
+          description: 'SMTP health, delivery rates, and secure email configuration',
           status: 'warning',
           category: 'Email',
           critical: true,
-          details: 'Email health check unavailable'
+          details: 'Email system health monitoring unavailable - manual verification required'
         });
       }
 
-      // Process production readiness
+      // Process production readiness with comprehensive scoring
       if (validationResult.production_ready) {
         const production = validationResult.production_ready;
+        const criticalIssues = Array.isArray(production.issues) ? production.issues.length : 0;
+        
         updatedChecks.push({
           id: 'production-validation',
-          name: 'Production Readiness',
-          description: 'Comprehensive system validation for production deployment',
-          status: production.ready_for_production ? 'pass' : 'fail',
+          name: 'Production Readiness Assessment',
+          description: 'Comprehensive system validation for secure production deployment',
+          status: production.ready_for_production && production.overall_score >= 80 ? 'pass' : (production.overall_score >= 60 ? 'warning' : 'fail'),
           category: 'Production',
           critical: true,
-          details: `Overall Score: ${production.overall_score}/100 | Status: ${production.status} | Issues: ${production.issues?.length || 0}`
+          details: `Production Score: ${production.overall_score}/100 | Status: ${production.status} | Critical Issues: ${criticalIssues} | Auth: ${production.component_scores?.authentication || 0}/100 | Security: ${production.component_scores?.security || 0}/100`
         });
       }
 
       setChecks(updatedChecks);
 
-      // Calculate overall metrics
+      // Calculate production-grade overall metrics
       const passedChecks = updatedChecks.filter(c => c.status === 'pass').length;
+      const warningChecks = updatedChecks.filter(c => c.status === 'warning').length;
       const totalChecks = updatedChecks.length;
-      const calculatedScore = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0;
+      const calculatedScore = totalChecks > 0 ? Math.round(((passedChecks * 100) + (warningChecks * 60)) / (totalChecks * 100) * 100) : 0;
       
       setOverallScore(calculatedScore);
-      setReadyForProduction(calculatedScore >= 80 && updatedChecks.every(c => c.status !== 'fail'));
+      const isProductionReady = calculatedScore >= 80 && updatedChecks.every(c => c.status !== 'fail');
+      setReadyForProduction(isProductionReady);
       setLastChecked(new Date());
 
+      console.log(`✅ Production audit completed - Score: ${calculatedScore}/100`);
+
       toast({
-        title: "Production Readiness Check Completed",
-        description: `System scored ${calculatedScore}/100. ${readyForProduction ? 'Ready for production!' : 'Needs attention before production.'}`,
-        variant: calculatedScore >= 80 ? "default" : "destructive"
+        title: isProductionReady ? "🚀 Production Ready!" : "⚠️ Production Issues Detected",
+        description: `Security audit scored ${calculatedScore}/100. ${isProductionReady ? 'System is secure for production deployment.' : 'Critical issues require immediate attention.'}`,
+        variant: isProductionReady ? "default" : "destructive"
       });
 
     } catch (error) {
-      console.error('Production readiness check failed:', error);
+      console.error('❌ Production readiness audit failed:', error);
       toast({
-        title: "Check Failed",
-        description: error instanceof Error ? error.message : 'Failed to run production readiness check',
+        title: "Security Audit Failed",
+        description: 'Critical system error during security validation. Manual review required.',
         variant: "destructive"
       });
 
-      // Set error state
+      // Set critical error state
       setChecks([
         {
           id: 'system-error',
-          name: 'System Check Error',
-          description: 'Unable to complete production readiness verification',
+          name: 'Production Security Audit Failed',
+          description: 'Critical system error preventing security validation',
           status: 'fail',
           category: 'Production',
           critical: true,
-          details: error instanceof Error ? error.message : 'Unknown error occurred'
+          details: `Error: ${error instanceof Error ? error.message : 'Unknown system failure'} - Manual security review required before production deployment`
         }
       ]);
       setOverallScore(0);

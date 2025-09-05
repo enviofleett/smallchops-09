@@ -11,6 +11,8 @@ import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
 import { HorizontalDatePicker } from './HorizontalDatePicker';
+import { LazyCalendar } from './LazyCalendar';
+import { useLazyDeliverySlots } from '@/hooks/useLazyDeliverySlots';
 import { useQuery } from '@tanstack/react-query';
 import { CacheOptimizer } from '@/utils/optimizedQuery';
 
@@ -119,9 +121,14 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
 
     return true;
   }, [dateValidation]);
-  // Optimized query with caching
-  const { data: availableSlots = [], isLoading: loading, error: queryError, refetch } = useQuery({
-    queryKey: ['delivery-slots', format(dateValidation.minDate, 'yyyy-MM-dd'), format(dateValidation.maxDate, 'yyyy-MM-dd')],
+  // Fast lazy loading with optimized caching
+  const { slots: availableSlots, loading, error: lazyError } = useLazyDeliverySlots(
+    selectedDate ? parseISO(selectedDate) : undefined
+  );
+
+  // Fallback query for horizontal variant (loads all at once for better UX)
+  const { data: horizontalSlots = [], isLoading: horizontalLoading, error: queryError, refetch } = useQuery({
+    queryKey: ['delivery-slots-horizontal', format(dateValidation.minDate, 'yyyy-MM-dd'), format(dateValidation.maxDate, 'yyyy-MM-dd')],
     queryFn: async () => {
       const { deliveryBookingAPI } = await import('@/api/deliveryBookingApi');
       
@@ -130,8 +137,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
         end_date: deliveryBookingAPI.formatDateForAPI(dateValidation.maxDate)
       });
       
-      console.log('✅ Delivery slots received:', response.slots.length, 'slots');
-      console.log('📊 Business days available:', response.business_days, 'of', response.total_days, 'total days');
+      console.log('✅ Horizontal delivery slots received:', response.slots.length, 'slots');
       
       return response.slots.map(slot => ({
         date: slot.date,
@@ -146,29 +152,34 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
         }))
       }));
     },
-    staleTime: 15 * 60 * 1000, // 15 minutes cache for static data
-    refetchInterval: false, // Disable auto-refetch
+    enabled: variant === 'horizontal',
+    staleTime: 15 * 60 * 1000,
+    refetchInterval: false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: 'always',
     retry: 2,
   });
 
-  const error = queryError?.message || null;
+  const error = lazyError || queryError?.message || null;
+  
+  // Use appropriate data source based on variant
+  const slotsData = variant === 'horizontal' ? horizontalSlots : availableSlots;
+  const isDataLoading = variant === 'horizontal' ? horizontalLoading : loading;
 
   useEffect(() => {
     if (calendarDate) {
       const dateStr = format(calendarDate, 'yyyy-MM-dd');
-      const daySlots = availableSlots.find(slot => slot.date === dateStr);
+      const daySlots = slotsData.find(slot => slot.date === dateStr);
       setSelectedDateSlots(daySlots?.time_slots || []);
     } else {
       setSelectedDateSlots([]);
     }
-  }, [calendarDate, availableSlots]);
+  }, [calendarDate, slotsData]);
 
   // Legacy date modifier functions for existing slot data
   const getDateModifiers = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const slot = availableSlots.find(s => s.date === dateStr);
+    const slot = slotsData.find(s => s.date === dateStr);
     if (slot?.is_holiday) return 'holiday';
     if (!slot?.is_business_day) return 'closed';
     return undefined;
@@ -204,8 +215,8 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
     };
     onScheduleChange(dateStr, newTimeSlot);
   };
-  const selectedSlot = availableSlots.find(slot => calendarDate && slot.date === format(calendarDate, 'yyyy-MM-dd'));
-  if (loading) {
+  const selectedSlot = slotsData.find(slot => calendarDate && slot.date === format(calendarDate, 'yyyy-MM-dd'));
+  if (isDataLoading && slotsData.length === 0) {
     return <DeliverySchedulingErrorBoundary>
         <Card className={className}>
           {showHeader && <CardHeader>
@@ -252,7 +263,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
           {/* Horizontal Date Picker */}
           <HorizontalDatePicker
             selectedDate={selectedDate}
-            availableSlots={availableSlots}
+            availableSlots={slotsData}
             onDateSelect={handleHorizontalDateSelect}
           />
 
@@ -346,82 +357,12 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
             </p>
           </div>
 
-          <div className="w-full overflow-hidden rounded-lg bg-background">
-            <Calendar 
-              mode="single" 
-              selected={calendarDate} 
-              onSelect={handleDateSelect} 
-              disabled={isDateDisabled}
-              className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200" 
-              classNames={{
-                months: "flex flex-col space-y-2 sm:space-y-4",
-                month: "space-y-2 sm:space-y-4 w-full",
-                caption: "flex justify-center pt-2 sm:pt-3 pb-1 sm:pb-2 relative items-center",
-                caption_label: "text-sm sm:text-base md:text-lg font-semibold text-foreground",
-                nav: "space-x-1 flex items-center",
-                nav_button: "h-8 w-8 sm:h-9 sm:w-9 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-lg transition-colors duration-200 touch-manipulation",
-                nav_button_previous: "absolute left-2 sm:left-3",
-                nav_button_next: "absolute right-2 sm:right-3",
-                table: "w-full border-collapse",
-                head_row: "flex mb-1 sm:mb-2",
-                head_cell: "text-muted-foreground rounded-md w-full font-medium text-xs uppercase tracking-wide py-1 sm:py-2 text-center flex-1",
-                row: "flex w-full mt-0.5 sm:mt-1",
-                cell: "relative p-0 text-center focus-within:relative focus-within:z-20 flex-1 aspect-square",
-                day: cn(
-                  "h-8 w-8 sm:h-10 sm:w-10 mx-auto font-normal transition-all duration-200",
-                  "hover:bg-accent hover:text-accent-foreground rounded-lg",
-                  "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
-                  "aria-selected:opacity-100 touch-manipulation text-xs sm:text-sm",
-                  "active:scale-95 disabled:pointer-events-none"
-                ),
-                day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-2 ring-primary ring-offset-1",
-                day_today: "bg-accent text-accent-foreground font-semibold ring-1 sm:ring-2 ring-primary/20",
-                day_outside: "text-muted-foreground/40 opacity-30",
-                day_disabled: "text-muted-foreground/20 opacity-20 cursor-not-allowed line-through",
-                day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-                day_hidden: "invisible"
-              }} 
-              modifiers={{
-                holiday: date => getDateModifiers(date) === 'holiday',
-                closed: date => getDateModifiers(date) === 'closed',
-                weekend: date => isWeekend(date),
-                unavailable: date => !isDateAvailable(date) && !isBefore(startOfDay(date), startOfDay(new Date())),
-                farFuture: date => differenceInDays(date, new Date()) > 90,
-                available: date => isDateAvailable(date)
-              }} 
-              modifiersStyles={{
-                holiday: {
-                  backgroundColor: 'hsl(var(--destructive) / 0.1)',
-                  color: 'hsl(var(--destructive))',
-                  border: '1px solid hsl(var(--destructive) / 0.3)'
-                },
-                closed: {
-                  backgroundColor: 'hsl(var(--muted))',
-                  color: 'hsl(var(--muted-foreground))',
-                  textDecoration: 'line-through'
-                },
-                unavailable: {
-                  backgroundColor: 'hsl(var(--muted) / 0.3)',
-                  color: 'hsl(var(--muted-foreground))',
-                  opacity: '0.6'
-                },
-                available: {
-                  backgroundColor: 'hsl(var(--success) / 0.1)',
-                  color: 'hsl(var(--success))',
-                  border: '1px solid hsl(var(--success) / 0.2)'
-                },
-                weekend: DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY ? {
-                  backgroundColor: 'hsl(var(--muted) / 0.5)',
-                  color: 'hsl(var(--muted-foreground))'
-                } : {},
-                farFuture: {
-                  backgroundColor: 'transparent',
-                  color: 'hsl(var(--muted-foreground))',
-                  fontSize: '0.75rem'
-                }
-              }} 
-            />
-          </div>
+          <LazyCalendar
+            selectedDate={calendarDate}
+            onDateSelect={handleDateSelect}
+            isDateAvailable={isDateAvailable}
+            className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200"
+          />
 
           {/* Date Selection Feedback - Enhanced */}
           {calendarDate && (
@@ -592,6 +533,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
           </Alert>
         )}
       </CardContent>
-      </Card>
-      </DeliverySchedulingErrorBoundary>;
+    </Card>
+  </DeliverySchedulingErrorBoundary>;
 });

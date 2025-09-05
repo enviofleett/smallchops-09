@@ -354,32 +354,36 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
               disabled={isDateDisabled}
               showOutsideDays={true}
               fixedWeeks={true}
-              className="w-full max-w-none mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200 min-w-0"
+              numberOfMonths={1}
+              className="w-full max-w-none mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200"
               classNames={{
-                months: "flex flex-col space-y-2 sm:space-y-4 w-full",
-                month: "space-y-2 sm:space-y-4 w-full min-w-0",
-                caption: "flex justify-center pt-2 sm:pt-3 pb-1 sm:pb-2 relative items-center w-full",
-                caption_label: "text-sm sm:text-base md:text-lg font-semibold text-foreground",
+                months: "flex flex-col w-full",
+                month: "w-full space-y-3 sm:space-y-4",
+                caption: "flex justify-center pt-3 pb-2 relative items-center w-full px-10",
+                caption_label: "text-base sm:text-lg font-semibold text-foreground truncate",
                 nav: "space-x-1 flex items-center",
-                nav_button: "h-8 w-8 sm:h-9 sm:w-9 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-lg transition-colors duration-200 touch-manipulation flex-shrink-0",
-                nav_button_previous: "absolute left-2 sm:left-3",
-                nav_button_next: "absolute right-2 sm:right-3",
-                table: "w-full border-collapse min-w-0",
-                head_row: "flex mb-1 sm:mb-2 w-full",
-                head_cell: "text-muted-foreground rounded-md font-medium text-xs uppercase tracking-wide py-1 sm:py-2 text-center min-w-0 flex-1 basis-0",
-                row: "flex w-full mt-0.5 sm:mt-1 min-w-0",
-                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 min-w-0 flex-1 basis-0 aspect-square max-w-none",
+                nav_button: "h-9 w-9 sm:h-10 sm:w-10 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-lg transition-colors duration-200 touch-manipulation flex-shrink-0 flex items-center justify-center",
+                nav_button_previous: "absolute left-2",
+                nav_button_next: "absolute right-2",
+                table: "w-full border-collapse table-fixed",
+                head_row: "flex w-full mb-2",
+                head_cell: "text-muted-foreground font-medium text-xs sm:text-sm uppercase tracking-wide py-2 text-center flex-1 min-w-0",
+                row: "flex w-full",
+                cell: "relative text-center focus-within:relative focus-within:z-20 flex-1 min-w-0 p-0.5 sm:p-1",
                 day: cn(
-                  "w-full h-8 sm:h-10 max-w-10 mx-auto font-normal transition-all duration-200",
-                  "hover:bg-accent hover:text-accent-foreground rounded-lg",
+                  "w-full aspect-square flex items-center justify-center font-normal transition-all duration-200",
+                  "text-xs sm:text-sm md:text-base",
+                  "min-h-[36px] sm:min-h-[40px] md:min-h-[44px]",
+                  "hover:bg-accent hover:text-accent-foreground rounded-md sm:rounded-lg",
                   "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
-                  "aria-selected:opacity-100 touch-manipulation text-xs sm:text-sm",
-                  "active:scale-95 disabled:pointer-events-none min-w-0 flex-shrink-0"
+                  "aria-selected:opacity-100 touch-manipulation",
+                  "active:scale-95 disabled:pointer-events-none",
+                  "border border-transparent hover:border-border/20"
                 ),
-                day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-2 ring-primary ring-offset-1",
-                day_today: "bg-accent text-accent-foreground font-semibold ring-1 sm:ring-2 ring-primary/20",
-                day_outside: "text-muted-foreground/40 opacity-30",
-                day_disabled: "text-muted-foreground/20 opacity-20 cursor-not-allowed line-through",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-lg ring-2 ring-primary ring-offset-1 font-semibold",
+                day_today: "bg-accent text-accent-foreground font-semibold ring-2 ring-primary/30 shadow-sm",
+                day_outside: "text-muted-foreground/50 opacity-40 hover:opacity-60",
+                day_disabled: "text-muted-foreground/30 opacity-25 cursor-not-allowed line-through hover:opacity-25",
                 day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
                 day_hidden: "invisible"
               }} 

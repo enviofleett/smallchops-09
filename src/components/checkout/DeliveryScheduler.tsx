@@ -352,7 +352,9 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
               selected={calendarDate} 
               onSelect={handleDateSelect} 
               disabled={isDateDisabled}
-              className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200" 
+              showOutsideDays={true}
+              fixedWeeks={true}
+              className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200"
               classNames={{
                 months: "flex flex-col space-y-2 sm:space-y-4",
                 month: "space-y-2 sm:space-y-4 w-full",

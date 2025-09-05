@@ -306,12 +306,12 @@ const ProductDetail = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 sm:py-8">
+      <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         {/* Product Main Section */}
-        <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 mb-8 sm:mb-12">
-          {/* Product Image - Mobile optimized */}
-          <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-full sm:w-4/5 mx-auto">
+        <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 mb-8 sm:mb-10 lg:mb-12">
+          {/* Product Image - Responsive optimized */}
+          <div className="space-y-4 lg:sticky lg:top-4">
+            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-full max-w-md sm:max-w-lg lg:max-w-none mx-auto lg:mx-0">
               <img
                 src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=480&h=480&fit=crop'}
                 alt={product.name}
@@ -321,10 +321,10 @@ const ProductDetail = () => {
           </div>
 
           {/* Product Details */}
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-4 sm:space-y-5 lg:space-y-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-2">{product.name}</h1>
-              <div className="flex items-center gap-4 mb-4">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 leading-tight">{product.name}</h1>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-4">
                 <StarRating 
                   rating={productRatings?.ratingSummary?.average_rating || 0} 
                   size="md"
@@ -337,16 +337,16 @@ const ProductDetail = () => {
 
             {/* Promotion Banner */}
             {product.active_promotion && (
-              <div className="bg-gradient-to-r from-destructive to-orange-500 text-destructive-foreground px-4 py-3 rounded-lg">
-                <div className="flex items-center justify-between">
+              <div className="bg-gradient-to-r from-destructive to-orange-500 text-destructive-foreground px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <span className="font-bold text-lg">🔥 {getPromotionBadge()}</span>
-                    <p className="text-sm mt-1 opacity-90">Limited time offer - don't miss out!</p>
+                    <span className="font-bold text-base sm:text-lg">🔥 {getPromotionBadge()}</span>
+                    <p className="text-xs sm:text-sm mt-1 opacity-90">Limited time offer - don't miss out!</p>
                   </div>
                   {getPromotionTimeLeft() && (
-                    <div className="text-right">
-                      <div className="flex items-center gap-1 text-sm">
-                        <Timer className="h-4 w-4" />
+                    <div className="text-left sm:text-right">
+                      <div className="flex items-center gap-1 text-xs sm:text-sm">
+                        <Timer className="h-3 sm:h-4 w-3 sm:w-4" />
                         {getPromotionTimeLeft()}
                       </div>
                     </div>
@@ -368,14 +368,14 @@ const ProductDetail = () => {
 
             {/* Description */}
             <div>
-              <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description || '') }} />
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description || '') }} />
             </div>
 
             {/* Features */}
             {product.features && product.features.length > 0 && (
               <div>
-                <h3 className="font-semibold mb-2">What's included:</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                <h3 className="font-semibold text-sm sm:text-base mb-2">What's included:</h3>
+                <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-muted-foreground">
                   {product.features.map((feature, index) => (
                     <li key={index}>{feature}</li>
                   ))}
@@ -394,41 +394,42 @@ const ProductDetail = () => {
             )}
 
             {/* Quantity and Add to Cart */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <span className="text-sm font-medium">Quantity:</span>
                 {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
                   <span className="text-xs text-gray-500">
                     (Min: {product.minimum_order_quantity})
                   </span>
                 )}
-                <div className="flex items-center border rounded-lg">
+                <div className="flex items-center border rounded-lg w-fit">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setQuantity(Math.max(getMinimumQuantity(), quantity - 1))}
                     disabled={quantity <= getMinimumQuantity()}
+                    className="h-8 w-8 sm:h-10 sm:w-10"
                   >
-                    <Minus className="h-4 w-4" />
+                    <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
-                  <span className="px-4 py-2 min-w-[60px] text-center">{quantity}</span>
+                  <span className="px-3 sm:px-4 py-2 min-w-[50px] sm:min-w-[60px] text-center text-sm sm:text-base">{quantity}</span>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setQuantity(quantity + 1)}
+                    className="h-8 w-8 sm:h-10 sm:w-10"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <Button 
                   onClick={handleAddToCart}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white order-2 sm:order-1"
-                  size="lg"
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white order-2 sm:order-1 h-11 sm:h-12 text-sm sm:text-base"
                 >
-                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Add to Cart
                 </Button>
                 <FavoriteButton
@@ -436,25 +437,25 @@ const ProductDetail = () => {
                   isLoading={favoriteLoading}
                   onToggle={toggleFavorite}
                   size="lg"
-                  className="order-1 sm:order-2 self-center sm:self-auto"
+                  className="order-1 sm:order-2 self-center sm:self-auto h-11 sm:h-12 w-11 sm:w-12"
                 />
               </div>
 
               {/* Support Information */}
-              <div className="border-t pt-4">
+              <div className="border-t pt-3 sm:pt-4">
                 <WhatsAppSupportWidget />
               </div>
             </div>
 
             {/* Social Sharing */}
-            <div className="space-y-3">
-              <h3 className="font-semibold">Share this product:</h3>
-              <div className="flex gap-2">
+            <div className="space-y-2 sm:space-y-3">
+              <h3 className="font-semibold text-sm sm:text-base">Share this product:</h3>
+              <div className="flex flex-wrap gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('telegram')}
-                  className="text-blue-500 border-blue-500 hover:bg-blue-50"
+                  className="text-blue-500 border-blue-500 hover:bg-blue-50 text-xs sm:text-sm px-2 sm:px-3"
                 >
                   Telegram
                 </Button>
@@ -462,7 +463,7 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('twitter')}
-                  className="text-blue-400 border-blue-400 hover:bg-blue-50"
+                  className="text-blue-400 border-blue-400 hover:bg-blue-50 text-xs sm:text-sm px-2 sm:px-3"
                 >
                   Twitter
                 </Button>
@@ -470,7 +471,7 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('whatsapp')}
-                  className="text-green-500 border-green-500 hover:bg-green-50"
+                  className="text-green-500 border-green-500 hover:bg-green-50 text-xs sm:text-sm px-2 sm:px-3"
                 >
                   WhatsApp
                 </Button>
@@ -478,8 +479,9 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('other')}
+                  className="text-xs sm:text-sm px-2 sm:px-3"
                 >
-                  <Share className="h-4 w-4 mr-1" />
+                  <Share className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                   Other
                 </Button>
               </div>
@@ -488,19 +490,19 @@ const ProductDetail = () => {
         </div>
 
         {/* Reviews Section */}
-        <div className="space-y-6 mb-8">
+        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold">Customer Reviews</h3>
+            <h3 className="text-xl sm:text-2xl font-bold">Customer Reviews</h3>
           </div>
 
           {/* Rating Summary */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               {productRatings.ratingSummary ? (
                 <RatingSummaryComponent summary={productRatings.ratingSummary} />
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No ratings yet</p>
+                <div className="text-center py-6 sm:py-8">
+                  <p className="text-muted-foreground text-sm sm:text-base">No ratings yet</p>
                 </div>
               )}
             </CardContent>
@@ -523,24 +525,25 @@ const ProductDetail = () => {
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div>
-            <h3 className="text-2xl font-bold mb-6">You might also like</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">You might also like</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
               {relatedProducts.map((relatedProduct) => (
                 <Card 
                   key={relatedProduct.id} 
-                  className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                  className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group animate-fade-in"
                   onClick={() => navigate(`/product/${relatedProduct.id}`)}
                 >
-                  <div className="aspect-square overflow-hidden">
+                  <div className="aspect-square overflow-hidden bg-muted">
                     <img
                       src={relatedProduct.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
                       alt={relatedProduct.name}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
                     />
                   </div>
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold mb-2">{relatedProduct.name}</h4>
-                    <div className="flex items-center justify-between">
+                  <CardContent className="p-3 sm:p-4">
+                    <h4 className="font-semibold mb-2 text-sm sm:text-base line-clamp-2 leading-tight">{relatedProduct.name}</h4>
+                    <div className="flex flex-col space-y-2">
                       <div className="flex flex-col">
                         <PriceDisplay
                           originalPrice={relatedProduct.price}
@@ -552,12 +555,13 @@ const ProductDetail = () => {
                           <DiscountBadge 
                             discountPercentage={relatedProduct.discount_percentage || 0}
                             size="sm"
-                            className="mt-1"
+                            className="mt-1 w-fit"
                           />
                         )}
                       </div>
                       <Button 
                         size="sm" 
+                        className="w-full text-xs sm:text-sm h-8 sm:h-9"
                         onClick={(e) => {
                           e.stopPropagation();
                           addItem({

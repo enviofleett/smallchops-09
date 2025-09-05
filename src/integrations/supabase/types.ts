@@ -8422,10 +8422,6 @@ export type Database = {
         Args: { order_items: Json }
         Returns: Json
       }
-      assess_production_readiness: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
       assign_driver_to_order: {
         Args: {
           p_driver_id: string
@@ -8621,10 +8617,6 @@ export type Database = {
       }
       check_registration_rate_limit_secure: {
         Args: { p_email: string; p_ip_address?: unknown }
-        Returns: Json
-      }
-      check_rls_status: {
-        Args: Record<PropertyKey, never>
         Returns: Json
       }
       check_upload_rate_limit: {

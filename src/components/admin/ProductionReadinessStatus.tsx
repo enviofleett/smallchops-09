@@ -39,14 +39,12 @@ export const ProductionReadinessStatus = () => {
     setChecks([]);
     
     try {
-      console.log('🚀 Starting production-ready authentication health audit...');
-      
-      // Initialize checking status with production security focus
+      // Initialize checking status
       const initialChecks: ReadinessCheck[] = [
         {
           id: 'auth-health',
           name: 'Authentication System Health',
-          description: 'Secure user registration, verification rates, and authentication integrity',
+          description: 'User registration, verification, and authentication success rates',
           status: 'checking',
           category: 'Authentication',
           critical: true
@@ -54,7 +52,7 @@ export const ProductionReadinessStatus = () => {
         {
           id: 'security-compliance',
           name: 'Security & Database Protection',
-          description: 'RLS policies, database security, and production-grade access controls',
+          description: 'RLS policies, database security, and access controls',
           status: 'checking',
           category: 'Security',
           critical: true
@@ -62,15 +60,15 @@ export const ProductionReadinessStatus = () => {
         {
           id: 'email-system',
           name: 'Email System Status',
-          description: 'SMTP health, delivery rates, and secure email configuration',
+          description: 'SMTP health, delivery rates, and email configuration',
           status: 'checking',
           category: 'Email',
           critical: true
         },
         {
           id: 'production-validation',
-          name: 'Production Readiness Assessment',
-          description: 'Comprehensive system validation for secure production deployment',
+          name: 'Production Readiness',
+          description: 'Comprehensive system validation for production deployment',
           status: 'checking',
           category: 'Production',
           critical: true
@@ -79,185 +77,125 @@ export const ProductionReadinessStatus = () => {
       
       setChecks(initialChecks);
 
-      // Run security-hardened validation with production timeout
-      const validationPromise = supabase.functions.invoke('auth-security-validator');
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Production validation timeout - check system health')), 20000)
-      );
+      // Run comprehensive security and auth validation
+      const { data: validationResult, error: validationError } = await supabase.functions.invoke('auth-security-validator');
       
-      let validationResult;
-      try {
-        const { data, error: validationError } = await Promise.race([validationPromise, timeoutPromise]) as any;
-        
-        if (validationError) {
-          console.error('⚠️ Validation service error:', validationError.message);
-          // Use secure database fallback for production
-          const fallbackResult = await supabase.rpc('assess_production_readiness');
-          if (fallbackResult.data && typeof fallbackResult.data === 'object') {
-            const fallbackData = fallbackResult.data as any;
-            validationResult = {
-              success: true,
-              auth_health: fallbackData.auth_health || { healthy: false, score: 0, status: 'fallback' },
-              security_compliance: { 
-                compliant: fallbackData.rls_status?.compliant || false,
-                score: fallbackData.rls_status?.compliant ? 100 : 0,
-                metrics: fallbackData.rls_status || {}
-              },
-              production_ready: fallbackData
-            };
-          } else {
-            validationResult = { 
-              success: false, 
-              error: 'All validation systems unavailable',
-              auth_health: { healthy: false, score: 0, status: 'system_error' },
-              security_compliance: { compliant: false, score: 0 },
-              production_ready: { ready_for_production: false, overall_score: 0, status: 'system_error' }
-            };
-          }
-        } else {
-          validationResult = data;
-        }
-      } catch (error) {
-        console.error('⚠️ Production validation timeout');
-        validationResult = { 
-          success: false, 
-          error: 'Production validation timeout - system may need maintenance',
-          auth_health: { healthy: false, score: 0, status: 'timeout', issues: ['Validation system timeout'], warnings: [] },
-          security_compliance: { compliant: false, score: 0, issues: ['Security check timeout'], warnings: [] },
-          production_ready: { ready_for_production: false, overall_score: 0, status: 'timeout', issues: ['System timeout'] }
-        };
+      if (validationError) {
+        throw new Error(`Validation failed: ${validationError.message}`);
+      }
+
+      if (!validationResult?.success) {
+        throw new Error(validationResult?.error || 'Security validation failed');
       }
 
       setValidationData(validationResult);
 
-      // Run secure email system check
-      let emailResult;
-      try {
-        const emailPromise = supabase.functions.invoke('smtp-health-monitor');
-        const emailTimeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Email check timeout')), 10000)
-        );
-        
-        const { data, error: emailError } = await Promise.race([emailPromise, emailTimeoutPromise]) as any;
-        emailResult = emailError ? null : data;
-      } catch (error) {
-        console.warn('📧 Email system check unavailable - using fallback');
-        emailResult = null;
-      }
+      // Run email system check
+      const { data: emailResult, error: emailError } = await supabase.functions.invoke('email-delivery-monitor');
       
       const updatedChecks: ReadinessCheck[] = [];
 
-      // Process authentication health with production focus
+      // Process authentication health
       if (validationResult.auth_health) {
         const authHealth = validationResult.auth_health;
-        const issues = Array.isArray(authHealth.issues) ? authHealth.issues.length : 0;
-        const warnings = Array.isArray(authHealth.warnings) ? authHealth.warnings.length : 0;
-        
         updatedChecks.push({
           id: 'auth-health',
           name: 'Authentication System Health',
-          description: 'Secure user registration, verification rates, and authentication integrity',
-          status: authHealth.healthy && authHealth.score >= 80 ? 'pass' : (authHealth.score >= 60 ? 'warning' : 'fail'),
+          description: 'User registration, verification, and authentication success rates',
+          status: authHealth.healthy ? 'pass' : 'fail',
           category: 'Authentication',
           critical: true,
-          details: `Security Score: ${authHealth.score}/100 | Status: ${authHealth.status} | Issues: ${issues} | Warnings: ${warnings}${authHealth.metrics ? ` | Users: ${authHealth.metrics.total_users} | Verified: ${authHealth.metrics.verification_rate}%` : ''}`
+          details: `Score: ${authHealth.score}/100 - Status: ${authHealth.status}${authHealth.metrics ? ` | Users: ${authHealth.metrics.total_users}, Verified: ${authHealth.metrics.verification_rate}%` : ''}`
         });
       }
 
-      // Process security compliance with production standards
+      // Process security compliance
       if (validationResult.security_compliance) {
         const security = validationResult.security_compliance;
-        const rlsCompliant = security.metrics?.rls_coverage_percent >= 100;
-        
         updatedChecks.push({
           id: 'security-compliance',
           name: 'Security & Database Protection',
-          description: 'RLS policies, database security, and production-grade access controls',
-          status: security.compliant && rlsCompliant ? 'pass' : 'fail',
+          description: 'RLS policies, database security, and access controls',
+          status: security.compliant ? 'pass' : 'fail',
           category: 'Security',
           critical: true,
-          details: `Compliance Score: ${security.score}/100 | RLS Coverage: ${security.metrics?.rls_coverage_percent || 0}% | Protected Tables: ${security.metrics?.tables_with_rls || 0}/${security.metrics?.total_critical_tables || 0}`
+          details: `Score: ${security.score}/100 | RLS Tables: ${security.metrics?.tables_with_rls || 0}/${(security.metrics?.tables_with_rls || 0) + (security.metrics?.tables_without_rls || 0)}`
         });
       }
 
-      // Process email system with production readiness
-      if (emailResult && emailResult.healthy) {
+      // Process email system
+      if (emailResult && !emailError) {
+        const emailHealthy = emailResult.smtp_health?.healthy && emailResult.delivery_health?.healthy;
         updatedChecks.push({
           id: 'email-system',
           name: 'Email System Status',
-          description: 'SMTP health, delivery rates, and secure email configuration',
-          status: emailResult.score >= 80 ? 'pass' : (emailResult.score >= 60 ? 'warning' : 'fail'),
+          description: 'SMTP health, delivery rates, and email configuration',
+          status: emailHealthy ? 'pass' : (emailResult.smtp_health?.healthy ? 'warning' : 'fail'),
           category: 'Email',
           critical: true,
-          details: `Health Score: ${emailResult.score}/100 | Provider: ${emailResult.active_provider || 'unknown'} | Last Check: ${emailResult.last_checked || 'never'}`
+          details: `SMTP: ${emailResult.smtp_health?.status || 'unknown'} | Delivery: ${emailResult.delivery_health?.status || 'unknown'}`
         });
       } else {
         updatedChecks.push({
           id: 'email-system',
           name: 'Email System Status',
-          description: 'SMTP health, delivery rates, and secure email configuration',
+          description: 'SMTP health, delivery rates, and email configuration',
           status: 'warning',
           category: 'Email',
           critical: true,
-          details: 'Email system health monitoring unavailable - manual verification required'
+          details: 'Email health check unavailable'
         });
       }
 
-      // Process production readiness with comprehensive scoring
+      // Process production readiness
       if (validationResult.production_ready) {
         const production = validationResult.production_ready;
-        const criticalIssues = Array.isArray(production.issues) ? production.issues.length : 0;
-        
         updatedChecks.push({
           id: 'production-validation',
-          name: 'Production Readiness Assessment',
-          description: 'Comprehensive system validation for secure production deployment',
-          status: production.ready_for_production && production.overall_score >= 80 ? 'pass' : (production.overall_score >= 60 ? 'warning' : 'fail'),
+          name: 'Production Readiness',
+          description: 'Comprehensive system validation for production deployment',
+          status: production.ready_for_production ? 'pass' : 'fail',
           category: 'Production',
           critical: true,
-          details: `Production Score: ${production.overall_score}/100 | Status: ${production.status} | Critical Issues: ${criticalIssues} | Auth: ${production.component_scores?.authentication || 0}/100 | Security: ${production.component_scores?.security || 0}/100`
+          details: `Overall Score: ${production.overall_score}/100 | Status: ${production.status} | Issues: ${production.issues?.length || 0}`
         });
       }
 
       setChecks(updatedChecks);
 
-      // Calculate production-grade overall metrics
+      // Calculate overall metrics
       const passedChecks = updatedChecks.filter(c => c.status === 'pass').length;
-      const warningChecks = updatedChecks.filter(c => c.status === 'warning').length;
       const totalChecks = updatedChecks.length;
-      const calculatedScore = totalChecks > 0 ? Math.round(((passedChecks * 100) + (warningChecks * 60)) / (totalChecks * 100) * 100) : 0;
+      const calculatedScore = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0;
       
       setOverallScore(calculatedScore);
-      const isProductionReady = calculatedScore >= 80 && updatedChecks.every(c => c.status !== 'fail');
-      setReadyForProduction(isProductionReady);
+      setReadyForProduction(calculatedScore >= 80 && updatedChecks.every(c => c.status !== 'fail'));
       setLastChecked(new Date());
 
-      console.log(`✅ Production audit completed - Score: ${calculatedScore}/100`);
-
       toast({
-        title: isProductionReady ? "🚀 Production Ready!" : "⚠️ Production Issues Detected",
-        description: `Security audit scored ${calculatedScore}/100. ${isProductionReady ? 'System is secure for production deployment.' : 'Critical issues require immediate attention.'}`,
-        variant: isProductionReady ? "default" : "destructive"
+        title: "Production Readiness Check Completed",
+        description: `System scored ${calculatedScore}/100. ${readyForProduction ? 'Ready for production!' : 'Needs attention before production.'}`,
+        variant: calculatedScore >= 80 ? "default" : "destructive"
       });
 
     } catch (error) {
-      console.error('❌ Production readiness audit failed:', error);
+      console.error('Production readiness check failed:', error);
       toast({
-        title: "Security Audit Failed",
-        description: 'Critical system error during security validation. Manual review required.',
+        title: "Check Failed",
+        description: error instanceof Error ? error.message : 'Failed to run production readiness check',
         variant: "destructive"
       });
 
-      // Set critical error state
+      // Set error state
       setChecks([
         {
           id: 'system-error',
-          name: 'Production Security Audit Failed',
-          description: 'Critical system error preventing security validation',
+          name: 'System Check Error',
+          description: 'Unable to complete production readiness verification',
           status: 'fail',
           category: 'Production',
           critical: true,
-          details: `Error: ${error instanceof Error ? error.message : 'Unknown system failure'} - Manual security review required before production deployment`
+          details: error instanceof Error ? error.message : 'Unknown error occurred'
         }
       ]);
       setOverallScore(0);
@@ -274,26 +212,26 @@ export const ProductionReadinessStatus = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pass':
-        return <CheckCircle className="w-5 h-5 text-success" />;
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'fail':
-        return <XCircle className="w-5 h-5 text-destructive" />;
+        return <XCircle className="w-5 h-5 text-red-500" />;
       case 'warning':
-        return <AlertTriangle className="w-5 h-5 text-warning" />;
+        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
       case 'checking':
-        return <RefreshCw className="w-5 h-5 text-primary animate-spin" />;
+        return <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />;
       default:
-        return <AlertTriangle className="w-5 h-5 text-muted-foreground" />;
+        return <AlertTriangle className="w-5 h-5 text-gray-500" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pass':
-        return <Badge variant="default" className="bg-success/10 text-success border-success/20">PASS</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800">PASS</Badge>;
       case 'fail':
         return <Badge variant="destructive">FAIL</Badge>;
       case 'warning':
-        return <Badge variant="secondary" className="bg-warning/10 text-warning border-warning/20">WARNING</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">WARNING</Badge>;
       case 'checking':
         return <Badge variant="outline">CHECKING</Badge>;
       default:
@@ -304,17 +242,17 @@ export const ProductionReadinessStatus = () => {
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'Authentication':
-        return <Users className="w-5 h-5 text-primary" />;
+        return <Users className="w-5 h-5 text-blue-500" />;
       case 'Security':
-        return <Shield className="w-5 h-5 text-destructive" />;
+        return <Shield className="w-5 h-5 text-red-500" />;
       case 'Email':
-        return <Mail className="w-5 h-5 text-success" />;
+        return <Mail className="w-5 h-5 text-green-500" />;
       case 'Database':
-        return <Database className="w-5 h-5 text-accent" />;
+        return <Database className="w-5 h-5 text-purple-500" />;
       case 'Production':
-        return <Rocket className="w-5 h-5 text-warning" />;
+        return <Rocket className="w-5 h-5 text-orange-500" />;
       default:
-        return <Settings className="w-5 h-5 text-muted-foreground" />;
+        return <Settings className="w-5 h-5 text-gray-500" />;
     }
   };
 
@@ -365,9 +303,9 @@ export const ProductionReadinessStatus = () => {
           <div className="flex items-center justify-between p-4 border rounded-lg">
             <div className="flex items-center gap-3">
               {readyForProduction ? (
-                <CheckCircle className="w-8 h-8 text-success" />
+                <CheckCircle className="w-8 h-8 text-green-500" />
               ) : (
-                <XCircle className="w-8 h-8 text-destructive" />
+                <XCircle className="w-8 h-8 text-red-500" />
               )}
               <div>
                 <h3 className="text-lg font-semibold">
@@ -383,14 +321,14 @@ export const ProductionReadinessStatus = () => {
 
           {/* Critical Issues Alert */}
           {criticalIssues.length > 0 && (
-            <div className="p-4 border-l-4 border-l-destructive bg-destructive/5 rounded-r-lg">
-              <h4 className="font-semibold text-destructive flex items-center gap-2">
+            <div className="p-4 border-l-4 border-l-red-500 bg-red-50 rounded-r-lg">
+              <h4 className="font-semibold text-red-800 flex items-center gap-2">
                 <XCircle className="w-5 h-5" />
                 Critical Issues ({criticalIssues.length})
               </h4>
               <ul className="mt-2 space-y-1">
                 {criticalIssues.map(issue => (
-                  <li key={issue.id} className="text-sm text-destructive/80">
+                  <li key={issue.id} className="text-sm text-red-700">
                     • {issue.name}: {issue.details || 'Failed validation'}
                   </li>
                 ))}
@@ -400,14 +338,14 @@ export const ProductionReadinessStatus = () => {
 
           {/* Warnings */}
           {warnings.length > 0 && (
-            <div className="p-4 border-l-4 border-l-warning bg-warning/5 rounded-r-lg">
-              <h4 className="font-semibold text-warning flex items-center gap-2">
+            <div className="p-4 border-l-4 border-l-yellow-500 bg-yellow-50 rounded-r-lg">
+              <h4 className="font-semibold text-yellow-800 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5" />
                 Warnings ({warnings.length})
               </h4>
               <ul className="mt-2 space-y-1">
                 {warnings.map(warning => (
-                  <li key={warning.id} className="text-sm text-warning/80">
+                  <li key={warning.id} className="text-sm text-yellow-700">
                     • {warning.name}: {warning.details || 'Needs attention'}
                   </li>
                 ))}
@@ -417,14 +355,14 @@ export const ProductionReadinessStatus = () => {
 
           {/* Recommendations */}
           {recommendations.length > 0 && (
-            <div className="p-4 border-l-4 border-l-primary bg-primary/5 rounded-r-lg">
-              <h4 className="font-semibold text-primary flex items-center gap-2">
+            <div className="p-4 border-l-4 border-l-blue-500 bg-blue-50 rounded-r-lg">
+              <h4 className="font-semibold text-blue-800 flex items-center gap-2">
                 <Settings className="w-5 h-5" />
                 Recommendations ({recommendations.length})
               </h4>
               <ul className="mt-2 space-y-1">
                 {recommendations.map((rec: string, index: number) => (
-                  <li key={index} className="text-sm text-primary/80">
+                  <li key={index} className="text-sm text-blue-700">
                     • {rec}
                   </li>
                 ))}
@@ -442,7 +380,7 @@ export const ProductionReadinessStatus = () => {
         <CardContent>
           <div className="grid gap-4">
             {checks.map((check) => (
-              <Card key={check.id} className={check.critical ? 'border-l-4 border-l-primary' : ''}>
+              <Card key={check.id} className={check.critical ? 'border-l-4 border-l-blue-500' : ''}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -451,7 +389,7 @@ export const ProductionReadinessStatus = () => {
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{check.name}</span>
                           {check.critical && (
-                            <Badge variant="outline" className="text-xs border-primary/20 text-primary">CRITICAL</Badge>
+                            <Badge variant="outline" className="text-xs">CRITICAL</Badge>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">{check.description}</p>

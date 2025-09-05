@@ -78,8 +78,14 @@ export const EmailCredentialsManager = () => {
       });
 
       if (error) {
-        console.error('Failed to check credential status:', error);
-        setCredentials([]);
+        // Production fallback - assume credentials need setup
+        console.warn('SMTP health check unavailable:', error.message);
+        const coreCredentials = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
+        setCredentials(coreCredentials.map(name => ({
+          name,
+          isSet: false,
+          masked: undefined
+        })));
         return;
       }
 
@@ -93,8 +99,14 @@ export const EmailCredentialsManager = () => {
 
       setCredentials(statusList);
     } catch (error) {
-      console.error('Error checking credentials:', error);
-      setCredentials([]);
+      // Silent fallback for production
+      console.warn('SMTP service unavailable, showing setup instructions');
+      const coreCredentials = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
+      setCredentials(coreCredentials.map(name => ({
+        name,
+        isSet: false,
+        masked: undefined
+      })));
     }
   };
 

@@ -64,6 +64,15 @@ verify_jwt = false
 [functions.track-promotion-usage]
 verify_jwt = true
 
+[functions.verify-payment]
+verify_jwt = false
+
+[functions.paystack-secure]
+verify_jwt = false
+
+[functions.payment-callback]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

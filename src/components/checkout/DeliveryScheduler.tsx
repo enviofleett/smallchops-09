@@ -457,31 +457,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                   )}
                 </div>
 
-                {/* Booking Timeline Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CalendarIcon className="w-4 h-4 text-primary" />
-                      <span className="font-medium text-sm">Booking Details</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Days ahead: <strong>{differenceInDays(parseISO(selectedDate), new Date())}</strong>
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Booking window: <strong>Valid until {format(dateValidation.maxDate, 'MMM d, yyyy')}</strong>
-                    </p>
-                  </div>
-
-                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Info className="w-4 h-4 text-green-600" />
-                      <span className="font-medium text-sm text-green-800">Delivery Notes</span>
-                    </div>
-                    <p className="text-sm text-green-700 leading-relaxed">
-                      📍 Please ensure someone is available to receive the delivery during this time window. Our delivery team will contact you 30 minutes before arrival.
-                    </p>
-                  </div>
-                </div>
 
               </div>
             </div>

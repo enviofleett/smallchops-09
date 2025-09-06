@@ -6,8 +6,9 @@
 // Get environment variables with sensible defaults
 const ENV_NAME = Deno.env.get('DENO_ENV') || Deno.env.get('ENVIRONMENT') || 'development';
 const ALLOWED_ORIGINS_ENV = Deno.env.get('ALLOWED_ORIGINS') || '';
+const ALLOW_PREVIEW_ORIGINS = Deno.env.get('ALLOW_PREVIEW_ORIGINS') === 'true';
 
-console.log(`🌍 CORS: Environment=${ENV_NAME}, Custom origins=${ALLOWED_ORIGINS_ENV}`);
+console.log(`🌍 CORS: Environment=${ENV_NAME}, Custom origins=${ALLOWED_ORIGINS_ENV}, Allow preview=${ALLOW_PREVIEW_ORIGINS}`);
 
 // Parse additional origins from environment
 const CUSTOM_ORIGINS = ALLOWED_ORIGINS_ENV
@@ -77,12 +78,14 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
     };
   }
 
-  // Check against development patterns (only in non-production)
+  // Check against development patterns (allow in non-production OR when ALLOW_PREVIEW_ORIGINS=true)
   const isProduction = ENV_NAME === 'production';
-  if (!isProduction) {
+  const shouldCheckDevPatterns = !isProduction || ALLOW_PREVIEW_ORIGINS;
+  
+  if (shouldCheckDevPatterns) {
     const isDevOrigin = DEV_PATTERNS.some(pattern => pattern.test(origin));
     if (isDevOrigin) {
-      console.log(`✅ CORS: Origin "${origin}" matched dev pattern in ${ENV_NAME} mode`);
+      console.log(`✅ CORS: Origin "${origin}" matched dev pattern in ${ENV_NAME} mode (preview allowed: ${ALLOW_PREVIEW_ORIGINS})`);
       return {
         ...baseHeaders,
         'Access-Control-Allow-Origin': origin,
@@ -114,7 +117,11 @@ export function handleCorsPreflightResponse(origin?: string | null): Response {
 export function validateOrigin(origin?: string | null): boolean {
   if (!origin) return false;
   
+  const isProduction = (Deno.env.get('DENO_ENV') || 'development') === 'production';
+  const allowPreview = Deno.env.get('ALLOW_PREVIEW_ORIGINS') === 'true';
+  const shouldCheckDevPatterns = !isProduction || allowPreview;
+  
   return ALLOWED_ORIGINS.includes(origin) || 
          PAYSTACK_DOMAINS.includes(origin) ||
-         DEV_PATTERNS.some(pattern => pattern.test(origin));
+         (shouldCheckDevPatterns && DEV_PATTERNS.some(pattern => pattern.test(origin)));
 }

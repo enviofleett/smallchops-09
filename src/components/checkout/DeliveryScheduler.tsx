@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CalendarIcon, Clock, AlertTriangle, Info } from 'lucide-react';
-import { deliverySchedulingService, DeliverySlot, DeliveryTimeSlot } from '@/utils/deliveryScheduling';
+import { DeliveryTimeSlot } from '@/utils/deliveryScheduling';
 import { isAfter, addDays, addMonths, isBefore, startOfDay, endOfDay, differenceInDays, isWeekend, addMinutes } from 'date-fns';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -13,20 +13,6 @@ import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBounda
 import { HorizontalDatePicker } from './HorizontalDatePicker';
 import { DropdownDatePicker } from './DropdownDatePicker';
 import { useQuery } from '@tanstack/react-query';
-import { CacheOptimizer } from '@/utils/optimizedQuery';
-
-// Production-ready constants with business logic integration
-const DELIVERY_BOOKING_CONSTANTS = {
-  MIN_LEAD_TIME_MINUTES: 60, // 60 minutes from booking time
-  MAX_ADVANCE_MONTHS: 2, // 2 months advance booking
-  DELIVERY_WINDOW_START: '08:00', // 8am start (Mon-Sat)
-  DELIVERY_WINDOW_END: '19:00', // 7pm end (Mon-Sat)
-  SUNDAY_WINDOW_START: '10:00', // 10am start (Sunday)
-  SUNDAY_WINDOW_END: '16:00', // 4pm end (Sunday)
-  SLOT_DURATION_MINUTES: 60, // 1-hour slots
-  BUSINESS_DAYS_ONLY: false, // Allow weekend deliveries
-  BLOCKED_DATES: [] as Date[] // Holidays from business settings
-} as const;
 
 interface DeliverySchedulerProps {
   selectedDate?: string;
@@ -53,117 +39,111 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
 }) => {
   const [selectedDateSlots, setSelectedDateSlots] = useState<DeliveryTimeSlot[]>([]);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(selectedDate ? parseISO(selectedDate) : undefined);
+  const [deliveryConfig, setDeliveryConfig] = useState<any>(null);
 
-  // Production-ready date validation with business logic
+  // Production-ready query that fetches config and slots
+  const {
+    data: apiResponse,
+    isLoading: loading,
+    error: queryError,
+    refetch
+  } = useQuery({
+    queryKey: ['delivery-availability', new Date().toISOString().split('T')[0]],
+    queryFn: async () => {
+      const { deliveryBookingAPI } = await import('@/api/deliveryBookingApi');
+      const now = new Date();
+      const maxDate = addDays(now, 60); // 60 days from backend config
+      
+      const response = await deliveryBookingAPI.getAvailableSlots({
+        start_date: deliveryBookingAPI.formatDateForAPI(now),
+        end_date: deliveryBookingAPI.formatDateForAPI(maxDate)
+      });
+      
+      console.log('✅ Delivery API response:', {
+        slots: response.slots.length,
+        config: response.config,
+        businessDays: response.business_days
+      });
+      
+      return response;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    refetchInterval: false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: 'always',
+    retry: 2
+  });
+
+  const availableSlots = apiResponse?.slots || [];
+  const config = apiResponse?.config;
+  const error = queryError?.message || null;
+
+  // Update delivery config when API response changes
+  useEffect(() => {
+    if (config) {
+      setDeliveryConfig(config);
+    }
+  }, [config]);
+
+  // Production-ready date validation using API config
   const dateValidation = useMemo(() => {
     const now = new Date();
-    const minDate = startOfDay(now); // Same day booking allowed if within lead time
-    const maxDate = addMonths(startOfDay(now), DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS);
+    const leadTimeMinutes = deliveryConfig?.lead_time_minutes || 60;
+    const maxAdvanceDays = deliveryConfig?.max_advance_days || 60;
+    
+    const minDate = startOfDay(now);
+    const maxDate = addDays(startOfDay(now), maxAdvanceDays);
     
     return {
       minDate,
       maxDate,
+      leadTimeMinutes,
+      maxAdvanceDays,
       isDateInRange: (date: Date) => {
         const dayStart = startOfDay(date);
         return !isBefore(dayStart, minDate) && !isAfter(dayStart, maxDate);
       },
       isDateBlocked: (date: Date) => {
-        const dayStart = startOfDay(date);
-        return DELIVERY_BOOKING_CONSTANTS.BLOCKED_DATES.some(blockedDate => 
-          startOfDay(blockedDate).getTime() === dayStart.getTime()
-        );
-      },
-      isBusinessDayOnly: (date: Date) => {
-        return DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY ? !isWeekend(date) : true;
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const slot = availableSlots.find(s => s.date === dateStr);
+        return slot?.is_holiday || false;
       },
       getMinimumBookingTime: () => {
-        return addMinutes(now, DELIVERY_BOOKING_CONSTANTS.MIN_LEAD_TIME_MINUTES);
+        return addMinutes(now, leadTimeMinutes);
       },
       getDateDisabledReason: (date: Date) => {
         const dayStart = startOfDay(date);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const slot = availableSlots.find(s => s.date === dateStr);
+        
         if (isBefore(dayStart, minDate)) {
           return 'Past dates not available';
         }
         if (isAfter(dayStart, maxDate)) {
-          return `Booking available up to ${DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS} months in advance`;
+          return `Booking available up to ${maxAdvanceDays} days in advance`;
         }
-        if (DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY && isWeekend(date)) {
-          return 'Delivery not available on weekends';
+        if (slot?.is_holiday) {
+          return `Delivery not available - ${slot.holiday_name || 'Holiday'}`;
         }
-        if (DELIVERY_BOOKING_CONSTANTS.BLOCKED_DATES.some(blockedDate => 
-          startOfDay(blockedDate).getTime() === dayStart.getTime()
-        )) {
-          return 'Delivery not available on this date (holiday)';
+        if (slot && !slot.is_business_day) {
+          return 'Delivery not available on this date';
         }
         return null;
       }
     };
-  }, []);
+  }, [deliveryConfig, availableSlots]);
 
-  // Enhanced date disabled function with comprehensive validation
+  // Enhanced date disabled function
   const isDateDisabled = useCallback((date: Date) => {
-    // Check if date is in valid range
-    if (!dateValidation.isDateInRange(date)) {
-      return true;
-    }
-
-    // Check if date is blocked
-    if (dateValidation.isDateBlocked(date)) {
-      return true;
-    }
-
-    // Check business days requirement
-    if (!dateValidation.isBusinessDayOnly(date)) {
-      return true;
-    }
-
-    // Check if it's a past date (extra safety)
-    if (isBefore(startOfDay(date), startOfDay(new Date()))) {
-      return true;
-    }
-    return false;
-  }, [dateValidation]);
-
-  // Optimized query with caching
-  const {
-    data: availableSlots = [],
-    isLoading: loading,
-    error: queryError,
-    refetch
-  } = useQuery({
-    queryKey: ['delivery-slots', format(dateValidation.minDate, 'yyyy-MM-dd'), format(dateValidation.maxDate, 'yyyy-MM-dd')],
-    queryFn: async () => {
-      const {
-        deliveryBookingAPI
-      } = await import('@/api/deliveryBookingApi');
-      const response = await deliveryBookingAPI.getAvailableSlots({
-        start_date: deliveryBookingAPI.formatDateForAPI(dateValidation.minDate),
-        end_date: deliveryBookingAPI.formatDateForAPI(dateValidation.maxDate)
-      });
-      console.log('✅ Delivery slots received:', response.slots.length, 'slots');
-      console.log('📊 Business days available:', response.business_days, 'of', response.total_days, 'total days');
-      return response.slots.map(slot => ({
-        date: slot.date,
-        is_business_day: slot.is_business_day,
-        is_holiday: slot.is_holiday,
-        holiday_name: slot.holiday_name,
-        time_slots: slot.time_slots.map(timeSlot => ({
-          start_time: timeSlot.start_time,
-          end_time: timeSlot.end_time,
-          available: timeSlot.available,
-          reason: timeSlot.reason
-        }))
-      }));
-    },
-    staleTime: 15 * 60 * 1000,
-    // 15 minutes cache for static data
-    refetchInterval: false,
-    // Disable auto-refetch
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: 'always',
-    retry: 2
-  });
-  const error = queryError?.message || null;
+    if (!dateValidation.isDateInRange(date)) return true;
+    if (dateValidation.isDateBlocked(date)) return true;
+    if (isBefore(startOfDay(date), startOfDay(new Date()))) return true;
+    
+    // Check if date has available slots
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const slot = availableSlots.find(s => s.date === dateStr);
+    return !slot?.is_business_day;
+  }, [dateValidation, availableSlots]);
 
   useEffect(() => {
     if (calendarDate) {
@@ -369,11 +349,16 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                 📅 <strong>Booking Window:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
               </p>
               <p className="text-xs text-muted-foreground">
-                ⏰ <strong>Delivery Hours:</strong> Mon-Sat: {DELIVERY_BOOKING_CONSTANTS.DELIVERY_WINDOW_START} - {DELIVERY_BOOKING_CONSTANTS.DELIVERY_WINDOW_END} | Sun: {DELIVERY_BOOKING_CONSTANTS.SUNDAY_WINDOW_START} - {DELIVERY_BOOKING_CONSTANTS.SUNDAY_WINDOW_END}
+                ⏰ <strong>Delivery Hours:</strong> Mon-Sat: 8:00AM - 7:00PM | Sunday: 10:00AM - 4:00PM
               </p>
               <p className="text-xs text-muted-foreground">
-                🕐 <strong>Lead Time:</strong> Minimum {DELIVERY_BOOKING_CONSTANTS.MIN_LEAD_TIME_MINUTES} minutes from booking
+                🕐 <strong>Lead Time:</strong> Minimum {dateValidation.leadTimeMinutes} minutes from booking
               </p>
+              {apiResponse && (
+                <p className="text-xs text-green-600 font-medium">
+                  ✓ {apiResponse.available_slots} available slots in next {dateValidation.maxAdvanceDays} days
+                </p>
+              )}
             </div>
           </div>
 

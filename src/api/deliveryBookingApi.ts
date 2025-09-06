@@ -29,6 +29,13 @@ export interface DeliveryAvailabilityResponse {
   slots: DeliverySlot[];
   total_days: number;
   business_days: number;
+  total_slots: number;
+  available_slots: number;
+  config: {
+    lead_time_minutes: number;
+    max_advance_days: number;
+    slot_duration_minutes: number;
+  };
 }
 
 export interface DeliveryBookingRequest {
@@ -102,80 +109,33 @@ export class DeliveryBookingAPI {
   }
 
   /**
-   * Create a new delivery booking
+   * Create a new delivery booking - REMOVED: Function not implemented
+   * This functionality has been moved to direct order processing
    */
-  async createBooking(booking: DeliveryBookingRequest): Promise<DeliveryBookingResponse> {
-    try {
-      console.log('📦 Creating delivery booking:', booking);
-
-      const { data, error } = await supabase.functions.invoke('delivery-booking', {
-        body: booking
-      });
-
-      if (error) {
-        console.error('❌ Delivery booking error:', error);
-        throw new Error(error.message || 'Failed to create delivery booking');
-      }
-
-      if (!data.success) {
-        console.log('❌ Booking failed:', data.error);
-        return {
-          success: false,
-          message: data.error || 'Failed to create booking',
-          error: data.error
-        };
-      }
-
-      console.log('✅ Booking created successfully:', data.confirmation_number);
-      return data;
-
-    } catch (error) {
-      console.error('❌ API Error in createBooking:', error);
-      throw error;
-    }
-  }
+  // createBooking method removed - delivery bookings are handled through order creation
 
   /**
-   * Get existing bookings for a customer
+   * Get existing bookings for a customer - REMOVED: Function not implemented  
+   * This functionality is available through the orders API
    */
-  async getCustomerBookings(customerId: string): Promise<any[]> {
-    try {
-      console.log('📋 Fetching customer bookings for:', customerId);
-
-      const { data, error } = await supabase.functions.invoke('delivery-booking', {
-        body: null,
-        method: 'GET'
-      });
-
-      if (error) {
-        console.error('❌ Error fetching bookings:', error);
-        throw new Error(error.message || 'Failed to fetch bookings');
-      }
-
-      return data.bookings || [];
-
-    } catch (error) {
-      console.error('❌ API Error in getCustomerBookings:', error);
-      throw error;
-    }
-  }
+  // getCustomerBookings method removed - use orders API instead
 
   /**
-   * Validate date range for 2-month booking window
+   * Validate date range for production booking window (60 days)
    */
   validateDateRange(startDate: Date, endDate: Date): { valid: boolean; error?: string } {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     const maxDate = new Date();
-    maxDate.setMonth(maxDate.getMonth() + 2);
+    maxDate.setDate(maxDate.getDate() + 60); // Production: 60 days advance booking
     
     if (startDate < today) {
       return { valid: false, error: 'Start date cannot be in the past' };
     }
     
     if (endDate > maxDate) {
-      return { valid: false, error: 'End date cannot be more than 2 months in advance' };
+      return { valid: false, error: 'End date cannot be more than 60 days in advance' };
     }
     
     if (startDate > endDate) {
@@ -193,20 +153,19 @@ export class DeliveryBookingAPI {
   }
 
   /**
-   * Get the maximum booking date (2 months from now)
+   * Get the maximum booking date (60 days from now)
    */
   getMaxBookingDate(): Date {
     const maxDate = new Date();
-    maxDate.setMonth(maxDate.getMonth() + 2);
+    maxDate.setDate(maxDate.getDate() + 60); // Production: 60 days advance booking
     return maxDate;
   }
 
   /**
-   * Get the minimum booking date (tomorrow)
+   * Get the minimum booking date (today with lead time)
    */
   getMinBookingDate(): Date {
     const minDate = new Date();
-    minDate.setDate(minDate.getDate() + 1);
     minDate.setHours(0, 0, 0, 0);
     return minDate;
   }

@@ -301,23 +301,34 @@ serve(async (req) => {
           })
         }
 
-        // Sanitize updates: map 'phone' to 'customer_phone' for orders table
-        const sanitizedUpdates = { ...(updates || {}) };
-        console.log('Raw updates before sanitization:', sanitizedUpdates);
+        // SECURITY: Strict whitelist of allowed columns for order updates
+        const allowedColumns = [
+          'status', 'customer_name', 'customer_phone', 'customer_email',
+          'delivery_address', 'delivery_instructions', 'order_notes',
+          'assigned_rider_id', 'payment_status', 'total_amount',
+          'delivery_zone_id', 'order_type', 'special_instructions',
+          'internal_notes', 'updated_at'
+        ];
+
+        // Sanitize and validate updates
+        const sanitizedUpdates = {};
+        console.log('Raw updates before sanitization:', updates);
         
-        if (sanitizedUpdates && 'phone' in sanitizedUpdates) {
-          console.log('Found phone field, mapping to customer_phone:', sanitizedUpdates.phone);
-          sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
-          delete sanitizedUpdates.phone;
+        if (updates && typeof updates === 'object') {
+          for (const [key, value] of Object.entries(updates)) {
+            if (key === 'phone') {
+              // Map legacy phone field to customer_phone
+              console.log('Mapping phone to customer_phone:', value);
+              sanitizedUpdates.customer_phone = value;
+            } else if (allowedColumns.includes(key)) {
+              sanitizedUpdates[key] = value;
+            } else {
+              console.warn(`⚠️ Blocked unauthorized column update attempt: ${key}`);
+            }
+          }
         }
         
-        console.log('Sanitized updates:', sanitizedUpdates);
-        
-        // FINAL SAFETY CHECK: Ensure no phone field exists before DB update
-        if ('phone' in sanitizedUpdates) {
-          console.error('🚨 CRITICAL: Phone field still exists after sanitization!');
-          delete sanitizedUpdates.phone;
-        }
+        console.log('Sanitized and whitelisted updates:', sanitizedUpdates);
 
         const { data, error } = await supabaseClient
           .from('orders')

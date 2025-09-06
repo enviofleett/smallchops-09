@@ -254,62 +254,8 @@ export const updateOrder = async (
       console.error('❌ Error updating order via admin function:', error);
     }
     
-    // Fallback to direct update with enhanced validation
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Attempting fallback direct update with validation...');
-      }
-      
-      // If assigning rider, validate first
-      if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
-        const { data: riderCheck, error: riderError } = await supabase
-          .from('drivers')
-          .select('id, is_active')
-          .eq('id', sanitizedUpdates.assigned_rider_id)
-          .single();
-
-        if (riderError || !riderCheck) {
-          throw new Error(`Invalid rider ID: ${sanitizedUpdates.assigned_rider_id}`);
-        }
-
-        if (!riderCheck.is_active) {
-          throw new Error(`Rider ${sanitizedUpdates.assigned_rider_id} is not active`);
-        }
-      }
-
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('orders')
-        .update(sanitizedUpdates)
-        .eq('id', orderId)
-        .select(`*, 
-          order_items (*),
-          delivery_zones (id, name, base_fee, is_active),
-          order_delivery_schedule (*)
-        `)
-        .maybeSingle();
-
-      if (fallbackError) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('❌ Fallback update also failed:', fallbackError);
-        }
-        throw new Error(fallbackError.message);
-      }
-
-      if (!fallbackData) {
-        throw new Error('Order not found');
-      }
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Fallback update successful');
-      }
-      return fallbackData as unknown as OrderWithItems;
-      
-    } catch (fallbackError) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('💥 All update methods failed:', fallbackError);
-      }
-      throw fallbackError;
-    }
+    // NO FALLBACK: For production security, we only allow updates through the hardened edge function
+    throw new Error(`Order update failed: ${error.message}`);
   }
 };
 

@@ -111,9 +111,9 @@ class DeliverySchedulingService {
 
   private getDefaultConfig(): DeliverySchedulingConfig {
     return {
-      minimum_lead_time_minutes: 90,
-      max_advance_booking_days: 30,
-      default_delivery_duration_minutes: 60,
+      minimum_lead_time_minutes: 60, // Production: 60 minutes lead time
+      max_advance_booking_days: 60, // 2 months for better planning
+      default_delivery_duration_minutes: 60, // 1-hour delivery slots
       allow_same_day_delivery: true,
       business_hours: {
         monday: { open: '08:00', close: '18:00', is_open: true },
@@ -196,33 +196,47 @@ class DeliverySchedulingService {
     if (!businessHours.is_open) return [];
 
     const slots: DeliveryTimeSlot[] = [];
-    const openTime = this.parseTime(businessHours.open);
-    const closeTime = this.parseTime(businessHours.close);
-    const slotDuration = this.config.default_delivery_duration_minutes;
+    
+    // Production: Fixed 8am-6pm window with hourly slots
+    const openTime = this.parseTime('08:00');
+    const closeTime = this.parseTime('18:00');
+    const slotDuration = 60; // Fixed 1-hour slots
     const minDeliveryTime = this.getMinimumDeliveryTime();
 
     let currentTime = openTime;
 
+    // Generate hourly slots from 8am to 6pm
     while (currentTime < closeTime) {
       const slotEnd = addMinutes(currentTime, slotDuration);
       
-      // Don't create slot if it would end after closing time
+      // Don't create slot if it would end after 6pm
       if (isAfter(slotEnd, closeTime)) break;
 
       const slotDateTime = this.combineDateAndTime(date, currentTime);
-      const slotEndDateTime = this.combineDateAndTime(date, slotEnd);
 
-      // Check if slot is available (not in the past)
-      const available = !isBefore(slotDateTime, minDeliveryTime);
+      // Production logic: Check if slot meets 60-minute lead time
+      const now = new Date();
+      const isToday = isSameDay(date, now);
+      
+      let available = true;
+      let reason: string | undefined;
+
+      if (isToday && isBefore(slotDateTime, minDeliveryTime)) {
+        available = false;
+        reason = 'Booking window closed - minimum 60 minutes required';
+      } else if (isBefore(slotDateTime, now)) {
+        available = false;
+        reason = 'Time slot has passed';
+      }
       
       slots.push({
         start_time: format(currentTime, 'HH:mm'),
         end_time: format(slotEnd, 'HH:mm'),
         available,
-        reason: available ? undefined : 'Too soon - minimum lead time required'
+        reason
       });
 
-      // Move to next slot (1-hour intervals)
+      // Move to next hour
       currentTime = addMinutes(currentTime, slotDuration);
     }
 

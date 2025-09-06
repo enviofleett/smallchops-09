@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CalendarIcon, Clock, AlertTriangle, Info } from 'lucide-react';
 import { deliverySchedulingService, DeliverySlot, DeliveryTimeSlot } from '@/utils/deliveryScheduling';
-import { isAfter, addDays, addMonths, isBefore, startOfDay, endOfDay, differenceInDays, isWeekend } from 'date-fns';
+import { isAfter, addDays, addMonths, isBefore, startOfDay, endOfDay, differenceInDays, isWeekend, addMinutes } from 'date-fns';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
@@ -15,15 +15,15 @@ import { DropdownDatePicker } from './DropdownDatePicker';
 import { useQuery } from '@tanstack/react-query';
 import { CacheOptimizer } from '@/utils/optimizedQuery';
 
-// Production-ready constants
+// Production-ready constants with business logic integration
 const DELIVERY_BOOKING_CONSTANTS = {
-  MIN_ADVANCE_DAYS: 1,
-  // Minimum 1 day advance booking
-  MAX_ADVANCE_MONTHS: 2,
-  // 2 months advance booking for faster loading
-  BUSINESS_DAYS_ONLY: false,
-  // Set to true if delivery only on business days
-  BLOCKED_DATES: [] as Date[] // Specific dates to block (holidays, maintenance days)
+  MIN_LEAD_TIME_MINUTES: 60, // 60 minutes from booking time
+  MAX_ADVANCE_MONTHS: 2, // 2 months advance booking
+  DELIVERY_WINDOW_START: '08:00', // 8am start
+  DELIVERY_WINDOW_END: '18:00', // 6pm end
+  SLOT_DURATION_MINUTES: 60, // 1-hour slots
+  BUSINESS_DAYS_ONLY: false, // Allow weekend deliveries
+  BLOCKED_DATES: [] as Date[] // Holidays from business settings
 } as const;
 
 interface DeliverySchedulerProps {
@@ -52,11 +52,12 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
   const [selectedDateSlots, setSelectedDateSlots] = useState<DeliveryTimeSlot[]>([]);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(selectedDate ? parseISO(selectedDate) : undefined);
 
-  // Production-ready date validation functions
+  // Production-ready date validation with business logic
   const dateValidation = useMemo(() => {
     const now = new Date();
-    const minDate = addDays(startOfDay(now), DELIVERY_BOOKING_CONSTANTS.MIN_ADVANCE_DAYS);
+    const minDate = startOfDay(now); // Same day booking allowed if within lead time
     const maxDate = addMonths(startOfDay(now), DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS);
+    
     return {
       minDate,
       maxDate,
@@ -66,15 +67,20 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
       },
       isDateBlocked: (date: Date) => {
         const dayStart = startOfDay(date);
-        return DELIVERY_BOOKING_CONSTANTS.BLOCKED_DATES.some(blockedDate => startOfDay(blockedDate).getTime() === dayStart.getTime());
+        return DELIVERY_BOOKING_CONSTANTS.BLOCKED_DATES.some(blockedDate => 
+          startOfDay(blockedDate).getTime() === dayStart.getTime()
+        );
       },
       isBusinessDayOnly: (date: Date) => {
         return DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY ? !isWeekend(date) : true;
       },
+      getMinimumBookingTime: () => {
+        return addMinutes(now, DELIVERY_BOOKING_CONSTANTS.MIN_LEAD_TIME_MINUTES);
+      },
       getDateDisabledReason: (date: Date) => {
         const dayStart = startOfDay(date);
         if (isBefore(dayStart, minDate)) {
-          return `Minimum ${DELIVERY_BOOKING_CONSTANTS.MIN_ADVANCE_DAYS} day advance booking required`;
+          return 'Past dates not available';
         }
         if (isAfter(dayStart, maxDate)) {
           return `Booking available up to ${DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS} months in advance`;
@@ -82,8 +88,10 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
         if (DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY && isWeekend(date)) {
           return 'Delivery not available on weekends';
         }
-        if (DELIVERY_BOOKING_CONSTANTS.BLOCKED_DATES.some(blockedDate => startOfDay(blockedDate).getTime() === dayStart.getTime())) {
-          return 'Delivery not available on this date';
+        if (DELIVERY_BOOKING_CONSTANTS.BLOCKED_DATES.some(blockedDate => 
+          startOfDay(blockedDate).getTime() === dayStart.getTime()
+        )) {
+          return 'Delivery not available on this date (holiday)';
         }
         return null;
       }
@@ -352,16 +360,19 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
             />
           </div>
           
-          {/* Date Range Information */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              📅 <strong>Booking Range:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
-              {DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY && (
-                <span className="block mt-1">
-                  🏢 <strong>Business days only</strong> (Monday-Friday)
-                </span>
-              )}
-            </p>
+          {/* Booking Information - Production Ready */}
+          <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+            <div className="space-y-2">
+              <p className="text-sm text-primary font-medium">
+                📅 <strong>Booking Window:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                ⏰ <strong>Delivery Hours:</strong> {DELIVERY_BOOKING_CONSTANTS.DELIVERY_WINDOW_START} - {DELIVERY_BOOKING_CONSTANTS.DELIVERY_WINDOW_END} (Hourly slots)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                🕐 <strong>Lead Time:</strong> Minimum {DELIVERY_BOOKING_CONSTANTS.MIN_LEAD_TIME_MINUTES} minutes from booking
+              </p>
+            </div>
           </div>
 
           {/* Date Selection Feedback */}

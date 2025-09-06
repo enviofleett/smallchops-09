@@ -708,25 +708,61 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           </CardContent>
         </Card>
 
-        {/* Fulfillment Type */}
+        {/* Fulfillment Type - Centered and Production Ready */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Fulfillment Method</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base text-center">How would you like to receive your order?</CardTitle>
+            <CardDescription className="text-center text-sm">
+              Choose delivery for convenience or pickup to save on fees
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <RadioGroup value={formData.fulfillment_type} onValueChange={value => handleFormChange('fulfillment_type', value)} className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="delivery" id="delivery" />
-                <Label htmlFor="delivery" className="flex items-center gap-2 cursor-pointer">
-                  <Truck className="w-4 h-4" />
-                  Delivery
+            <RadioGroup 
+              value={formData.fulfillment_type} 
+              onValueChange={value => handleFormChange('fulfillment_type', value)} 
+              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            >
+              <div className="relative">
+                <RadioGroupItem value="delivery" id="delivery" className="peer sr-only" />
+                <Label 
+                  htmlFor="delivery" 
+                  className={cn(
+                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
+                    "hover:border-primary/20 hover:bg-accent/5",
+                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
+                  )}
+                >
+                  <Truck className="w-8 h-8 mb-3 text-primary" />
+                  <span className="font-medium text-base">Delivery</span>
+                  <span className="text-sm text-muted-foreground text-center mt-1">
+                    We'll deliver to your address
+                  </span>
+                  {deliveryFee > 0 && (
+                    <span className="text-xs text-primary mt-2 font-medium">
+                      Fee: ₦{deliveryFee.toLocaleString()}
+                    </span>
+                  )}
                 </Label>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="pickup" id="pickup" />
-                <Label htmlFor="pickup" className="flex items-center gap-2 cursor-pointer">
-                  <MapPin className="w-4 h-4" />
-                  Pickup
+              
+              <div className="relative">
+                <RadioGroupItem value="pickup" id="pickup" className="peer sr-only" />
+                <Label 
+                  htmlFor="pickup" 
+                  className={cn(
+                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
+                    "hover:border-primary/20 hover:bg-accent/5",
+                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
+                  )}
+                >
+                  <MapPin className="w-8 h-8 mb-3 text-primary" />
+                  <span className="font-medium text-base">Pickup</span>
+                  <span className="text-sm text-muted-foreground text-center mt-1">
+                    Collect from our location
+                  </span>
+                  <span className="text-xs text-green-600 mt-2 font-medium">
+                    No delivery fee
+                  </span>
                 </Label>
               </div>
             </RadioGroup>
@@ -793,21 +829,39 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             </CardContent>
           </Card>}
 
-        {/* Pickup Point Selection */}
-        {formData.fulfillment_type === 'pickup' && <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                Pickup Location
+          {/* Pickup Point Selection - Centered */}
+        {formData.fulfillment_type === 'pickup' && (
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base text-center flex items-center justify-center gap-2">
+                <MapPin className="w-5 h-5 text-primary" />
+                Select Pickup Location
               </CardTitle>
+              <CardDescription className="text-center text-sm">
+                Choose a convenient location to collect your order
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <PickupPointSelector selectedPointId={pickupPoint?.id} onSelect={point => {
-            setPickupPoint(point);
-            handleFormChange('pickup_point_id', point?.id);
-          }} />
+              <PickupPointSelector 
+                selectedPointId={pickupPoint?.id} 
+                onSelect={point => {
+                  setPickupPoint(point);
+                  handleFormChange('pickup_point_id', point?.id);
+                }} 
+              />
+              {pickupPoint && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800 font-medium">
+                    ✅ Selected: {pickupPoint.name}
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">
+                    {pickupPoint.address}
+                  </p>
+                </div>
+              )}
             </CardContent>
-          </Card>}
+          </Card>
+        )}
 
       </div>
 

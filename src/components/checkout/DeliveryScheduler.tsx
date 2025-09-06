@@ -326,17 +326,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
             </div>
           </div>
           
-          {/* Date Range Information */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              📅 <strong>Booking Range:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
-              {DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY && (
-                <span className="block mt-1">
-                  🏢 <strong>Business days only</strong> (Monday-Friday)
-                </span>
-              )}
-            </p>
-          </div>
 
           <div className="w-full overflow-hidden rounded-lg bg-background">
             <Calendar 

@@ -56,7 +56,7 @@ export const HorizontalDatePicker: React.FC<HorizontalDatePickerProps> = ({
             size="sm"
             onClick={handlePrev}
             disabled={!canGoPrev}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 touch-manipulation active:scale-95"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -65,47 +65,50 @@ export const HorizontalDatePicker: React.FC<HorizontalDatePickerProps> = ({
             size="sm"
             onClick={handleNext}
             disabled={!canGoNext}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 touch-manipulation active:scale-95"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {visibleSlots.map((slot) => {
-          const date = parseISO(slot.date);
-          const isSelected = selectedDate && isSameDay(date, parseISO(selectedDate));
-          const isToday = isSameDay(date, new Date());
+      <div className="overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex gap-1 xs:gap-2 min-w-max px-1">
+          {visibleSlots.map((slot) => {
+            const date = parseISO(slot.date);
+            const isSelected = selectedDate && isSameDay(date, parseISO(selectedDate));
+            const isToday = isSameDay(date, new Date());
 
-          return (
-            <Button
-              key={slot.date}
-              variant={isSelected ? "default" : "outline"}
-              onClick={() => onDateSelect(slot.date)}
-              className={cn(
-                "flex-shrink-0 min-w-[80px] h-16 sm:h-18 flex flex-col items-center justify-center gap-1 px-3",
-                "border-2 transition-all duration-200 hover:scale-105 active:scale-95",
-                "text-center touch-manipulation",
-                isSelected && "bg-primary text-primary-foreground border-primary shadow-md",
-                !isSelected && "hover:bg-muted/50 hover:border-primary/20"
-              )}
-            >
-              <span className="text-xs font-medium opacity-80">
-                {format(date, 'EEE')}
-              </span>
-              <span className={cn(
-                "text-lg font-bold",
-                isToday && !isSelected && "text-primary"
-              )}>
-                {format(date, 'd')}
-              </span>
-              {isToday && (
-                <span className="text-xs opacity-80">Today</span>
-              )}
-            </Button>
-          );
-        })}
+            return (
+              <Button
+                key={slot.date}
+                variant={isSelected ? "default" : "outline"}
+                onClick={() => onDateSelect(slot.date)}
+                className={cn(
+                  "flex-shrink-0 w-[calc((100vw-2rem)/7)] min-w-[44px] max-w-[80px] h-14 xs:h-16 sm:h-18",
+                  "flex flex-col items-center justify-center gap-0.5 xs:gap-1 px-1 xs:px-2 sm:px-3",
+                  "border-2 transition-all duration-200 hover:scale-105 active:scale-95",
+                  "text-center touch-manipulation rounded-lg",
+                  isSelected && "bg-primary text-primary-foreground border-primary shadow-md",
+                  !isSelected && "hover:bg-muted/50 hover:border-primary/20"
+                )}
+              >
+                <span className="text-[10px] xs:text-xs font-medium opacity-80 leading-tight">
+                  {format(date, 'EEE')}
+                </span>
+                <span className={cn(
+                  "text-sm xs:text-base sm:text-lg font-bold leading-none",
+                  isToday && !isSelected && "text-primary"
+                )}>
+                  {format(date, 'd')}
+                </span>
+                {isToday && (
+                  <span className="text-[9px] xs:text-xs opacity-80 leading-tight">Today</span>
+                )}
+              </Button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

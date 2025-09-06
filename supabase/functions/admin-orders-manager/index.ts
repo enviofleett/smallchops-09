@@ -293,9 +293,19 @@ serve(async (req) => {
           })
         }
 
+        // Sanitize updates: map 'phone' to 'customer_phone' for orders table
+        const sanitizedUpdates = { ...(updates || {}) };
+        if (sanitizedUpdates && 'phone' in sanitizedUpdates) {
+          // Normalize potential guest phone field
+          // @ts-ignore - dynamic field mapping in edge function
+          sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
+          // @ts-ignore
+          delete sanitizedUpdates.phone;
+        }
+
         const { data, error } = await supabaseClient
           .from('orders')
-          .update(updates)
+          .update(sanitizedUpdates)
           .eq('id', orderId)
           .select(`*, 
             order_items (*),

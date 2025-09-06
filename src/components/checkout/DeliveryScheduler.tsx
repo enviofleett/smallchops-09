@@ -360,7 +360,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
             <DropdownDatePicker 
               selectedDate={selectedDate} 
               availableSlots={availableSlots} 
-              onDateSelect={handleDateSelect} 
+              onDateSelect={handleHorizontalDateSelect} 
             />
           </div>
           

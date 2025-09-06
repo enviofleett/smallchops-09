@@ -135,12 +135,14 @@ serve(async (req) => {
   try {
     let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
     
-    // CRITICAL: Sanitize any phone fields that come through to prevent column errors
-    if (updates && typeof updates === 'object' && 'phone' in updates) {
-      console.log('🚨 SANITIZING: Found phone field in updates, mapping to customer_phone');
-      updates.customer_phone = updates.phone;
-      delete updates.phone;
-      console.log('✅ SANITIZED: Updates after phone field cleanup:', updates);
+    // CRITICAL: Comprehensive phone field sanitization to prevent ALL column errors
+    if (updates && typeof updates === 'object') {
+      if ('phone' in updates) {
+        console.log('🚨 GLOBAL SANITIZATION: Found phone field in updates, mapping to customer_phone');
+        updates.customer_phone = updates.phone;
+        delete updates.phone;
+        console.log('✅ GLOBAL SANITIZED: Updates after phone field cleanup:', updates);
+      }
     }
 
     switch (action) {
@@ -430,7 +432,7 @@ serve(async (req) => {
           for (const [key, value] of Object.entries(updates)) {
             if (key === 'phone') {
               // Map legacy phone field to customer_phone
-              console.log('Mapping phone to customer_phone:', value);
+              console.log('🔧 Mapping phone to customer_phone:', value);
               sanitizedUpdates.customer_phone = value;
             } else if (allowedColumns.includes(key)) {
               sanitizedUpdates[key] = value;
@@ -439,6 +441,9 @@ serve(async (req) => {
             }
           }
         }
+
+        // Ensure we always set updated_at for tracking
+        sanitizedUpdates.updated_at = new Date().toISOString();
         
         console.log('Sanitized and whitelisted updates:', sanitizedUpdates);
 

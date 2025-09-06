@@ -166,24 +166,30 @@ export const getOrders = async ({
  */
 export const updateOrder = async (
   orderId: string,
-  updates: { status?: OrderStatus; assigned_rider_id?: string | null }
+  updates: { status?: OrderStatus; assigned_rider_id?: string | null; phone?: string; customer_phone?: string; [key: string]: any }
 ): Promise<OrderWithItems> => {
+  // Fix field mapping: ensure phone is mapped to customer_phone for orders table
+  const sanitizedUpdates = { ...updates };
+  if (sanitizedUpdates.phone) {
+    sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
+    delete sanitizedUpdates.phone;
+  }
   try {
     if (process.env.NODE_ENV === 'development') {
       console.log('🔄 Updating order via production-safe method:', orderId, updates);
     }
 
     // If we're assigning a rider, use the secure RPC-based assignment
-    if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
+    if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('🎯 Assigning/reassigning rider using secure RPC:', updates.assigned_rider_id);
+        console.log('🎯 Assigning/reassigning rider using secure RPC:', sanitizedUpdates.assigned_rider_id);
       }
       
       const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'assign_rider',
           orderId,
-          riderId: updates.assigned_rider_id
+          riderId: sanitizedUpdates.assigned_rider_id
         }
       });
 
@@ -200,7 +206,7 @@ export const updateOrder = async (
       }
 
       // If there are other updates besides rider assignment, apply them separately
-      const otherUpdates = { ...updates };
+      const otherUpdates = { ...sanitizedUpdates };
       delete otherUpdates.assigned_rider_id;
       
       if (Object.keys(otherUpdates).length > 0) {
@@ -227,7 +233,7 @@ export const updateOrder = async (
       body: {
         action: 'update',
         orderId,
-        updates
+        updates: sanitizedUpdates
       }
     });
 
@@ -252,25 +258,25 @@ export const updateOrder = async (
       }
       
       // If assigning rider, validate first
-      if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
+      if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
         const { data: riderCheck, error: riderError } = await supabase
           .from('drivers')
           .select('id, is_active')
-          .eq('id', updates.assigned_rider_id)
+          .eq('id', sanitizedUpdates.assigned_rider_id)
           .single();
 
         if (riderError || !riderCheck) {
-          throw new Error(`Invalid rider ID: ${updates.assigned_rider_id}`);
+          throw new Error(`Invalid rider ID: ${sanitizedUpdates.assigned_rider_id}`);
         }
 
         if (!riderCheck.is_active) {
-          throw new Error(`Rider ${updates.assigned_rider_id} is not active`);
+          throw new Error(`Rider ${sanitizedUpdates.assigned_rider_id} is not active`);
         }
       }
 
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('orders')
-        .update(updates)
+        .update(sanitizedUpdates)
         .eq('id', orderId)
         .select(`*, 
           order_items (*),

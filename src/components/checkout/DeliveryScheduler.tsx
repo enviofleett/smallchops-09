@@ -343,18 +343,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
 
           {/* Date Picker - Mobile Optimized */}
           <div className="space-y-4">
-            <div className="flex flex-col gap-2">
-              <h3 className="font-medium text-foreground flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4" />
-                Select delivery date
-              </h3>
-              <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">
-                  Book up to {DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS} months ahead
-                </span>
-              </div>
-            </div>
             
             {/* Always use dropdown for better UX */}
             <DropdownDatePicker 

@@ -116,13 +116,13 @@ class DeliverySchedulingService {
       default_delivery_duration_minutes: 60, // 1-hour delivery slots
       allow_same_day_delivery: true,
       business_hours: {
-        monday: { open: '08:00', close: '18:00', is_open: true },
-        tuesday: { open: '08:00', close: '18:00', is_open: true },
-        wednesday: { open: '08:00', close: '18:00', is_open: true },
-        thursday: { open: '08:00', close: '18:00', is_open: true },
-        friday: { open: '08:00', close: '18:00', is_open: true },
-        saturday: { open: '08:00', close: '18:00', is_open: true },
-        sunday: { open: '08:00', close: '18:00', is_open: true },
+        monday: { open: '08:00', close: '19:00', is_open: true },
+        tuesday: { open: '08:00', close: '19:00', is_open: true },
+        wednesday: { open: '08:00', close: '19:00', is_open: true },
+        thursday: { open: '08:00', close: '19:00', is_open: true },
+        friday: { open: '08:00', close: '19:00', is_open: true },
+        saturday: { open: '08:00', close: '19:00', is_open: true },
+        sunday: { open: '10:00', close: '16:00', is_open: true },
       }
     };
   }
@@ -197,24 +197,25 @@ class DeliverySchedulingService {
 
     const slots: DeliveryTimeSlot[] = [];
     
-    // Production: Fixed 8am-6pm window with hourly slots
-    const openTime = this.parseTime('08:00');
-    const closeTime = this.parseTime('18:00');
-    const slotDuration = 60; // Fixed 1-hour slots
+    // Production: Use dynamic hours based on day of week
+    // Monday-Saturday: 8am-7pm, Sunday: 10am-4pm
+    const openTime = this.parseTime(businessHours.open);
+    const closeTime = this.parseTime(businessHours.close);
+    const slotDuration = this.config.default_delivery_duration_minutes; // Use config duration
     const minDeliveryTime = this.getMinimumDeliveryTime();
 
     let currentTime = openTime;
 
-    // Generate hourly slots from 8am to 6pm
+    // Generate hourly slots within business hours
     while (currentTime < closeTime) {
       const slotEnd = addMinutes(currentTime, slotDuration);
       
-      // Don't create slot if it would end after 6pm
+      // Don't create slot if it would end after closing time
       if (isAfter(slotEnd, closeTime)) break;
 
       const slotDateTime = this.combineDateAndTime(date, currentTime);
 
-      // Production logic: Check if slot meets 60-minute lead time
+      // Production logic: Check if slot meets lead time requirement  
       const now = new Date();
       const isToday = isSameDay(date, now);
       
@@ -223,7 +224,7 @@ class DeliverySchedulingService {
 
       if (isToday && isBefore(slotDateTime, minDeliveryTime)) {
         available = false;
-        reason = 'Booking window closed - minimum 60 minutes required';
+        reason = `Booking window closed - minimum ${this.config.minimum_lead_time_minutes} minutes required`;
       } else if (isBefore(slotDateTime, now)) {
         available = false;
         reason = 'Time slot has passed';
@@ -236,7 +237,7 @@ class DeliverySchedulingService {
         reason
       });
 
-      // Move to next hour
+      // Move to next slot
       currentTime = addMinutes(currentTime, slotDuration);
     }
 

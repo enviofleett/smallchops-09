@@ -19,8 +19,10 @@ import { CacheOptimizer } from '@/utils/optimizedQuery';
 const DELIVERY_BOOKING_CONSTANTS = {
   MIN_LEAD_TIME_MINUTES: 60, // 60 minutes from booking time
   MAX_ADVANCE_MONTHS: 2, // 2 months advance booking
-  DELIVERY_WINDOW_START: '08:00', // 8am start
-  DELIVERY_WINDOW_END: '18:00', // 6pm end
+  DELIVERY_WINDOW_START: '08:00', // 8am start (Mon-Sat)
+  DELIVERY_WINDOW_END: '19:00', // 7pm end (Mon-Sat)
+  SUNDAY_WINDOW_START: '10:00', // 10am start (Sunday)
+  SUNDAY_WINDOW_END: '16:00', // 4pm end (Sunday)
   SLOT_DURATION_MINUTES: 60, // 1-hour slots
   BUSINESS_DAYS_ONLY: false, // Allow weekend deliveries
   BLOCKED_DATES: [] as Date[] // Holidays from business settings
@@ -367,7 +369,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                 📅 <strong>Booking Window:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
               </p>
               <p className="text-xs text-muted-foreground">
-                ⏰ <strong>Delivery Hours:</strong> {DELIVERY_BOOKING_CONSTANTS.DELIVERY_WINDOW_START} - {DELIVERY_BOOKING_CONSTANTS.DELIVERY_WINDOW_END} (Hourly slots)
+                ⏰ <strong>Delivery Hours:</strong> Mon-Sat: {DELIVERY_BOOKING_CONSTANTS.DELIVERY_WINDOW_START} - {DELIVERY_BOOKING_CONSTANTS.DELIVERY_WINDOW_END} | Sun: {DELIVERY_BOOKING_CONSTANTS.SUNDAY_WINDOW_START} - {DELIVERY_BOOKING_CONSTANTS.SUNDAY_WINDOW_END}
               </p>
               <p className="text-xs text-muted-foreground">
                 🕐 <strong>Lead Time:</strong> Minimum {DELIVERY_BOOKING_CONSTANTS.MIN_LEAD_TIME_MINUTES} minutes from booking

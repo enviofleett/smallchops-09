@@ -1,6 +1,56 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0'
-import { getCorsHeaders } from '../_shared/cors.ts'
+
+// Import shared CORS with inline fallback for production stability
+let getCorsHeaders: (origin?: string | null) => Record<string, string>;
+let handleCorsPreflightResponse: (origin?: string | null) => Response;
+
+try {
+  const corsModule = await import('../_shared/cors.ts');
+  getCorsHeaders = corsModule.getCorsHeaders;
+  handleCorsPreflightResponse = corsModule.handleCorsPreflightResponse;
+  console.log('✅ Loaded shared CORS module');
+} catch (error) {
+  console.warn('⚠️ Failed to load shared CORS, using inline fallback:', error);
+  
+  // Inline CORS fallback for production stability
+  const FALLBACK_ALLOWED_ORIGINS = [
+    'https://startersmallchops.com',
+    'https://www.startersmallchops.com',
+    'https://oknnklksdiqaifhxaccs.lovable.app',
+    'https://id-preview--7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.app',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.sandbox.lovable.dev',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  
+  const DEV_PATTERNS = [
+    /^https:\/\/.*\.lovable\.app$/,
+    /^https:\/\/.*\.sandbox\.lovable\.dev$/,
+    /^http:\/\/localhost:\d+$/
+  ];
+  
+  getCorsHeaders = (origin?: string | null) => {
+    const baseHeaders = {
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Access-Control-Allow-Credentials': 'false'
+    };
+    
+    if (!origin || (
+      !FALLBACK_ALLOWED_ORIGINS.includes(origin) && 
+      !DEV_PATTERNS.some(pattern => pattern.test(origin))
+    )) {
+      return { ...baseHeaders, 'Access-Control-Allow-Origin': '*' }; // Permissive fallback
+    }
+    
+    return { ...baseHeaders, 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' };
+  };
+  
+  handleCorsPreflightResponse = (origin?: string | null) => {
+    return new Response(null, { status: 204, headers: getCorsHeaders(origin) });
+  };
+}
 
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -9,16 +59,16 @@ const supabaseClient = createClient(
 
 serve(async (req) => {
   const origin = req.headers.get('origin')
-  const corsHeaders = getCorsHeaders(origin)
   
-  console.log(`🌐 Request from origin: ${origin || 'none'}`)
+  console.log(`🚀 Admin Orders Manager: ${req.method} request from origin: ${origin}`)
 
+  // Handle CORS preflight requests with proper 204 response
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 204,
-      headers: corsHeaders 
-    })
+    console.log('🔄 Handling CORS preflight request')
+    return handleCorsPreflightResponse(origin)
   }
+
+  const corsHeaders = getCorsHeaders(origin)
 
   try {
     let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()

@@ -117,11 +117,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     getCartTotal
   } = useCart();
   const items = cart.items || [];
-  // 🔧 CLEANUP: Initialize guest session cleanup and remove usage
+  // Initialize guest session for guest checkout support
   useGuestSessionCleanup();
-  // Remove guest session usage since guest mode is discontinued
-  // const { guestSession } = useGuestSession();
-  // const guestSessionId = guestSession?.sessionId;
+  const { guestSession, generateGuestSession } = useGuestSession();
+  const guestSessionId = guestSession?.sessionId;
   const {
     user,
     session,
@@ -138,7 +137,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   // Initialize checkout step based on authentication status
   const getInitialCheckoutStep = () => {
     if (isAuthenticated) return 'details';
-    return 'auth';
+    return 'auth'; // Will allow both login and guest options
   };
   const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(getInitialCheckoutStep());
   const [formData, setFormData] = useState<CheckoutData>({
@@ -195,6 +194,34 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       return;
     }
     onClose();
+  };
+
+  // Handle guest checkout choice
+  const handleContinueAsGuest = async () => {
+    try {
+      // Generate guest session if not already present
+      if (!guestSessionId) {
+        await generateGuestSession();
+      }
+      setCheckoutStep('details');
+      toast({
+        title: "Guest Checkout",
+        description: "You can proceed without creating an account.",
+      });
+    } catch (error) {
+      console.error('Error generating guest session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start guest checkout. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle login choice
+  const handleLogin = () => {
+    storeRedirectUrl(`${window.location.pathname}${window.location.search}`);
+    navigate('/auth');
   };
 
   // Listen for payment completion messages from popup window
@@ -305,14 +332,14 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   // Remove the processOrder hook usage since it doesn't exist
 
   const handleFormSubmit = async () => {
-    // 🔐 ENFORCE AUTHENTICATION: Block if not authenticated
-    if (!isAuthenticated) {
+    // 🔐 AUTHENTICATION CHECK: Allow both authenticated users and guests with session
+    if (!isAuthenticated && !guestSessionId) {
       toast({
-        title: "Authentication Required",
-        description: "Please log in to continue with checkout.",
+        title: "Session Required",
+        description: "Please log in or continue as guest to checkout.",
         variant: "destructive"
       });
-      navigate('/auth');
+      setCheckoutStep('auth');
       return;
     }
 
@@ -371,7 +398,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         customer: {
           name: formData.customer_name.trim(),
           email: formData.customer_email.trim().toLowerCase(),
-          phone: formData.customer_phone?.trim() || undefined
+          phone: formData.customer_phone?.trim() || undefined,
+          guest_session_id: guestSessionId || undefined // Include guest session for guest users
         },
         items: items.map(item => ({
           product_id: item.product_id,
@@ -604,11 +632,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         </p>
       </div>
       
-      <GuestOrLoginChoice onContinueAsGuest={() => setCheckoutStep('details')} onLogin={() => {
-      storeRedirectUrl('/cart');
-      onClose();
-      navigate('/auth');
-    }} totalAmount={total} />
+      <GuestOrLoginChoice 
+        onContinueAsGuest={handleContinueAsGuest} 
+        onLogin={handleLogin} 
+        totalAmount={total} 
+      />
     </div>;
   const renderDetailsStep = () => <div className="space-y-6">
       <div className="space-y-4">

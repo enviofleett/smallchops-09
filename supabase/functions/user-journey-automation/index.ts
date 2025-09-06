@@ -366,23 +366,42 @@ async function handleOrderStatusChangeJourney(
     }
   }
 
-  // Map status to template
+  // Check for existing ready emails to prevent duplicates
+  if (status === 'ready') {
+    const { data: existingReadyEmail } = await supabase
+      .from('communication_events')
+      .select('id')
+      .eq('order_id', orderData.order_id)
+      .eq('event_type', 'order_status_update')
+      .eq('template_key', 'order_ready')
+      .eq('status', 'sent')
+      .limit(1);
+
+    if (existingReadyEmail && existingReadyEmail.length > 0) {
+      console.log(`⚠️ Order ${orderData.order_number} already has ready notification sent, skipping duplicate`);
+      return events;
+    }
+  }
+
+  // Map status to correct template keys that exist in enhanced_email_templates
   const statusTemplateMap: Record<string, string> = {
-    'confirmed': 'order_confirmed',
-    'preparing': 'order_preparing', 
+    'confirmed': 'order_confirmation',    // Fix: changed from order_confirmed
+    'preparing': 'order_processing',     // Fix: changed from order_preparing
     'ready': 'order_ready',
     'out_for_delivery': 'order_out_for_delivery',
     'delivered': 'order_delivered',
-    'cancelled': 'order_cancelled',
+    'cancelled': 'order_cancellation',    // Fix: changed from order_cancelled
     'completed': 'order_completed',
     'returned': 'order_returned'
   };
 
   const templateKey = statusTemplateMap[status];
   if (!templateKey) {
-    console.warn(`No template found for status: ${status}`);
+    console.warn(`❌ No template found for status: ${status}. Available mappings:`, Object.keys(statusTemplateMap));
     return events;
   }
+
+  console.log(`📧 Using template key: ${templateKey} for status: ${status}`);
 
   const statusUpdateEvent = await supabase
     .from('communication_events')

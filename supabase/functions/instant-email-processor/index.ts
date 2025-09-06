@@ -146,18 +146,34 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
       try {
         // Normalize template key for backwards compatibility
         let normalizedTemplateKey = email.template_key;
-        if (email.template_key === 'order_confirmed') {
-          normalizedTemplateKey = 'order_confirmation';
+        const legacyMappings: Record<string, string> = {
+          'order_confirmed': 'order_confirmation',
+          'order_preparing': 'order_processing', 
+          'order_cancelled': 'order_cancellation',
+          'pickup_ready': 'order_ready'
+        };
+        
+        if (legacyMappings[email.template_key]) {
+          normalizedTemplateKey = legacyMappings[email.template_key];
+          console.log(`🔄 Normalized template key: ${email.template_key} → ${normalizedTemplateKey}`);
         }
 
+        // Merge template_variables and variables for complete data
+        const mergedVariables = {
+          ...(email.template_variables || {}),
+          ...(email.variables || {})
+        };
+
+        console.log(`📧 Sending with template: ${normalizedTemplateKey} (original: ${email.template_key})`);
+        
         emailResult = await supabase.functions.invoke('unified-smtp-sender', {
           body: {
             to: email.recipient_email,
-            subject: email.variables?.subject || 'Notification from Starters Small Chops',
-            htmlContent: email.variables?.html_content,
-            textContent: email.variables?.text_content,
+            subject: mergedVariables.subject || 'Notification from Starters Small Chops',
+            htmlContent: mergedVariables.html_content,
+            textContent: mergedVariables.text_content,
             templateKey: normalizedTemplateKey,
-            variables: email.variables
+            variables: mergedVariables
           }
         })
       } catch (sendError) {

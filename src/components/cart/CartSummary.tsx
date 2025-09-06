@@ -221,20 +221,6 @@ export function CartSummary({ cart }: CartSummaryProps) {
               <span>{formatCurrency(cart.summary.total_amount)}</span>
             </div>
 
-            {/* Tax Summary Box */}
-            <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Tax Breakdown</h4>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span>Items VAT:</span>
-                  <span>{formatCurrency(cart.summary.total_vat)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>Total VAT Inclusive:</span>
-                  <span className="font-medium">{formatCurrency(cart.summary.total_vat)}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* BOGO Items Display */}

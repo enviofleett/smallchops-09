@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { FileText, Save, AlertCircle, CheckCircle, Shield, Eye, Timer } from 'lucide-react';
@@ -244,15 +244,14 @@ export const LegalTermsManager = () => {
                 )}
               </div>
             </div>
-            <Textarea
-              id="terms-content"
+            <RichTextEditor
               value={termsContent}
-              onChange={(e) => setTermsContent(e.target.value)}
-              placeholder="Enter your terms and conditions here. HTML formatting is supported."
-              className="min-h-[300px] font-mono text-sm"
+              onChange={setTermsContent}
+              placeholder="Enter your terms and conditions here. Use the toolbar to format your content professionally."
+              className="min-h-[300px]"
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>HTML tags are supported for formatting (e.g., &lt;h2&gt;, &lt;p&gt;, &lt;strong&gt;, &lt;ul&gt;, etc.)</span>
+              <span>Use the formatting toolbar above to create professional, well-structured terms and conditions</span>
               {termsContent.length < 100 && termsContent.length > 0 && (
                 <span className="text-amber-600">Minimum 100 characters recommended for legal validity</span>
               )}

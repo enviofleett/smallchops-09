@@ -427,16 +427,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       };
       console.log('📦 Submitting checkout data:', sanitizedData);
 
-      // Call Supabase edge function with authentication
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('process-checkout', {
-        body: sanitizedData,
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
-        }
-      });
+      // Call Supabase edge function with authentication when available
+      const invokeOptions: any = { body: sanitizedData };
+      if (session?.access_token) {
+        invokeOptions.headers = { Authorization: `Bearer ${session.access_token}` };
+      }
+      const { data, error } = await supabase.functions.invoke('process-checkout', invokeOptions);
 
       // 🚨 CRITICAL: Stop flow immediately on order creation failure
       if (error || !data?.success) {

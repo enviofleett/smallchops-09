@@ -76,6 +76,12 @@ verify_jwt = false
 [functions.admin-orders-manager]
 verify_jwt = false
 
+[functions.user-journey-automation]
+verify_jwt = false
+
+[functions.instant-email-processor]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

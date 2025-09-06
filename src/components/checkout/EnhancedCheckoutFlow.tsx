@@ -920,8 +920,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                       </Label>
                     </div>}
 
-                  <Button onClick={handleFormSubmit} disabled={!canProceedToDetails || isSubmitting || !isAuthenticated} className="w-full h-11 md:h-14 text-sm md:text-lg font-medium" size="lg">
-                    {isSubmitting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : !isAuthenticated ? "Please log in to continue" : `Proceed to Payment • ₦${total.toLocaleString()}`}
+                  <Button onClick={handleFormSubmit} disabled={!canProceedToDetails || isSubmitting || (!isAuthenticated && !guestSession)} className="w-full h-11 md:h-14 text-sm md:text-lg font-medium" size="lg">
+                    {isSubmitting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : (!isAuthenticated && !guestSession) ? "Please choose checkout method" : `Proceed to Payment • ₦${total.toLocaleString()}`}
                   </Button>
                   
                   {lastPaymentError && <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">

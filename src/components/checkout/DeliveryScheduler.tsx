@@ -11,6 +11,7 @@ import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
 import { HorizontalDatePicker } from './HorizontalDatePicker';
+import { DropdownDatePicker } from './DropdownDatePicker';
 import { useQuery } from '@tanstack/react-query';
 import { CacheOptimizer } from '@/utils/optimizedQuery';
 
@@ -233,8 +234,21 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
               </AlertDescription>
             </Alert>}
 
-          {/* Horizontal Date Picker */}
-          <HorizontalDatePicker selectedDate={selectedDate} availableSlots={availableSlots} onDateSelect={handleHorizontalDateSelect} />
+          {/* Date Picker - Responsive */}
+          <div className="block sm:hidden">
+            <DropdownDatePicker 
+              selectedDate={selectedDate} 
+              availableSlots={availableSlots} 
+              onDateSelect={handleHorizontalDateSelect} 
+            />
+          </div>
+          <div className="hidden sm:block">
+            <HorizontalDatePicker 
+              selectedDate={selectedDate} 
+              availableSlots={availableSlots} 
+              onDateSelect={handleHorizontalDateSelect} 
+            />
+          </div>
 
           {/* Time Slots Section */}
           {calendarDate && selectedDateSlots.length > 0 && <div className="space-y-4">

@@ -55,9 +55,6 @@ ip_version = "ipv4"
 [functions.delivery-availability]
 verify_jwt = false
 
-[functions.delivery-booking]
-verify_jwt = true
-
 [functions.validate-promotion-code]
 verify_jwt = false
 

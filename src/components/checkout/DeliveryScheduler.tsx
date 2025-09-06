@@ -422,7 +422,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                       </span>
                     )}
                     {timeSlot.available && (
-                      <span className="text-xs text-green-600 font-medium">Available</span>
+                      <span className="text-xs text-muted-foreground font-medium">Available</span>
                     )}
                   </Button>
                 ))}

@@ -70,6 +70,68 @@ serve(async (req) => {
 
   const corsHeaders = getCorsHeaders(origin)
 
+  // ADMIN AUTHENTICATION: Validate JWT and admin role manually since verify_jwt = false
+  try {
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Missing or invalid authorization header')
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Unauthorized: Missing authentication token'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401
+      })
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    
+    if (authError || !user) {
+      console.log('❌ Invalid JWT token:', authError?.message)
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Unauthorized: Invalid authentication token'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401
+      })
+    }
+
+    // Check if user is admin
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile || profile.role !== 'admin' || !profile.is_active) {
+      console.log('❌ User is not an active admin:', { 
+        userId: user.id, 
+        role: profile?.role, 
+        isActive: profile?.is_active 
+      })
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Forbidden: Admin access required'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403
+      })
+    }
+
+    console.log('✅ Admin authentication successful for user:', user.id)
+  } catch (authError) {
+    console.error('❌ Authentication error:', authError)
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Authentication failed'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500
+    })
+  }
+
   try {
     let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
     

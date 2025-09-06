@@ -21,7 +21,15 @@ serve(async (req) => {
   }
 
   try {
-    const { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
+    let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
+    
+    // CRITICAL: Sanitize any phone fields that come through to prevent column errors
+    if (updates && typeof updates === 'object' && 'phone' in updates) {
+      console.log('🚨 SANITIZING: Found phone field in updates, mapping to customer_phone');
+      updates.customer_phone = updates.phone;
+      delete updates.phone;
+      console.log('✅ SANITIZED: Updates after phone field cleanup:', updates);
+    }
 
     switch (action) {
       case 'list': {
@@ -273,7 +281,7 @@ serve(async (req) => {
       }
 
       case 'update': {
-        console.log('Admin function: Updating order', orderId, updates)
+        console.log('Admin function: Updating order', orderId, 'with updates:', JSON.stringify(updates))
 
         // Get the current order to compare status changes
         const { data: currentOrder, error: fetchError } = await supabaseClient
@@ -295,11 +303,19 @@ serve(async (req) => {
 
         // Sanitize updates: map 'phone' to 'customer_phone' for orders table
         const sanitizedUpdates = { ...(updates || {}) };
+        console.log('Raw updates before sanitization:', sanitizedUpdates);
+        
         if (sanitizedUpdates && 'phone' in sanitizedUpdates) {
-          // Normalize potential guest phone field
-          // @ts-ignore - dynamic field mapping in edge function
+          console.log('Found phone field, mapping to customer_phone:', sanitizedUpdates.phone);
           sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
-          // @ts-ignore
+          delete sanitizedUpdates.phone;
+        }
+        
+        console.log('Sanitized updates:', sanitizedUpdates);
+        
+        // FINAL SAFETY CHECK: Ensure no phone field exists before DB update
+        if ('phone' in sanitizedUpdates) {
+          console.error('🚨 CRITICAL: Phone field still exists after sanitization!');
           delete sanitizedUpdates.phone;
         }
 

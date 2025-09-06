@@ -168,9 +168,12 @@ export const updateOrder = async (
   orderId: string,
   updates: { status?: OrderStatus; assigned_rider_id?: string | null; phone?: string; customer_phone?: string; [key: string]: any }
 ): Promise<OrderWithItems> => {
-  // Fix field mapping: ensure phone is mapped to customer_phone for orders table
+  // CRITICAL: Fix field mapping to prevent database column errors
   const sanitizedUpdates = { ...updates };
-  if (sanitizedUpdates.phone) {
+  
+  // Always sanitize phone field to customer_phone for orders table compatibility
+  if ('phone' in sanitizedUpdates) {
+    console.log('🔧 Mapping phone to customer_phone for orders table compatibility');
     sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
     delete sanitizedUpdates.phone;
   }

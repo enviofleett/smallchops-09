@@ -483,12 +483,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                   </div>
                 </div>
 
-                {/* Production Features */}
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    ⚡ <strong>Production Features:</strong> 6-month advance booking • Smart date validation • Business day filtering • Holiday detection
-                  </p>
-                </div>
               </div>
             </div>
           )}

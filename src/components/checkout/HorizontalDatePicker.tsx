@@ -73,7 +73,7 @@ export const HorizontalDatePicker: React.FC<HorizontalDatePickerProps> = ({
       </div>
 
       <div className="overflow-x-auto pb-2 scrollbar-hide">
-        <div className="flex gap-1 xs:gap-2 min-w-max px-1">
+        <div className="flex gap-0.5 xs:gap-1 sm:gap-2 min-w-max px-0.5 xs:px-1">
           {visibleSlots.map((slot) => {
             const date = parseISO(slot.date);
             const isSelected = selectedDate && isSameDay(date, parseISO(selectedDate));
@@ -85,25 +85,25 @@ export const HorizontalDatePicker: React.FC<HorizontalDatePickerProps> = ({
                 variant={isSelected ? "default" : "outline"}
                 onClick={() => onDateSelect(slot.date)}
                 className={cn(
-                  "flex-shrink-0 w-[calc((100vw-2rem)/7)] min-w-[44px] max-w-[80px] h-14 xs:h-16 sm:h-18",
-                  "flex flex-col items-center justify-center gap-0.5 xs:gap-1 px-1 xs:px-2 sm:px-3",
-                  "border-2 transition-all duration-200 hover:scale-105 active:scale-95",
-                  "text-center touch-manipulation rounded-lg",
+                  "flex-shrink-0 w-[calc((100vw-2rem)/7)] min-w-[38px] max-w-[80px] h-12 xs:h-14 sm:h-16",
+                  "flex flex-col items-center justify-center gap-0.5 xs:gap-1 px-0.5 xs:px-1 sm:px-2",
+                  "border transition-all duration-200 hover:scale-105 active:scale-95",
+                  "text-center touch-manipulation rounded-md xs:rounded-lg",
                   isSelected && "bg-primary text-primary-foreground border-primary shadow-md",
                   !isSelected && "hover:bg-muted/50 hover:border-primary/20"
                 )}
               >
-                <span className="text-[10px] xs:text-xs font-medium opacity-80 leading-tight">
-                  {format(date, 'EEE')}
+                <span className="text-[8px] xs:text-[10px] sm:text-xs font-medium opacity-80 leading-tight">
+                  {format(date, 'EEEEE')}
                 </span>
                 <span className={cn(
-                  "text-sm xs:text-base sm:text-lg font-bold leading-none",
+                  "text-xs xs:text-sm sm:text-base font-bold leading-none",
                   isToday && !isSelected && "text-primary"
                 )}>
                   {format(date, 'd')}
                 </span>
                 {isToday && (
-                  <span className="text-[9px] xs:text-xs opacity-80 leading-tight">Today</span>
+                  <span className="text-[7px] xs:text-[8px] sm:text-xs opacity-80 leading-tight">Now</span>
                 )}
               </Button>
             );

@@ -6,11 +6,14 @@ import { useCart } from '@/hooks/useCart';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { useWebsiteMenu } from '@/hooks/useWebsiteMenu';
+import { useHeaderBanners } from '@/hooks/useHeaderBanners';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { NotificationPreview } from '@/components/notifications/NotificationPreview';
 import { NotificationIntegration } from '@/components/notifications/NotificationIntegration';
+import { HeaderBanner } from '@/components/banners/HeaderBanner';
 
 export const PublicHeader = () => {
   return (
@@ -23,22 +26,44 @@ export const PublicHeader = () => {
 const PublicHeaderContent = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Keep for backward compatibility
+  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
   const { getItemCount } = useCart();
   const { getFavoritesCount } = useFavorites();
   const { data: settings, error } = useBusinessSettings();
   const { isAuthenticated, customerAccount, isLoading } = useCustomerAuth();
+  const { data: menuItems } = useWebsiteMenu();
+  const { data: banners } = useHeaderBanners();
   const navigate = useNavigate();
 
   const handleCartClick = () => {
     navigate('/cart');
   };
 
+  const handleDismissBanner = (bannerId: string) => {
+    setDismissedBanners(prev => new Set([...prev, bannerId]));
+  };
+
   // Graceful degradation for logo and business name
   const logoUrl = settings?.logo_url || "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
   const businessName = settings?.name || "Starters";
 
+  // Filter out dismissed banners
+  const activeBanners = banners?.filter(banner => !dismissedBanners.has(banner.id)) || [];
+
   return (
-    <header className="bg-background border-b border-border sticky top-0 z-50">
+    <div>
+      {/* Header Banners */}
+      {activeBanners.map((banner) => (
+        <HeaderBanner
+          key={banner.id}
+          banner={banner}
+          onDismiss={() => handleDismissBanner(banner.id)}
+          dismissible={true}
+        />
+      ))}
+      
+      {/* Main Header */}
+      <header className="bg-background border-b border-border sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
@@ -55,36 +80,16 @@ const PublicHeaderContent = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Link 
-              to="/" 
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              Home
-            </Link>
-            <Link 
-              to="/products" 
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              Shop
-            </Link>
-            <Link 
-              to="/booking" 
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              Event
-            </Link>
-            <Link 
-              to="/about" 
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              About
-            </Link>
-            <Link 
-              to="/contact" 
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              Contact
-            </Link>
+            {menuItems?.map((item) => (
+              <Link
+                key={item.id}
+                to={item.url || '#'}
+                className="text-foreground hover:text-primary transition-colors"
+                target={item.target}
+              >
+                {item.label}
+              </Link>
+            ))}
           </nav>
 
           {/* Search Bar - Hidden on mobile, shown in mobile menu */}
@@ -171,27 +176,17 @@ const PublicHeaderContent = () => {
 
               {/* Mobile Navigation */}
               <nav className="flex flex-col space-y-1 px-4">
-                <Link 
-                  to="/" 
-                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Home
-                </Link>
-                <Link 
-                  to="/products" 
-                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Shop
-                </Link>
-                <Link 
-                  to="/booking" 
-                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Event
-                </Link>
+                {menuItems?.map((item) => (
+                  <Link
+                    key={item.id}
+                    to={item.url || '#'}
+                    className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
+                    target={item.target}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
                 {isAuthenticated && (
                   <button 
                     className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
@@ -221,20 +216,6 @@ const PublicHeaderContent = () => {
                     </span>
                   )}
                 </button>
-                <Link 
-                  to="/about" 
-                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  About
-                </Link>
-                <Link 
-                  to="/contact" 
-                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Contact
-                </Link>
               </nav>
             </div>
           </div>
@@ -246,6 +227,7 @@ const PublicHeaderContent = () => {
       
       {/* Notification Integration - Global Event Listeners */}
       <NotificationIntegration />
-    </header>
+      </header>
+    </div>
   );
 };

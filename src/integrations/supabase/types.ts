@@ -4088,6 +4088,63 @@ export type Database = {
         }
         Relationships: []
       }
+      header_banners: {
+        Row: {
+          background_color: string | null
+          button_text: string | null
+          button_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_priority: number | null
+          end_date: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          start_date: string | null
+          text_color: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          background_color?: string | null
+          button_text?: string | null
+          button_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_priority?: number | null
+          end_date?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          start_date?: string | null
+          text_color?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          background_color?: string | null
+          button_text?: string | null
+          button_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_priority?: number | null
+          end_date?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          start_date?: string | null
+          text_color?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       hero_carousel_images: {
         Row: {
           alt_text: string | null
@@ -8351,6 +8408,62 @@ export type Database = {
           transaction_reference?: string | null
         }
         Relationships: []
+      }
+      website_menu: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          icon_name: string | null
+          id: string
+          is_active: boolean | null
+          label: string
+          menu_key: string
+          parent_id: string | null
+          sort_order: number | null
+          target: string | null
+          updated_at: string
+          updated_by: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          label: string
+          menu_key: string
+          parent_id?: string | null
+          sort_order?: number | null
+          target?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          label?: string
+          menu_key?: string
+          parent_id?: string | null
+          sort_order?: number | null
+          target?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_menu_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "website_menu"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       zone_consolidation_map: {
         Row: {

@@ -22,6 +22,7 @@ import { DeliverySchedulingTab } from './DeliverySchedulingTab';
 import { LegalTermsManager } from './LegalTermsManager';
 import { SMTPIntegrationDiagnostics } from './SMTPIntegrationDiagnostics';
 import { SMTPConfigurationGuide } from './SMTPConfigurationGuide';
+import { BannerManagement } from '@/components/communications/BannerManagement';
 interface EmailStats {
   totalSent: number;
   deliveredToday: number;
@@ -432,7 +433,7 @@ export const CommunicationsTab = () => {
         </div>}
 
       <Tabs defaultValue="unified" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="unified" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
             Unified System
@@ -480,6 +481,10 @@ export const CommunicationsTab = () => {
 
         <TabsContent value="templates" className="space-y-4">
           <EmailTemplateManager />
+        </TabsContent>
+
+        <TabsContent value="banners" className="space-y-4">
+          <BannerManagement />
         </TabsContent>
 
         <TabsContent value="processing" className="space-y-4">

@@ -219,15 +219,6 @@ const Blog: React.FC = () => {
         {/* Hero Section */}
         <section className="bg-gradient-to-br from-primary to-primary-variant text-primary-foreground py-16 px-4">
           <div className="container mx-auto max-w-4xl text-center">
-            {blogSettings?.blog_banner_url && (
-              <div className="mb-8">
-                <img 
-                  src={blogSettings.blog_banner_url} 
-                  alt="Blog Banner"
-                  className="w-full h-64 object-cover rounded-lg shadow-lg"
-                />
-              </div>
-            )}
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               {blogTitle}
             </h1>

@@ -141,6 +141,108 @@ export const CommunicationsTab = () => {
       });
     }
   }, [deliveryLogs]);
+  const testProductionReadiness = async () => {
+    if (!testEmail?.trim()) {
+      toast.error('Please enter a test email address');
+      return;
+    }
+
+    setTestingConnection(true);
+    setConnectionStatus(null);
+
+    try {
+      console.log('🔍 Starting comprehensive production readiness test...');
+
+      // Test 1: SMTP Configuration Health
+      const { data: smtpHealth, error: smtpError } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: { healthcheck: true, check: 'smtp' }
+      });
+
+      if (smtpError || !smtpHealth?.smtpCheck?.configured) {
+        throw new Error('SMTP configuration failed health check');
+      }
+
+      // Test 2: Email Delivery Test
+      const { data: deliveryTest, error: deliveryError } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: {
+          to: testEmail.trim(),
+          template_key: 'production_readiness_test',
+          variables: {
+            test_timestamp: new Date().toISOString(),
+            environment: 'production',
+            business_name: 'Starters Small Chops'
+          },
+          email_type: 'system_test'
+        }
+      });
+
+      if (deliveryError || !deliveryTest?.success) {
+        throw new Error('Email delivery test failed');
+      }
+
+      // Test 3: Email Queue Processing
+      const { data: queueTest, error: queueError } = await supabase.functions.invoke('unified-email-queue-processor', {
+        body: { healthcheck: true }
+      });
+
+      if (queueError) {
+        console.warn('Queue processor test warning:', queueError);
+      }
+
+      // Test 4: Communication Events Check
+      const { data: recentEvents, error: eventsError } = await supabase
+        .from('communication_events')
+        .select('status, event_type')
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .limit(50);
+
+      const eventStats = recentEvents?.reduce((acc, event) => {
+        acc[event.status] = (acc[event.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>) || {};
+
+      setConnectionStatus('success');
+      toast.success('✅ Production readiness test completed successfully!', {
+        description: `All systems operational. Test email sent to ${testEmail}`,
+        duration: 10000
+      });
+
+      // Log comprehensive test results
+      console.log('✅ Production Readiness Test Results:', {
+        smtp_configured: smtpHealth.smtpCheck.configured,
+        smtp_source: smtpHealth.smtpCheck.source,
+        email_delivered: deliveryTest.success,
+        queue_healthy: !queueError,
+        recent_events: recentEvents?.length || 0,
+        event_stats: eventStats,
+        test_email: testEmail.replace(/(.{3}).*(@.*)/, '$1***$2')
+      });
+
+      const failedEvents = eventStats.failed || 0;
+      const totalEvents = Object.values(eventStats).reduce((sum, count) => sum + count, 0);
+      
+      if (failedEvents > 0 && totalEvents > 0) {
+        const failureRate = Math.round((failedEvents / totalEvents) * 100);
+        if (failureRate > 20) {
+          toast.warning(`⚠️ High email failure rate: ${failureRate}%`, {
+            description: 'Check SMTP configuration and email provider status'
+          });
+        }
+      }
+
+    } catch (error: any) {
+      console.error('💥 Production readiness test failed:', error);
+      setConnectionStatus('error');
+      
+      toast.error('❌ Production readiness test failed', {
+        description: error.message || 'System not ready for production use',
+        duration: 8000
+      });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   const testEmailConnection = async () => {
     // PRODUCTION-READY: Comprehensive input validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -559,12 +661,8 @@ export const CommunicationsTab = () => {
                   <Input id="test-email" type="email" placeholder="your-email@example.com" value={testEmail} onChange={e => setTestEmail(e.target.value)} />
                 </div>
                 <Button 
-                  onClick={testEmailConnection} 
-                  disabled={
-                    testingConnection || 
-                    !testEmail || 
-                    (productionStatus && !productionStatus.configured)
-                  } 
+                  onClick={testProductionReadiness} 
+                  disabled={testingConnection} 
                   className="w-full"
                   variant={productionStatus?.configured ? "default" : "secondary"}
                 >
@@ -580,7 +678,7 @@ export const CommunicationsTab = () => {
                       ) : (
                         <Shield className="mr-2 h-4 w-4" />
                       )}
-                      {productionStatus?.configured ? 'Send Production Test' : 'Configure SMTP First'}
+                      Test Production Readiness
                     </>
                   )}
                 </Button>

@@ -4741,6 +4741,7 @@ export type Database = {
       order_items: {
         Row: {
           cost_price: number | null
+          created_at: string | null
           customizations: Json | null
           discount_amount: number | null
           id: string
@@ -4751,11 +4752,13 @@ export type Database = {
           special_instructions: string | null
           total_price: number
           unit_price: number
+          updated_at: string | null
           vat_amount: number | null
           vat_rate: number | null
         }
         Insert: {
           cost_price?: number | null
+          created_at?: string | null
           customizations?: Json | null
           discount_amount?: number | null
           id?: string
@@ -4766,11 +4769,13 @@ export type Database = {
           special_instructions?: string | null
           total_price: number
           unit_price: number
+          updated_at?: string | null
           vat_amount?: number | null
           vat_rate?: number | null
         }
         Update: {
           cost_price?: number | null
+          created_at?: string | null
           customizations?: Json | null
           discount_amount?: number | null
           id?: string
@@ -4781,6 +4786,7 @@ export type Database = {
           special_instructions?: string | null
           total_price?: number
           unit_price?: number
+          updated_at?: string | null
           vat_amount?: number | null
           vat_rate?: number | null
         }
@@ -4964,6 +4970,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          admin_notes: string | null
           amount_kobo: number | null
           assigned_rider_id: string | null
           created_at: string
@@ -5012,6 +5019,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          admin_notes?: string | null
           amount_kobo?: number | null
           assigned_rider_id?: string | null
           created_at?: string
@@ -5060,6 +5068,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          admin_notes?: string | null
           amount_kobo?: number | null
           assigned_rider_id?: string | null
           created_at?: string
@@ -9157,6 +9166,7 @@ export type Database = {
       get_detailed_order_with_products: {
         Args: { p_order_id: string }
         Returns: {
+          admin_notes: string
           created_at: string
           customer_email: string
           customer_name: string

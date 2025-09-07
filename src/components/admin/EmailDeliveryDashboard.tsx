@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEmailDeliveryTracking } from '@/hooks/useEmailDeliveryTracking';
 import { formatDistanceToNow } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Mail, 
   CheckCircle, 
@@ -12,11 +14,12 @@ import {
   AlertTriangle, 
   RefreshCw,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Send
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-export const EmailDeliveryDashboard = () => {
+export const EmailDeliveryDashboard: React.FC = () => {
   const { 
     deliveryLogs, 
     emailStats, 
@@ -27,16 +30,33 @@ export const EmailDeliveryDashboard = () => {
   } = useEmailDeliveryTracking();
   const { toast } = useToast();
 
+  // Get communication events for enhanced visibility
+  const { data: communicationEvents = [], isLoading: isLoadingEvents } = useQuery({
+    queryKey: ['communication-events'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('communication_events')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data || [];
+    },
+    refetchInterval: 30000,
+  });
+
   const handleRetryEmail = async (messageId: string) => {
     const success = await retryFailedEmail(messageId);
+    
     if (success) {
       toast({
-        title: "Email Retry Initiated",
-        description: "The failed email has been queued for retry",
+        title: "Email Retry Successful",
+        description: "The email has been queued for retry.",
       });
     } else {
       toast({
-        title: "Retry Failed",
+        title: "Email Retry Failed",
         description: "Unable to retry the email. Please try again.",
         variant: "destructive",
       });
@@ -45,8 +65,13 @@ export const EmailDeliveryDashboard = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'sent':
       case 'delivered':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'processing':
+        return <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />;
+      case 'queued':
+        return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'bounced':
       case 'failed':
         return <XCircle className="w-4 h-4 text-red-500" />;
@@ -60,10 +85,12 @@ export const EmailDeliveryDashboard = () => {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       delivered: "default",
+      sent: "default",
       bounced: "destructive",
       failed: "destructive",
       complained: "secondary",
-      sent: "outline"
+      processing: "secondary",
+      queued: "outline"
     };
 
     return (
@@ -73,17 +100,56 @@ export const EmailDeliveryDashboard = () => {
     );
   };
 
-  if (isLoading) {
-    return <div>Loading email delivery data...</div>;
+  const processQueue = async () => {
+    try {
+      const { error } = await supabase.functions.invoke('instant-email-processor');
+      if (error) throw error;
+      
+      toast({
+        title: "Email Processing Started",
+        description: "The email queue is being processed.",
+      });
+      
+      // Refresh data after processing
+      setTimeout(() => {
+        refetch();
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: "Processing Failed",
+        description: "Unable to process email queue. Please check configuration.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isLoading || isLoadingEvents) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+        Loading email delivery data...
+      </div>
+    );
   }
 
   if (error) {
     return (
       <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-red-500">
-            Error loading email delivery data
-          </div>
+        <CardHeader>
+          <CardTitle className="text-red-600">Error Loading Email Data</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            Unable to load email delivery information. Please try refreshing the page.
+          </p>
+          <Button 
+            onClick={refetch} 
+            className="mt-4"
+            variant="outline"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </Button>
         </CardContent>
       </Card>
     );
@@ -91,17 +157,30 @@ export const EmailDeliveryDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Email Delivery Dashboard</h3>
-          <p className="text-sm text-muted-foreground">
-            Monitor email delivery status and performance
+          <h2 className="text-2xl font-bold">Email Delivery Dashboard</h2>
+          <p className="text-muted-foreground">
+            Monitor email delivery status and queue processing
           </p>
         </div>
-        <Button onClick={refetch} variant="outline" size="sm">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={processQueue}
+            className="flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" />
+            Process Queue
+          </Button>
+          <Button 
+            onClick={refetch} 
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Email Statistics */}
@@ -113,7 +192,7 @@ export const EmailDeliveryDashboard = () => {
                 <p className="text-sm font-medium text-muted-foreground">Total Sent</p>
                 <p className="text-2xl font-bold">{emailStats.total_sent}</p>
               </div>
-              <Mail className="w-8 h-8 text-blue-500" />
+              <Mail className="w-8 h-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -125,7 +204,11 @@ export const EmailDeliveryDashboard = () => {
                 <p className="text-sm font-medium text-muted-foreground">Delivery Rate</p>
                 <p className="text-2xl font-bold">{emailStats.delivery_rate.toFixed(1)}%</p>
               </div>
-              <TrendingUp className="w-8 h-8 text-green-500" />
+              {emailStats.delivery_rate >= 95 ? (
+                <TrendingUp className="w-8 h-8 text-green-500" />
+              ) : (
+                <TrendingDown className="w-8 h-8 text-yellow-500" />
+              )}
             </div>
           </CardContent>
         </Card>
@@ -149,64 +232,122 @@ export const EmailDeliveryDashboard = () => {
                 <p className="text-sm font-medium text-muted-foreground">Bounce Rate</p>
                 <p className="text-2xl font-bold">{emailStats.bounce_rate.toFixed(1)}%</p>
               </div>
-              <TrendingDown className="w-8 h-8 text-red-500" />
+              {emailStats.bounce_rate <= 2 ? (
+                <CheckCircle className="w-8 h-8 text-green-500" />
+              ) : (
+                <AlertTriangle className="w-8 h-8 text-yellow-500" />
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Email Logs */}
+      {/* Communication Events - Production Email Queue */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Email Deliveries</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Email Queue Status (Production)
+          </CardTitle>
           <CardDescription>
-            Last 100 email delivery attempts
+            Live email processing queue showing communication events
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {deliveryLogs.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No email delivery logs found
-              </div>
-            ) : (
-              deliveryLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    {getStatusIcon(log.delivery_status)}
-                    <div>
-                      <p className="font-medium">{log.subject}</p>
-                      <p className="text-sm text-muted-foreground">
-                        To: {log.recipient_email}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(log.delivery_timestamp || log.created_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <Badge variant="outline" className="text-xs">
-                      {log.provider}
-                    </Badge>
-                    {getStatusBadge(log.delivery_status)}
-                    
-                    {(log.delivery_status === 'failed' || log.delivery_status === 'bounced') && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRetryEmail(log.message_id)}
-                      >
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        Retry
-                      </Button>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {communicationEvents.map((event: any) => (
+              <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    {getStatusBadge(event.status)}
+                    <span className="text-sm font-medium">{event.template_key || event.event_type}</span>
+                    {event.priority === 'high' && (
+                      <Badge variant="destructive" className="text-xs">High Priority</Badge>
                     )}
                   </div>
+                  <p className="text-sm text-muted-foreground">To: {event.recipient_email}</p>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>{formatDistanceToNow(new Date(event.created_at))} ago</span>
+                    {event.retry_count > 0 && <span>Retries: {event.retry_count}</span>}
+                    {event.external_id && <span>ID: {event.external_id}</span>}
+                  </div>
+                  {event.error_message && (
+                    <p className="text-xs text-red-500 mt-1">Error: {event.error_message}</p>
+                  )}
                 </div>
-              ))
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(event.status)}
+                  {event.status === 'failed' && event.retry_count < 3 && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleRetryEmail(event.id)}
+                    >
+                      Retry
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {communicationEvents.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No email events found
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SMTP Delivery Logs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Recent Email Delivery Logs
+          </CardTitle>
+          <CardDescription>
+            Historical email delivery tracking from SMTP provider
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {deliveryLogs.map((log: any) => (
+              <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    {getStatusBadge(log.delivery_status)}
+                    <span className="text-sm font-medium">{log.subject}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">To: {log.recipient_email}</p>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>{formatDistanceToNow(new Date(log.created_at))} ago</span>
+                    <span>Provider: {log.provider}</span>
+                    {log.message_id && <span>ID: {log.message_id.substring(0, 8)}...</span>}
+                  </div>
+                  {log.smtp_response && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Response: {log.smtp_response}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(log.delivery_status)}
+                  {(log.delivery_status === 'failed' || log.delivery_status === 'bounced') && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleRetryEmail(log.message_id)}
+                    >
+                      Retry
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {deliveryLogs.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No delivery logs found
+              </div>
             )}
           </div>
         </CardContent>

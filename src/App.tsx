@@ -76,6 +76,7 @@ const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPag
 const Cart = withLazyLoading(() => import("./pages/Cart"), undefined, true, 10000);
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"), undefined, false, 10000);
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"), undefined, true, 10000);
+const Blog = withLazyLoading(() => import("./pages/Blog"), undefined, true, 10000);
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })), undefined, false, 15000);
 
 // Hardened QueryClient with comprehensive error handling and performance optimizations
@@ -211,6 +212,7 @@ const App = () => {
               <Route path="/favorites" element={<Favorites />} />
               <Route path="/booking" element={<Booking />} />
               <Route path="/about" element={<About />} />
+              <Route path="/blog" element={<Blog />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/paystack-test" element={<PaystackTest />} />
               <Route path="/paystack-testing" element={<PaystackTestingDashboard />} />

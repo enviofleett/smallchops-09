@@ -621,12 +621,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     }
   }, [formData, deliveryZone, pickupPoint, checkoutStep, termsRequired, termsAccepted]);
   const renderAuthStep = () => <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h3 className="text-lg font-semibold">Complete Your Order</h3>
-        <p className="text-muted-foreground">
-          {items.length} item{items.length > 1 ? 's' : ''} • ₦{total.toLocaleString()}
-        </p>
-      </div>
       
       <GuestOrLoginChoice 
         onContinueAsGuest={handleContinueAsGuest} 

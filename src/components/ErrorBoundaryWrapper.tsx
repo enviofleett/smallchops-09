@@ -161,23 +161,11 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
         return (
           <div className="min-h-[200px] flex items-center justify-center p-4 sm:p-6">
             <Card className="w-full max-w-md shadow-lg border-border/50">
-              <CardContent className="p-4 sm:p-6 space-y-6">
-                <div className="text-center space-y-4">
-                  <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-medium">Component Loading Failed</h3>
-                    <p className="text-muted-foreground text-base">
-                      Please refresh your page
-                    </p>
-                  </div>
-                  
-                  <Button 
-                    onClick={this.handleRefresh}
-                    className="flex items-center gap-2 w-full"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh Page
-                  </Button>
+              <CardContent className="p-4 sm:p-6">
+                <div className="text-center">
+                  <p className="text-foreground text-base">
+                    Please refresh the page
+                  </p>
                 </div>
               </CardContent>
             </Card>

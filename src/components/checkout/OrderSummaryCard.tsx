@@ -65,10 +65,6 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
       {/* Totals */}
       <div className="space-y-2">
         {/* VAT-aware breakdown */}
-        <div className="flex items-center justify-between text-sm">
-          <span>Sub Total (excl. VAT)</span>
-          <span>₦{(subTotalExVat ?? (subtotal - (vatAmount ?? 0))).toLocaleString()}</span>
-        </div>
 
 
         <div className="flex items-center justify-between text-sm font-medium">

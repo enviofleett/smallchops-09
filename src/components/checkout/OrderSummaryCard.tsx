@@ -70,10 +70,6 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
           <span>₦{(subTotalExVat ?? (subtotal - (vatAmount ?? 0))).toLocaleString()}</span>
         </div>
 
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>VAT</span>
-          <span>₦{(vatAmount ?? 0).toLocaleString()}</span>
-        </div>
 
         <div className="flex items-center justify-between text-sm font-medium">
           <span>Sub Total (incl. VAT)</span>

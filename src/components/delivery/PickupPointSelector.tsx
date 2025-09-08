@@ -34,13 +34,13 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
         address: '2B Close Off 11Crescent Kado Estate, Kado',
         contact_phone: '0807 301 1100',
         operating_hours: {
-          monday: { open: '09:00', close: '18:00' },
-          tuesday: { open: '09:00', close: '18:00' },
-          wednesday: { open: '09:00', close: '18:00' },
-          thursday: { open: '09:00', close: '18:00' },
-          friday: { open: '09:00', close: '18:00' },
-          saturday: { open: '09:00', close: '18:00' },
-          sunday: { open: '09:00', close: '18:00' }
+          monday: { open: '08:00', close: '18:00' },
+          tuesday: { open: '08:00', close: '18:00' },
+          wednesday: { open: '08:00', close: '18:00' },
+          thursday: { open: '08:00', close: '18:00' },
+          friday: { open: '08:00', close: '18:00' },
+          saturday: { open: '08:00', close: '18:00' },
+          sunday: { open: '10:00', close: '16:00' }
         },
         instructions: 'Please call us when you arrive for quick pickup',
         is_active: true,
@@ -75,28 +75,46 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
   };
 
   const isCurrentlyOpen = (hours: any) => {
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    
+    // Production business hours:
+    // Monday-Saturday: 8am-6pm (8:00-18:00)
+    // Sunday: 10am-4pm (10:00-16:00)
+    
     if (!hours || typeof hours !== 'object') {
-      // Default business hours check (9 AM - 6 PM)
-      const now = new Date();
-      const currentTime = now.getHours() * 60 + now.getMinutes();
-      const openTime = 9 * 60; // 9 AM
-      const closeTime = 18 * 60; // 6 PM
-      return currentTime >= openTime && currentTime <= closeTime;
+      // Fallback to default business hours if no hours provided
+      if (currentDay === 0) { // Sunday
+        const openTime = 10 * 60; // 10 AM
+        const closeTime = 16 * 60; // 4 PM
+        return currentTime >= openTime && currentTime < closeTime;
+      } else { // Monday-Saturday
+        const openTime = 8 * 60; // 8 AM
+        const closeTime = 18 * 60; // 6 PM
+        return currentTime >= openTime && currentTime < closeTime;
+      }
     }
     
-    const now = new Date();
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const todayKey = days[now.getDay()];
+    const todayKey = days[currentDay];
     
-    if (!hours[todayKey] || !hours[todayKey].open || !hours[todayKey].close) return false;
+    if (!hours[todayKey] || !hours[todayKey].open || !hours[todayKey].close) {
+      // If no hours for today, return false
+      return false;
+    }
     
-    const currentTime = now.getHours() * 60 + now.getMinutes();
-    const [openHour, openMin] = hours[todayKey].open.split(':').map(Number);
-    const [closeHour, closeMin] = hours[todayKey].close.split(':').map(Number);
-    const openTime = openHour * 60 + openMin;
-    const closeTime = closeHour * 60 + closeMin;
-    
-    return currentTime >= openTime && currentTime <= closeTime;
+    try {
+      const [openHour, openMin] = hours[todayKey].open.split(':').map(Number);
+      const [closeHour, closeMin] = hours[todayKey].close.split(':').map(Number);
+      const openTime = openHour * 60 + openMin;
+      const closeTime = closeHour * 60 + closeMin;
+      
+      return currentTime >= openTime && currentTime < closeTime;
+    } catch (error) {
+      console.error('Error parsing operating hours:', error);
+      return false;
+    }
   };
 
   if (loading) {

@@ -109,7 +109,7 @@ export const DeliverySchedulingTab = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('business_settings')
+        .from('business_info')
         .select('delivery_scheduling_config, business_hours')
         .single();
 

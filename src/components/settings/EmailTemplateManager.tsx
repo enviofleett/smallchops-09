@@ -67,8 +67,8 @@ export const EmailTemplateManager: React.FC = () => {
     try {
       // Get business settings for production branding
       const { data: businessSettings } = await supabase
-        .from('business_settings')
-        .select('name, tagline, website_url, admin_notification_email, working_hours, whatsapp_support_number')
+        .from('business_info')
+        .select('name, tagline, website_url, working_hours')
         .limit(1)
         .maybeSingle();
 
@@ -95,9 +95,9 @@ export const EmailTemplateManager: React.FC = () => {
         business_name: businessSettings?.name || 'Your Business',
         business_tagline: businessSettings?.tagline || 'Quality products delivered',
         website_url: businessSettings?.website_url || 'https://yourbusiness.com',
-        support_email: businessSettings?.admin_notification_email || 'support@yourbusiness.com',
+        support_email: 'support@startersmallchops.com',
         working_hours: businessSettings?.working_hours || '9 AM - 6 PM',
-        whatsapp_number: businessSettings?.whatsapp_support_number || 'Not configured',
+        whatsapp_number: '+234123456789',
         
         // Customer information (use real recent customer or fallback)
         customer_name: recentCustomer?.name || 'John Doe',
@@ -124,7 +124,7 @@ export const EmailTemplateManager: React.FC = () => {
         terms_url: `${businessSettings?.website_url || 'https://yourbusiness.com'}/terms`,
         
         // Support information
-        support_phone: businessSettings?.whatsapp_support_number || 'Contact us via email',
+        support_phone: '+234123456789',
         help_center_url: `${businessSettings?.website_url || 'https://yourbusiness.com'}/help`,
         
         // Social proof

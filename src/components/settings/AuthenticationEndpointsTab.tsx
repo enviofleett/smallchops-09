@@ -134,10 +134,10 @@ const { data, error } = await supabase.auth.signInWithOAuth({
       description: 'Admin user management operations'
     },
     {
-      title: 'Business Settings',
+      title: 'Business Info',
       method: 'GET',
-      path: '/rest/v1/business_settings',
-      description: 'Get business configuration for branding'
+      path: '/rest/v1/business_info',
+      description: 'Get public business configuration for branding'
     }
   ];
 

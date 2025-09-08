@@ -215,8 +215,8 @@ export const EmailTemplateManager: React.FC = () => {
     try {
       // Get business settings for production branding
       const { data: businessSettings } = await supabase
-        .from('business_settings')
-        .select('name, tagline, website_url, admin_notification_email, working_hours, whatsapp_support_number')
+        .from('business_info')
+        .select('name, tagline, website_url, working_hours')
         .limit(1)
         .maybeSingle();
 
@@ -241,8 +241,8 @@ export const EmailTemplateManager: React.FC = () => {
         business_name: businessSettings?.name || 'Your Business',
         business_tagline: businessSettings?.tagline || 'Quality products delivered',
         business_website: businessSettings?.website_url || 'https://yourbusiness.com',
-        business_email: businessSettings?.admin_notification_email || 'admin@yourbusiness.com',
-        business_phone: businessSettings?.whatsapp_support_number || '+1234567890',
+        business_email: 'store@startersmallchops.com',
+        business_phone: '+234123456789',
         business_hours: businessSettings?.working_hours || 'Mon-Fri 9AM-6PM',
         
         // Customer information
@@ -260,7 +260,7 @@ export const EmailTemplateManager: React.FC = () => {
         // Common variables
         current_year: new Date().getFullYear().toString(),
         current_date: new Date().toLocaleDateString(),
-        support_email: businessSettings?.admin_notification_email || 'support@yourbusiness.com',
+        support_email: 'support@startersmallchops.com',
         
         // Delivery information
         delivery_address: '123 Main Street, Lagos, Nigeria',

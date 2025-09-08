@@ -59,9 +59,9 @@ export const useBusinessSettings = () => {
       try {
         logger.info('Starting business settings fetch');
         
-        // First, always try direct database query with public access
+        // First, try direct database query for public business info
         const { data, error: dbError } = await supabase
-          .from('business_settings')
+          .from('business_info')
           .select('*')
           .order('updated_at', { ascending: false })
           .limit(1)
@@ -130,7 +130,7 @@ export const useBusinessSettings = () => {
         // One final attempt at direct database query
         try {
           const { data, error: finalError } = await supabase
-            .from('business_settings')
+            .from('business_info')
             .select('*')
             .order('updated_at', { ascending: false })
             .limit(1)

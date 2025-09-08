@@ -175,18 +175,13 @@ export const DropdownDatePicker: React.FC<DropdownDatePickerProps> = ({
                           isSelected && "bg-primary text-primary-foreground hover:bg-primary/90"
                         )}
                       >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {format(date, 'EEEE, MMM d')}
-                            </span>
-                            {isDateToday && (
-                              <span className="text-xs opacity-70">Today</span>
-                            )}
-                          </div>
-                          <div className="text-xs opacity-70">
-                            {slot.time_slots.filter(ts => ts.available).length} slots
-                          </div>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {format(date, 'EEEE, MMM d')}
+                          </span>
+                          {isDateToday && (
+                            <span className="text-xs opacity-70">Today</span>
+                          )}
                         </div>
                       </Button>
                     );

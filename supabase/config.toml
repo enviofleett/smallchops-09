@@ -65,7 +65,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.paystack-secure]
-verify_jwt = false
+verify_jwt = true
 
 [functions.payment-callback]
 verify_jwt = false

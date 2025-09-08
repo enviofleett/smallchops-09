@@ -36,11 +36,54 @@ serve(async (req) => {
   try {
     console.log(`🔄 Paystack secure function called [${VERSION}]`)
     
-    // Initialize Supabase client
+    // Get and validate JWT token
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Authorization required',
+        code: 'UNAUTHORIZED'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const jwt = authHeader.replace('Bearer ', '')
+    
+    // Initialize Supabase clients
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+    
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        }
+      }
+    )
+
+    // Verify user authentication
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(jwt)
+    if (authError || !user) {
+      console.error('❌ Authentication failed:', authError)
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid authentication token',
+        code: 'AUTH_INVALID'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    console.log('✅ User authenticated:', user.id)
 
     // Get environment-specific Paystack configuration
     let paystackConfig;
@@ -84,6 +127,8 @@ serve(async (req) => {
     if (action === 'initialize') {
       return await initializePayment({
         supabaseAdmin,
+        supabaseClient,
+        user,
         paystackConfig,
         email,
         amount,
@@ -97,6 +142,8 @@ serve(async (req) => {
     if (action === 'verify') {
       return await verifyPayment({
         supabaseAdmin,
+        supabaseClient,
+        user,
         paystackConfig,
         reference: reference || requestBody.reference,
         corsHeaders
@@ -125,6 +172,8 @@ serve(async (req) => {
 
 async function initializePayment({
   supabaseAdmin,
+  supabaseClient,
+  user,
   paystackConfig,
   email,
   amount,
@@ -141,6 +190,45 @@ async function initializePayment({
 
     console.log('🔍 Fetching authoritative order data:', orderId)
 
+    // Check if user is admin
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = profile?.role === 'admin'
+
+    // Get order details for authorization check
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .select('id, total_amount, delivery_fee, delivery_zone_id, payment_reference, customer_name, order_number, order_type, customer_email, user_id')
+      .eq('id', orderId)
+      .single()
+
+    if (orderError || !order) {
+      throw new Error(`Order not found: ${orderId}`)
+    }
+
+    // Authorization check: admin or order owner
+    if (!isAdmin && order.user_id !== user.id) {
+      // For guest orders, check if email matches
+      if (!order.user_id && order.customer_email === user.email) {
+        console.log('✅ Guest order email match authorization')
+      } else {
+        console.error('❌ Authorization failed - user not order owner', {
+          userId: user.id,
+          orderUserId: order.user_id,
+          userEmail: user.email,
+          orderEmail: order.customer_email,
+          isAdmin
+        })
+        throw new Error('Access denied: not authorized for this order')
+      }
+    }
+
+    console.log('✅ User authorized for order:', { userId: user.id, isAdmin, orderId })
+
     // Get business settings for website URL
     const { data: businessSettings } = await supabaseAdmin
       .from('business_settings')
@@ -149,16 +237,7 @@ async function initializePayment({
 
     const frontendUrl = businessSettings?.website_url || 'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.sandbox.lovable.dev'
 
-    // Get order details for authoritative amount
-    const { data: order, error: orderError } = await supabaseAdmin
-      .from('orders')
-      .select('id, total_amount, delivery_fee, delivery_zone_id, payment_reference, customer_name, order_number, order_type')
-      .eq('id', orderId)
-      .single()
-
-    if (orderError || !order) {
-      throw new Error(`Order not found: ${orderId}`)
-    }
+    // Order already fetched above for authorization
 
     // Compute authoritative amount to ensure delivery fee is included
     let deliveryFee = Number(order.delivery_fee) || 0
@@ -405,12 +484,50 @@ async function initializePayment({
 
 async function verifyPayment({
   supabaseAdmin,
+  supabaseClient,
+  user,
   paystackConfig,
   reference,
   corsHeaders
 }: any) {
   try {
     console.log('🔍 Verifying payment:', reference)
+
+    // Check if user is admin
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = profile?.role === 'admin'
+
+    // Get payment transaction to check authorization
+    const { data: transaction } = await supabaseAdmin
+      .from('payment_transactions')
+      .select('order_id, customer_email')
+      .eq('reference', reference)
+      .single()
+
+    if (transaction) {
+      // Get order to check ownership
+      const { data: order } = await supabaseAdmin
+        .from('orders')
+        .select('user_id, customer_email')
+        .eq('id', transaction.order_id)
+        .single()
+
+      if (order && !isAdmin && order.user_id !== user.id) {
+        // For guest orders, check email match
+        if (!order.user_id && order.customer_email === user.email) {
+          console.log('✅ Guest order verification authorized')
+        } else {
+          throw new Error('Access denied: not authorized for this payment')
+        }
+      }
+    }
+
+    console.log('✅ User authorized for payment verification:', { userId: user.id, isAdmin, reference })
 
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',

@@ -354,11 +354,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
               <p className="text-xs text-muted-foreground">
                 🕐 <strong>Lead Time:</strong> Minimum {dateValidation.leadTimeMinutes} minutes from booking
               </p>
-              {apiResponse && (
-                <p className="text-xs text-green-600 font-medium">
-                  ✓ {apiResponse.available_slots} available slots in next {dateValidation.maxAdvanceDays} days
-                </p>
-              )}
             </div>
           </div>
 

@@ -53,25 +53,8 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
   };
 
   const formatOperatingHours = (hours: any) => {
-    if (!hours || typeof hours !== 'object') return 'Contact for hours';
-    
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const todayKey = days[new Date().getDay()];
-    
-    if (hours[todayKey] && hours[todayKey].open && hours[todayKey].close) {
-      const isToday = true;
-      const openTime = hours[todayKey].open;
-      const closeTime = hours[todayKey].close;
-      return isToday ? `Today: ${openTime} - ${closeTime}` : `${openTime} - ${closeTime}`;
-    }
-    
-    // Show general hours if today's hours aren't available
-    const firstDay = Object.keys(hours).find(day => hours[day] && hours[day].open);
-    if (firstDay && hours[firstDay]) {
-      return `${hours[firstDay].open} - ${hours[firstDay].close}`;
-    }
-    
-    return 'Contact for hours';
+    // Show production business hours
+    return "Mon-Sat: 8:00AM - 6:00PM | Sun: 10:00AM - 4:00PM";
   };
 
   const isCurrentlyOpen = (hours: any) => {

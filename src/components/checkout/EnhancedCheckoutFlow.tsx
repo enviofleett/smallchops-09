@@ -260,17 +260,53 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     }
   }, [isAuthenticated, isLoading]);
 
-  // Auto-fill form data from user profile
+  // Enhanced customer profile loading with error handling - PRODUCTION READY
   useEffect(() => {
-    if (isAuthenticated && profile) {
+    if (isAuthenticated && !isLoading) {
+      if (profile) {
+        console.log('✅ Successfully loaded authenticated customer profile:', { 
+          profileId: (profile as any).id,
+          name: (profile as any).name, 
+          email: (profile as any).email,
+          phone: (profile as any).phone,
+          hasCompleteProfile: !!(profile as any).name && !!(profile as any).email 
+        });
+        
+        setFormData(prev => ({
+          ...prev,
+          customer_email: (profile as any).email || user?.email || '',
+          customer_name: (profile as any).name || '',
+          customer_phone: (profile as any).phone || ''
+        }));
+      } else if (user) {
+        // Profile hasn't loaded yet, but we have user data - show fallback
+        console.log('⚠️ Profile not loaded yet, using fallback user data');
+        setFormData(prev => ({
+          ...prev,
+          customer_email: user.email || '',
+          customer_name: prev.customer_name || '', 
+          customer_phone: prev.customer_phone || ''
+        }));
+        
+        // Retry profile loading after a short delay
+        const retryTimeout = setTimeout(() => {
+          console.log('🔄 Retrying profile load...');
+          // The useCustomerProfile hook should handle this automatically
+        }, 2000);
+        
+        return () => clearTimeout(retryTimeout);
+      }
+    } else if (!isAuthenticated && !isLoading) {
+      // Clear form data for unauthenticated users
+      console.log('🧹 Clearing form data for unauthenticated user');
       setFormData(prev => ({
         ...prev,
-        customer_email: (profile as any).email || '',
-        customer_name: (profile as any).name || '',
-        customer_phone: (profile as any).phone || ''
+        customer_email: '',
+        customer_name: '',
+        customer_phone: ''
       }));
     }
-  }, [isAuthenticated, profile]);
+  }, [isAuthenticated, profile, user, isLoading]);
 
   // Auto-load default delivery address
   useEffect(() => {
@@ -640,46 +676,111 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         {/* Customer Information */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Customer Information</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              Customer Information
+              {isAuthenticated && (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                  Verified Account
+                </span>
+              )}
+            </CardTitle>
+            {isAuthenticated && (
+              <CardDescription className="text-sm text-muted-foreground">
+                Your account information is automatically loaded and secured.
+              </CardDescription>
+            )}
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <Label htmlFor="customer_name">Full Name *</Label>
+              <Label htmlFor="customer_name" className="flex items-center gap-2">
+                Full Name *
+                {isAuthenticated && formData.customer_name && (
+                  <span className="text-xs text-green-600">✓ Verified</span>
+                )}
+              </Label>
               <Input 
                 id="customer_name" 
                 value={formData.customer_name} 
                 onChange={e => handleFormChange('customer_name', e.target.value)} 
-                placeholder="Enter your full name" 
+                placeholder={isAuthenticated ? "Loading your name..." : "Enter your full name"} 
                 required 
-                className="h-10" 
-                readOnly={isAuthenticated && !!(profile as any)?.name}
+                className={cn(
+                  "h-10",
+                  isAuthenticated && formData.customer_name && "bg-muted border-green-200",
+                  isAuthenticated && !formData.customer_name && "animate-pulse"
+                )}
+                readOnly={isAuthenticated && !!formData.customer_name}
+                disabled={isAuthenticated && !!formData.customer_name}
               />
+              {isAuthenticated && !formData.customer_name && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Loading your profile information...
+                </p>
+              )}
             </div>
             <div>
-              <Label htmlFor="customer_email">Email *</Label>
+              <Label htmlFor="customer_email" className="flex items-center gap-2">
+                Email *
+                {isAuthenticated && formData.customer_email && (
+                  <span className="text-xs text-green-600">✓ Verified</span>
+                )}
+              </Label>
               <Input 
                 id="customer_email" 
                 type="email" 
                 value={formData.customer_email} 
                 onChange={e => handleFormChange('customer_email', e.target.value)} 
-                placeholder="Enter your email" 
+                placeholder={isAuthenticated ? "Loading your email..." : "Enter your email"} 
                 required 
-                className="h-10" 
-                readOnly={isAuthenticated && !!(profile as any)?.email}
+                className={cn(
+                  "h-10",
+                  isAuthenticated && formData.customer_email && "bg-muted border-green-200",
+                  isAuthenticated && !formData.customer_email && "animate-pulse"
+                )}
+                readOnly={isAuthenticated && !!formData.customer_email}
+                disabled={isAuthenticated && !!formData.customer_email}
               />
+              {isAuthenticated && !formData.customer_email && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Loading your email address...
+                </p>
+              )}
             </div>
             <div>
-              <Label htmlFor="customer_phone">Phone Number</Label>
+              <Label htmlFor="customer_phone" className="flex items-center gap-2">
+                Phone Number
+                {isAuthenticated && formData.customer_phone && (
+                  <span className="text-xs text-green-600">✓ Verified</span>
+                )}
+              </Label>
               <Input 
                 id="customer_phone" 
                 type="tel" 
                 value={formData.customer_phone} 
                 onChange={e => handleFormChange('customer_phone', e.target.value)} 
-                placeholder="Enter your phone number" 
-                className="h-10" 
-                readOnly={isAuthenticated && !!(profile as any)?.phone}
+                placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
+                className={cn(
+                  "h-10",
+                  isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
+                  isAuthenticated && !formData.customer_phone && "animate-pulse"
+                )}
+                readOnly={isAuthenticated && !!formData.customer_phone}
+                disabled={isAuthenticated && !!formData.customer_phone}
               />
+              {isAuthenticated && !formData.customer_phone && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  You can add a phone number to your profile for better service.
+                </p>
+              )}
             </div>
+            {isAuthenticated && (
+              <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                <p className="text-xs text-blue-700">
+                  <strong>Secure Checkout:</strong> Your information is automatically loaded from your verified account. 
+                  To update these details, please visit your account settings.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

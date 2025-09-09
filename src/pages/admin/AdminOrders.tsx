@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from '@/hooks/useDebounce';
 import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFilter';
+import { DeliveryFilterErrorBoundary } from '@/components/admin/orders/DeliveryFilterErrorBoundary';
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
 import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
 import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
@@ -686,13 +687,16 @@ export default function AdminOrders() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <HourlyDeliveryFilter
-                      selectedDay={selectedDay}
-                      selectedHour={selectedHour}
-                      onDayChange={setSelectedDay}
-                      onHourChange={setSelectedHour}
-                      orderCounts={hourlyOrderCounts}
-                    />
+                    <DeliveryFilterErrorBoundary>
+                      <HourlyDeliveryFilter
+                        selectedDay={selectedDay}
+                        selectedHour={selectedHour}
+                        onDayChange={setSelectedDay}
+                        onHourChange={setSelectedHour}
+                        orderCounts={hourlyOrderCounts}
+                        isLoading={isLoading}
+                      />
+                    </DeliveryFilterErrorBoundary>
                   </CardContent>
                 </Card>
               )}

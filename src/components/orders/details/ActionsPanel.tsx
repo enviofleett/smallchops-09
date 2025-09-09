@@ -154,33 +154,6 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
           )}
         </div>
 
-        {/* Manual Notification */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Send Manual Notification</label>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Select value={manualStatus} onValueChange={(value) => onManualStatusChange(value as OrderStatus)}>
-              <SelectTrigger className="flex-1 bg-background">
-                <SelectValue placeholder="Select notification type" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
-                {Constants.public.Enums.order_status.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button 
-              variant="secondary" 
-              onClick={onManualSend}
-              disabled={!manualStatus || isSendingManual}
-              className="w-full sm:w-auto"
-            >
-              <Send className="w-4 h-4 mr-2" />
-              {isSendingManual ? 'Sending...' : 'Send'}
-            </Button>
-          </div>
-        </div>
 
         {/* Payment Verification */}
         <div className="space-y-2">

@@ -209,21 +209,6 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
           </Button>
         </div>
 
-        {/* Email Automation Info */}
-        <div className="pt-4 border-t border-border">
-          <Collapsible>
-            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Info className="h-4 w-4 text-blue-500" />
-                Email Automation Status
-              </div>
-              <span className="text-xs text-muted-foreground">View Details</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3">
-              <EmailStatusGuide />
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
       </CardContent>
     </Card>
   );

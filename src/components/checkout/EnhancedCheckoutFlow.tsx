@@ -437,9 +437,31 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       // 🚨 CRITICAL: Stop flow immediately on order creation failure
       if (error || !data?.success) {
         console.error('❌ Order creation failed - stopping checkout flow:', error || data);
-        const errorMessage = error?.message || data?.error || 'Order creation failed';
-        const errorCode = data?.code || 'ORDER_CREATION_FAILED';
-        throw new Error(`${errorMessage} [${errorCode}]`);
+        
+        // Extract detailed error information
+        const errorDetails = {
+          message: error?.message || data?.error || 'Order creation failed',
+          code: data?.code || 'ORDER_CREATION_FAILED',
+          context: data?.details || {},
+          amount: total,
+          customerEmail: sanitizedData.customer.email,
+          fulfillmentType: sanitizedData.fulfillment.type,
+          itemCount: items.length
+        };
+        
+        // Log payment attempt failure with proper data
+        console.log('📊 Payment Attempt Log:', {
+          timestamp: new Date().toISOString(),
+          result: 'failure',
+          amount: errorDetails.amount,
+          customerEmail: errorDetails.customerEmail,
+          paymentReference: null,
+          fulfillmentType: errorDetails.fulfillmentType,
+          itemCount: errorDetails.itemCount,
+          details: errorDetails.context
+        });
+        
+        throw new Error(`${errorDetails.message} [${errorDetails.code}]`);
       }
       console.log('🔄 Raw server response:', data);
 
@@ -529,16 +551,25 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       // Enhanced error handling with safe message extraction
       const errorMessage = safeErrorMessage(error);
 
-      // Map specific errors to user-friendly messages
+      // Map specific errors to user-friendly messages with retry suggestions
       let userFriendlyMessage: string;
-      if (errorMessage.includes('ORDER_CREATION_FAILED') || errorMessage.includes('INVALID_ORDER_DATA')) {
-        userFriendlyMessage = 'Order creation failed. Please check your details and try again.';
+      let shouldRetry = true;
+      
+      if (errorMessage.includes('ORDER_CREATION_FAILED')) {
+        userFriendlyMessage = 'We couldn\'t process your order right now. Please check your information and try again.';
+        shouldRetry = true;
+      } else if (errorMessage.includes('INVALID_ORDER_DATA')) {
+        userFriendlyMessage = 'Please check your order details and delivery information, then try again.';
+        shouldRetry = true;
       } else if (errorMessage.includes('CUSTOMER_ERROR')) {
-        userFriendlyMessage = 'There was an issue with customer information. Please verify your details.';
-      } else if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
-        userFriendlyMessage = 'Payment system configuration issue. Please contact support.';
+        userFriendlyMessage = 'Please verify your contact information and try again.';
+        shouldRetry = true;
+      } else if (errorMessage.includes('Payment initialization incomplete') || errorMessage.includes('missing authorization URL')) {
+        userFriendlyMessage = 'Payment service is temporarily unavailable. Please try again in a moment or contact support.';
+        shouldRetry = false;
       } else if (errorMessage.includes('Payment URL not available')) {
         userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
+        shouldRetry = true;
       } else {
         // Generate user-friendly error with safe fallback
         const validationResult = validatePaymentInitializationData({
@@ -546,12 +577,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           error: errorMessage
         });
         userFriendlyMessage = generateUserFriendlyErrorMessage(validationResult);
+        shouldRetry = true;
       }
+      
       setLastPaymentError(userFriendlyMessage);
       logPaymentAttempt(null, 'failure');
+      
+      // Enhanced toast with clearer messaging
       toast({
         title: "Checkout Error",
-        description: userFriendlyMessage,
+        description: userFriendlyMessage + (shouldRetry ? " You can try again." : ""),
         variant: "destructive"
       });
     }

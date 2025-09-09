@@ -140,6 +140,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     return 'auth'; // Will allow both login and guest options
   };
   const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(getInitialCheckoutStep());
+  const prevFulfillmentTypeRef = React.useRef<'delivery' | 'pickup'>('delivery');
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: '',
     customer_name: '',
@@ -249,6 +250,29 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     return () => window.removeEventListener('message', handleMessage);
   }, [handleClose]);
 
+  // Handle fulfillment type changes and provide price feedback
+  useEffect(() => {
+    if (prevFulfillmentTypeRef.current !== formData.fulfillment_type) {
+      const currentFee = formData.fulfillment_type === 'pickup' ? 0 : (deliveryZone?.base_fee || 0);
+      const prevFee = prevFulfillmentTypeRef.current === 'pickup' ? 0 : (deliveryZone?.base_fee || 0);
+      
+      // Only show toast if this isn't the initial render and fees actually changed
+      if (prevFulfillmentTypeRef.current !== 'delivery' && currentFee !== prevFee) {
+        const feeChange = currentFee - prevFee;
+        const isRemoving = feeChange < 0;
+        
+        toast({
+          title: isRemoving ? "Delivery Fee Removed" : "Delivery Fee Added",
+          description: isRemoving 
+            ? `₦${Math.abs(feeChange).toLocaleString()} delivery fee removed for pickup`
+            : `₦${feeChange.toLocaleString()} delivery fee added`,
+        });
+      }
+      
+      prevFulfillmentTypeRef.current = formData.fulfillment_type;
+    }
+  }, [formData.fulfillment_type, deliveryZone?.base_fee]);
+
   // Manage checkout step based on authentication status
   useEffect(() => {
     if (!isLoading) {
@@ -328,8 +352,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     }
   }, [isAuthenticated, addresses]);
 
-  // Calculate delivery fee (simple calculation since no getDeliveryFee from useCart)
-  const deliveryFee = deliveryZone?.base_fee || 0;
+  // Calculate delivery fee based on fulfillment type
+  const deliveryFee = useMemo(() => {
+    if (formData.fulfillment_type === 'pickup') {
+      return 0;
+    }
+    return deliveryZone?.base_fee || 0;
+  }, [formData.fulfillment_type, deliveryZone?.base_fee]);
 
   // Calculate totals
   const subtotal = getCartTotal();

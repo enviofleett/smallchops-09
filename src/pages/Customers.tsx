@@ -8,7 +8,7 @@ import { CustomerTable } from '@/components/customers/CustomerTable';
 import { CustomerTypeFilter, CustomerTypeFilter as CustomerTypeFilterType } from '@/components/customers/CustomerTypeFilter';
 import { CustomerRateLimitWarning } from '@/components/customers/CustomerRateLimitWarning';
 
-import { BulkEmailActions } from '@/components/customers/BulkEmailActions';
+
 import { getCustomerAnalytics } from '@/api/customers';
 import { DateRange, Customer, CustomerDb } from '@/types/customers';
 import { CustomerDialog } from '@/components/customers/CustomerDialog';
@@ -276,7 +276,6 @@ const Customers = () => {
                 className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <BulkEmailActions onEmailsRequeued={refetchAnalytics} />
             <Button 
               variant="outline"
               className="flex items-center space-x-2"

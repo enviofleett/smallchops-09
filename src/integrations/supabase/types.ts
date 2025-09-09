@@ -9191,7 +9191,17 @@ export type Database = {
       }
       get_all_customers_display: {
         Args: Record<PropertyKey, never>
-        Returns: Json
+        Returns: {
+          email: string
+          id: string
+          isGuest: boolean
+          lastOrderDate: string
+          name: string
+          phone: string
+          status: string
+          totalOrders: number
+          totalSpent: number
+        }[]
       }
       get_all_customers_for_analytics: {
         Args: Record<PropertyKey, never>
@@ -9226,7 +9236,7 @@ export type Database = {
         Returns: string
       }
       get_customer_analytics_safe: {
-        Args: { p_end_date?: string; p_start_date?: string }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: Json
       }
       get_customer_payment_status: {

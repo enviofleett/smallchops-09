@@ -25,14 +25,23 @@ interface TopCustomersChartProps {
 }
 
 export const TopCustomersChart = ({ customers, type, title }: TopCustomersChartProps) => {
-  const data = customers.slice(0, 5).map(customer => {
+  // Show fewer customers on mobile for better readability
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const maxCustomers = isMobile ? 3 : 5;
+  
+  const data = customers.slice(0, maxCustomers).map(customer => {
     // Handle multiple API formats
     const customerName = customer.customer_name || customer.name || 'Unknown';
     const totalOrders = customer.orders || customer.totalOrders || customer.total_orders || 0;
     const totalSpent = customer.spending || customer.totalSpent || customer.total_spent || 0;
     
+    // Truncate names for mobile
+    const displayName = isMobile 
+      ? customerName.split(' ')[0].substring(0, 8) 
+      : customerName.split(' ')[0];
+    
     return {
-      name: customerName.split(' ')[0], // First name only for better display
+      name: displayName,
       value: type === 'orders' ? totalOrders : totalSpent,
       fullName: customerName
     };
@@ -52,9 +61,9 @@ export const TopCustomersChart = ({ customers, type, title }: TopCustomersChartP
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <Users className="mx-auto h-12 w-12 opacity-50 mb-4" />
-            <p className="text-muted-foreground">No customer data available</p>
+          <div className="text-center py-6 sm:py-8">
+            <Users className="mx-auto h-8 sm:h-12 w-8 sm:w-12 opacity-50 mb-3 sm:mb-4" />
+            <p className="text-muted-foreground text-sm">No customer data available</p>
           </div>
         </CardContent>
       </Card>
@@ -70,32 +79,53 @@ export const TopCustomersChart = ({ customers, type, title }: TopCustomersChartP
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-80">
+        <div className="h-64 sm:h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <BarChart 
+              data={data} 
+              margin={{ 
+                top: 20, 
+                right: isMobile ? 10 : 30, 
+                left: isMobile ? 10 : 20, 
+                bottom: 5 
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
-              interval={0}
-            />
-            <YAxis 
-              tick={{ fontSize: 12 }}
-              tickFormatter={type === 'spending' ? (value) => `₦${(value / 1000).toFixed(0)}k` : undefined}
-            />
-            <Tooltip 
-              formatter={(value, name, props) => [
-                formatValue(Number(value)), 
-                type === 'orders' ? 'Orders' : 'Spent'
-              ]}
-              labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
-            />
-            <Bar 
-              dataKey="value" 
-              fill={type === 'orders' ? '#3B82F6' : '#8B5CF6'} 
-              radius={[4, 4, 0, 0]}
-            />
-          </BarChart>
+                tick={{ 
+                  fontSize: isMobile ? 10 : 12, 
+                  fill: "hsl(var(--foreground))" 
+                }}
+                interval={0}
+                angle={isMobile ? -45 : 0}
+                textAnchor={isMobile ? "end" : "middle"}
+                height={isMobile ? 60 : 30}
+              />
+              <YAxis 
+                tick={{ fontSize: isMobile ? 10 : 12 }}
+                tickFormatter={type === 'spending' ? (value) => `₦${(value / 1000).toFixed(0)}k` : undefined}
+                width={isMobile ? 40 : 60}
+              />
+              <Tooltip 
+                formatter={(value, name, props) => [
+                  formatValue(Number(value)), 
+                  type === 'orders' ? 'Orders' : 'Spent'
+                ]}
+                labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '6px',
+                  fontSize: isMobile ? '12px' : '14px'
+                }}
+              />
+              <Bar 
+                dataKey="value" 
+                fill={type === 'orders' ? 'hsl(var(--primary))' : 'hsl(var(--secondary))'} 
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </CardContent>

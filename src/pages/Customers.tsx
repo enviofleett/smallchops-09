@@ -1,19 +1,19 @@
 
 import React, { useState } from 'react';
-import { Search, Filter, Plus, Edit, UserPlus, Shield, Users, BarChart3 } from 'lucide-react';
+import { Search, Filter, Plus, Edit, UserPlus, Users, BarChart3 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { CustomerAnalytics } from '@/components/customers/CustomerAnalytics';
 import { CustomerFilters } from '@/components/customers/CustomerFilters';
 import { CustomerTable } from '@/components/customers/CustomerTable';
 import { CustomerTypeFilter, CustomerTypeFilter as CustomerTypeFilterType } from '@/components/customers/CustomerTypeFilter';
 import { CustomerRateLimitWarning } from '@/components/customers/CustomerRateLimitWarning';
-import { CustomerSecurityDashboard } from '@/components/customers/CustomerSecurityDashboard';
+
 import { BulkEmailActions } from '@/components/customers/BulkEmailActions';
 import { getCustomerAnalytics } from '@/api/customers';
 import { DateRange, Customer, CustomerDb } from '@/types/customers';
 import { CustomerDialog } from '@/components/customers/CustomerDialog';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
 import { useCustomerRateLimit } from '@/hooks/useCustomerRateLimit';
 
 const Customers = () => {
@@ -26,7 +26,7 @@ const Customers = () => {
   const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerTypeFilterType>('all');
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [currentEditCustomer, setCurrentEditCustomer] = useState<CustomerDb | null>(null);
-  const [securitySectionOpen, setSecuritySectionOpen] = useState(false);
+  
 
   // Rate limiting for customer operations
   const rateLimitStatus = useCustomerRateLimit('create', 50);
@@ -298,21 +298,6 @@ const Customers = () => {
         />
       </div>
 
-      {/* Collapsible Security Section */}
-      <Collapsible open={securitySectionOpen} onOpenChange={setSecuritySectionOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Security & Audit Dashboard
-            </div>
-            <Filter className={`h-4 w-4 transition-transform ${securitySectionOpen ? 'rotate-180' : ''}`} />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-6 mt-6">
-          <CustomerSecurityDashboard />
-        </CollapsibleContent>
-      </Collapsible>
       
       <CustomerDialog
         open={customerDialogOpen}

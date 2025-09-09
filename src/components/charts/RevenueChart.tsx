@@ -26,16 +26,7 @@ const RevenueChart = ({ data, isLoading }: RevenueChartProps) => {
     );
   }
 
-  if (!chartData || chartData.length === 0) {
-    return (
-      <div className="h-64 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-gray-400 text-sm">No revenue data available</div>
-          <div className="text-gray-300 text-xs mt-1">Complete some orders to see revenue trends</div>
-        </div>
-      </div>
-    );
-  }
+  // Chart will handle empty data gracefully
 
   return (
     <div className="h-64">

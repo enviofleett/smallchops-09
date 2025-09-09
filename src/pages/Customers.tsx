@@ -246,15 +246,16 @@ const Customers = () => {
         </div>
       )}
 
-      {/* Customer Type Filter */}
-      {analytics && (
+      {/* Customer Type Filter - Production Ready */}
+      {hasValidAnalytics && (
         <CustomerTypeFilter
           currentFilter={customerTypeFilter}
           onFilterChange={setCustomerTypeFilter}
+          isLoading={isLoading}
           counts={{
-            all: analytics.allCustomers.length,
-            authenticated: analytics.metrics.authenticatedCustomers,
-            guest: analytics.metrics.guestCustomers
+            all: allCustomers.length,
+            authenticated: Math.max(0, analytics.metrics.authenticatedCustomers || 0),
+            guest: Math.max(0, analytics.metrics.guestCustomers || 0)
           }}
         />
       )}

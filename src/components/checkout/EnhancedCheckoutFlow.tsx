@@ -546,8 +546,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
 
         // Close dialog immediately and redirect to payment
         onClose();
-        clearCart();
-        window.location.href = paymentUrl;
+        // Don't clear cart before payment - only clear after successful payment
+        window.location.replace(paymentUrl);
         return;
       }
 
@@ -555,7 +555,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
 
       // Close dialog and redirect directly to payment callback page with processing state
       onClose();
-      clearCart();
+      // Don't clear cart before payment - only clear after successful payment
 
       // Store payment reference for callback page
       sessionStorage.setItem('paystack_payment_reference', data?.reference || parsedData?.reference || '');

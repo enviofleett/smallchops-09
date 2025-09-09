@@ -247,11 +247,12 @@ serve(async (req) => {
     const callbackUrl = `${SUPABASE_URL}/functions/v1/payment-callback?order_id=${order.id}`;
     console.log("🔗 Payment callback URL:", callbackUrl);
 
-    // ✅ Initialize payment with forwarded Authorization header
+    // ✅ Initialize payment with service role for internal authorization
     console.log("💳 Initializing payment via paystack-secure...");
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
       headers: {
-        Authorization: authHeader,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "x-internal-caller": "process-checkout"
       },
       body: {
         action: "initialize",

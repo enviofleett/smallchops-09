@@ -69,21 +69,32 @@ serve(async (req) => {
       }
     )
 
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(jwt)
-    if (authError || !user) {
-      console.error('❌ Authentication failed:', authError)
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Invalid authentication token',
-        code: 'AUTH_INVALID'
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    // Determine if this is an internal service call (service role token)
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const isInternal = jwt === serviceRoleKey
 
-    console.log('✅ User authenticated:', user.id)
+    // Verify user authentication unless internal
+    let user: any = null
+    if (isInternal) {
+      console.log('🛡️ Internal service call authorized via service role')
+      user = { id: 'service-role', email: 'internal@service.local' }
+    } else {
+      const { data: userData, error: authError } = await supabaseClient.auth.getUser(jwt)
+      if (authError || !userData?.user) {
+        console.error('❌ Authentication failed:', authError)
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Invalid authentication token',
+          code: 'AUTH_INVALID'
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      user = userData.user
+      console.log('✅ User authenticated:', user.id)
+    }
 
     // Get environment-specific Paystack configuration
     let paystackConfig;
@@ -135,7 +146,8 @@ serve(async (req) => {
         reference,
         metadata,
         callback_url,
-        corsHeaders
+        corsHeaders,
+        isInternal
       })
     }
 
@@ -146,7 +158,8 @@ serve(async (req) => {
         user,
         paystackConfig,
         reference: reference || requestBody.reference,
-        corsHeaders
+        corsHeaders,
+        isInternal
       })
     }
 
@@ -180,7 +193,8 @@ async function initializePayment({
   reference,
   metadata,
   callback_url,
-  corsHeaders
+  corsHeaders,
+  isInternal
 }: any) {
   try {
     const orderId = metadata?.order_id
@@ -197,7 +211,7 @@ async function initializePayment({
       .eq('id', user.id)
       .single()
 
-    const isAdmin = profile?.role === 'admin'
+    const isAdmin = isInternal || profile?.role === 'admin'
 
     // Get order details for authorization check
     const { data: order, error: orderError } = await supabaseAdmin

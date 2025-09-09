@@ -773,14 +773,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 </p>
               )}
             </div>
-            {isAuthenticated && (
-              <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
-                <p className="text-xs text-blue-700">
-                  <strong>Secure Checkout:</strong> Your information is automatically loaded from your verified account. 
-                  To update these details, please visit your account settings.
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
 

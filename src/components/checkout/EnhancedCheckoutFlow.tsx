@@ -678,7 +678,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     const termsValidation = !termsRequired || termsAccepted;
     if (formData.fulfillment_type === 'delivery') {
       // Make city and postal code optional, delivery schedule mandatory
-      const deliveryValidation = baseValidation && formData.delivery_address.address_line_1.trim() && formData.delivery_address.state.trim() && deliveryZone;
+      const deliveryValidation = baseValidation && formData.delivery_address.address_line_1.trim() && deliveryZone;
       return deliveryValidation && termsValidation;
     } else {
       // For pickup, require pickup point selection
@@ -907,11 +907,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   <Label htmlFor="city">City</Label>
                   <Input id="city" value={formData.delivery_address.city} onChange={e => handleFormChange('delivery_address.city', e.target.value)} placeholder="City" className="h-10" />
                 </div>
-                <div>
-                  <Label htmlFor="state">State *</Label>
-                  <Input id="state" value={formData.delivery_address.state} onChange={e => handleFormChange('delivery_address.state', e.target.value)} placeholder="State" required className="h-10" />
-                </div>
-                
               </div>
               <div>
                 <Label htmlFor="landmark">Landmark (optional)</Label>

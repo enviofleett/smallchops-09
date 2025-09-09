@@ -396,9 +396,9 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                     <span className="font-semibold text-sm leading-tight">
                       {timeSlot.start_time} - {timeSlot.end_time}
                     </span>
-                    {!timeSlot.available && (
+                    {!timeSlot.available && timeSlot.reason && (
                       <span className="text-xs text-destructive text-center leading-tight max-w-full">
-                        closed
+                        {timeSlot.reason}
                       </span>
                     )}
                     {timeSlot.available && (

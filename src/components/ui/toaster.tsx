@@ -17,14 +17,10 @@ export function Toaster() {
         return (
           <Toast key={id} {...props}>
             <div className="grid gap-1">
-              {title && (
-                <ToastTitle className="font-semibold text-sm leading-tight">
-                  {title}
-                </ToastTitle>
-              )}
+              {title && <ToastTitle className="text-foreground">{title}</ToastTitle>}
               {description && (
-                <ToastDescription className="text-sm leading-relaxed opacity-90">
-                  {typeof description === 'string' ? description : 'An error occurred. Please try again.'}
+                <ToastDescription className="text-muted-foreground">
+                  {description}
                 </ToastDescription>
               )}
             </div>

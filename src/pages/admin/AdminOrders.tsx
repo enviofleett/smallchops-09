@@ -14,7 +14,7 @@ import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck, BarChart3, Send, RefreshCw } from 'lucide-react';
+import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck, BarChart3, Send, RefreshCw, Calendar, MessageSquare } from 'lucide-react';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
@@ -1152,194 +1152,180 @@ function AdminOrderCard({
         {/* Enhanced Delivery Information Display using DeliveryScheduleDisplay */}
         {order.payment_status === 'paid' && (
           <div className="mt-4 border-t pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              {order.order_type === 'delivery' ? (
-                <Truck className="w-4 h-4 text-primary" />
-              ) : (
-                <Package className="w-4 h-4 text-primary" />
-              )}
-              <h4 className="font-medium">
-                {order.order_type === 'delivery' ? 'Delivery Information' : 'Pickup Information'}
-              </h4>
-            </div>
-            
-            <div className="space-y-4">
-              {/* Delivery Address */}
-              {order.order_type === 'delivery' && order.delivery_address && (
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium mb-1">Delivery Address</p>
-                  <p className="text-sm font-semibold">
-                    {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
-                      ? `${(order.delivery_address as any).street || ''} ${(order.delivery_address as any).city || ''} ${(order.delivery_address as any).state || ''}`.trim()
-                      : typeof order.delivery_address === 'string' 
-                        ? order.delivery_address
-                        : 'Address details available'
-                    }
-                  </p>
-                </div>
-              )}
+            {/* Customer Delivery/Pickup Schedule Requirements */}
+            <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4 border border-primary/20">
+              <div className="flex items-center gap-2 mb-4">
+                {order.order_type === 'delivery' ? (
+                  <Truck className="w-5 h-5 text-primary" />
+                ) : (
+                  <Package className="w-5 h-5 text-primary" />
+                )}
+                <h4 className="font-semibold text-base">
+                  Customer {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Requirements
+                </h4>
+              </div>
               
-              {/* Pickup Point */}
-              {order.order_type === 'pickup' && order.pickup_point_id && (
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium mb-1">Pickup Point</p>
-                  <PickupPointDisplay 
-                    pickupPointId={order.pickup_point_id} 
-                    pickupSchedule={
-                      order.delivery_schedule ? {
-                        pickup_date: order.delivery_schedule.delivery_date,
-                        pickup_time_start: order.delivery_schedule.delivery_time_start,
-                        pickup_time_end: order.delivery_schedule.delivery_time_end
-                      } : undefined
-                    }
-                  />
-                </div>
-              )}
-              
-              {/* Delivery Zone */}
-              {order.order_type === 'delivery' && deliveryZone && (
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium mb-1">Delivery Zone</p>
-                  <p className="text-sm font-semibold">{deliveryZone.name}</p>
-                  {order.delivery_fee && Number(order.delivery_fee) > 0 && (
-                    <p className="text-sm text-green-600 font-medium">
-                      Delivery Fee: {formatCurrency(Number(order.delivery_fee))}
-                    </p>
-                  )}
-                </div>
-              )}
-              
-              {/* Detailed Delivery/Pickup Schedule Display */}
-              {order.payment_status === 'paid' && (
+              {deliverySchedule ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Clock className="w-5 h-5 text-primary" />
-                    <h5 className="font-semibold text-base">
-                      {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
-                    </h5>
-                  </div>
-                  
-                  {deliverySchedule ? (
-                    <div className="bg-card border rounded-lg p-4 space-y-4">
-                      {/* Fulfillment Channel */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground mb-1">Fulfillment Channel</p>
-                          <p className="text-sm font-semibold">
-                            {order.order_type === 'delivery' ? 'Home Delivery' : 
-                             order.order_type === 'pickup' ? 'Store Pickup' : 'Dine In'}
-                          </p>
+                  {/* Required Date & Time - Most Important Info */}
+                  <div className="bg-card rounded-lg p-4 border shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-primary" />
+                          <span className="text-sm font-medium text-muted-foreground">Required Date</span>
                         </div>
-                        
-                        {/* Order Status */}
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground mb-1">Order Status</p>
-                          <p className="text-sm font-semibold capitalize">
-                            {order.status.replace('_', ' ')}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {/* Delivery Date */}
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">
-                          {order.order_type === 'delivery' ? 'Delivery Date' : 'Pickup Date'}
-                        </p>
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold">
-                            {format(new Date(deliverySchedule.delivery_date), 'dd/MM/yyyy')}
+                          <p className="text-lg font-bold text-primary">
+                            {format(new Date(deliverySchedule.delivery_date), 'EEE, MMM d')}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMM d, yyyy')}
+                            {format(new Date(deliverySchedule.delivery_date), 'yyyy')}
                           </p>
                         </div>
                       </div>
                       
-                      {/* Time Window */}
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">
-                          {order.order_type === 'delivery' ? 'Delivery Time Window' : 'Pickup Time Window'}
-                        </p>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-primary" />
+                          <span className="text-sm font-medium text-muted-foreground">Time Window</span>
+                        </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold">
-                            {format(new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`), 'h:mm a')} – {format(new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_end}`), 'h:mm a')}
+                          <p className="text-lg font-bold text-primary">
+                            {format(new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`), 'h:mm a')} - {format(new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_end}`), 'h:mm a')}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {(() => {
                               const start = new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`);
                               const end = new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_end}`);
                               const diffMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
-                              return diffMinutes >= 60 ? `${Math.round(diffMinutes / 60)}-hour window` : `${diffMinutes}-minute window`;
+                              return diffMinutes >= 60 ? `${Math.round(diffMinutes / 60)} hour window` : `${diffMinutes} minute window`;
                             })()}
                           </p>
                         </div>
                       </div>
-                      
-                      {/* Delivery Instructions */}
-                      {(deliverySchedule.special_instructions || order.special_instructions) && (
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground mb-1">
-                            {order.order_type === 'delivery' ? 'Delivery Instructions' : 'Pickup Instructions'}
-                          </p>
-                          <p className="text-sm font-semibold break-words">
-                            {deliverySchedule.special_instructions || order.special_instructions}
-                          </p>
-                        </div>
-                      )}
-                      
-                      {/* Scheduling Info */}
-                      <div className="pt-2 border-t">
-                        <p className="text-xs text-muted-foreground">
-                          Scheduled on {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'MMM d, yyyy')} at {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'h:mm a')}
-                        </p>
-                      </div>
-                      
-                      {/* Enhanced Countdown Timer for Active Orders */}
-                      {['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
-                        <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border-t">
-                          <Activity className="w-4 h-4 text-primary animate-pulse" />
-                          <MiniCountdownTimer
-                            deliveryDate={deliverySchedule.delivery_date}
-                            deliveryTimeStart={deliverySchedule.delivery_time_start}
-                            deliveryTimeEnd={deliverySchedule.delivery_time_end}
-                            orderStatus={order.status}
-                            className="text-sm font-medium"
-                          />
-                        </div>
-                      )}
-                      
-                      {/* Overdue Alert */}
-                      {isOrderOverdue(deliverySchedule.delivery_date, deliverySchedule.delivery_time_end) && 
-                       ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
-                        <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                          <AlertCircle className="w-4 h-4 text-destructive" />
-                          <span className="text-sm font-medium text-destructive">
-                            This order is overdue and requires immediate attention
+                    </div>
+                    
+                    {/* Urgency Indicator */}
+                    <div className="mt-4 pt-3 border-t">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            (() => {
+                              const now = new Date();
+                              const deliveryDateTime = new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`);
+                              const hoursUntilDelivery = (deliveryDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+                              
+                              if (hoursUntilDelivery < 0) return 'bg-destructive animate-pulse';
+                              if (hoursUntilDelivery < 2) return 'bg-orange-500 animate-pulse';
+                              if (hoursUntilDelivery < 24) return 'bg-yellow-500';
+                              return 'bg-green-500';
+                            })()
+                          }`} />
+                          <span className="text-sm font-medium">
+                            {(() => {
+                              const now = new Date();
+                              const deliveryDateTime = new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`);
+                              const hoursUntilDelivery = (deliveryDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+                              
+                              if (hoursUntilDelivery < 0) return 'Overdue';
+                              if (hoursUntilDelivery < 2) return 'Urgent - Within 2 hours';
+                              if (hoursUntilDelivery < 24) return 'Due Today';
+                              return 'Scheduled';
+                            })()}
                           </span>
                         </div>
-                      )}
+                        
+                        {/* Countdown Timer */}
+                        {['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
+                          <div className="flex items-center gap-2 bg-muted/50 px-3 py-1 rounded-full">
+                            <Activity className="w-3 h-3 text-primary animate-pulse" />
+                            <MiniCountdownTimer
+                              deliveryDate={deliverySchedule.delivery_date}
+                              deliveryTimeStart={deliverySchedule.delivery_time_start}
+                              deliveryTimeEnd={deliverySchedule.delivery_time_end}
+                              orderStatus={order.status}
+                              className="text-xs font-medium"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-orange-600" />
-                      <span className="text-sm text-orange-700">
-                        {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} schedule not yet configured
-                      </span>
+                  </div>
+                  
+                  {/* Additional Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Flexibility */}
+                    {deliverySchedule.is_flexible && (
+                      <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-sm text-green-700 font-medium">Flexible timing accepted</span>
+                      </div>
+                    )}
+                    
+                    {/* Special Instructions */}
+                    {(deliverySchedule.special_instructions || order.special_instructions) && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <MessageSquare className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-blue-800 mb-1">Customer Instructions</p>
+                            <p className="text-sm text-blue-700 break-words">
+                              {deliverySchedule.special_instructions || order.special_instructions}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Delivery Address for Delivery Orders */}
+                  {order.order_type === 'delivery' && order.delivery_address && (
+                    <div className="p-3 bg-muted/30 border rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-1">Delivery Address</p>
+                          <p className="text-sm font-semibold">
+                            {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
+                              ? `${(order.delivery_address as any).street || ''} ${(order.delivery_address as any).city || ''} ${(order.delivery_address as any).state || ''}`.trim()
+                              : typeof order.delivery_address === 'string' 
+                                ? order.delivery_address
+                                : 'Address details available'
+                            }
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
+                  
+                  {/* Schedule Request Info */}
+                  <div className="text-xs text-muted-foreground border-t pt-2">
+                    Schedule requested on {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                  </div>
                 </div>
-              )}
-
-              {/* Special Instructions Fallback */}
-              {!deliverySchedule?.special_instructions && order.special_instructions && (
-                <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
-                  <p className="text-sm font-medium text-orange-800 mb-1">Order Special Instructions:</p>
-                  <p className="text-sm text-orange-700 break-words">
-                    {order.special_instructions}
+              ) : (
+                <div className="text-center p-6 bg-orange-50 border border-orange-200 rounded-lg">
+                  <AlertCircle className="w-8 h-8 text-orange-600 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-orange-800 mb-1">
+                    {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Schedule Not Set
+                  </p>
+                  <p className="text-xs text-orange-600">
+                    Customer hasn't specified when they need this {order.order_type === 'delivery' ? 'delivered' : 'picked up'}
                   </p>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Special Instructions Fallback */}
+        {!order.delivery_schedule?.special_instructions && order.special_instructions && (
+          <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mt-4">
+            <p className="text-sm font-medium text-orange-800 mb-1">Order Special Instructions:</p>
+            <p className="text-sm text-orange-700 break-words">
+              {order.special_instructions}
+            </p>
           </div>
         )}
       </CardContent>

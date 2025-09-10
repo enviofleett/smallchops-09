@@ -1305,14 +1305,114 @@ function AdminOrderCard({
                   </div>
                 </div>
               ) : (
-                <div className="text-center p-6 bg-orange-50 border border-orange-200 rounded-lg">
-                  <AlertCircle className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                  <p className="text-sm font-medium text-orange-800 mb-1">
-                    {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Schedule Not Set
-                  </p>
-                  <p className="text-xs text-orange-600">
-                    Customer hasn't specified when they need this {order.order_type === 'delivery' ? 'delivered' : 'picked up'}
-                  </p>
+                <div className="space-y-4">
+                  {/* Fallback: Display order information provided during checkout */}
+                  <div className="bg-card rounded-lg p-4 border shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium text-muted-foreground">Order Placed</span>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-lg font-bold">
+                            {format(new Date(order.order_time), 'EEE, MMM d')}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(order.order_time), 'h:mm a, yyyy')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          {order.order_type === 'delivery' ? (
+                            <Truck className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <Package className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <span className="text-sm font-medium text-muted-foreground">Fulfillment</span>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-lg font-bold capitalize">{order.order_type}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {order.order_type === 'delivery' ? 'Home Delivery' : 'Customer Pickup'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Available customer information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Delivery Address for Delivery Orders */}
+                    {order.order_type === 'delivery' && order.delivery_address && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-blue-800 mb-1">Customer Address</p>
+                            <p className="text-sm text-blue-700 break-words">
+                              {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
+                                ? `${(order.delivery_address as any).street || ''} ${(order.delivery_address as any).city || ''} ${(order.delivery_address as any).state || ''}`.trim()
+                                : typeof order.delivery_address === 'string' 
+                                  ? order.delivery_address
+                                  : 'Address provided during checkout'
+                              }
+                            </p>
+                            {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address) && (order.delivery_address as any).instructions && (
+                              <p className="text-xs text-blue-600 mt-1 font-medium">
+                                Instructions: {(order.delivery_address as any).instructions}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Special Instructions */}
+                    {order.special_instructions && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <MessageSquare className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-green-800 mb-1">Customer Instructions</p>
+                            <p className="text-sm text-green-700 break-words">
+                              {order.special_instructions}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Delivery Time if available */}
+                  {order.delivery_time && (
+                    <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Clock className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-purple-800 mb-1">Requested {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Time</p>
+                          <p className="text-sm text-purple-700">
+                            {format(new Date(order.delivery_time), 'PPp')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No specific schedule notice */}
+                  <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <AlertCircle className="w-5 h-5 text-orange-600" />
+                      <p className="text-sm font-medium text-orange-800">
+                        No Specific Schedule Set
+                      </p>
+                    </div>
+                    <p className="text-xs text-orange-600">
+                      Customer provided basic {order.order_type} information during checkout but didn't set a specific schedule
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

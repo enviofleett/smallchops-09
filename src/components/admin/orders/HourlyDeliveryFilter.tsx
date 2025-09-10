@@ -23,13 +23,19 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
   onHourChange,
   orderCounts
 }) => {
-  // Generate hourly slots from 8 AM to 10 PM
+  // Generate hourly slots from 8 AM to 10 PM with validation
   const generateHourlySlots = () => {
     const slots = [];
     for (let hour = 8; hour <= 22; hour++) {
-      const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
-      const displayTime = format(new Date().setHours(hour, 0, 0, 0), 'h:mm a');
-      slots.push({ value: timeSlot, label: displayTime, hour });
+      try {
+        const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
+        const testDate = new Date();
+        testDate.setHours(hour, 0, 0, 0);
+        const displayTime = format(testDate, 'h:mm a');
+        slots.push({ value: timeSlot, label: displayTime, hour });
+      } catch (error) {
+        console.warn('Error generating time slot for hour:', hour, error);
+      }
     }
     return slots;
   };
@@ -44,9 +50,18 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
   };
 
   const getTotalCountForDay = (day: 'today' | 'tomorrow') => {
-    if (!orderCounts) return 0;
-    const counts = orderCounts[day];
-    return Object.values(counts).reduce((sum, count) => sum + count, 0);
+    if (!orderCounts || !orderCounts[day]) return 0;
+    
+    try {
+      const counts = orderCounts[day];
+      return Object.values(counts).reduce((sum, count) => {
+        const numCount = typeof count === 'number' ? count : 0;
+        return sum + numCount;
+      }, 0);
+    } catch (error) {
+      console.warn('Error calculating total count for day:', day, error);
+      return 0;
+    }
   };
 
   return (
@@ -125,7 +140,7 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
                   <SelectItem key={slot.value} value={slot.value}>
                     <div className="flex items-center justify-between w-full">
                       <span>{slot.label}</span>
-                      {orderCounts && orderCounts[selectedDay][slot.value] > 0 && (
+                      {orderCounts && orderCounts[selectedDay] && orderCounts[selectedDay][slot.value] > 0 && (
                         <Badge variant="secondary" className="ml-2">
                           {orderCounts[selectedDay][slot.value]}
                         </Badge>
@@ -149,20 +164,20 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
                 All times
               </Button>
               {hourlySlots.map((slot) => (
-                <Button
-                  key={slot.value}
-                  variant={selectedHour === slot.value ? 'default' : 'outline'}
-                  onClick={() => onHourChange(selectedHour === slot.value ? null : slot.value)}
-                  className="flex-shrink-0"
-                  size="sm"
-                >
-                  {slot.label}
-                  {orderCounts && orderCounts[selectedDay][slot.value] > 0 && (
-                    <Badge variant="secondary" className="ml-1 text-xs">
-                      {orderCounts[selectedDay][slot.value]}
-                    </Badge>
-                  )}
-                </Button>
+                  <Button
+                    key={slot.value}
+                    variant={selectedHour === slot.value ? 'default' : 'outline'}
+                    onClick={() => onHourChange(selectedHour === slot.value ? null : slot.value)}
+                    className="flex-shrink-0"
+                    size="sm"
+                  >
+                    {slot.label}
+                    {orderCounts && orderCounts[selectedDay] && orderCounts[selectedDay][slot.value] > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-xs">
+                        {orderCounts[selectedDay][slot.value]}
+                      </Badge>
+                    )}
+                  </Button>
               ))}
             </div>
           </div>

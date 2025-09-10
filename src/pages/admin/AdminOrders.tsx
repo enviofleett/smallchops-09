@@ -279,37 +279,59 @@ export default function AdminOrders() {
     }
     
     // Apply hourly filtering for confirmed tab
-    if (statusFilter === 'confirmed' && (selectedDay || selectedHour)) {
+    if (activeTab === 'confirmed' && (selectedDay || selectedHour)) {
       const today = startOfDay(new Date());
       const tomorrow = startOfDay(addDays(new Date(), 1));
       
       result = result.filter(order => {
+        // Only filter delivery orders with paid status that have schedules
+        if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
+          return false;
+        }
+        
         const schedule = deliverySchedules[order.id];
-        if (!schedule || !schedule.delivery_date) return false;
+        if (!schedule?.delivery_date) return false;
         
         try {
-          const deliveryDate = startOfDay(new Date(schedule.delivery_date));
+          const deliveryDate = new Date(schedule.delivery_date);
           
-          // Filter by selected day
+          // Validate delivery date
+          if (isNaN(deliveryDate.getTime())) {
+            console.warn('Invalid delivery date for order:', order.id, schedule.delivery_date);
+            return false;
+          }
+          
+          const normalizedDeliveryDate = startOfDay(deliveryDate);
+          
+          // Filter by selected day - must match exactly
           if (selectedDay) {
             const targetDate = selectedDay === 'today' ? today : tomorrow;
-            if (deliveryDate.getTime() !== targetDate.getTime()) {
+            if (normalizedDeliveryDate.getTime() !== targetDate.getTime()) {
               return false;
             }
           }
           
-          // Filter by selected hour
+          // Filter by selected hour - more robust hour matching
           if (selectedHour && schedule.delivery_time_start) {
-            const orderHour = schedule.delivery_time_start.split(':')[0];
-            const selectedHourFormatted = selectedHour.split(':')[0];
-            if (orderHour !== selectedHourFormatted) {
+            const orderTimeComponents = schedule.delivery_time_start.split(':');
+            const selectedTimeComponents = selectedHour.split(':');
+            
+            if (orderTimeComponents.length < 2 || selectedTimeComponents.length < 2) {
+              console.warn('Invalid time format for order:', order.id, schedule.delivery_time_start);
+              return false;
+            }
+            
+            const orderHour = parseInt(orderTimeComponents[0], 10);
+            const selectedHourInt = parseInt(selectedTimeComponents[0], 10);
+            
+            if (isNaN(orderHour) || isNaN(selectedHourInt) || orderHour !== selectedHourInt) {
               return false;
             }
           }
           
           return true;
         } catch (error) {
-          console.warn('Error parsing delivery date for hourly filter:', schedule.delivery_date, error);
+          console.warn('Error processing delivery schedule for order:', order.id, error);
           return false;
         }
       });
@@ -320,7 +342,7 @@ export default function AdminOrders() {
 
   // Calculate hourly order counts for confirmed orders
   const hourlyOrderCounts = useMemo(() => {
-    if (statusFilter !== 'confirmed') return { today: {}, tomorrow: {} };
+    if (activeTab !== 'confirmed') return { today: {}, tomorrow: {} };
     
     const today = startOfDay(new Date());
     const tomorrow = startOfDay(addDays(new Date(), 1));
@@ -329,27 +351,51 @@ export default function AdminOrders() {
       tomorrow: {} as Record<string, number>
     };
     
-    // Initialize hourly slots
+    // Initialize hourly slots (8 AM to 10 PM)
     for (let hour = 8; hour <= 22; hour++) {
       const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
       counts.today[timeSlot] = 0;
       counts.tomorrow[timeSlot] = 0;
     }
     
-    // Count orders for each hour
+    // Count orders for each hour - only paid delivery orders with valid schedules
     prioritySortedOrders.forEach(order => {
-      if (order.status !== 'confirmed' || order.payment_status !== 'paid') return;
+      // Only count relevant orders in confirmed tab (not just confirmed status)
+      if (order.order_type !== 'delivery' || order.payment_status !== 'paid') return;
       
       const schedule = deliverySchedules[order.id];
-      if (!schedule || !schedule.delivery_date || !schedule.delivery_time_start) return;
+      if (!schedule?.delivery_date || !schedule.delivery_time_start) return;
       
       try {
-        const deliveryDate = startOfDay(new Date(schedule.delivery_date));
-        const orderHour = `${schedule.delivery_time_start.split(':')[0]}:00`;
+        const deliveryDate = new Date(schedule.delivery_date);
         
-        if (deliveryDate.getTime() === today.getTime()) {
+        // Validate delivery date
+        if (isNaN(deliveryDate.getTime())) {
+          console.warn('Invalid delivery date for counting:', order.id, schedule.delivery_date);
+          return;
+        }
+        
+        const normalizedDeliveryDate = startOfDay(deliveryDate);
+        
+        // Parse hour more robustly
+        const timeComponents = schedule.delivery_time_start.split(':');
+        if (timeComponents.length < 2) {
+          console.warn('Invalid time format for counting:', order.id, schedule.delivery_time_start);
+          return;
+        }
+        
+        const hourInt = parseInt(timeComponents[0], 10);
+        if (isNaN(hourInt) || hourInt < 8 || hourInt > 22) {
+          console.warn('Hour out of range for counting:', order.id, hourInt);
+          return;
+        }
+        
+        const orderHour = `${hourInt.toString().padStart(2, '0')}:00`;
+        
+        // Count for today and tomorrow only
+        if (normalizedDeliveryDate.getTime() === today.getTime()) {
           counts.today[orderHour] = (counts.today[orderHour] || 0) + 1;
-        } else if (deliveryDate.getTime() === tomorrow.getTime()) {
+        } else if (normalizedDeliveryDate.getTime() === tomorrow.getTime()) {
           counts.tomorrow[orderHour] = (counts.tomorrow[orderHour] || 0) + 1;
         }
       } catch (error) {
@@ -358,7 +404,7 @@ export default function AdminOrders() {
     });
     
     return counts;
-  }, [prioritySortedOrders, deliverySchedules, statusFilter]);
+  }, [prioritySortedOrders, deliverySchedules, activeTab]);
 
   // Calculate overdue order counts by date ranges
   const overdueOrderCounts = useMemo(() => {

@@ -21,6 +21,7 @@ import { CustomizationOrderBuilder } from '@/components/customization/Customizat
 import { ShoppingCart } from 'lucide-react';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { ProductMOQIndicator, ProductMOQWarning } from '@/components/products/ProductMOQIndicator';
+import { MOQBadge } from '@/components/ui/moq-badge';
 import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
 import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
 
@@ -329,6 +330,19 @@ const CategoryProductsContent = () => {
                              />
                            </div>
                          )}
+                         
+                         {/* MOQ Badge - Only for customization category */}
+                         {isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+                           <div className="absolute top-1 sm:top-2 right-1 sm:right-2 z-10">
+                             <MOQBadge 
+                               minimumQuantity={product.minimum_order_quantity}
+                               variant="default"
+                               showIcon={false}
+                               className="bg-blue-100 text-blue-800 border-blue-200 text-xs"
+                             />
+                           </div>
+                         )}
+                         
                          {/* Hover overlay for better UX */}
                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 z-5" />
                        </div>
@@ -338,21 +352,18 @@ const CategoryProductsContent = () => {
                            <ProductRatingDisplay productId={product.id} />
                          </div>
                          
-                         {/* MOQ Requirements - Same logic as ProductDetail page */}
-                         {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
-                           <div className="mb-3">
-                             <ProductMOQIndicator
-                               minimumOrderQuantity={product.minimum_order_quantity}
-                               price={product.discounted_price || product.price}
-                               stockQuantity={product.stock_quantity}
-                               currentCartQuantity={isCustomizationCategory 
-                                 ? customizationContext.items.find(item => item.id === product.id)?.quantity || 0
-                                 : 0
-                               }
-                               className="text-xs"
-                             />
-                           </div>
-                         )}
+                          {/* MOQ Requirements - Only for non-customization categories */}
+                          {!isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+                            <div className="mb-3">
+                              <ProductMOQIndicator
+                                minimumOrderQuantity={product.minimum_order_quantity}
+                                price={product.discounted_price || product.price}
+                                stockQuantity={product.stock_quantity}
+                                currentCartQuantity={0}
+                                className="text-xs"
+                              />
+                            </div>
+                          )}
                          
                          <div className="flex items-center justify-between">
                            <PriceDisplay
@@ -361,19 +372,32 @@ const CategoryProductsContent = () => {
                              hasDiscount={(product.discount_percentage || 0) > 0}
                              size="sm"
                            />
-                           <Button 
-                             size="sm" 
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleAddToCart(product);
-                             }}
-                             className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
-                             variant={isCustomizationCategory ? "outline" : "default"}
-                             disabled={isValidatingMOQ}
-                           >
-                             {isValidatingMOQ ? "..." : "Add"}
-                           </Button>
-                         </div>
+                            <Button 
+                              size="sm" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(product);
+                              }}
+                              className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
+                              variant={isCustomizationCategory ? "outline" : "default"}
+                              disabled={isValidatingMOQ}
+                            >
+                              {isValidatingMOQ ? "..." : 
+                               (isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1) 
+                                 ? `Add ${product.minimum_order_quantity}+`
+                                 : "Add"
+                              }
+                            </Button>
+                          </div>
+                          
+                          {/* Min. order text - Only for customization category */}
+                          {isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+                            <div className="text-center pt-2 mt-2 border-t border-muted">
+                              <span className="text-xs text-muted-foreground">
+                                Min. order: {product.minimum_order_quantity} units
+                              </span>
+                            </div>
+                          )}
                        </CardContent>
                     </Card>
                   ))}

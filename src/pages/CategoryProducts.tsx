@@ -21,7 +21,6 @@ import { CustomizationOrderBuilder } from '@/components/customization/Customizat
 import { ShoppingCart } from 'lucide-react';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { ProductMOQIndicator, ProductMOQWarning } from '@/components/products/ProductMOQIndicator';
-import { MOQBadge, MOQInfo } from '@/components/ui/moq-badge';
 import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
 import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
 
@@ -339,17 +338,17 @@ const CategoryProductsContent = () => {
                            <ProductRatingDisplay productId={product.id} />
                          </div>
                          
-                         {/* MOQ Information for All Products */}
-                         {product.minimum_order_quantity > 1 && (
-                           <div className="mb-2">
-                             <MOQBadge 
-                               minimumQuantity={product.minimum_order_quantity}
-                               currentQuantity={isCustomizationCategory 
-                                 ? customizationContext.items.find(item => item.id === product.id)?.quantity
-                                 : undefined
+                         {/* MOQ Requirements - Same logic as ProductDetail page */}
+                         {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+                           <div className="mb-3">
+                             <ProductMOQIndicator
+                               minimumOrderQuantity={product.minimum_order_quantity}
+                               price={product.discounted_price || product.price}
+                               stockQuantity={product.stock_quantity}
+                               currentCartQuantity={isCustomizationCategory 
+                                 ? customizationContext.items.find(item => item.id === product.id)?.quantity || 0
+                                 : 0
                                }
-                               variant="default"
-                               showIcon={true}
                                className="text-xs"
                              />
                            </div>
@@ -375,17 +374,6 @@ const CategoryProductsContent = () => {
                              {isValidatingMOQ ? "..." : "Add"}
                            </Button>
                          </div>
-                         
-                         {/* MOQ Info for All Products */}
-                         {product.minimum_order_quantity > 1 && (
-                           <div className="mt-2">
-                             <MOQInfo 
-                               minimumQuantity={product.minimum_order_quantity}
-                               productName={product.name}
-                               className="text-xs bg-muted/30 p-2 rounded border-l-2 border-primary/30"
-                             />
-                           </div>
-                         )}
                        </CardContent>
                     </Card>
                   ))}

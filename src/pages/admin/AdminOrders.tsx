@@ -1209,31 +1209,94 @@ function AdminOrderCard({
                 </div>
               )}
               
-              {/* Delivery/Pickup Schedule Display */}
+              {/* Detailed Delivery/Pickup Schedule Display */}
               {order.payment_status === 'paid' && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-primary" />
-                    <h5 className="font-medium text-sm">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock className="w-5 h-5 text-primary" />
+                    <h5 className="font-semibold text-base">
                       {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
                     </h5>
                   </div>
                   
                   {deliverySchedule ? (
-                    <>
-                      <DeliveryScheduleDisplay 
-                        schedule={deliverySchedule}
-                        orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
-                        orderStatus={order.status}
-                        className="border rounded-lg p-3"
-                      />
+                    <div className="bg-card border rounded-lg p-4 space-y-4">
+                      {/* Fulfillment Channel */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-1">Fulfillment Channel</p>
+                          <p className="text-sm font-semibold">
+                            {order.order_type === 'delivery' ? 'Home Delivery' : 
+                             order.order_type === 'pickup' ? 'Store Pickup' : 'Dine In'}
+                          </p>
+                        </div>
+                        
+                        {/* Order Status */}
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-1">Order Status</p>
+                          <p className="text-sm font-semibold capitalize">
+                            {order.status.replace('_', ' ')}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Delivery Date */}
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">
+                          {order.order_type === 'delivery' ? 'Delivery Date' : 'Pickup Date'}
+                        </p>
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold">
+                            {format(new Date(deliverySchedule.delivery_date), 'dd/MM/yyyy')}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMM d, yyyy')}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Time Window */}
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">
+                          {order.order_type === 'delivery' ? 'Delivery Time Window' : 'Pickup Time Window'}
+                        </p>
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold">
+                            {format(new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`), 'h:mm a')} – {format(new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_end}`), 'h:mm a')}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {(() => {
+                              const start = new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`);
+                              const end = new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_end}`);
+                              const diffMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+                              return diffMinutes >= 60 ? `${Math.round(diffMinutes / 60)}-hour window` : `${diffMinutes}-minute window`;
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Delivery Instructions */}
+                      {(deliverySchedule.special_instructions || order.special_instructions) && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-1">
+                            {order.order_type === 'delivery' ? 'Delivery Instructions' : 'Pickup Instructions'}
+                          </p>
+                          <p className="text-sm font-semibold break-words">
+                            {deliverySchedule.special_instructions || order.special_instructions}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Scheduling Info */}
+                      <div className="pt-2 border-t">
+                        <p className="text-xs text-muted-foreground">
+                          Scheduled on {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'MMM d, yyyy')} at {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'h:mm a')}
+                        </p>
+                      </div>
                       
                       {/* Enhanced Countdown Timer for Active Orders */}
-                      {['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && 
-                       deliverySchedule.delivery_date && 
-                       deliverySchedule.delivery_time_start && 
-                       deliverySchedule.delivery_time_end && (
-                        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                      {['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
+                        <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border-t">
                           <Activity className="w-4 h-4 text-primary animate-pulse" />
                           <MiniCountdownTimer
                             deliveryDate={deliverySchedule.delivery_date}
@@ -1246,20 +1309,18 @@ function AdminOrderCard({
                       )}
                       
                       {/* Overdue Alert */}
-                      {deliverySchedule.delivery_date && 
-                       deliverySchedule.delivery_time_end && 
-                       isOrderOverdue(deliverySchedule.delivery_date, deliverySchedule.delivery_time_end) && 
+                      {isOrderOverdue(deliverySchedule.delivery_date, deliverySchedule.delivery_time_end) && 
                        ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
-                        <div className="flex items-center gap-2 p-2 bg-destructive/10 border border-destructive/20 rounded-lg">
+                        <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
                           <AlertCircle className="w-4 h-4 text-destructive" />
                           <span className="text-sm font-medium text-destructive">
                             This order is overdue and requires immediate attention
                           </span>
                         </div>
                       )}
-                    </>
+                    </div>
                   ) : (
-                    <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center gap-2 p-4 bg-orange-50 border border-orange-200 rounded-lg">
                       <AlertCircle className="w-4 h-4 text-orange-600" />
                       <span className="text-sm text-orange-700">
                         {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} schedule not yet configured

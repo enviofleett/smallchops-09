@@ -339,12 +339,15 @@ const CategoryProductsContent = () => {
                            <ProductRatingDisplay productId={product.id} />
                          </div>
                          
-                         {/* MOQ Information for Customization Products */}
-                         {isCustomizationCategory && product.minimum_order_quantity > 1 && (
+                         {/* MOQ Information for All Products */}
+                         {product.minimum_order_quantity > 1 && (
                            <div className="mb-2">
                              <MOQBadge 
                                minimumQuantity={product.minimum_order_quantity}
-                               currentQuantity={customizationContext.items.find(item => item.id === product.id)?.quantity}
+                               currentQuantity={isCustomizationCategory 
+                                 ? customizationContext.items.find(item => item.id === product.id)?.quantity
+                                 : undefined
+                               }
                                variant="default"
                                showIcon={true}
                                className="text-xs"
@@ -373,8 +376,8 @@ const CategoryProductsContent = () => {
                            </Button>
                          </div>
                          
-                         {/* MOQ Warning for Customization Products */}
-                         {isCustomizationCategory && product.minimum_order_quantity > 1 && (
+                         {/* MOQ Info for All Products */}
+                         {product.minimum_order_quantity > 1 && (
                            <div className="mt-2">
                              <MOQInfo 
                                minimumQuantity={product.minimum_order_quantity}

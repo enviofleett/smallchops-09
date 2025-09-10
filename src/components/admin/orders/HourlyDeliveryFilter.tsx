@@ -143,17 +143,17 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
             variant={selectedDay === 'today' ? 'default' : 'outline'}
             onClick={() => handleDayChange('today')}
             className="flex-1 sm:flex-none relative transition-all duration-200 hover:scale-[1.02]"
-            disabled={loading || (!orderCounts && !loading) || getTotalCountForDay('today') === 0}
+            disabled={loading}
           >
             <Calendar className="w-4 h-4 mr-2" />
             <span className="font-medium">Today</span>
             <span className="hidden sm:inline ml-1 text-xs opacity-75">
               ({format(today, 'MMM d')})
             </span>
-            {orderCounts && getTotalCountForDay('today') > 0 && (
+            {orderCounts && (
               <Badge 
                 variant={selectedDay === 'today' ? 'secondary' : 'outline'} 
-                className="ml-2 text-xs animate-in fade-in-50"
+                className={`ml-2 text-xs animate-in fade-in-50 ${getTotalCountForDay('today') === 0 ? 'opacity-50' : ''}`}
               >
                 {getTotalCountForDay('today')}
               </Badge>
@@ -172,17 +172,17 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
             variant={selectedDay === 'tomorrow' ? 'default' : 'outline'}
             onClick={() => handleDayChange('tomorrow')}
             className="flex-1 sm:flex-none relative transition-all duration-200 hover:scale-[1.02]"
-            disabled={loading || (!orderCounts && !loading) || getTotalCountForDay('tomorrow') === 0}
+            disabled={loading}
           >
             <Calendar className="w-4 h-4 mr-2" />
             <span className="font-medium">Tomorrow</span>
             <span className="hidden sm:inline ml-1 text-xs opacity-75">
               ({format(tomorrow, 'MMM d')})
             </span>
-            {orderCounts && getTotalCountForDay('tomorrow') > 0 && (
+            {orderCounts && (
               <Badge 
                 variant={selectedDay === 'tomorrow' ? 'secondary' : 'outline'} 
-                className="ml-2 text-xs animate-in fade-in-50"
+                className={`ml-2 text-xs animate-in fade-in-50 ${getTotalCountForDay('tomorrow') === 0 ? 'opacity-50' : ''}`}
               >
                 {getTotalCountForDay('tomorrow')}
               </Badge>
@@ -209,8 +209,8 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
         )}
       </div>
 
-      {/* Hour Selection - Only show when day is selected and has orders */}
-      {selectedDay && orderCounts && getTotalCountForDay(selectedDay) > 0 && !loading && (
+      {/* Hour Selection - Show when day is selected */}
+      {selectedDay && orderCounts && !loading && (
         <div className="space-y-2 animate-in slide-in-from-top-5 duration-300">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Clock className="w-4 h-4" />
@@ -220,139 +220,142 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
             </span>
           </div>
           
-          {/* Desktop/Tablet: Select dropdown */}
-          <div className="hidden sm:block">
-            <Select
-              value={selectedHour || 'all'}
-              onValueChange={(value) => handleHourChange(value === 'all' ? null : value)}
-            >
-              <SelectTrigger className="w-full sm:w-[280px] transition-all duration-200 hover:border-primary">
-                <SelectValue placeholder="Select time slot" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                <SelectItem value="all" className="font-medium">
-                  <div className="flex items-center justify-between w-full">
-                    <span>All delivery slots</span>
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      {getTotalCountForDay(selectedDay)} orders
-                    </Badge>
-                  </div>
-                </SelectItem>
-                {hourlySlots.map((slot) => {
-                  const slotCount = orderCounts[selectedDay]?.[slot.value] || 0;
-                  if (slotCount === 0) return null; // Only show slots with orders
-                  
-                  return (
-                    <SelectItem key={slot.value} value={slot.value}>
+          {/* Show content if there are orders, otherwise show empty state */}
+          {getTotalCountForDay(selectedDay) > 0 ? (
+            <>
+              {/* Desktop/Tablet: Select dropdown */}
+              <div className="hidden sm:block">
+                <Select
+                  value={selectedHour || 'all'}
+                  onValueChange={(value) => handleHourChange(value === 'all' ? null : value)}
+                >
+                  <SelectTrigger className="w-full sm:w-[280px] transition-all duration-200 hover:border-primary">
+                    <SelectValue placeholder="Select time slot" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="all" className="font-medium">
                       <div className="flex items-center justify-between w-full">
-                        <span className="font-medium">{slot.label}</span>
+                        <span>All delivery slots</span>
                         <Badge variant="secondary" className="ml-2 text-xs">
-                          {slotCount} {slotCount === 1 ? 'order' : 'orders'}
+                          {getTotalCountForDay(selectedDay)} orders
                         </Badge>
                       </div>
                     </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </div>
+                    {hourlySlots.map((slot) => {
+                      const slotCount = orderCounts[selectedDay]?.[slot.value] || 0;
+                      if (slotCount === 0) return null; // Only show slots with orders
+                      
+                      return (
+                        <SelectItem key={slot.value} value={slot.value}>
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-medium">{slot.label}</span>
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              {slotCount} {slotCount === 1 ? 'order' : 'orders'}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Mobile: Scrollable buttons with improved UX */}
-          <div className="sm:hidden">
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border">
-              <Button
-                variant={!selectedHour ? 'default' : 'outline'}
-                onClick={() => handleHourChange(null)}
-                className="flex-shrink-0 transition-all duration-200"
-                size="sm"
-              >
-                All slots
-                <Badge variant="outline" className="ml-1 text-xs">
-                  {getTotalCountForDay(selectedDay)}
-                </Badge>
-              </Button>
-              {hourlySlots.map((slot) => {
-                const slotCount = orderCounts[selectedDay]?.[slot.value] || 0;
-                if (slotCount === 0) return null; // Only show slots with orders
-                
-                return (
+              {/* Mobile: Scrollable buttons with improved UX */}
+              <div className="sm:hidden">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border">
                   <Button
-                    key={slot.value}
-                    variant={selectedHour === slot.value ? 'default' : 'outline'}
-                    onClick={() => handleHourChange(slot.value)}
+                    variant={!selectedHour ? 'default' : 'outline'}
+                    onClick={() => handleHourChange(null)}
                     className="flex-shrink-0 transition-all duration-200"
                     size="sm"
                   >
-                    <span className="font-medium">{slot.label}</span>
-                    <Badge 
-                      variant={selectedHour === slot.value ? 'secondary' : 'outline'} 
-                      className="ml-1 text-xs"
-                    >
-                      {slotCount}
+                    All slots
+                    <Badge variant="outline" className="ml-1 text-xs">
+                      {getTotalCountForDay(selectedDay)}
                     </Badge>
                   </Button>
-                );
-              })}
+                  {hourlySlots.map((slot) => {
+                    const slotCount = orderCounts[selectedDay]?.[slot.value] || 0;
+                    if (slotCount === 0) return null; // Only show slots with orders
+                    
+                    return (
+                      <Button
+                        key={slot.value}
+                        variant={selectedHour === slot.value ? 'default' : 'outline'}
+                        onClick={() => handleHourChange(slot.value)}
+                        className="flex-shrink-0 transition-all duration-200"
+                        size="sm"
+                      >
+                        <span className="font-medium">{slot.label}</span>
+                        <Badge 
+                          variant={selectedHour === slot.value ? 'secondary' : 'outline'} 
+                          className="ml-1 text-xs"
+                        >
+                          {slotCount}
+                        </Badge>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Empty state when no orders for selected day */
+            <div className="text-center py-6 text-muted-foreground animate-in fade-in-50">
+              <Clock className="w-12 h-12 mx-auto mb-3 opacity-40" />
+              <div className="space-y-1">
+                <p className="font-medium">No delivery orders scheduled</p>
+                <p className="text-sm text-muted-foreground/80">
+                  for {selectedDay === 'today' ? format(today, 'EEEE, MMM d') : format(tomorrow, 'EEEE, MMM d')}
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearFilters}
+                  className="mt-3 transition-all duration-200"
+                >
+                  View All Orders
+                </Button>
+              </div>
             </div>
-           </div>
-          </div>
-        )}
-        
-        {/* Loading state for hour selection */}
-        {loading && selectedDay && (
-          <div className="space-y-2 animate-pulse">
-            <div className="h-4 bg-muted rounded w-1/3"></div>
-            <div className="h-10 bg-muted rounded"></div>
-          </div>
-        )}
+          )}
+        </div>
+      )}
+      
+      {/* Loading state for hour selection */}
+      {loading && selectedDay && (
+        <div className="space-y-2 animate-pulse">
+          <div className="h-4 bg-muted rounded w-1/3"></div>
+          <div className="h-10 bg-muted rounded"></div>
+        </div>
+      )}
 
-        {/* No orders message with improved UX */}
-        {selectedDay && orderCounts && getTotalCountForDay(selectedDay) === 0 && !loading && (
-          <div className="text-center py-8 text-muted-foreground animate-in fade-in-50">
-            <Clock className="w-16 h-16 mx-auto mb-4 opacity-40" />
-            <div className="space-y-2">
-              <p className="font-medium text-lg">No delivery orders scheduled</p>
-              <p className="text-sm">
-                for {selectedDay === 'today' ? format(today, 'EEEE, MMM d') : format(tomorrow, 'EEEE, MMM d')}
-              </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={clearFilters}
-                className="mt-4 transition-all duration-200"
-              >
-                View All Orders
-              </Button>
-            </div>
+      {/* Active filters display with enhanced styling */}
+      {(selectedDay || selectedHour) && !loading && (
+        <div className="flex flex-wrap gap-2 animate-in slide-in-from-bottom-2">
+          <span className="text-sm text-muted-foreground font-medium">Active filters:</span>
+          {selectedDay && (
+            <Badge variant="outline" className="transition-all duration-200 hover:bg-primary/10">
+              📅 {selectedDay === 'today' ? format(today, 'MMM d') : format(tomorrow, 'MMM d')}
+            </Badge>
+          )}
+          {selectedHour && (
+            <Badge variant="outline" className="transition-all duration-200 hover:bg-primary/10">
+              🕒 {hourlySlots.find(slot => slot.value === selectedHour)?.label}
+            </Badge>
+          )}
+        </div>
+      )}
+      
+      {/* Data freshness indicator (production feature) */}
+      {orderCounts && !loading && (
+        <div className="text-xs text-muted-foreground text-center pt-2 border-t">
+          <div className="flex items-center justify-center gap-1">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span>Data updated {format(new Date(), 'h:mm a')}</span>
           </div>
-        )}
-
-        {/* Active filters display with enhanced styling */}
-        {(selectedDay || selectedHour) && !loading && (
-          <div className="flex flex-wrap gap-2 animate-in slide-in-from-bottom-2">
-            <span className="text-sm text-muted-foreground font-medium">Active filters:</span>
-            {selectedDay && (
-              <Badge variant="outline" className="transition-all duration-200 hover:bg-primary/10">
-                📅 {selectedDay === 'today' ? format(today, 'MMM d') : format(tomorrow, 'MMM d')}
-              </Badge>
-            )}
-            {selectedHour && (
-              <Badge variant="outline" className="transition-all duration-200 hover:bg-primary/10">
-                🕒 {hourlySlots.find(slot => slot.value === selectedHour)?.label}
-              </Badge>
-            )}
-          </div>
-        )}
-        
-        {/* Data freshness indicator (production feature) */}
-        {orderCounts && !loading && (
-          <div className="text-xs text-muted-foreground text-center pt-2 border-t">
-            <div className="flex items-center justify-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Data updated {format(new Date(), 'h:mm a')}</span>
-            </div>
-          </div>
-        )}
-     </div>
-   );
+        </div>
+      )}
+    </div>
+  );
 };

@@ -220,10 +220,9 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
             </span>
           </div>
           
-          {/* Show content if there are orders, otherwise show empty state */}
-          {getTotalCountForDay(selectedDay) > 0 ? (
-            <>
-              {/* Desktop/Tablet: Select dropdown */}
+          {/* Always show time slots - production ready view */}
+          <div className="space-y-4">
+            {/* Desktop/Tablet: Select dropdown */}
               <div className="hidden sm:block">
                 <Select
                   value={selectedHour || 'all'}
@@ -243,13 +242,15 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
                     </SelectItem>
                     {hourlySlots.map((slot) => {
                       const slotCount = orderCounts[selectedDay]?.[slot.value] || 0;
-                      if (slotCount === 0) return null; // Only show slots with orders
                       
                       return (
                         <SelectItem key={slot.value} value={slot.value}>
                           <div className="flex items-center justify-between w-full">
                             <span className="font-medium">{slot.label}</span>
-                            <Badge variant="secondary" className="ml-2 text-xs">
+                            <Badge 
+                              variant={slotCount > 0 ? "default" : "secondary"} 
+                              className={`ml-2 text-xs ${slotCount === 0 ? 'opacity-60' : ''}`}
+                            >
                               {slotCount} {slotCount === 1 ? 'order' : 'orders'}
                             </Badge>
                           </div>
@@ -276,20 +277,19 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
                   </Button>
                   {hourlySlots.map((slot) => {
                     const slotCount = orderCounts[selectedDay]?.[slot.value] || 0;
-                    if (slotCount === 0) return null; // Only show slots with orders
                     
                     return (
                       <Button
                         key={slot.value}
-                        variant={selectedHour === slot.value ? 'default' : 'outline'}
+                        variant={selectedHour === slot.value ? 'default' : slotCount > 0 ? 'outline' : 'ghost'}
                         onClick={() => handleHourChange(slot.value)}
-                        className="flex-shrink-0 transition-all duration-200"
+                        className={`flex-shrink-0 transition-all duration-200 ${slotCount === 0 ? 'opacity-60' : ''}`}
                         size="sm"
                       >
                         <span className="font-medium">{slot.label}</span>
                         <Badge 
-                          variant={selectedHour === slot.value ? 'secondary' : 'outline'} 
-                          className="ml-1 text-xs"
+                          variant={selectedHour === slot.value ? 'secondary' : slotCount > 0 ? 'outline' : 'secondary'} 
+                          className={`ml-1 text-xs ${slotCount === 0 ? 'opacity-70' : ''}`}
                         >
                           {slotCount}
                         </Badge>
@@ -298,27 +298,41 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
                   })}
                 </div>
               </div>
-            </>
-          ) : (
-            /* Empty state when no orders for selected day */
-            <div className="text-center py-6 text-muted-foreground animate-in fade-in-50">
-              <Clock className="w-12 h-12 mx-auto mb-3 opacity-40" />
-              <div className="space-y-1">
-                <p className="font-medium">No delivery orders scheduled</p>
-                <p className="text-sm text-muted-foreground/80">
-                  for {selectedDay === 'today' ? format(today, 'EEEE, MMM d') : format(tomorrow, 'EEEE, MMM d')}
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={clearFilters}
-                  className="mt-3 transition-all duration-200"
-                >
-                  View All Orders
-                </Button>
+            
+            {/* Day Summary Card - Production Feature */}
+            {getTotalCountForDay(selectedDay) === 0 && (
+              <div className="text-center py-6 text-muted-foreground animate-in fade-in-50 bg-muted/30 rounded-lg border-2 border-dashed border-muted-foreground/20">
+                <Clock className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                <div className="space-y-1">
+                  <p className="font-medium">No delivery orders scheduled</p>
+                  <p className="text-sm text-muted-foreground/80">
+                    for {selectedDay === 'today' ? format(today, 'EEEE, MMM d') : format(tomorrow, 'EEEE, MMM d')}
+                  </p>
+                  <p className="text-xs text-muted-foreground/60 mt-2">
+                    All time slots are available for new orders
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            
+            {getTotalCountForDay(selectedDay) > 0 && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-primary">
+                      {getTotalCountForDay(selectedDay)} orders scheduled
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      for {selectedDay === 'today' ? format(today, 'EEEE, MMM d') : format(tomorrow, 'EEEE, MMM d')}
+                    </p>
+                  </div>
+                  <Badge variant="default" className="text-sm px-3 py-1">
+                    Active Day
+                  </Badge>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
       

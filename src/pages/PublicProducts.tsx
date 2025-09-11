@@ -22,6 +22,7 @@ import { useCustomerFavorites, useFavoritesByProducts } from '@/hooks/useCustome
 import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import ProductsFilters, { FilterState } from '@/components/products/ProductsFilters';
+import { MOQBadge } from '@/components/ui/moq-badge';
 
 const PublicProducts = () => {
   const navigate = useNavigate();
@@ -360,6 +361,16 @@ const PublicProducts = () => {
                               />
                             </div>
                           )}
+                          {/* MOQ Badge - Top Right */}
+                          {(product.minimum_order_quantity && product.minimum_order_quantity > 1) && (
+                            <div className="absolute top-1 sm:top-2 right-1 sm:right-2">
+                              <MOQBadge 
+                                minimumQuantity={product.minimum_order_quantity}
+                                showIcon={false}
+                                className="text-xs px-2 py-1 bg-blue-500/90 text-white border-blue-500"
+                              />
+                            </div>
+                          )}
                         </div>
                         <CardContent className="p-2 sm:p-3 lg:p-4">
                           <div className="flex items-start justify-between mb-1 sm:mb-2">
@@ -389,9 +400,19 @@ const PublicProducts = () => {
                               }}
                               className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
                             >
-                              Add
+                              {(product.minimum_order_quantity && product.minimum_order_quantity > 1) 
+                                ? `Add ${product.minimum_order_quantity}+` 
+                                : 'Add'
+                              }
                             </Button>
                           </div>
+                          
+                          {/* Minimum Order Information */}
+                          {(product.minimum_order_quantity && product.minimum_order_quantity > 1) && (
+                            <div className="mt-2 text-xs text-muted-foreground text-center">
+                              Min. order: {product.minimum_order_quantity} units
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))}

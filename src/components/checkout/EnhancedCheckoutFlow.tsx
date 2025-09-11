@@ -63,6 +63,65 @@ interface EnhancedCheckoutFlowProps {
   onClose: () => void;
 }
 
+// Validation function for checkout form
+const validateCheckoutForm = (
+  formData: CheckoutData, 
+  deliveryZone: any, 
+  pickupPoint: any
+): string[] => {
+  const errors: string[] = [];
+
+  // Basic customer information
+  if (!formData.customer_email?.trim()) {
+    errors.push("Please enter your email address");
+  } else if (!/\S+@\S+\.\S+/.test(formData.customer_email)) {
+    errors.push("Please enter a valid email address");
+  }
+
+  if (!formData.customer_name?.trim()) {
+    errors.push("Please enter your full name");
+  }
+
+  if (!formData.customer_phone?.trim()) {
+    errors.push("Please enter your phone number");
+  } else if (formData.customer_phone.trim().length < 10) {
+    errors.push("Please enter a valid phone number");
+  }
+
+  // Fulfillment type validation
+  if (!formData.fulfillment_type) {
+    errors.push("Please select delivery or pickup option");
+  }
+
+  // Delivery-specific validation
+  if (formData.fulfillment_type === 'delivery') {
+    if (!deliveryZone) {
+      errors.push("Please select a delivery zone");
+    }
+    
+    if (!formData.delivery_address.address_line_1?.trim()) {
+      errors.push("Please enter your delivery address");
+    }
+    
+    if (!formData.delivery_address.city?.trim()) {
+      errors.push("Please enter your city");
+    }
+    
+    if (!formData.delivery_address.state?.trim()) {
+      errors.push("Please enter your state");
+    }
+  }
+
+  // Pickup-specific validation
+  if (formData.fulfillment_type === 'pickup') {
+    if (!formData.pickup_point_id || !pickupPoint) {
+      errors.push("Please select a pickup location");
+    }
+  }
+
+  return errors;
+};
+
 // Error boundary component
 class CheckoutErrorBoundary extends React.Component<{
   children: React.ReactNode;
@@ -447,15 +506,26 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         }
       }
 
-      // Validate required fields after MOQ check
-      if (!formData.customer_email?.trim()) {
-        throw new Error('Customer email is required');
-      }
-      if (!formData.customer_name?.trim()) {
-        throw new Error('Customer name is required');
-      }
-      if (!formData.fulfillment_type) {
-        throw new Error('Fulfillment type is required');
+      // Enhanced validation with friendly messages
+      const validationErrors = validateCheckoutForm(formData, deliveryZone, pickupPoint);
+      if (validationErrors.length > 0) {
+        // Show friendly validation message with helpful guidance
+        const errorCount = validationErrors.length;
+        const title = errorCount === 1 
+          ? "Please complete this required field" 
+          : `Please complete ${errorCount} required fields`;
+        
+        const description = errorCount === 1 
+          ? validationErrors[0]
+          : `${validationErrors[0]} ${errorCount > 1 ? `and ${errorCount - 1} other field${errorCount > 2 ? 's' : ''}` : ''}`;
+
+        toast({
+          title,
+          description,
+          variant: "destructive"
+        });
+        setIsSubmitting(false);
+        return;
       }
 
       // Enhanced data sanitization and validation - Structure payload for backend
@@ -1081,8 +1151,22 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                       </Label>
                     </div>}
 
-                  <Button onClick={handleFormSubmit} disabled={!canProceedToDetails || isSubmitting || (!isAuthenticated && !guestSession)} className="w-full h-11 md:h-14 text-sm md:text-lg font-medium" size="lg">
-                    {isSubmitting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : (!isAuthenticated && !guestSession) ? "Please choose checkout method" : `Proceed to Payment • ₦${total.toLocaleString()}`}
+                  <Button 
+                    onClick={handleFormSubmit} 
+                    disabled={!canProceedToDetails || isSubmitting || (!isAuthenticated && !guestSession)} 
+                    className="w-full h-11 md:h-14 text-sm md:text-lg font-medium" 
+                    size="lg"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (!isAuthenticated && !guestSession) ? (
+                      "Please choose checkout method"
+                    ) : (
+                      `Proceed to Payment • ₦${total.toLocaleString()}`
+                    )}
                   </Button>
                   
                   {lastPaymentError && <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">

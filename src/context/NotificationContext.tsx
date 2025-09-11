@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
+import { useNotificationSoundEffect } from '@/hooks/useNotificationSound';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info' | 'order';
 
@@ -135,6 +136,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   children,
 }) => {
   const [state, dispatch] = useReducer(notificationReducer, initialState);
+  const playNotificationSound = useNotificationSoundEffect({ enabled: true, volume: 0.7 });
 
   const addNotification = useCallback((
     notificationData: Omit<Notification, 'id' | 'timestamp' | 'read'>
@@ -147,6 +149,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     };
 
     dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
+
+    // Play notification sound
+    playNotificationSound(notification.type, true);
 
     // Show preview for new notifications
     dispatch({ type: 'SHOW_PREVIEW', payload: notification });

@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { useNotifications, Notification, NotificationType } from '@/context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useNotificationSound } from '@/hooks/useNotificationSound';
 
 const getNotificationIcon = (type: NotificationType) => {
   switch (type) {
@@ -132,6 +133,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
 
 export const NotificationBell: React.FC = () => {
   const { state, markAsRead, removeNotification, markAllAsRead, clearAll } = useNotifications();
+  const { playSound } = useNotificationSound({ enabled: true, volume: 0.3 });
   const [isOpen, setIsOpen] = useState(false);
 
   const hasUnread = state.unreadCount > 0;
@@ -141,13 +143,21 @@ export const NotificationBell: React.FC = () => {
     markAllAsRead();
   };
 
+  const handleOpenChange = (open: boolean) => {
+    if (open && hasUnread) {
+      // Play a subtle info sound when opening notifications with unread items
+      playSound('info');
+    }
+    setIsOpen(open);
+  };
+
   const handleClearAll = () => {
     clearAll();
     setIsOpen(false);
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"

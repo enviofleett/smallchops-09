@@ -122,7 +122,7 @@ const Contact = () => {
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Business Hours</h3>
                         <div className="text-gray-600 space-y-1">
                           {settings?.working_hours ? <p>{settings.working_hours}</p> : <>
-                              <p>Open 8 am closes 6 pm, Monday to Saturday
+                              <p>Open 8 am closes 6 pm, Monday to Saturday 
 Sunday open 10 am, closes 4 pm.</p>
                             </>}
                         </div>

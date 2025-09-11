@@ -107,9 +107,6 @@ const validateCheckoutForm = (
       errors.push("Please enter your city");
     }
     
-    if (!formData.delivery_address.state?.trim()) {
-      errors.push("Please enter your state");
-    }
   }
 
   // Pickup-specific validation

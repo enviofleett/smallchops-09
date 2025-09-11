@@ -192,8 +192,8 @@ const PublicHome = () => {
     };
   }, []);
 
-  // Filter and shuffle products - Enhanced with advanced filtering
-  const filteredAndShuffledProducts = useMemo(() => {
+  // Filter and sort products by price (lowest to highest by default) - Production Ready
+  const filteredAndSortedProducts = useMemo(() => {
     if (!Array.isArray(products)) {
       console.warn('🚨 Products is not an array:', products);
       return [];
@@ -225,21 +225,27 @@ const PublicHome = () => {
       return matchesSearch && matchesPrice && matchesPromotion && matchesRating;
     });
 
-    // Apply smart reshuffling for equal visibility
-    const shuffled = createBalancedProductShuffle(filtered);
-    console.log('🔍 Filtered and shuffled products:', {
+    // Sort by price (lowest to highest) as default
+    const sorted = filtered.sort((a, b) => {
+      const priceA = a.discounted_price || a.price;
+      const priceB = b.discounted_price || b.price;
+      return priceA - priceB;
+    });
+
+    console.log('🔍 Filtered and sorted products:', {
       total: products.length,
       filtered: filtered.length,
       searchTerm,
-      filtersActive: filters.onlyPromotions || filters.priceRange[0] > priceRange[0] || filters.priceRange[1] < priceRange[1] || filters.minRating > 0
+      filtersActive: filters.onlyPromotions || filters.priceRange[0] > priceRange[0] || filters.priceRange[1] < priceRange[1] || filters.minRating > 0,
+      sortedByPrice: 'lowest to highest'
     });
-    return shuffled;
-  }, [products, searchTerm, filters, createBalancedProductShuffle, priceRange]);
+    return sorted;
+  }, [products, searchTerm, filters, priceRange]);
 
-  // Pagination with shuffled products
-  const totalPages = Math.ceil(filteredAndShuffledProducts.length / itemsPerPage);
+  // Pagination with sorted products
+  const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentProducts = filteredAndShuffledProducts.slice(startIndex, startIndex + itemsPerPage);
+  const currentProducts = filteredAndSortedProducts.slice(startIndex, startIndex + itemsPerPage);
   const handleAddToCart = React.useCallback((product: any) => {
     try {
       const moq = product.minimum_order_quantity || 1;
@@ -347,7 +353,7 @@ const PublicHome = () => {
             <div className="col-span-full lg:col-span-3">
               {/* Advanced Filters */}
               <div className="mb-6">
-                <ProductsFilters categoryFilter={activeCategory} onCategoryChange={setActiveCategory} searchQuery={searchTerm} onSearchChange={setSearchTerm} categories={categories} isLoadingCategories={false} filters={filters} onFiltersChange={setFilters} priceRange={priceRange} totalProducts={products.length} filteredProducts={filteredAndShuffledProducts.length} />
+                <ProductsFilters categoryFilter={activeCategory} onCategoryChange={setActiveCategory} searchQuery={searchTerm} onSearchChange={setSearchTerm} categories={categories} isLoadingCategories={false} filters={filters} onFiltersChange={setFilters} priceRange={priceRange} totalProducts={products.length} filteredProducts={filteredAndSortedProducts.length} />
               </div>
 
               {/* Products Loading State */}
@@ -370,7 +376,7 @@ const PublicHome = () => {
                   <Button onClick={() => refetchProducts()} variant="outline">
                     Try Again
                   </Button>
-                </div> : filteredAndShuffledProducts.length === 0 ? <div className="text-center py-8 sm:py-12">
+                </div> : filteredAndSortedProducts.length === 0 ? <div className="text-center py-8 sm:py-12">
                   <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
                   <p className="text-gray-600 mb-4 px-4">
                     {searchTerm || filters.onlyPromotions || filters.priceRange[0] > priceRange[0] || filters.priceRange[1] < priceRange[1] || filters.minRating > 0 ? 'Try adjusting your search or filter settings.' : 'No products available yet.'}

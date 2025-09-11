@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { MapPin, Truck, ChevronDown, Check, Search } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { getDeliveryZonesWithFees, DeliveryZoneWithFee } from '@/api/delivery';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -108,8 +109,8 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   {selectedDeliveryFee === 0 ? (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                      'FREE'
+                    <Badge variant="secondary" className="bg-secondary text-secondary-foreground border-secondary">
+                      FREE
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-primary border-primary/30">
@@ -133,7 +134,7 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
             <CommandInput placeholder="Search delivery zones..." className="h-9" />
             <CommandEmpty>No delivery zone found.</CommandEmpty>
             <CommandGroup>
-              <CommandList className="max-h-[200px] overflow-y-auto">
+              <ScrollArea className="h-[240px]">
                 {zones.map((zone) => {
                   const deliveryFee = calculateDeliveryFee(zone);
                   const isSelected = selectedZoneId === zone.id;
@@ -146,27 +147,37 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
                         handleZoneSelect(zone.id);
                         setOpen(false);
                       }}
-                      className="cursor-pointer p-3 border-b last:border-b-0"
+                      className={cn(
+                        "cursor-pointer p-3 border-b border-border/50 last:border-b-0",
+                        "hover:bg-accent/50 focus:bg-accent/50 transition-colors",
+                        isSelected && "bg-accent/80"
+                      )}
                     >
                       <div className="flex items-center justify-between w-full">
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-primary" />
-                            <span className="font-medium">{zone.name}</span>
+                            <span className="font-medium text-foreground">{zone.name}</span>
                             {isSelected && <Check className="h-4 w-4 text-primary" />}
                           </div>
                         </div>
                         
                         <div className="ml-3">
-                          <Badge variant="outline" className="text-primary border-primary/30">
-                            ₦{deliveryFee.toFixed(2)}
-                          </Badge>
+                          {deliveryFee === 0 ? (
+                            <Badge variant="secondary" className="bg-secondary text-secondary-foreground border-secondary">
+                              FREE
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-primary border-primary/30">
+                              ₦{deliveryFee.toFixed(2)}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </CommandItem>
                   );
                 })}
-              </CommandList>
+              </ScrollArea>
             </CommandGroup>
           </Command>
         </PopoverContent>

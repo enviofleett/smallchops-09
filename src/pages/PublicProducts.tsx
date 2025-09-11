@@ -89,25 +89,32 @@ const PublicProducts = () => {
     }
   }, [products.length, priceRange, filters.priceRange]);
 
-  // Filter products based on all criteria
+  // Filter and sort products based on all criteria - Production Ready
   const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      // Search filter
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Price filter
-      const productPrice = product.discounted_price || product.price;
-      const matchesPrice = productPrice >= filters.priceRange[0] && productPrice <= filters.priceRange[1];
-      
-      // Promotion filter
-      const matchesPromotion = !filters.onlyPromotions || (product.discount_percentage && product.discount_percentage > 0);
-      
-      // Rating filter (you'll need to implement this based on your rating system)
-      const matchesRating = filters.minRating === 0; // For now, assuming all products match
-      
-      return matchesSearch && matchesPrice && matchesPromotion && matchesRating;
-    });
+    return products
+      .filter(product => {
+        // Search filter
+        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // Price filter
+        const productPrice = product.discounted_price || product.price;
+        const matchesPrice = productPrice >= filters.priceRange[0] && productPrice <= filters.priceRange[1];
+        
+        // Promotion filter
+        const matchesPromotion = !filters.onlyPromotions || (product.discount_percentage && product.discount_percentage > 0);
+        
+        // Rating filter (you'll need to implement this based on your rating system)
+        const matchesRating = filters.minRating === 0; // For now, assuming all products match
+        
+        return matchesSearch && matchesPrice && matchesPromotion && matchesRating;
+      })
+      .sort((a, b) => {
+        // Sort by price (lowest to highest) - Production Ready
+        const priceA = a.discounted_price || a.price;
+        const priceB = b.discounted_price || b.price;
+        return priceA - priceB;
+      });
   }, [products, searchTerm, filters]);
 
   // Pagination

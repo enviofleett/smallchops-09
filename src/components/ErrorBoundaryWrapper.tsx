@@ -1,8 +1,9 @@
 import React, { Component, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
+import { logger } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -59,16 +60,17 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       url: window.location.href
     };
 
-    console.group(`🚨 Error Boundary: ${this.props.context || 'Unknown Context'}`);
-    console.error('Error Details:', errorDetails);
-    console.groupEnd();
+    // Use production-safe logger
+    logger.error('Error Boundary caught error', error, this.props.context);
 
     this.setState({ errorInfo });
     this.props.onError?.(error, errorInfo);
 
     // Log to external service in production
     if (import.meta.env.PROD) {
-      this.logErrorToService(errorDetails).catch(console.error);
+      this.logErrorToService(errorDetails).catch((logError) => {
+        logger.error('Failed to log error to service', logError);
+      });
     }
   }
 
@@ -160,12 +162,21 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       if (errorCategory === 'Component Load Error') {
         return (
           <div className="min-h-[200px] flex items-center justify-center p-4 sm:p-6">
-            <Card className="w-full max-w-md shadow-lg border-border/50">
+            <Card className="w-full max-w-md shadow-sm border-border/50 bg-card">
               <CardContent className="p-4 sm:p-6">
-                <div className="text-center">
-                  <p className="text-foreground text-base">
-                    Please refresh the page
+                <div className="text-center space-y-3">
+                  <AlertTriangle className="h-6 w-6 text-destructive mx-auto" />
+                  <p className="text-foreground text-sm">
+                    Component failed to load. Please refresh the page.
                   </p>
+                  <Button 
+                    onClick={this.handleRefresh}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh Page
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -175,18 +186,18 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
 
       return (
         <div className="min-h-[400px] flex items-center justify-center p-4 sm:p-6">
-          <Card className="w-full max-w-lg shadow-lg border-border/50">
+          <Card className="w-full max-w-lg shadow-sm border-border/50 bg-card">
             <CardContent className="p-4 sm:p-6 space-y-6">
               <div className="text-center space-y-4">
                 <div className="flex items-center justify-center space-x-3 mb-4">
                   <AlertTriangle className="h-8 w-8 text-destructive" />
-                  <h3 className="text-xl font-semibold">
+                  <h3 className="text-xl font-semibold text-foreground">
                     {errorCategory}
                   </h3>
                 </div>
                 
-                <Alert className="mb-4">
-                  <AlertDescription className="text-left">
+                <Alert className="mb-4 border-destructive/50 bg-destructive/5">
+                  <AlertDescription className="text-left text-foreground">
                     {suggestion}
                   </AlertDescription>
                 </Alert>
@@ -253,18 +264,24 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
 
                 {this.props.showErrorDetails && this.state.error && (
                   <details className="mt-4 text-left">
-                    <summary className="text-sm font-medium cursor-pointer mb-2">
+                    <summary className="text-sm font-medium cursor-pointer mb-2 text-muted-foreground flex items-center gap-1">
+                      <Bug className="h-3 w-3" />
                       Technical Details
                     </summary>
-                    <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-40 text-left">
-                      {this.state.error.message}
+                    <div className="text-xs bg-muted/50 p-3 rounded border overflow-auto max-h-40 text-left space-y-2">
+                      <div>
+                        <strong className="text-foreground">Error:</strong>
+                        <span className="text-muted-foreground ml-1">{this.state.error.message}</span>
+                      </div>
                       {this.state.error.stack && (
-                        <>
-                          {'\n\nStack Trace:\n'}
-                          {this.state.error.stack}
-                        </>
+                        <div>
+                          <strong className="text-foreground">Stack:</strong>
+                          <pre className="text-xs mt-1 bg-background p-2 rounded overflow-auto max-h-32 text-muted-foreground">
+                            {this.state.error.stack}
+                          </pre>
+                        </div>
                       )}
-                    </pre>
+                    </div>
                   </details>
                 )}
               </div>

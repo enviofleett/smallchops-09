@@ -182,45 +182,82 @@ class CheckoutErrorBoundary extends React.Component<{
             </DialogHeader>
             
             <div className="space-y-6">
-              <div id="error-description" className="space-y-3">
-                <p className="text-muted-foreground leading-relaxed">
-                  We encountered an unexpected error during checkout. This has been automatically reported to our team.
-                </p>
+              <div id="error-description" className="space-y-4">
+                <div className="text-center">
+                  <p className="text-foreground font-medium mb-2">
+                    Oops! Something went wrong
+                  </p>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    We've encountered a technical issue during checkout. Our team has been automatically notified and is working to resolve this.
+                  </p>
+                </div>
                 
-                <div className="bg-muted/50 rounded-lg p-3 border border-border">
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-mono text-muted-foreground">
-                      Error ID: {this.state.errorId?.slice(-8)}
-                    </span>
+                <div className="bg-accent/30 rounded-lg p-4 border border-accent/50">
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="space-y-2 min-w-0">
+                      <div className="text-sm">
+                        <span className="font-medium text-foreground">Reference ID:</span>
+                        <span className="font-mono text-muted-foreground ml-2 text-xs">
+                          {this.state.errorId?.slice(-12) || 'ERR-UNKNOWN'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Please share this ID if you contact our support team.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
               
-              <div className="flex flex-col gap-2">
-                <Button 
-                  onClick={this.handleReset}
-                  className="w-full"
-                  aria-label="Try checkout again"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Try Again
-                </Button>
+              <div className="space-y-3">
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    onClick={this.handleReset}
+                    className="w-full h-11 font-medium"
+                    aria-label="Retry checkout process"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Try Checkout Again
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      // Clear any corrupted state
+                      localStorage.removeItem('checkout_state');
+                      sessionStorage.removeItem('payment_data');
+                      window.location.href = '/cart';
+                    }}
+                    className="w-full h-11 text-muted-foreground hover:text-foreground"
+                    aria-label="Return to shopping cart"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-2" />
+                    Back to Cart
+                  </Button>
+                </div>
                 
-                <Button 
-                  variant="outline" 
-                  onClick={() => window.location.href = '/cart'}
-                  className="w-full text-muted-foreground hover:text-foreground"
-                  aria-label="Return to cart"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Back to Cart
-                </Button>
+                <div className="text-center pt-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      // Open support in new tab to preserve user's cart
+                      window.open('mailto:support@company.com?subject=Checkout Error&body=' + 
+                        encodeURIComponent(`Error ID: ${this.state.errorId}\nTime: ${new Date().toISOString()}\n\nPlease describe what happened:`), 
+                        '_blank'
+                      );
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Contact Support
+                  </Button>
+                </div>
               </div>
               
-              <p className="text-xs text-muted-foreground text-center">
-                If this problem persists, please contact support with the error ID above.
-              </p>
+              <div className="text-xs text-muted-foreground text-center opacity-75">
+                Your cart items are safely saved and will be available when you return.
+              </div>
             </div>
           </DialogContent>
         </Dialog>

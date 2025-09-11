@@ -196,10 +196,10 @@ const App = () => {
           <Sonner />
           <DynamicFavicon />
           <OnlineStatusBanner />
-           <NotificationProvider>
-             <NotificationIntegration />
-             <AuthProvider>
-             <CartProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <NotificationIntegration />
+              <CartProvider>
             <BrowserRouter>
             <Routes>
               {/* Customer store at root */}
@@ -285,8 +285,8 @@ const App = () => {
             </Routes>
             </BrowserRouter>
             </CartProvider>
+            </NotificationProvider>
           </AuthProvider>
-        </NotificationProvider>
         </NetworkProvider>
       </TooltipProvider>
       <DeploymentInfo />

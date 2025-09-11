@@ -130,56 +130,70 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
         </PopoverTrigger>
         
         <PopoverContent className="w-full p-0 z-[300] bg-popover/95 backdrop-blur-sm border shadow-xl" align="start" sideOffset={4}>
-          <Command>
-            <CommandInput placeholder="Search delivery zones..." className="h-9" />
-            <CommandEmpty>No delivery zone found.</CommandEmpty>
-            <CommandGroup>
-              <ScrollArea className="h-[240px]">
-                {zones.map((zone) => {
-                  const deliveryFee = calculateDeliveryFee(zone);
-                  const isSelected = selectedZoneId === zone.id;
-                  
-                  return (
-                    <CommandItem
-                      key={zone.id}
-                      value={zone.name}
-                      onSelect={() => {
-                        handleZoneSelect(zone.id);
-                        setOpen(false);
-                      }}
-                      className={cn(
-                        "cursor-pointer p-3 border-b border-border/50 last:border-b-0",
-                        "hover:bg-accent/50 focus:bg-accent/50 transition-colors",
-                        isSelected && "bg-accent/80"
-                      )}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-primary" />
-                            <span className="font-medium text-foreground">{zone.name}</span>
-                            {isSelected && <Check className="h-4 w-4 text-primary" />}
+          {Array.isArray(zones) && zones.length > 0 ? (
+            <Command>
+              <CommandInput placeholder="Search delivery zones..." className="h-9" />
+              <CommandEmpty>No delivery zone found.</CommandEmpty>
+              <CommandGroup>
+                <ScrollArea className="h-[240px]">
+                  {zones.map((zone) => {
+                    // Validate zone data before rendering
+                    if (!zone || !zone.id || !zone.name) {
+                      console.warn('Invalid zone data:', zone);
+                      return null;
+                    }
+
+                    const deliveryFee = calculateDeliveryFee(zone);
+                    const isSelected = selectedZoneId === zone.id;
+                    
+                    return (
+                      <CommandItem
+                        key={zone.id}
+                        value={zone.name}
+                        onSelect={() => {
+                          handleZoneSelect(zone.id);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          "cursor-pointer p-3 border-b border-border/50 last:border-b-0",
+                          "hover:bg-accent/50 focus:bg-accent/50 transition-colors",
+                          isSelected && "bg-accent/80"
+                        )}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-primary" />
+                              <span className="font-medium text-foreground">{zone.name}</span>
+                              {isSelected && <Check className="h-4 w-4 text-primary" />}
+                            </div>
+                          </div>
+                          
+                          <div className="ml-3">
+                            {deliveryFee === 0 ? (
+                              <Badge variant="secondary" className="bg-secondary text-secondary-foreground border-secondary">
+                                FREE
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-primary border-primary/30">
+                                ₦{deliveryFee.toFixed(2)}
+                              </Badge>
+                            )}
                           </div>
                         </div>
-                        
-                        <div className="ml-3">
-                          {deliveryFee === 0 ? (
-                            <Badge variant="secondary" className="bg-secondary text-secondary-foreground border-secondary">
-                              FREE
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-primary border-primary/30">
-                              ₦{deliveryFee.toFixed(2)}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CommandItem>
-                  );
-                })}
-              </ScrollArea>
-            </CommandGroup>
-          </Command>
+                      </CommandItem>
+                    );
+                  })}
+                </ScrollArea>
+              </CommandGroup>
+            </Command>
+          ) : (
+            <div className="p-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                {loading ? 'Loading delivery zones...' : 'No delivery zones available'}
+              </p>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
 

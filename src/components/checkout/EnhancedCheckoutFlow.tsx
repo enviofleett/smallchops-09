@@ -119,149 +119,45 @@ const validateCheckoutForm = (
   return errors;
 };
 
-// Production-ready error boundary component
+// Error boundary component
 class CheckoutErrorBoundary extends React.Component<{
   children: React.ReactNode;
-  onReset?: () => void;
 }, {
   hasError: boolean;
-  errorId: string | null;
 }> {
   constructor(props: any) {
     super(props);
     this.state = {
-      hasError: false,
-      errorId: null
+      hasError: false
     };
   }
-  
-  static getDerivedStateFromError(error: Error) {
-    // Generate unique error ID for tracking
-    const errorId = `checkout-error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  static getDerivedStateFromError() {
     return {
-      hasError: true,
-      errorId
+      hasError: true
     };
   }
-  
   componentDidCatch(error: Error, errorInfo: any) {
-    // Enhanced error logging for production monitoring
-    console.error('🚨 Checkout Error Boundary:', {
-      error: error.message,
-      stack: error.stack,
-      errorInfo,
-      timestamp: new Date().toISOString(),
-      errorId: this.state.errorId,
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    });
-    
-    // Report to external monitoring service in production
-    if (process.env.NODE_ENV === 'production') {
-      // Add monitoring service integration here
-    }
+    console.error('🚨 Checkout error boundary caught:', error, errorInfo);
   }
-  
-  handleReset = () => {
-    this.setState({ hasError: false, errorId: null });
-    if (this.props.onReset) {
-      this.props.onReset();
-    }
-  };
-  
   render() {
     if (this.state.hasError) {
-      return (
-        <Dialog open onOpenChange={() => {}}>
-          <DialogContent className="max-w-md" aria-describedby="error-description">
+      return <Dialog open>
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-                Checkout System Error
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                Checkout Error
               </DialogTitle>
             </DialogHeader>
-            
-            <div className="space-y-6">
-              <div id="error-description" className="space-y-4">
-                <div className="text-center">
-                  <p className="text-foreground font-medium mb-2">
-                    Oops! Something went wrong
-                  </p>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
-                    We've encountered a technical issue during checkout. Our team has been automatically notified and is working to resolve this.
-                  </p>
-                </div>
-                
-                <div className="bg-accent/30 rounded-lg p-4 border border-accent/50">
-                  <div className="flex items-start gap-3">
-                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <div className="space-y-2 min-w-0">
-                      <div className="text-sm">
-                        <span className="font-medium text-foreground">Reference ID:</span>
-                        <span className="font-mono text-muted-foreground ml-2 text-xs">
-                          {this.state.errorId?.slice(-12) || 'ERR-UNKNOWN'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Please share this ID if you contact our support team.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex flex-col gap-2">
-                  <Button 
-                    onClick={this.handleReset}
-                    className="w-full h-11 font-medium"
-                    aria-label="Retry checkout process"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Try Checkout Again
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      // Clear any corrupted state
-                      localStorage.removeItem('checkout_state');
-                      sessionStorage.removeItem('payment_data');
-                      window.location.href = '/cart';
-                    }}
-                    className="w-full h-11 text-muted-foreground hover:text-foreground"
-                    aria-label="Return to shopping cart"
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Back to Cart
-                  </Button>
-                </div>
-                
-                <div className="text-center pt-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      // Open support in new tab to preserve user's cart
-                      window.open('mailto:support@company.com?subject=Checkout Error&body=' + 
-                        encodeURIComponent(`Error ID: ${this.state.errorId}\nTime: ${new Date().toISOString()}\n\nPlease describe what happened:`), 
-                        '_blank'
-                      );
-                    }}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Contact Support
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="text-xs text-muted-foreground text-center opacity-75">
-                Your cart items are safely saved and will be available when you return.
-              </div>
+            <div className="space-y-4">
+              <p>Something went wrong with the checkout process. Please try again.</p>
+              <Button onClick={() => window.location.reload()}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh Page
+              </Button>
             </div>
           </DialogContent>
-        </Dialog>
-      );
+        </Dialog>;
     }
     return this.props.children;
   }

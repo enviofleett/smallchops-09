@@ -20,6 +20,20 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
     loadPickupPoints();
   }, []);
 
+  // Auto-select pickup point if there's only one available - Production Ready
+  useEffect(() => {
+    if (!loading && 
+        pickupPoints.length === 1 && 
+        !selectedPointId && 
+        !disabled) {
+      // Automatically select the only available pickup point
+      const singlePickupPoint = pickupPoints[0];
+      if (singlePickupPoint.is_active) {
+        onSelect(singlePickupPoint);
+      }
+    }
+  }, [loading, pickupPoints, selectedPointId, disabled, onSelect]);
+
   const loadPickupPoints = async () => {
     try {
       setLoading(true);

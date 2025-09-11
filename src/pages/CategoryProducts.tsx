@@ -58,16 +58,22 @@ const CategoryProductsContent = () => {
   const currentCategory = categories.find(cat => cat.id === categoryId);
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
-  // Filter products based on search
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter and sort products by price (lowest to highest by default) - Production Ready
+  const filteredAndSortedProducts = products
+    .filter(product => 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      const priceA = a.discounted_price || a.price;
+      const priceB = b.discounted_price || b.price;
+      return priceA - priceB;
+    });
 
   // Pagination
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+  const currentProducts = filteredAndSortedProducts.slice(startIndex, startIndex + itemsPerPage);
 
   const handleAddToCart = async (product: any) => {
     if (isCustomizationCategory) {
@@ -296,7 +302,7 @@ const CategoryProductsContent = () => {
                   </Card>
                 ))}
               </div>
-            ) : filteredProducts.length === 0 ? (
+            ) : filteredAndSortedProducts.length === 0 ? (
               <div className="text-center py-8 sm:py-12">
                 <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
                 <p className="text-muted-foreground mb-4 px-4">

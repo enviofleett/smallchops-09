@@ -33,13 +33,14 @@ import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFi
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
 import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
 import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
+import { filterOrdersByDate, getFilterDescription, getFilterStats, DeliveryFilterType } from '@/utils/dateFilterUtils';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus | 'overdue'>('all');
-  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'due_today' | 'upcoming'>('all');
+  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilterType>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
   const [showDeliveryReport, setShowDeliveryReport] = useState(false);
@@ -240,42 +241,20 @@ export default function AdminOrders() {
     }
   }, [overdueOrders, selectedOverdueDateFilter]);
 
+  // Production-ready filtering with performance optimizations
   const filteredOrders = useMemo(() => {
-    // Use overdue orders for the overdue tab, regular orders for others
+    // Use overdue orders for the overdue tab, regular orders for others  
     let result = statusFilter === 'overdue' ? filteredOverdueOrders : prioritySortedOrders;
     
-    // Apply delivery filter first (existing logic) - only for non-overdue tabs
-    if (deliveryFilter !== 'all' && statusFilter !== 'overdue') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      result = result.filter(order => {
-        // Only apply delivery schedule filter to paid delivery orders
-        if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
-          return false; // Exclude non-delivery/unpaid orders when applying delivery filters
-        }
-        
-        const schedule = deliverySchedules[order.id];
-        if (!schedule || !schedule.delivery_date) return false;
-        
-        try {
-          const deliveryDate = new Date(schedule.delivery_date);
-          if (isNaN(deliveryDate.getTime())) return false;
-          
-          deliveryDate.setHours(0, 0, 0, 0);
-          
-          if (deliveryFilter === 'due_today') {
-            return deliveryDate.getTime() === today.getTime();
-          } else if (deliveryFilter === 'upcoming') {
-            return deliveryDate.getTime() > today.getTime();
-          }
-        } catch (error) {
-          console.warn('Error parsing delivery date:', schedule.delivery_date, error);
-          return false;
-        }
-        
-        return false;
-      });
+    // Apply comprehensive delivery/pickup date filter using utility functions
+    if (deliveryFilter !== 'all' && (statusFilter as string) !== 'overdue') {
+      try {
+        result = filterOrdersByDate(result, deliveryFilter, deliverySchedules);
+      } catch (error) {
+        console.error('Error applying date filter:', error);
+        // Fallback to showing all orders if filtering fails
+        result = statusFilter === 'overdue' ? filteredOverdueOrders : prioritySortedOrders;
+      }
     }
     
     // Apply hourly filtering for confirmed tab
@@ -655,17 +634,65 @@ export default function AdminOrders() {
                   <Truck className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Delivery Schedule:</span>
                 </div>
-                <Select value={deliveryFilter} onValueChange={(value: 'all' | 'due_today' | 'upcoming') => setDeliveryFilter(value)}>
+                <Select value={deliveryFilter} onValueChange={(value: DeliveryFilterType) => setDeliveryFilter(value)}>
                   <SelectTrigger className="w-full sm:w-48">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Orders</SelectItem>
                     <SelectItem value="due_today">Due Today</SelectItem>
-                    <SelectItem value="upcoming">Upcoming Deliveries</SelectItem>
+                    <SelectItem value="past_due">Past Due</SelectItem>
+                    <SelectItem value="upcoming">Future Orders</SelectItem>
+                    <SelectItem value="this_week">This Week</SelectItem>
+                    <SelectItem value="next_week">Next Week</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* Filter Statistics - Production Ready Feedback */}
+              {deliveryFilter !== 'all' && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Activity className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-blue-800">
+                        Active Filter: {
+                          deliveryFilter === 'due_today' ? 'Orders Due Today' :
+                          deliveryFilter === 'past_due' ? 'Past Due Orders' :
+                          deliveryFilter === 'upcoming' ? 'Future Orders' :
+                          deliveryFilter === 'this_week' ? 'This Week\'s Orders' :
+                          deliveryFilter === 'next_week' ? 'Next Week\'s Orders' :
+                          'Filtered Orders'
+                        }
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        {(() => {
+                          const count = filteredOrders.length;
+                          const total = statusFilter === 'overdue' ? filteredOverdueOrders.length : prioritySortedOrders.length;
+                          
+                          if (deliveryFilter === 'due_today') {
+                            return `Showing ${count} ${count === 1 ? 'order' : 'orders'} scheduled for today`;
+                          } else if (deliveryFilter === 'past_due') {
+                            return `${count} ${count === 1 ? 'order is' : 'orders are'} past their scheduled date`;
+                          } else if (deliveryFilter === 'upcoming') {
+                            return `${count} ${count === 1 ? 'order' : 'orders'} scheduled for future dates`;
+                          } else if (deliveryFilter === 'this_week') {
+                            return `${count} ${count === 1 ? 'order' : 'orders'} scheduled for this week`;
+                          } else if (deliveryFilter === 'next_week') {
+                            return `${count} ${count === 1 ? 'order' : 'orders'} scheduled for next week`;
+                          }
+                          return `${count} of ${total} orders match the current filter`;
+                        })()}
+                      </p>
+                      {filteredOrders.length === 0 && (
+                        <p className="text-xs text-amber-600 mt-1 font-medium">
+                          No orders found for this time period. Try selecting a different date range.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

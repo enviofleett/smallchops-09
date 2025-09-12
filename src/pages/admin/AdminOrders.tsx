@@ -649,45 +649,44 @@ export default function AdminOrders() {
                 </Select>
               </div>
               
-              {/* Filter Statistics - Production Ready Feedback */}
+              {/* Enhanced Filter Statistics - Production Ready */}
               {deliveryFilter !== 'all' && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Activity className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-blue-800">
-                        Active Filter: {
-                          deliveryFilter === 'due_today' ? 'Orders Due Today' :
-                          deliveryFilter === 'past_due' ? 'Past Due Orders' :
-                          deliveryFilter === 'upcoming' ? 'Future Orders' :
-                          deliveryFilter === 'this_week' ? 'This Week\'s Orders' :
-                          deliveryFilter === 'next_week' ? 'Next Week\'s Orders' :
-                          'Filtered Orders'
-                        }
+                      <p className="text-sm font-medium text-foreground">
+                        {getFilterDescription(deliveryFilter, filteredOrders.length, 
+                          statusFilter === 'overdue' ? filteredOverdueOrders.length : prioritySortedOrders.length
+                        ).split(':')[0]}
                       </p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        {(() => {
-                          const count = filteredOrders.length;
-                          const total = statusFilter === 'overdue' ? filteredOverdueOrders.length : prioritySortedOrders.length;
-                          
-                          if (deliveryFilter === 'due_today') {
-                            return `Showing ${count} ${count === 1 ? 'order' : 'orders'} scheduled for today`;
-                          } else if (deliveryFilter === 'past_due') {
-                            return `${count} ${count === 1 ? 'order is' : 'orders are'} past their scheduled date`;
-                          } else if (deliveryFilter === 'upcoming') {
-                            return `${count} ${count === 1 ? 'order' : 'orders'} scheduled for future dates`;
-                          } else if (deliveryFilter === 'this_week') {
-                            return `${count} ${count === 1 ? 'order' : 'orders'} scheduled for this week`;
-                          } else if (deliveryFilter === 'next_week') {
-                            return `${count} ${count === 1 ? 'order' : 'orders'} scheduled for next week`;
-                          }
-                          return `${count} of ${total} orders match the current filter`;
-                        })()}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {getFilterDescription(deliveryFilter, filteredOrders.length, 
+                          statusFilter === 'overdue' ? filteredOverdueOrders.length : prioritySortedOrders.length
+                        )}
                       </p>
                       {filteredOrders.length === 0 && (
-                        <p className="text-xs text-amber-600 mt-1 font-medium">
-                          No orders found for this time period. Try selecting a different date range.
-                        </p>
+                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                            <span>No orders found for this time period. Try selecting a different date range or check if orders have delivery schedules.</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Quick Stats for Current Filter */}
+                      {filteredOrders.length > 0 && (
+                        <div className="mt-2 flex items-center gap-4 text-xs">
+                          <span className="text-muted-foreground">
+                            Pickup: {filteredOrders.filter(o => o.order_type === 'pickup').length}
+                          </span>
+                          <span className="text-muted-foreground">
+                            Delivery: {filteredOrders.filter(o => o.order_type === 'delivery').length}
+                          </span>
+                          <span className="text-muted-foreground">
+                            Paid: {filteredOrders.filter(o => o.payment_status === 'paid').length}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>

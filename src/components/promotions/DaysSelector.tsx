@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Clock } from "lucide-react";
 
 interface DaysSelectorProps {
-  selectedDays: string[];
+  selectedDays?: string[];
   onDaysChange: (days: string[]) => void;
   disabled?: boolean;
 }
@@ -25,30 +25,42 @@ export function DaysSelector({
   onDaysChange,
   disabled = false,
 }: DaysSelectorProps) {
-  const handleDayToggle = (day: string, checked: boolean) => {
-    if (disabled) return;
+  const safeDays = React.useMemo(() => {
+    return Array.isArray(selectedDays) ? selectedDays : [];
+  }, [selectedDays]);
+
+  const handleDayToggle = React.useCallback((day: string, checked: boolean) => {
+    if (disabled || !onDaysChange) return;
     
-    if (checked) {
-      if (!selectedDays.includes(day)) {
-        onDaysChange([...selectedDays, day]);
+    try {
+      if (checked) {
+        if (!safeDays.includes(day)) {
+          onDaysChange([...safeDays, day]);
+        }
+      } else {
+        onDaysChange(safeDays.filter((d) => d !== day));
       }
-    } else {
-      onDaysChange(selectedDays.filter((d) => d !== day));
+    } catch (error) {
+      console.error('Error toggling day selection:', error);
     }
-  };
+  }, [safeDays, onDaysChange, disabled]);
 
-  const handleSelectAll = () => {
-    if (disabled) return;
+  const handleSelectAll = React.useCallback(() => {
+    if (disabled || !onDaysChange) return;
     
-    if (selectedDays.length === DAYS_OF_WEEK.length) {
-      onDaysChange([]);
-    } else {
-      onDaysChange(DAYS_OF_WEEK.map((day) => day.value));
+    try {
+      if (safeDays.length === DAYS_OF_WEEK.length) {
+        onDaysChange([]);
+      } else {
+        onDaysChange(DAYS_OF_WEEK.map((day) => day.value));
+      }
+    } catch (error) {
+      console.error('Error in select all operation:', error);
     }
-  };
+  }, [safeDays.length, onDaysChange, disabled]);
 
-  const allSelected = selectedDays.length === DAYS_OF_WEEK.length;
-  const noneSelected = selectedDays.length === 0;
+  const allSelected = safeDays.length === DAYS_OF_WEEK.length;
+  const noneSelected = safeDays.length === 0;
 
   return (
     <Card className="border-primary/20">
@@ -81,15 +93,15 @@ export function DaysSelector({
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="w-3 h-3" />
-            {selectedDays.length === 0
+            {safeDays.length === 0
               ? "Active every day"
-              : `Active ${selectedDays.length} day${selectedDays.length !== 1 ? "s" : ""}`}
+              : `Active ${safeDays.length} day${safeDays.length !== 1 ? "s" : ""}`}
           </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 md:gap-3">
           {DAYS_OF_WEEK.map((day) => {
-            const isSelected = selectedDays.includes(day.value);
+            const isSelected = safeDays.includes(day.value);
             return (
               <div
                 key={day.value}
@@ -129,12 +141,12 @@ export function DaysSelector({
           })}
         </div>
 
-        {selectedDays.length > 0 && (
+        {safeDays.length > 0 && (
           <div className="mt-4 p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
               <strong>Active on:</strong>{" "}
               {DAYS_OF_WEEK
-                .filter((day) => selectedDays.includes(day.value))
+                .filter((day) => safeDays.includes(day.value))
                 .map((day) => day.label)
                 .join(", ")}
             </p>

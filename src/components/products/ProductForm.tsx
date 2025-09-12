@@ -51,10 +51,18 @@ export const ProductForm = ({
   });
 
   const handleSubmit = async (data: ProductFormData) => {
-    await onSubmit({
-      ...data,
-      imageFile: imageFile || undefined
-    });
+    try {
+      await onSubmit({
+        ...data,
+        imageFile: imageFile || undefined
+      });
+      
+      // Reset image file state after successful submission
+      setImageFile(null);
+    } catch (error) {
+      // Re-throw to let parent handle the error
+      throw error;
+    }
   };
 
   const watchPrice = form.watch('price');
@@ -288,10 +296,19 @@ export const ProductForm = ({
                   if (!file) {
                     // When file is removed, clear the form URL too
                     form.setValue('image_url', '');
+                  } else {
+                    // When new file is selected, clear any existing URL to prevent conflicts
+                    form.setValue('image_url', '');
                   }
                 }}
+                disabled={isLoading}
                 className="mt-2"
               />
+              {imageFile && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  New image selected: {imageFile.name}
+                </p>
+              )}
             </div>
           </div>
         </div>

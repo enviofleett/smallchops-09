@@ -215,6 +215,7 @@ export const createProduct = async (productData: NewProduct & { imageFile?: File
 export const updateProduct = async (id: string, updates: UpdatedProduct & { imageFile?: File }): Promise<Product> => {
     let newImageUrl: string | null = updates.image_url ?? null;
     let oldImageUrl: string | null = null;
+    let uploadAttempted: boolean = false;
 
     try {
         // Handle SKU validation for updates
@@ -222,45 +223,89 @@ export const updateProduct = async (id: string, updates: UpdatedProduct & { imag
             throw new Error(`SKU "${updates.sku}" already exists. Please choose a different SKU.`);
         }
 
-        // Get current product to access old image URL
-        if (updates.imageFile) {
-            const { data: currentProduct } = await supabase
-                .from('products')
-                .select('image_url')
-                .eq('id', id)
-                .single();
+        // Get current product to access old image URL - do this first
+        const { data: currentProduct, error: fetchError } = await supabase
+            .from('products')
+            .select('image_url')
+            .eq('id', id)
+            .single();
             
-            oldImageUrl = currentProduct?.image_url || null;
+        if (fetchError) {
+            throw new Error(`Failed to fetch current product: ${fetchError.message}`);
+        }
+        
+        oldImageUrl = currentProduct?.image_url || null;
+
+        // Upload new image if provided
+        if (updates.imageFile) {
+            uploadAttempted = true;
+            console.log('Uploading new product image...');
             newImageUrl = await uploadProductImage(updates.imageFile);
+            console.log('New image uploaded successfully:', newImageUrl);
+            
+            if (!newImageUrl) {
+                throw new Error('Image upload failed - no URL returned');
+            }
         }
         
         const { imageFile, ...productToUpdate } = updates;
         
         const finalProductUpdates = {
             ...productToUpdate,
-            image_url: newImageUrl,
+            ...(uploadAttempted && { image_url: newImageUrl }), // Only update image_url if we uploaded a new image
         };
 
-        const { data, error } = await supabase.from('products').update(finalProductUpdates).eq('id', id).select().single();
+        console.log('Updating product in database...', { id, updates: finalProductUpdates });
+        
+        const { data, error } = await supabase
+            .from('products')
+            .update(finalProductUpdates)
+            .eq('id', id)
+            .select()
+            .single();
         
         if (error) {
+            console.error('Database update failed:', error);
+            
             // Cleanup new image if update fails
-            if (updates.imageFile && newImageUrl) {
-                await deleteProductImage(newImageUrl);
+            if (uploadAttempted && newImageUrl) {
+                console.log('Cleaning up uploaded image due to database error...');
+                try {
+                    await deleteProductImage(newImageUrl);
+                } catch (cleanupError) {
+                    console.error('Failed to cleanup uploaded image:', cleanupError);
+                }
             }
             throw new Error(`Failed to update product: ${error.message}`);
         }
         
-        // Clean up old image only after successful update
-        if (updates.imageFile && oldImageUrl && oldImageUrl !== newImageUrl) {
-            await deleteProductImage(oldImageUrl);
+        console.log('Product updated successfully');
+        
+        // Clean up old image only after successful update and if we uploaded a new one
+        if (uploadAttempted && oldImageUrl && oldImageUrl !== newImageUrl && newImageUrl) {
+            console.log('Cleaning up old image:', oldImageUrl);
+            try {
+                await deleteProductImage(oldImageUrl);
+                console.log('Old image cleaned up successfully');
+            } catch (cleanupError) {
+                console.error('Failed to cleanup old image (non-critical):', cleanupError);
+                // Don't throw here as the update was successful
+            }
         }
         
         return data;
     } catch (error) {
+        console.error('Product update failed:', error);
+        
         // Cleanup new image if any error occurs during update
-        if (updates.imageFile && newImageUrl && newImageUrl !== oldImageUrl) {
-            await deleteProductImage(newImageUrl);
+        if (uploadAttempted && newImageUrl && newImageUrl !== oldImageUrl) {
+            console.log('Cleaning up new image due to error...');
+            try {
+                await deleteProductImage(newImageUrl);
+                console.log('Cleanup completed');
+            } catch (cleanupError) {
+                console.error('Failed to cleanup new image:', cleanupError);
+            }
         }
         throw error;
     }

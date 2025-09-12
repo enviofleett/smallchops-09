@@ -7056,7 +7056,7 @@ export type Database = {
           usage_limit: number | null
           valid_from: string
           valid_until: string | null
-          value: number
+          value: number | null
         }
         Insert: {
           applicable_categories?: string[] | null
@@ -7077,7 +7077,7 @@ export type Database = {
           usage_limit?: number | null
           valid_from?: string
           valid_until?: string | null
-          value: number
+          value?: number | null
         }
         Update: {
           applicable_categories?: string[] | null
@@ -7098,7 +7098,7 @@ export type Database = {
           usage_limit?: number | null
           valid_from?: string
           valid_until?: string | null
-          value?: number
+          value?: number | null
         }
         Relationships: []
       }

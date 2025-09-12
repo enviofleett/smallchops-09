@@ -1564,6 +1564,7 @@ function AdminOrderCard({
                 </p>
               </div>
             )}
+            </div>
           </div>
         </CardContent>
       </Card>

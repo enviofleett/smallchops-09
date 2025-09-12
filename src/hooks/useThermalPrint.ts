@@ -49,6 +49,12 @@ export const useThermalPrint = () => {
         link.rel = 'stylesheet';
         link.href = '/src/styles/thermal-print.css';
         document.head.appendChild(link);
+        
+        // Wait for stylesheet to load
+        await new Promise((resolve) => {
+          link.onload = resolve;
+          link.onerror = resolve; // Continue even if load fails
+        });
       }
 
       // Create a temporary div for the receipt

@@ -79,6 +79,15 @@ verify_jwt = false
 [functions.instant-email-processor]
 verify_jwt = false
 
+[functions.email-cron-automation]
+verify_jwt = false
+
+[functions.upload-product-image]
+verify_jwt = true
+
+[functions.check_upload_rate_limit]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

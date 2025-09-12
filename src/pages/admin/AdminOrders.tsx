@@ -1552,20 +1552,18 @@ function AdminOrderCard({
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Special Instructions Fallback */}
-        {!order.delivery_schedule?.special_instructions && order.special_instructions && (
-          <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mt-4">
-            <p className="text-sm font-medium text-orange-800 mb-1">Order Special Instructions:</p>
-            <p className="text-sm text-orange-700 break-words">
-              {order.special_instructions}
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+            {/* Special Instructions Fallback */}
+            {!order.delivery_schedule?.special_instructions && order.special_instructions && (
+              <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mt-4">
+                <p className="text-sm font-medium text-orange-800 mb-1">Order Special Instructions:</p>
+                <p className="text-sm text-orange-700 break-words">
+                  {order.special_instructions}
+                </p>
+              </div>
+            )}
+        </CardContent>
+      </Card>
+    );
+  }

@@ -175,19 +175,20 @@ export default function CreatePromotionForm({
   }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
-    <ScrollArea className="h-full max-h-[calc(90vh-120px)]">
-      <div className="space-y-4 p-4">
-        <div className="flex items-center justify-between sticky top-0 bg-background pb-2">
-          <h3 className="text-lg font-semibold">Create New Promotion</h3>
-        </div>
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between p-4 pb-2 border-b flex-shrink-0">
+        <h3 className="text-lg font-semibold">Create New Promotion</h3>
+      </div>
 
-        <Form {...form}>
-          <form
-            className="space-y-6 pb-20 md:pb-6"
-            onSubmit={form.handleSubmit(handleSubmit)}
-            autoComplete="off"
-            noValidate
-          >
+      <ScrollArea className="flex-1 px-4">
+        <div className="space-y-6 py-4 pb-8">
+          <Form {...form}>
+            <form
+              className="space-y-6"
+              onSubmit={form.handleSubmit(handleSubmit)}
+              autoComplete="off"
+              noValidate
+            >
             {/* Basic Information */}
             <div className="space-y-4">
               <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
@@ -482,7 +483,7 @@ export default function CreatePromotionForm({
             </div>
 
             {/* Submit Buttons */}
-            <div className="flex items-center gap-3 justify-end pt-4">
+            <div className="flex items-center gap-3 justify-end pt-6 pb-4">
               <Button
                 type="submit"
                 disabled={disabled || isSubmitting || createMutation.isPending}
@@ -503,7 +504,8 @@ export default function CreatePromotionForm({
             </div>
           </form>
         </Form>
-      </div>
-    </ScrollArea>
+        </div>
+      </ScrollArea>
+    </div>
   );
 }

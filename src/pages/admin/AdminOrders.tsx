@@ -1529,7 +1529,9 @@ function AdminOrderCard({
                       <div className="flex items-start gap-2">
                         <Clock className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-medium text-purple-800 mb-1">Requested {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Time</p>
+                          <p className="text-sm font-medium text-purple-800 mb-1">
+                            Requested {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Time
+                          </p>
                           <p className="text-sm text-purple-700">
                             {format(new Date(order.delivery_time), 'PPp')}
                           </p>
@@ -1547,7 +1549,7 @@ function AdminOrderCard({
                       </p>
                     </div>
                     <p className="text-xs text-orange-600">
-                      Customer provided basic {order.order_type} information during checkout but didn't set a specific schedule
+                      Customer provided basic order information during checkout but didn't set a specific schedule
                     </p>
                   </div>
                 </div>
@@ -1562,6 +1564,7 @@ function AdminOrderCard({
                 </p>
               </div>
             )}
+          </div>
         </CardContent>
       </Card>
     );

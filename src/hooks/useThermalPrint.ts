@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { OrderWithItems } from '@/api/orders';
-import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BusinessInfo {
   name: string;
@@ -11,27 +12,33 @@ interface BusinessInfo {
 
 export const useThermalPrint = () => {
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewOrder, setPreviewOrder] = useState<OrderWithItems | null>(null);
   const [previewDeliverySchedule, setPreviewDeliverySchedule] = useState<any>(null);
   const [previewBusinessInfo, setPreviewBusinessInfo] = useState<BusinessInfo | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const { toast } = useToast();
 
-  const printThermalReceipt = async (
-    order: OrderWithItems,
-    deliverySchedule?: any,
-    businessInfo?: BusinessInfo
-  ) => {
+  const printThermalReceipt = async (order: OrderWithItems, deliverySchedule?: any, businessInfo?: BusinessInfo) => {
     if (!order) {
-      toast({
-        title: "Print Error",
-        description: "No order data available for printing",
-        variant: "destructive",
-      });
+      toast.error('No order data available for printing');
       return;
     }
 
     setIsPrinting(true);
+    
+    // Fetch pickup point details if needed
+    let pickupPoint = null;
+    if (order.order_type === 'pickup' && order.pickup_point_id) {
+      try {
+        const { data } = await supabase
+          .from('pickup_points')
+          .select('*')
+          .eq('id', order.pickup_point_id)
+          .single();
+        pickupPoint = data;
+      } catch (error) {
+        console.warn('Failed to fetch pickup point details:', error);
+      }
+    }
 
     try {
       // Import the thermal print styles
@@ -126,18 +133,34 @@ export const useThermalPrint = () => {
           
           <div class="divider">================================</div>
           
-          <div class="schedule-info">
+          <div class="delivery-schedule">
             <div class="section-header">${getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
-            ${deliverySchedule ? `
-              <div>Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB')}</div>
-              <div>Time: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
+            
+            ${order.order_type === 'delivery' ? `
+              ${deliverySchedule ? `
+                <div>Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB')}</div>
+                <div>Time: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
+                ${deliverySchedule.special_instructions ? 
+                  `<div>Special Notes: ${deliverySchedule.special_instructions}</div>` : ''}
+              ` : ''}
               ${deliveryInfo?.address ? `<div>Address: ${deliveryInfo.address}</div>` : ''}
               ${deliveryInfo?.instructions ? `<div>Instructions: ${deliveryInfo.instructions}</div>` : ''}
-              ${deliverySchedule.special_instructions ? 
-                `<div>Special Notes: ${deliverySchedule.special_instructions}</div>` : ''}
             ` : ''}
-            ${!deliverySchedule && order.order_type === 'delivery' && deliveryInfo?.address ? 
-              `<div>Address: ${deliveryInfo.address}</div>` : ''}
+            
+            ${order.order_type === 'pickup' ? `
+              ${deliverySchedule ? `
+                <div>Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB')}</div>
+                <div>Time: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
+                ${deliverySchedule.special_instructions ? 
+                  `<div>Special Notes: ${deliverySchedule.special_instructions}</div>` : ''}
+              ` : ''}
+              ${pickupPoint ? `
+                <div>Location: ${pickupPoint.name}</div>
+                <div>Address: ${pickupPoint.address}</div>
+                ${pickupPoint.contact_phone ? `<div>Contact: ${pickupPoint.contact_phone}</div>` : ''}
+                ${pickupPoint.operating_hours ? `<div>Hours: ${JSON.stringify(pickupPoint.operating_hours).replace(/[{}\"]/g, '').replace(/,/g, ', ')}</div>` : ''}
+              ` : ''}
+            ` : ''}
           </div>
           
           <div class="divider">================================</div>
@@ -172,6 +195,7 @@ export const useThermalPrint = () => {
           </div>
           
           <div class="order-summary">
+            <div class="section-header">ORDER SUMMARY:</div>
             <div class="summary-line">
               <span>Subtotal:</span>
               <span>${formatCurrency(order.subtotal || 0)}</span>
@@ -188,86 +212,84 @@ export const useThermalPrint = () => {
                 <span>${formatCurrency(order.total_vat)}</span>
               </div>
             ` : ''}
-            
-            <div class="divider">--------------------------------</div>
-            
+            ${order.discount_amount && order.discount_amount > 0 ? `
+              <div class="summary-line discount">
+                <span>Discount:</span>
+                <span>-${formatCurrency(order.discount_amount)}</span>
+              </div>
+            ` : ''}
             <div class="total-line">
-              <span>TOTAL:</span>
-              <span>${formatCurrency(order.total_amount)}</span>
+              <span class="total-label">TOTAL:</span>
+              <span class="total-amount">${formatCurrency(order.total_amount)}</span>
             </div>
           </div>
           
           <div class="divider">================================</div>
           
           <div class="payment-info">
-            <div>Payment: ${order.payment_status?.toUpperCase()}</div>
-            ${order.payment_method ? `<div>Method: ${order.payment_method}</div>` : ''}
+            <div class="section-header">PAYMENT DETAILS:</div>
+            <div>Method: ${order.payment_method || 'N/A'}</div>
+            <div>Status: ${order.payment_status?.replace('_', ' ').toUpperCase()}</div>
             ${order.payment_reference ? `<div>Ref: ${order.payment_reference}</div>` : ''}
           </div>
           
-          <div class="divider">================================</div>
-          
-          ${(order.admin_notes || deliverySchedule?.special_instructions || deliveryInfo?.instructions) ? `
-            <div class="prep-notes">
-              <div class="section-header">PREPARATION NOTES:</div>
-              ${order.admin_notes ? `<div>- ${order.admin_notes}</div>` : ''}
-              ${deliverySchedule?.special_instructions ? 
-                `<div>- ${deliverySchedule.special_instructions}</div>` : ''}
-              ${deliveryInfo?.instructions ? 
-                `<div>- Delivery: ${deliveryInfo.instructions}</div>` : ''}
-            </div>
+          ${order.special_instructions ? `
             <div class="divider">================================</div>
+            <div class="special-instructions">
+              <div class="section-header">PREPARATION NOTES:</div>
+              <div>${order.special_instructions}</div>
+            </div>
           ` : ''}
           
-          <div class="receipt-footer text-center">
+          <div class="divider">================================</div>
+          
+          <div class="footer text-center">
             <div>Thank you for your order!</div>
-            <div>Estimated prep time: 25-30 mins</div>
-            ${businessInfo?.whatsapp_support_number ? 
-              `<div>For support: ${businessInfo.whatsapp_support_number}</div>` : ''}
+            <div>Starters Small Chops</div>
             ${businessInfo?.admin_notification_email ? 
-              `<div>Email: ${businessInfo.admin_notification_email}</div>` : ''}
+              `<div>${businessInfo.admin_notification_email}</div>` : ''}
           </div>
         </div>
       `;
 
-      // Add the receipt to the document temporarily
+      // Add to DOM temporarily
       document.body.appendChild(printContainer);
       
-      // Wait for styles to load
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Print
+      // Trigger print
       window.print();
       
       // Clean up
       document.body.removeChild(printContainer);
       
-      toast({
-        title: "Receipt Printed",
-        description: `Thermal receipt for order ${order.order_number} sent to printer`,
-        variant: "default",
-      });
-
+      toast.success('Receipt sent to printer successfully!');
+      
     } catch (error) {
       console.error('Print error:', error);
-      toast({
-        title: "Print Failed",
-        description: "Unable to print receipt. Please check your printer connection.",
-        variant: "destructive",
-      });
+      toast.error('Failed to print receipt. Please try again.');
     } finally {
       setIsPrinting(false);
     }
   };
 
-  const showPreview = (
-    order: OrderWithItems,
-    deliverySchedule?: any,
-    businessInfo?: BusinessInfo
-  ) => {
+  const showPreview = async (order: OrderWithItems, deliverySchedule?: any, businessInfo?: BusinessInfo) => {
+    // Fetch pickup point details if needed for preview
+    if (order.order_type === 'pickup' && order.pickup_point_id) {
+      try {
+        const { data } = await supabase
+          .from('pickup_points')
+          .select('*')
+          .eq('id', order.pickup_point_id)
+          .single();
+        // Store pickup point data in the order object for preview
+        (order as any).pickup_point = data;
+      } catch (error) {
+        console.warn('Failed to fetch pickup point details for preview:', error);
+      }
+    }
+    
     setPreviewOrder(order);
     setPreviewDeliverySchedule(deliverySchedule);
-    setPreviewBusinessInfo(businessInfo || null);
+    setPreviewBusinessInfo(businessInfo);
     setIsPreviewOpen(true);
   };
 

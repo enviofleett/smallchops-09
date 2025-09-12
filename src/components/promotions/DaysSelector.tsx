@@ -78,80 +78,10 @@ export function DaysSelector({
           Select specific days when this promotion is active. Leave empty for all days.
         </p>
       </CardHeader>
-      <CardContent className="space-y-3 md:space-y-4 p-3 md:p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="select-all"
-              checked={allSelected}
-              onCheckedChange={handleSelectAll}
-              disabled={disabled}
-            />
-            <Label htmlFor="select-all" className="text-sm font-medium">
-              {allSelected ? "Deselect All" : "Select All Days"}
-            </Label>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="w-3 h-3" />
-            {safeDays.length === 0
-              ? "Active every day"
-              : `Active ${safeDays.length} day${safeDays.length !== 1 ? "s" : ""}`}
-          </div>
+      <CardContent className="p-3 md:p-6">
+        <div className="text-sm text-muted-foreground">
+          Day selection temporarily disabled
         </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 md:gap-3">
-          {DAYS_OF_WEEK.map((day) => {
-            const isSelected = safeDays.includes(day.value);
-            return (
-              <div
-                key={day.value}
-                className={`
-                  flex items-center gap-2 p-2 md:p-3 rounded-lg border transition-colors
-                  ${
-                    isSelected
-                      ? "bg-primary/5 border-primary/30"
-                      : "bg-muted/50 border-border hover:border-primary/30"
-                  }
-                  ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/70"}
-                `}
-                onClick={() => {
-                  if (!disabled) {
-                    handleDayToggle(day.value, !isSelected);
-                  }
-                }}
-              >
-                <Checkbox
-                  id={`day-${day.value}`}
-                  checked={isSelected}
-                  onCheckedChange={(checked) => {
-                    if (!disabled) {
-                      handleDayToggle(day.value, !!checked);
-                    }
-                  }}
-                  disabled={disabled}
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">{day.short}</span>
-                  <span className="text-xs text-muted-foreground hidden sm:block">
-                    {day.label}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {safeDays.length > 0 && (
-          <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-            <p className="text-xs text-muted-foreground">
-              <strong>Active on:</strong>{" "}
-              {DAYS_OF_WEEK
-                .filter((day) => safeDays.includes(day.value))
-                .map((day) => day.label)
-                .join(", ")}
-            </p>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

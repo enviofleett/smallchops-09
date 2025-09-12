@@ -35,49 +35,16 @@ export const usePromotionTracking = () => {
         console.log('✅ Promotion usage recorded successfully');
       }
 
-      // Record audit entry
-      const { error: auditError } = await supabase
-        .from('promotion_usage_audit')
-        .insert({
-          promotion_id: data.promotionId,
-          order_id: data.orderId,
-          customer_email: data.customerEmail,
-          usage_type: 'order_completion',
-          discount_amount: data.discountAmount,
-          original_order_amount: data.originalOrderAmount,
-          final_order_amount: data.finalOrderAmount,
-          metadata: {
-            promotion_code: data.promotionCode,
-            customer_id: data.customerId,
-            tracked_at: new Date().toISOString()
-          }
-        });
-
-      if (auditError) {
-        console.error('❌ Failed to record promotion audit:', auditError);
-      } else {
-        console.log('✅ Promotion audit recorded successfully');
-      }
-
-      // Update promotion usage count - fetch current count and increment
-      const { data: currentPromotion, error: fetchError } = await supabase
+      // Update promotion updated_at timestamp
+      const { error: updateError } = await supabase
         .from('promotions')
-        .select('usage_count')
-        .eq('id', data.promotionId)
-        .single();
+        .update({ 
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', data.promotionId);
 
-      if (!fetchError && currentPromotion) {
-        const { error: countError } = await supabase
-          .from('promotions')
-          .update({ 
-            usage_count: (currentPromotion.usage_count || 0) + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', data.promotionId);
-
-        if (countError) {
-          console.warn('⚠️ Failed to update promotion usage count:', countError);
-        }
+      if (updateError) {
+        console.warn('⚠️ Failed to update promotion timestamp:', updateError);
       }
 
     } catch (error) {
@@ -88,20 +55,20 @@ export const usePromotionTracking = () => {
   const getPromotionAnalytics = useCallback(async (promotionId: string, days: number = 30) => {
     try {
       const { data, error } = await supabase
-        .from('promotion_analytics')
+        .from('promotion_usage')
         .select('*')
         .eq('promotion_id', promotionId)
-        .gte('date', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .order('date', { ascending: false });
+        .gte('used_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
+        .order('used_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Failed to fetch promotion analytics:', error);
+        console.error('❌ Failed to fetch promotion usage:', error);
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error('❌ Promotion analytics error:', error);
+      console.error('❌ Promotion usage error:', error);
       return null;
     }
   }, []);

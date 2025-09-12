@@ -223,22 +223,6 @@ export function CartSummary({ cart }: CartSummaryProps) {
 
           </div>
 
-          {/* BOGO Items Display */}
-          {cart.summary.applied_promotions.some(p => p.bogo_items?.length) && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <h4 className="font-medium text-sm text-green-800 mb-2">Free Items (BOGO):</h4>
-              {cart.summary.applied_promotions
-                .filter(p => p.bogo_items?.length)
-                .map(promotion => 
-                  promotion.bogo_items?.map(item => (
-                    <div key={`${promotion.id}-${item.product_id}`} className="flex justify-between text-sm text-green-700">
-                      <span>{item.product_name} x{item.free_quantity}</span>
-                      <span className="font-medium">FREE!</span>
-                    </div>
-                  ))
-                )}
-            </div>
-          )}
 
           {/* MOQ Violation Warning */}
           {hasMOQViolations && (

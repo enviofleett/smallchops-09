@@ -157,25 +157,6 @@ function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
                         value={promo.min_order_amount || "-"} 
                       />
                       <MobileCardRow 
-                        label="Applicable Days" 
-                        value={
-                          (!promo.applicable_days || promo.applicable_days.length === 0) ? (
-                            <Badge variant="secondary" className="text-xs">All Days</Badge>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {promo.applicable_days.slice(0, 4).map((day) => (
-                                <Badge key={day} variant="outline" className="text-xs capitalize">
-                                  {day.slice(0, 3)}
-                                </Badge>
-                              ))}
-                              {promo.applicable_days.length > 4 && (
-                                <span className="text-xs text-muted-foreground">+{promo.applicable_days.length - 4}</span>
-                              )}
-                            </div>
-                          )
-                        }
-                      />
-                      <MobileCardRow 
                         label="Valid From" 
                         value={promo.valid_from ? promo.valid_from.substring(0,10) : "-"} 
                       />
@@ -243,7 +224,6 @@ function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
                 <th className="p-3">Name</th>
                 <th className="p-3">Type</th>
                 <th className="p-3">Discount</th>
-                <th className="p-3">Days</th>
                 <th className="p-3">Min. Purchase</th>
                 <th className="p-3">Starts</th>
                 <th className="p-3">Expires</th>
@@ -260,24 +240,7 @@ function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
                   <td className="p-3">
                     {promo.type === "percentage" && `${promo.value}%`}
                     {promo.type === "fixed_amount" && `₦${promo.value}`}
-                    {promo.type === "buy_one_get_one" && "BOGO"}
                     {promo.type === "free_delivery" && "Free"}
-                  </td>
-                   <td className="p-3">
-                    {(!promo.applicable_days || promo.applicable_days.length === 0) ? (
-                      <Badge variant="secondary" className="text-xs">All</Badge>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {promo.applicable_days.slice(0, 2).map((day) => (
-                          <Badge key={day} variant="outline" className="text-xs capitalize">
-                            {day.slice(0, 3)}
-                          </Badge>
-                        ))}
-                        {promo.applicable_days.length > 2 && (
-                          <span className="text-xs text-muted-foreground">+{promo.applicable_days.length - 2}</span>
-                        )}
-                      </div>
-                    )}
                   </td>
                   <td className="p-3">{promo.min_order_amount || "-"}</td>
                   <td className="p-3">{promo.valid_from ? promo.valid_from.substring(0,10) : "-"}</td>
@@ -325,7 +288,7 @@ function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
                 </tr>
               ))}
               {data.length === 0 &&
-                <tr><td colSpan={10} className="p-8 text-center text-gray-500">No promotions found.</td></tr>
+                <tr><td colSpan={9} className="p-8 text-center text-gray-500">No promotions found.</td></tr>
               }
             </tbody>
           </table>

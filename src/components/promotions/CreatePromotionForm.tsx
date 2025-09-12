@@ -31,9 +31,10 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { DaysSelector } from "./DaysSelector";
+
 
 const PromotionFormSchema = z.object({
   name: z.string()
@@ -320,7 +321,8 @@ export default function CreatePromotionForm({
   }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
-    <div className="space-y-4 max-h-[85vh] overflow-y-auto">
+    <ScrollArea className="h-full">
+      <div className="space-y-4 p-1">{/* Padding for scrollbar */}
       <div className="flex items-center justify-between sticky top-0 bg-background pb-2">
         <h3 className="text-lg font-semibold">Create New Promotion</h3>
       </div>
@@ -606,27 +608,6 @@ export default function CreatePromotionForm({
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Schedule</h4>
         </div>
         
-        {/* Days Selection */}
-        <FormField
-          control={form.control}
-          name="applicable_days"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Applicable Days</FormLabel>
-              <FormControl>
-                <DaysSelector
-                  selectedDays={field.value || []}
-                  onDaysChange={field.onChange}
-                  disabled={disabled}
-                />
-              </FormControl>
-              <FormDescription>
-                Select specific days or leave empty for all days
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         {/* Dates */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -749,6 +730,7 @@ export default function CreatePromotionForm({
         </div>
         </form>
       </Form>
-    </div>
+      </div>
+    </ScrollArea>
   );
 }

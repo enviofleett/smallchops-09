@@ -321,8 +321,8 @@ export default function CreatePromotionForm({
   }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-4 p-1">{/* Padding for scrollbar */}
+    <ScrollArea className="h-full max-h-[calc(90vh-120px)]">
+      <div className="space-y-4 p-4">{/* Proper padding */}
       <div className="flex items-center justify-between sticky top-0 bg-background pb-2">
         <h3 className="text-lg font-semibold">Create New Promotion</h3>
       </div>

@@ -334,11 +334,11 @@ function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
 
       {/* Create Promotion Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl w-full max-h-[85vh] p-0 overflow-hidden">
-          <DialogHeader className="p-4 pb-2 border-b">
+        <DialogContent className="max-w-2xl w-full max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="p-4 pb-2 border-b flex-shrink-0">
             <DialogTitle>Create Promotion</DialogTitle>
           </DialogHeader>
-          <div className="p-4">
+          <div className="flex-1 min-h-0">
             <CreatePromotionForm
               onSuccess={() => setDialogOpen(false)}
             />

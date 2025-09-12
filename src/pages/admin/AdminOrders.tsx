@@ -1349,32 +1349,16 @@ function AdminOrderCard({
                           </span>
                         </div>
                         <div className="space-y-1">
-                          {/* Show delivery date/time or pickup date/time based on order type */}
-                          {order.order_type === 'delivery' ? (
-                            <>
-                              <p className="text-lg font-bold">
-                                {order.estimated_delivery_date 
-                                  ? format(new Date(order.estimated_delivery_date), 'EEE, MMM d')
-                                  : 'Date TBD'
-                                }
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {order.delivery_time || order.preferred_delivery_time || 'Time TBD'}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-lg font-bold">
-                                {order.estimated_delivery_date 
-                                  ? format(new Date(order.estimated_delivery_date), 'EEE, MMM d')
-                                  : 'Date TBD'
-                                }
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {order.pickup_time || order.delivery_time || order.preferred_delivery_time || 'Time TBD'}
-                              </p>
-                            </>
-                          )}
+                          {/* Show actual delivery schedule data from order */}
+                          <p className="text-lg font-bold">
+                            {format(new Date(order.order_time), 'EEE, MMM d, yyyy')}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {order.order_type === 'delivery' 
+                              ? (order.delivery_time || order.preferred_delivery_time || 'Same day delivery')
+                              : (order.pickup_time || order.delivery_time || order.preferred_delivery_time || 'Ready for pickup')
+                            }
+                          </p>
                         </div>
                       </div>
                     </div>

@@ -1306,9 +1306,9 @@ function AdminOrderCard({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Fallback: Display order information provided during checkout */}
+                   {/* Fallback: Display order information provided during checkout */}
                   <div className="bg-card rounded-lg p-4 border shadow-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -1338,6 +1338,43 @@ function AdminOrderCard({
                           <p className="text-sm text-muted-foreground">
                             {order.order_type === 'delivery' ? 'Home Delivery' : 'Customer Pickup'}
                           </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium text-muted-foreground">
+                            {order.order_type === 'delivery' ? 'Delivery Window' : 'Pickup Time'}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          {/* Show delivery date/time or pickup date/time based on order type */}
+                          {order.order_type === 'delivery' ? (
+                            <>
+                              <p className="text-lg font-bold">
+                                {order.estimated_delivery_date 
+                                  ? format(new Date(order.estimated_delivery_date), 'EEE, MMM d')
+                                  : 'Date TBD'
+                                }
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {order.delivery_time || order.preferred_delivery_time || 'Time TBD'}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-lg font-bold">
+                                {order.estimated_delivery_date 
+                                  ? format(new Date(order.estimated_delivery_date), 'EEE, MMM d')
+                                  : 'Date TBD'
+                                }
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {order.pickup_time || order.delivery_time || order.preferred_delivery_time || 'Time TBD'}
+                              </p>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -1,6 +1,68 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
+// Enhanced email validation function for production safety
+function validateEmailEventData(emailEvent: any, orderDetails: any) {
+  const errors: string[] = [];
+  
+  // Critical: Validate recipient email
+  if (!emailEvent.recipient_email) {
+    // Try to use order customer email as fallback
+    if (orderDetails?.customer_email) {
+      emailEvent.recipient_email = orderDetails.customer_email;
+      console.log('🔧 Fixed missing recipient_email using order.customer_email:', orderDetails.customer_email);
+    } else {
+      errors.push('recipient_email is required and order.customer_email is not available');
+    }
+  }
+  
+  // Validate email format
+  if (emailEvent.recipient_email) {
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(emailEvent.recipient_email.trim())) {
+      errors.push(`Invalid email format: ${emailEvent.recipient_email}`);
+    } else {
+      // Normalize email
+      emailEvent.recipient_email = emailEvent.recipient_email.trim().toLowerCase();
+    }
+  }
+  
+  // Validate required fields
+  if (!emailEvent.event_type) {
+    errors.push('event_type is required');
+  }
+  
+  if (!emailEvent.template_key) {
+    errors.push('template_key is required');
+  }
+  
+  // Validate order_id if this is an order-related event
+  if (emailEvent.event_type?.includes('order') && !emailEvent.order_id) {
+    errors.push('order_id is required for order-related events');
+  }
+  
+  // Ensure email_type is set
+  if (!emailEvent.email_type) {
+    emailEvent.email_type = 'transactional';
+  }
+  
+  // Ensure status is set
+  if (!emailEvent.status) {
+    emailEvent.status = 'queued';
+  }
+  
+  // Ensure priority is set
+  if (!emailEvent.priority) {
+    emailEvent.priority = 'normal';
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    emailEvent
+  };
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -169,23 +231,35 @@ async function handleRegistrationJourney(
 ): Promise<any[]> {
   const events = [];
 
-  // Welcome email
+  // Welcome email with enhanced validation
+  const welcomeEventData = {
+    event_type: 'customer_welcome',
+    recipient_email: userData.email,
+    status: 'queued',
+    template_key: 'customer_welcome',
+    email_type: 'transactional',
+    source: 'edge_function',
+    template_variables: {
+      customer_name: userData.name || 'New Customer',
+      store_name: 'Starters',
+      support_email: 'support@starters.com',
+      onboarding_link: 'https://yourdomain.com/onboarding',
+      ...metadata
+    },
+    priority: 'normal'
+  };
+
+  // Validate before insertion
+  const validationResult = validateEmailEventData(welcomeEventData, null);
+  
+  if (!validationResult.isValid) {
+    console.error('❌ Welcome email validation failed:', validationResult.errors);
+    throw new Error(`Welcome email validation failed: ${validationResult.errors.join(', ')}`);
+  }
+
   const welcomeEvent = await supabase
     .from('communication_events')
-    .insert({
-      event_type: 'customer_welcome',
-      recipient_email: userData.email,
-      status: 'queued',
-      template_key: 'customer_welcome',
-      template_variables: {
-        customer_name: userData.name || 'New Customer',
-        store_name: 'Starters',
-        support_email: 'support@starters.com',
-        onboarding_link: 'https://yourdomain.com/onboarding',
-        ...metadata
-      },
-      priority: 'normal'
-    })
+    .insert(welcomeEventData)
     .select()
     .single();
 
@@ -205,27 +279,39 @@ async function handleOrderPlacementJourney(
 ): Promise<any[]> {
   const events = [];
 
-  // Order confirmation email
+  // Order confirmation email with enhanced validation
+  const orderConfirmationData = {
+    event_type: 'order_confirmation',
+    recipient_email: userData.email,
+    order_id: orderData.order_id,
+    status: 'queued',
+    template_key: 'order_confirmation',
+    email_type: 'transactional',
+    source: 'edge_function',
+    template_variables: {
+      customer_name: userData.name || 'Customer',
+      order_number: orderData.order_number,
+      order_total: `₦${orderData.total_amount.toLocaleString()}`,
+      order_date: new Date().toLocaleDateString(),
+      items_count: orderData.items.length,
+      order_tracking_link: `https://yourdomain.com/track/${orderData.order_id}`,
+      store_name: 'Starters',
+      ...metadata
+    },
+    priority: 'high'
+  };
+
+  // Validate before insertion
+  const validationResult = validateEmailEventData(orderConfirmationData, { order_id: orderData.order_id, customer_email: userData.email });
+  
+  if (!validationResult.isValid) {
+    console.error('❌ Order confirmation email validation failed:', validationResult.errors);
+    throw new Error(`Order confirmation email validation failed: ${validationResult.errors.join(', ')}`);
+  }
+
   const orderConfirmationEvent = await supabase
     .from('communication_events')
-    .insert({
-      event_type: 'order_confirmation',
-      recipient_email: userData.email,
-      order_id: orderData.order_id,
-      status: 'queued',
-      template_key: 'order_confirmation',
-      template_variables: {
-        customer_name: userData.name || 'Customer',
-        order_number: orderData.order_number,
-        order_total: `₦${orderData.total_amount.toLocaleString()}`,
-        order_date: new Date().toLocaleDateString(),
-        items_count: orderData.items.length,
-        order_tracking_link: `https://yourdomain.com/track/${orderData.order_id}`,
-        store_name: 'Starters',
-        ...metadata
-      },
-      priority: 'high'
-    })
+    .insert(orderConfirmationData)
     .select()
     .single();
 
@@ -243,28 +329,36 @@ async function handleOrderPlacementJourney(
   const adminEmail = businessSettings?.admin_notification_email || businessSettings?.email;
   
   if (adminEmail) {
-    const adminNotificationEvent = await supabase
-      .from('communication_events')
-      .insert({
-        event_type: 'admin_new_order',
-        recipient_email: adminEmail,
+    const adminNotificationData = {
+      event_type: 'admin_new_order',
+      recipient_email: adminEmail,
+      order_id: orderData.order_id,
+      status: 'queued',
+      template_key: 'admin_new_order',
+      email_type: 'transactional',
+      source: 'edge_function',
+      template_variables: {
+        order_number: orderData.order_number,
+        customer_name: userData.name || 'Customer',
+        customer_email: userData.email,
+        order_total: `₦${orderData.total_amount.toLocaleString()}`,
+        order_date: new Date().toLocaleDateString(),
+        items_count: orderData.items.length,
         order_id: orderData.order_id,
-        status: 'queued',
-        template_key: 'admin_new_order',
-        template_variables: {
-          order_number: orderData.order_number,
-          customer_name: userData.name || 'Customer',
-          customer_email: userData.email,
-          order_total: `₦${orderData.total_amount.toLocaleString()}`,
-          order_date: new Date().toLocaleDateString(),
-          items_count: orderData.items.length,
-          order_id: orderData.order_id,
-          admin_dashboard_link: 'https://yourdomain.com/admin/orders'
-        },
-        priority: 'high'
-      })
-      .select()
-      .single();
+        admin_dashboard_link: 'https://yourdomain.com/admin/orders'
+      },
+      priority: 'high'
+    };
+
+    // Validate before insertion
+    const adminValidationResult = validateEmailEventData(adminNotificationData, { order_id: orderData.order_id, customer_email: adminEmail });
+    
+    if (adminValidationResult.isValid) {
+      const adminNotificationEvent = await supabase
+        .from('communication_events')
+        .insert(adminNotificationData)
+        .select()
+        .single();
 
     if (adminNotificationEvent.data) {
       events.push(adminNotificationEvent.data);
@@ -403,34 +497,47 @@ async function handleOrderStatusChangeJourney(
 
   console.log(`📧 Using template key: ${templateKey} for status: ${status}`);
 
+  // Enhanced status update email with validation
+  const statusUpdateData = {
+    event_type: 'order_status_update',
+    recipient_email: userData.email,
+    order_id: orderData.order_id,
+    status: 'queued',
+    template_key: templateKey,
+    email_type: 'transactional',
+    source: 'edge_function',
+    template_variables: {
+      customer_name: userData.name || 'Valued Customer',
+      order_number: orderData.order_number,
+      order_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      status_date: new Date().toLocaleDateString('en-NG', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }),
+      business_name: 'Starters Small Chops',
+      support_email: 'support@starterssmallchops.com',
+      order_id: orderData.order_id,
+      old_status: metadata?.old_status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '',
+      new_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      updated_at: metadata?.updated_at || new Date().toISOString(),
+      fulfillment_type: orderDetails.order_type,
+      ...metadata
+    },
+    priority: 'normal'
+  };
+
+  // Validate before insertion
+  const validationResult = validateEmailEventData(statusUpdateData, orderDetails);
+  
+  if (!validationResult.isValid) {
+    console.error('❌ Status update email validation failed:', validationResult.errors);
+    throw new Error(`Status update email validation failed: ${validationResult.errors.join(', ')}`);
+  }
+
   const statusUpdateEvent = await supabase
     .from('communication_events')
-    .insert({
-      event_type: 'order_status_update',
-      recipient_email: userData.email,
-      order_id: orderData.order_id,
-      status: 'queued',
-      template_key: templateKey,
-      template_variables: {
-        customer_name: userData.name || 'Valued Customer',
-        order_number: orderData.order_number,
-        order_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        status_date: new Date().toLocaleDateString('en-NG', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        }),
-        business_name: 'Starters Small Chops',
-        support_email: 'support@starterssmallchops.com',
-        order_id: orderData.order_id,
-        old_status: metadata?.old_status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '',
-        new_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        updated_at: metadata?.updated_at || new Date().toISOString(),
-        fulfillment_type: orderDetails.order_type,
-        ...metadata
-      },
-      priority: 'normal'
-    })
+    .insert(statusUpdateData)
     .select()
     .single();
 
@@ -474,23 +581,36 @@ async function handlePasswordResetJourney(
 
   const resetToken = metadata?.reset_token || crypto.randomUUID();
 
+  // Password reset email with enhanced validation
+  const passwordResetData = {
+    event_type: 'password_reset',
+    recipient_email: userData.email,
+    status: 'queued',
+    template_key: 'password_reset',
+    email_type: 'transactional',
+    source: 'edge_function',
+    template_variables: {
+      customer_name: userData.name || 'Customer',
+      reset_link: `https://yourdomain.com/reset-password?token=${resetToken}`,
+      reset_token: resetToken,
+      expiry_time: '24 hours',
+      support_email: 'support@starters.com',
+      ...metadata
+    },
+    priority: 'high'
+  };
+
+  // Validate before insertion
+  const validationResult = validateEmailEventData(passwordResetData, null);
+  
+  if (!validationResult.isValid) {
+    console.error('❌ Password reset email validation failed:', validationResult.errors);
+    throw new Error(`Password reset email validation failed: ${validationResult.errors.join(', ')}`);
+  }
+
   const passwordResetEvent = await supabase
     .from('communication_events')
-    .insert({
-      event_type: 'password_reset',
-      recipient_email: userData.email,
-      status: 'queued',
-      template_key: 'password_reset',
-      template_variables: {
-        customer_name: userData.name || 'Customer',
-        reset_link: `https://yourdomain.com/reset-password?token=${resetToken}`,
-        reset_token: resetToken,
-        expiry_time: '24 hours',
-        support_email: 'support@starters.com',
-        ...metadata
-      },
-      priority: 'high'
-    })
+    .insert(passwordResetData)
     .select()
     .single();
 

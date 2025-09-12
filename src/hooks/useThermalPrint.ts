@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { OrderWithItems } from '@/api/orders';
 import { supabase } from '@/integrations/supabase/client';
+import { generateReceiptContent } from '@/utils/receiptGenerator';
 
 interface BusinessInfo {
   name: string;
@@ -54,71 +55,29 @@ export const useThermalPrint = () => {
       const printContainer = document.createElement('div');
       printContainer.className = 'thermal-receipt';
       
-      const formatCurrency = (amount: number) => {
-        return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-      };
-
-      const getOrderTypeDisplay = () => {
-        return order.order_type === 'delivery' ? 'Delivery' : 'Pickup';
-      };
-
-      const getDeliveryInfo = () => {
-        if (order.order_type === 'delivery' && order.delivery_address) {
-          const address = typeof order.delivery_address === 'string' 
-            ? order.delivery_address 
-            : (order.delivery_address as any)?.formatted_address || 'Address on file';
-          
-          const instructions = typeof order.delivery_address === 'object'
-            ? (order.delivery_address as any)?.instructions
-            : null;
-
-          return { address, instructions };
-        }
-        return null;
-      };
-
-      const getItemDetails = (item: any) => {
-        const product = item.products || {};
-        const details = [];
-        
-        if (product.description) {
-          details.push(`Desc: ${product.description}`);
-        }
-        
-        if (product.ingredients && Array.isArray(product.ingredients)) {
-          details.push(`Ingredients: ${product.ingredients.join(', ')}`);
-        }
-        
-        if (product.features && Array.isArray(product.features)) {
-          details.push(`Features: ${product.features.join(', ')}`);
-        }
-        
-        return details;
-      };
-
-      const deliveryInfo = getDeliveryInfo();
+      // Generate receipt content using shared utility
+      const receiptContent = generateReceiptContent({
+        order,
+        deliverySchedule,
+        businessInfo,
+        pickupPoint
+      });
       
       // Generate the receipt HTML
       printContainer.innerHTML = `
         <div class="receipt-content">
           <div class="text-center mb-2">
-            <div class="business-name">${businessInfo?.name || 'STARTERS SMALL CHOPS'}</div>
-            ${businessInfo?.whatsapp_support_number ? 
-              `<div class="contact">Contact: ${businessInfo.whatsapp_support_number}</div>` : ''}
+            <div class="business-name">${receiptContent.businessName}</div>
+            ${receiptContent.contactNumber ? 
+              `<div class="contact">Contact: ${receiptContent.contactNumber}</div>` : ''}
           </div>
           
           <div class="divider">================================</div>
           
           <div class="order-info">
             <div>ORDER #: ${order.order_number}</div>
-            <div>Date: ${new Date(order.created_at).toLocaleString('en-GB', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}</div>
-            <div>Type: ${getOrderTypeDisplay()}</div>
+            <div>Date: ${receiptContent.formattedDate}</div>
+            <div>Type: ${receiptContent.getOrderTypeDisplay()}</div>
             <div>Status: ${order.status?.replace('_', ' ').toUpperCase()}</div>
           </div>
           
@@ -134,34 +93,24 @@ export const useThermalPrint = () => {
           <div class="divider">================================</div>
           
           <div class="delivery-schedule">
-            <div class="section-header">${getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
+            <div class="section-header">${receiptContent.getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
             
             ${order.order_type === 'delivery' ? `
               ${deliverySchedule ? `
-                <div>Scheduled Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB', {
-                  weekday: 'short',
-                  year: 'numeric', 
-                  month: 'short',
-                  day: 'numeric'
-                })}</div>
+                <div>Scheduled Date: ${receiptContent.formattedScheduleDate}</div>
                 <div>Time Window: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
                 ${deliverySchedule.is_flexible ? '<div>Flexible: Yes</div>' : ''}
                 ${deliverySchedule.special_instructions ? 
                   `<div>Special Notes: ${deliverySchedule.special_instructions}</div>` : ''}
               ` : ''}
-              ${deliveryInfo?.address ? `<div>Delivery Address: ${deliveryInfo.address}</div>` : ''}
-              ${deliveryInfo?.instructions ? `<div>Delivery Instructions: ${deliveryInfo.instructions}</div>` : ''}
-              ${!deliverySchedule && deliveryInfo?.address ? '<div>⚠️ No scheduled delivery window</div>' : ''}
+              ${receiptContent.deliveryInfo?.address ? `<div>Delivery Address: ${receiptContent.deliveryInfo.address}</div>` : ''}
+              ${receiptContent.deliveryInfo?.instructions ? `<div>Delivery Instructions: ${receiptContent.deliveryInfo.instructions}</div>` : ''}
+              ${!deliverySchedule && receiptContent.deliveryInfo?.address ? '<div>⚠️ No scheduled delivery window</div>' : ''}
             ` : ''}
             
             ${order.order_type === 'pickup' ? `
               ${deliverySchedule ? `
-                <div>Scheduled Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB', {
-                  weekday: 'short',
-                  year: 'numeric',
-                  month: 'short', 
-                  day: 'numeric'
-                })}</div>
+                <div>Scheduled Date: ${receiptContent.formattedScheduleDate}</div>
                 <div>Pickup Window: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
                 ${deliverySchedule.is_flexible ? '<div>Flexible: Yes</div>' : ''}
                 ${deliverySchedule.special_instructions ? 
@@ -171,7 +120,7 @@ export const useThermalPrint = () => {
                 <div>Pickup Location: ${pickupPoint.name}</div>
                 <div>Location Address: ${pickupPoint.address}</div>
                 ${pickupPoint.contact_phone ? `<div>Location Phone: ${pickupPoint.contact_phone}</div>` : ''}
-                ${pickupPoint.operating_hours ? `<div>Operating Hours: ${JSON.stringify(pickupPoint.operating_hours).replace(/[{}\"]/g, '').replace(/,/g, ', ')}</div>` : ''}
+                ${receiptContent.pickupPointHours ? `<div>Operating Hours: ${receiptContent.pickupPointHours}</div>` : ''}
               ` : ''}
               ${!deliverySchedule && !pickupPoint ? '<div>⚠️ No pickup schedule or location</div>' : ''}
             ` : ''}
@@ -184,16 +133,16 @@ export const useThermalPrint = () => {
             <div class="divider">--------------------------------</div>
             
             ${order.order_items?.map((item, index) => {
-              const itemDetails = getItemDetails(item);
+              const itemDetails = receiptContent.getItemDetails(item);
               return `
                 <div class="item-block">
                   <div class="item-header">
                     <span>${item.product_name}</span>
-                    <span class="item-total">${formatCurrency(item.total_price || 0)}</span>
+                    <span class="item-total">${receiptContent.formatCurrency(item.total_price || 0)}</span>
                   </div>
                   <div class="item-meta">
                     Qty: ${item.quantity}${item.unit_price ? 
-                      ` @ ${formatCurrency(item.unit_price)}` : ''}
+                      ` @ ${receiptContent.formatCurrency(item.unit_price)}` : ''}
                   </div>
                   
                   ${itemDetails.map(detail => 
@@ -212,29 +161,29 @@ export const useThermalPrint = () => {
             <div class="section-header">ORDER SUMMARY:</div>
             <div class="summary-line">
               <span>Subtotal:</span>
-              <span>${formatCurrency(order.subtotal || 0)}</span>
+              <span>${receiptContent.formatCurrency(order.subtotal || 0)}</span>
             </div>
             ${order.delivery_fee && order.delivery_fee > 0 ? `
               <div class="summary-line">
                 <span>Delivery Fee:</span>
-                <span>${formatCurrency(order.delivery_fee)}</span>
+                <span>${receiptContent.formatCurrency(order.delivery_fee)}</span>
               </div>
             ` : ''}
             ${order.total_vat && order.total_vat > 0 ? `
               <div class="summary-line">
                 <span>VAT (${((order.total_vat / (order.subtotal || 1)) * 100).toFixed(1)}%):</span>
-                <span>${formatCurrency(order.total_vat)}</span>
+                <span>${receiptContent.formatCurrency(order.total_vat)}</span>
               </div>
             ` : ''}
             ${order.discount_amount && order.discount_amount > 0 ? `
               <div class="summary-line discount">
                 <span>Discount:</span>
-                <span>-${formatCurrency(order.discount_amount)}</span>
+                <span>-${receiptContent.formatCurrency(order.discount_amount)}</span>
               </div>
             ` : ''}
             <div class="total-line">
               <span class="total-label">TOTAL:</span>
-              <span class="total-amount">${formatCurrency(order.total_amount)}</span>
+              <span class="total-amount">${receiptContent.formatCurrency(order.total_amount)}</span>
             </div>
           </div>
           
@@ -260,8 +209,8 @@ export const useThermalPrint = () => {
           <div class="footer text-center">
             <div>Thank you for your order!</div>
             <div>Starters Small Chops</div>
-            ${businessInfo?.admin_notification_email ? 
-              `<div>${businessInfo.admin_notification_email}</div>` : ''}
+            ${receiptContent.adminEmail ? 
+              `<div>${receiptContent.adminEmail}</div>` : ''}
           </div>
         </div>
       `;

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { OrderWithItems } from '@/api/orders';
 import { Printer, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { generateReceiptContent } from '@/utils/receiptGenerator';
 
 interface BusinessInfo {
   name: string;
@@ -59,49 +60,13 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
 
   if (!order) return null;
 
-  const formatCurrency = (amount: number) => {
-    return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-  };
-
-  const getOrderTypeDisplay = () => {
-    return order.order_type === 'delivery' ? 'Delivery' : 'Pickup';
-  };
-
-  const getDeliveryInfo = () => {
-    if (order.order_type === 'delivery' && order.delivery_address) {
-      const address = typeof order.delivery_address === 'string' 
-        ? order.delivery_address 
-        : (order.delivery_address as any)?.formatted_address || 'Address on file';
-      
-      const instructions = typeof order.delivery_address === 'object'
-        ? (order.delivery_address as any)?.instructions
-        : null;
-
-      return { address, instructions };
-    }
-    return null;
-  };
-
-  const getItemDetails = (item: any) => {
-    const product = item.products || {};
-    const details = [];
-    
-    if (product.description) {
-      details.push(`Desc: ${product.description}`);
-    }
-    
-    if (product.ingredients && Array.isArray(product.ingredients)) {
-      details.push(`Ingredients: ${product.ingredients.join(', ')}`);
-    }
-    
-    if (product.features && Array.isArray(product.features)) {
-      details.push(`Features: ${product.features.join(', ')}`);
-    }
-    
-    return details;
-  };
-
-  const deliveryInfo = getDeliveryInfo();
+  // Generate receipt content using shared utility
+  const receiptContent = generateReceiptContent({
+    order,
+    deliverySchedule,
+    businessInfo,
+    pickupPoint
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -120,11 +85,11 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               {/* Business Header */}
               <div className="text-center mb-2">
                 <div className="font-bold text-sm uppercase">
-                  {businessInfo?.name || 'STARTERS SMALL CHOPS'}
+                  {receiptContent.businessName}
                 </div>
-                {businessInfo?.whatsapp_support_number && (
+                {receiptContent.contactNumber && (
                   <div className="text-xs">
-                    Contact: {businessInfo.whatsapp_support_number}
+                    Contact: {receiptContent.contactNumber}
                   </div>
                 )}
               </div>
@@ -136,14 +101,8 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               {/* Order Info */}
               <div className="mb-2">
                 <div>ORDER #: {order.order_number}</div>
-                <div>Date: {new Date(order.created_at).toLocaleString('en-GB', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}</div>
-                <div>Type: {getOrderTypeDisplay()}</div>
+                <div>Date: {receiptContent.formattedDate}</div>
+                <div>Type: {receiptContent.getOrderTypeDisplay()}</div>
                 <div>Status: {order.status?.replace('_', ' ').toUpperCase()}</div>
               </div>
               
@@ -165,18 +124,13 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               
               {/* Delivery/Pickup Schedule */}
               <div className="mb-2">
-                <div className="font-bold">{getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
+                <div className="font-bold">{receiptContent.getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
                 
                 {order.order_type === 'delivery' && (
                   <>
                     {deliverySchedule && (
                       <>
-                        <div>Scheduled Date: {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB', {
-                          weekday: 'short',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}</div>
+                        <div>Scheduled Date: {receiptContent.formattedScheduleDate}</div>
                         <div>Time Window: {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
                         {deliverySchedule.is_flexible && (
                           <div>Flexible: Yes</div>
@@ -186,13 +140,13 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
                         )}
                       </>
                     )}
-                    {deliveryInfo?.address && (
-                      <div>Delivery Address: {deliveryInfo.address}</div>
+                    {receiptContent.deliveryInfo?.address && (
+                      <div>Delivery Address: {receiptContent.deliveryInfo.address}</div>
                     )}
-                    {deliveryInfo?.instructions && (
-                      <div>Delivery Instructions: {deliveryInfo.instructions}</div>
+                    {receiptContent.deliveryInfo?.instructions && (
+                      <div>Delivery Instructions: {receiptContent.deliveryInfo.instructions}</div>
                     )}
-                    {!deliverySchedule && deliveryInfo?.address && (
+                    {!deliverySchedule && receiptContent.deliveryInfo?.address && (
                       <div>⚠️ No scheduled delivery window</div>
                     )}
                   </>
@@ -202,12 +156,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
                   <>
                     {deliverySchedule && (
                       <>
-                        <div>Scheduled Date: {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB', {
-                          weekday: 'short',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}</div>
+                        <div>Scheduled Date: {receiptContent.formattedScheduleDate}</div>
                         <div>Pickup Window: {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
                         {deliverySchedule.is_flexible && (
                           <div>Flexible: Yes</div>
@@ -224,8 +173,8 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
                         {pickupPoint.contact_phone && (
                           <div>Location Phone: {pickupPoint.contact_phone}</div>
                         )}
-                        {pickupPoint.operating_hours && (
-                          <div>Operating Hours: {JSON.stringify(pickupPoint.operating_hours).replace(/[{}\"]/g, '').replace(/,/g, ', ')}</div>
+                        {receiptContent.pickupPointHours && (
+                          <div>Operating Hours: {receiptContent.pickupPointHours}</div>
                         )}
                       </>
                     )}
@@ -248,17 +197,17 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
                 </div>
                 
                 {order.order_items?.map((item, index) => {
-                  const itemDetails = getItemDetails(item);
+                  const itemDetails = receiptContent.getItemDetails(item);
                   return (
                     <div key={index} className="mb-1">
                       <div className="flex justify-between items-start">
                         <span className="flex-1 pr-2">{item.product_name}</span>
-                        <span className="font-bold">{formatCurrency(item.total_price || 0)}</span>
+                        <span className="font-bold">{receiptContent.formatCurrency(item.total_price || 0)}</span>
                       </div>
                       <div className="text-xs">
                         <span>Qty: {item.quantity}</span>
                         {item.unit_price && (
-                          <span> @ {formatCurrency(item.unit_price)}</span>
+                          <span> @ {receiptContent.formatCurrency(item.unit_price)}</span>
                         )}
                       </div>
                       
@@ -284,29 +233,29 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               <div className="mb-2">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>{formatCurrency(order.subtotal || 0)}</span>
+                  <span>{receiptContent.formatCurrency(order.subtotal || 0)}</span>
                 </div>
                 {order.delivery_fee && order.delivery_fee > 0 && (
                   <div className="flex justify-between">
                     <span>Delivery Fee:</span>
-                    <span>{formatCurrency(order.delivery_fee)}</span>
+                    <span>{receiptContent.formatCurrency(order.delivery_fee)}</span>
                   </div>
                 )}
                 {order.total_vat && order.total_vat > 0 && (
                   <div className="flex justify-between">
                     <span>VAT ({((order.total_vat / (order.subtotal || 1)) * 100).toFixed(1)}%):</span>
-                    <span>{formatCurrency(order.total_vat)}</span>
+                    <span>{receiptContent.formatCurrency(order.total_vat)}</span>
                   </div>
                 )}
                 {order.discount_amount && order.discount_amount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount:</span>
-                    <span>-{formatCurrency(order.discount_amount)}</span>
+                    <span>-{receiptContent.formatCurrency(order.discount_amount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold border-t pt-1">
                   <span>TOTAL:</span>
-                  <span>{formatCurrency(order.total_amount)}</span>
+                  <span>{receiptContent.formatCurrency(order.total_amount)}</span>
                 </div>
               </div>
               
@@ -342,8 +291,8 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               <div className="text-center text-xs">
                 <div>Thank you for your order!</div>
                 <div className="font-bold">Starters Small Chops</div>
-                {businessInfo?.admin_notification_email && (
-                  <div>{businessInfo.admin_notification_email}</div>
+                {receiptContent.adminEmail && (
+                  <div>{receiptContent.adminEmail}</div>
                 )}
               </div>
             </div>

@@ -19,7 +19,8 @@ import {
   Clock,
   Truck,
   CheckCircle,
-  Loader2
+  Loader2,
+  Printer
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -29,13 +30,17 @@ interface EnhancedOrderCardProps {
   deliverySchedule?: any;
   showExpandedByDefault?: boolean;
   className?: string;
+  onPrintReceipt?: (order: any, deliverySchedule?: any) => void;
+  isPrinting?: boolean;
 }
 
 export function EnhancedOrderCard({ 
   order, 
   deliverySchedule, 
   showExpandedByDefault = false,
-  className = "" 
+  className = "",
+  onPrintReceipt,
+  isPrinting = false
 }: EnhancedOrderCardProps) {
   const [isExpanded, setIsExpanded] = useState(showExpandedByDefault);
   const { processing, processPayment } = usePayment();
@@ -203,6 +208,24 @@ export function EnhancedOrderCard({
                       Pay Now
                     </>
                   )}
+                </Button>
+              )}
+              {/* Print Receipt Button - Only for paid orders */}
+              {order.payment_status === 'paid' && onPrintReceipt && (
+                <Button
+                  onClick={() => onPrintReceipt(order, deliverySchedule)}
+                  disabled={isPrinting}
+                  size="sm"
+                  variant="outline"
+                  className="text-xs sm:text-sm"
+                  title="Print thermal receipt"
+                >
+                  {isPrinting ? (
+                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                  ) : (
+                    <Printer className="h-3 w-3 sm:h-4 sm:w-4" />
+                  )}
+                  <span className="hidden sm:inline ml-1 sm:ml-2">Print</span>
                 </Button>
               )}
               <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>

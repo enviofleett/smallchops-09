@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import './styles/thermal-print.css';
 import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck, BarChart3, Send, RefreshCw, Calendar, MessageSquare } from 'lucide-react';
+import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck, BarChart3, Send, RefreshCw, Calendar, MessageSquare, Printer, Loader2 } from 'lucide-react';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
@@ -34,6 +35,7 @@ import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
 import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
 import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
 import { filterOrdersByDate, getFilterDescription, getFilterStats, DeliveryFilterType } from '@/utils/dateFilterUtils';
+import { useThermalPrint } from '@/hooks/useThermalPrint';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -55,6 +57,28 @@ export default function AdminOrders() {
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Thermal printing functionality
+  const { printThermalReceipt, isPrinting } = useThermalPrint();
+
+  // Fetch business info for receipts
+  const { data: businessInfo } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('business_settings')
+        .select('name, admin_notification_email, whatsapp_support_number, logo_url')
+        .single();
+      
+      if (error) {
+        console.warn('Could not fetch business info:', error);
+        return null;
+      }
+      
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
 
   // Debounce search query to avoid excessive API calls
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -836,8 +860,27 @@ export default function AdminOrders() {
                 {/* Orders List */}
                 <div className="space-y-4">
                   {filteredOrders.map(order => (
-                    <div key={order.id} onClick={() => handleOrderClick(order)} className="cursor-pointer transition-transform hover:scale-[1.01]">
-                      <AdminOrderCard order={order} deliverySchedule={deliverySchedules[order.id]} />
+                    <div key={order.id} className="flex items-center gap-2">
+                      <div onClick={() => handleOrderClick(order)} className="flex-1 cursor-pointer transition-transform hover:scale-[1.01]">
+                        <AdminOrderCard order={order} deliverySchedule={deliverySchedules[order.id]} />
+                      </div>
+                      {/* Print Receipt Button */}
+                      {order.payment_status === 'paid' && (
+                        <Button
+                          onClick={() => printThermalReceipt(order, deliverySchedules[order.id], businessInfo)}
+                          disabled={isPrinting}
+                          size="sm"
+                          variant="outline"
+                          className="flex-shrink-0"
+                          title="Print 80mm thermal receipt"
+                        >
+                          {isPrinting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Printer className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

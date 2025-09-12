@@ -15,44 +15,51 @@ export interface ProductionEmailHealth {
  */
 export class ProductionEmailHealthChecker {
   
-  /**
-   * Test SMTP connection without sending emails
-   */
+  // Update production email health checker to use enhanced validation
   static async testSMTPConnection(): Promise<{
     success: boolean;
     message: string;
     configured: boolean;
     connection_healthy: boolean;
+    user_type?: string;
+    provider?: string;
+    validation_details?: any;
   }> {
     try {
-      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
-        body: {
-          healthcheck: true,
-          check: 'smtp'
-        }
+      const { data, error } = await supabase.functions.invoke('smtp-health-check', {
+        body: { healthcheck: true }
       });
 
       if (error) {
         return {
           success: false,
-          message: `Health check failed: ${error.message}`,
+          message: `SMTP health check failed: ${error.message}`,
           configured: false,
           connection_healthy: false
         };
       }
 
+      const healthResult = data?.smtp_health || {};
+      
       return {
         success: true,
-        message: data?.smtpCheck?.configured 
-          ? 'SMTP connection healthy' 
-          : 'SMTP not properly configured',
-        configured: data?.smtpCheck?.configured || false,
-        connection_healthy: data?.smtpCheck?.connection_healthy || false
+        message: healthResult.connection_healthy 
+          ? `SMTP connection healthy (${healthResult.user_type} via ${healthResult.provider || 'unknown provider'})` 
+          : `SMTP configured but validation issues found`,
+        configured: healthResult.configured || false,
+        connection_healthy: healthResult.connection_healthy || false,
+        user_type: healthResult.user_type,
+        provider: healthResult.provider,
+        validation_details: {
+          source: healthResult.source,
+          errors: healthResult.validation_errors,
+          suggestions: healthResult.suggestions
+        }
       };
     } catch (error: any) {
       return {
         success: false,
-        message: `SMTP test failed: ${error.message}`,
+        message: `SMTP health check failed: ${error.message}`,
         configured: false,
         connection_healthy: false
       };

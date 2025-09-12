@@ -1,6 +1,6 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { validateSMTPUser, isValidSMTPConfig, maskSMTPConfig, getProviderSpecificSettings, type SMTPUserValidation } from '../_shared/smtp-config.ts';
 
 // Production mode configuration
 const isProductionMode = Deno.env.get('EMAIL_PRODUCTION_MODE')?.toLowerCase() === 'true' || 
@@ -22,16 +22,7 @@ const RETRY_CONFIG = {
   jitterFactor: 0.1
 };
 
-// Utility function to mask SMTP config for logging
-function maskSMTPConfig(config: any) {
-  return {
-    ...config,
-    user: config.user ? config.user.replace(/.(?=.{2})/g, '*') : undefined,
-    username: config.username ? config.username.replace(/.(?=.{2})/g, '*') : undefined,
-    pass: config.pass ? '***MASKED***' : undefined,
-    password: config.password ? '***MASKED***' : undefined
-  };
-}
+// Import shared SMTP utilities - mask function now in shared module
 
 // Helper function for timeouts
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
@@ -64,11 +55,135 @@ function parseResponse(response: string): SMTPResponse {
   return { code, lines, message };
 }
 
-// Validate SMTP configuration values to detect invalid hashed secrets
+// Production-ready SMTP user type detection and validation
+interface SMTPUserValidation {
+  isValid: boolean;
+  userType: 'email' | 'api_key' | 'username' | 'unknown';
+  provider?: string;
+  errors: string[];
+  suggestions: string[];
+}
+
+function validateSMTPUser(user: string, host: string): SMTPUserValidation {
+  const errors: string[] = [];
+  const suggestions: string[] = [];
+  let userType: 'email' | 'api_key' | 'username' | 'unknown' = 'unknown';
+  let provider: string | undefined;
+
+  // Detect user type based on format and host
+  if (user.includes('@')) {
+    userType = 'email';
+    const domain = user.split('@')[1]?.toLowerCase();
+    if (domain) {
+      if (domain.includes('gmail')) provider = 'gmail';
+      else if (domain.includes('outlook') || domain.includes('hotmail') || domain.includes('live')) provider = 'outlook';
+      else if (domain.includes('yahoo')) provider = 'yahoo';
+    }
+  } else if (user.toLowerCase().startsWith('apikey') || user.toLowerCase().includes('api') || user.length > 20) {
+    userType = 'api_key';
+  } else if (user.length >= 3 && !user.includes('@')) {
+    userType = 'username';
+  }
+
+  // Host-based provider detection for validation
+  const detectProviderFromHost = (hostname: string): string | undefined => {
+    const h = hostname.toLowerCase();
+    if (h.includes('gmail')) return 'gmail';
+    if (h.includes('outlook') || h.includes('office365') || h.includes('hotmail')) return 'outlook';
+    if (h.includes('sendgrid')) return 'sendgrid';
+    if (h.includes('mailgun')) return 'mailgun';
+    if (h.includes('ses') || h.includes('amazonses')) return 'aws_ses';
+    if (h.includes('postmark')) return 'postmark';
+    if (h.includes('mailersend')) return 'mailersend';
+    if (h.includes('yahoo')) return 'yahoo';
+    return undefined;
+  };
+
+  const hostProvider = detectProviderFromHost(host);
+
+  // Provider-specific validation rules
+  switch (hostProvider) {
+    case 'gmail':
+      if (userType !== 'email') {
+        errors.push('Gmail SMTP requires full email address as SMTP_USER');
+        suggestions.push('Use your complete Gmail address (e.g., user@gmail.com)');
+      } else if (!user.toLowerCase().includes('gmail.com')) {
+        errors.push('Gmail SMTP host requires Gmail email address');
+        suggestions.push('Use your Gmail address ending with @gmail.com');
+      }
+      break;
+
+    case 'outlook':
+      if (userType !== 'email') {
+        errors.push('Outlook/Office365 SMTP requires full email address as SMTP_USER');
+        suggestions.push('Use your complete Outlook/Hotmail/Office365 email address');
+      }
+      break;
+
+    case 'sendgrid':
+      if (userType !== 'api_key' && user.toLowerCase() !== 'apikey') {
+        errors.push('SendGrid SMTP typically uses "apikey" as SMTP_USER');
+        suggestions.push('Set SMTP_USER to "apikey" and use your API key as SMTP_PASS');
+      }
+      break;
+
+    case 'mailgun':
+      if (userType !== 'api_key' && userType !== 'username') {
+        errors.push('Mailgun SMTP requires API username or postmaster email');
+        suggestions.push('Use your Mailgun API username or postmaster@yourdomain.com');
+      }
+      break;
+
+    case 'aws_ses':
+      if (userType !== 'api_key' && userType !== 'username') {
+        errors.push('Amazon SES requires SMTP username (not email address)');
+        suggestions.push('Use your AWS SES SMTP username (20-character string starting with AKIA)');
+      }
+      break;
+
+    case 'postmark':
+      if (userType !== 'api_key') {
+        errors.push('Postmark SMTP uses API tokens, not email addresses');
+        suggestions.push('Use your Postmark SMTP token as SMTP_USER');
+      }
+      break;
+
+    default:
+      // Generic validation for unknown providers
+      if (userType === 'unknown') {
+        errors.push(`SMTP_USER format unclear for provider. Should be email, API key, or username`);
+        suggestions.push('Check your email provider documentation for correct SMTP_USER format');
+      }
+  }
+
+  // Check for obvious placeholder/test values
+  const placeholderPatterns = ['test', 'example', 'placeholder', 'your-email', 'user@domain'];
+  if (placeholderPatterns.some(pattern => user.toLowerCase().includes(pattern))) {
+    errors.push(`SMTP_USER "${user}" appears to be a placeholder value`);
+    suggestions.push('Replace with your actual SMTP username, email address, or API key');
+  }
+
+  // Check minimum length requirements
+  if (user.length < 3) {
+    errors.push('SMTP_USER too short - must be at least 3 characters');
+    suggestions.push('Provide a valid email address, username, or API key');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    userType,
+    provider: hostProvider,
+    errors,
+    suggestions
+  };
+}
+
+// Enhanced SMTP configuration validation supporting multiple user formats
 function isValidSMTPConfig(host: string, port: string, user: string, pass: string): { 
   isValid: boolean; 
   errors: string[];
   suggestions: string[];
+  userValidation?: SMTPUserValidation;
 } {
   const errors: string[] = [];
   const suggestions: string[] = [];
@@ -87,8 +202,8 @@ function isValidSMTPConfig(host: string, port: string, user: string, pass: strin
   }
   
   if (hashPattern.test(user)) {
-    errors.push(`SMTP_USER appears to be a hashed value (${user.substring(0,8)}...), needs actual email/username`);
-    suggestions.push('Set SMTP_USER to your email address or API username');
+    errors.push(`SMTP_USER appears to be a hashed value (${user.substring(0,8)}...), needs actual credential`);
+    suggestions.push('Set SMTP_USER to your email address, username, or API key');
   }
   
   if (hashPattern.test(pass)) {
@@ -109,27 +224,31 @@ function isValidSMTPConfig(host: string, port: string, user: string, pass: strin
     suggestions.push('Use port 587 for most providers, or 465 for SSL connections');
   }
   
-  // Basic email validation for user
-  if (user && !user.includes('@') && !user.includes('apikey') && user.length < 10) {
-    errors.push(`SMTP_USER "${user}" should typically be an email address or API key`);
-    suggestions.push('Use your full email address for Gmail/Outlook, or "apikey" for SendGrid');
+  // Validate SMTP user with enhanced logic
+  const userValidation = validateSMTPUser(user, host);
+  if (!userValidation.isValid) {
+    errors.push(...userValidation.errors);
+    suggestions.push(...userValidation.suggestions);
   }
   
-  // Check for obvious placeholder/test values
-  if (user.toLowerCase().includes('test') || user.toLowerCase().includes('example') || user.toLowerCase() === 'starters') {
-    errors.push(`SMTP_USER "${user}" appears to be a placeholder or test value`);
-    suggestions.push('Replace with your actual SMTP username/email address');
+  // Validate password strength
+  if (pass.length < 8 && !pass.toLowerCase().includes('api') && !pass.toLowerCase().includes('key')) {
+    errors.push('SMTP_PASS appears too short for a secure password');
+    suggestions.push('Use a strong password or API key (at least 8 characters)');
   }
   
-  if (pass.toLowerCase().includes('test') || pass.toLowerCase().includes('example') || pass.length < 8) {
-    errors.push(`SMTP_PASS appears to be a placeholder or test value`);
-    suggestions.push('Use your actual email password or API key (at least 8 characters)');
+  // Check for obvious placeholder/test values in password
+  const passwordPlaceholders = ['test', 'example', 'password', 'secret', '12345'];
+  if (passwordPlaceholders.some(placeholder => pass.toLowerCase().includes(placeholder))) {
+    errors.push('SMTP_PASS appears to be a placeholder or weak password');
+    suggestions.push('Use your actual email password or API key');
   }
   
   return {
     isValid: errors.length === 0,
     errors,
-    suggestions
+    suggestions,
+    userValidation
   };
 }
 
@@ -237,26 +356,54 @@ Never use placeholder, test, or hashed values in production.
       }
     }
     
-    // Gmail-specific validation for Function Secrets
-    if (secretHost?.includes('gmail.com') && port === 587) {
-      if (!secretUser.includes('@')) {
-        throw new Error('Gmail SMTP requires full email address as username. Please set SMTP_USER to your full Gmail address.');
-      }
+    // Provider-specific validation for Function Secrets
+    const userValidation = validateSMTPUser(secretUser, secretHost);
+    
+    // Gmail-specific App Password validation
+    if (userValidation.provider === 'gmail' && port === 587) {
       const cleanPassword = secretPass.replace(/\s+/g, '');
       if (cleanPassword.length !== 16) {
-        throw new Error(`Gmail requires a 16-character App Password. Current password length: ${cleanPassword.length}. Generate one at https://myaccount.google.com/apppasswords`);
+        console.warn(`⚠️ Gmail App Password should be 16 characters. Current length: ${cleanPassword.length}. Generate one at https://myaccount.google.com/apppasswords`);
+      }
+    }
+    
+    // SendGrid-specific validation
+    if (userValidation.provider === 'sendgrid' && secretUser.toLowerCase() === 'apikey') {
+      if (!secretPass.startsWith('SG.')) {
+        console.warn('⚠️ SendGrid API key should start with "SG." - verify your API key format');
+      }
+    }
+    
+    // AWS SES validation
+    if (userValidation.provider === 'aws_ses') {
+      if (!secretUser.startsWith('AKIA') || secretUser.length !== 20) {
+        console.warn('⚠️ AWS SES SMTP username should be 20 characters starting with "AKIA"');
       }
     }
 
-    console.log('🔍 Production SMTP Configuration:', maskSMTPConfig({
+    // Log user type detection and provider-specific settings
+    console.log(`🔍 Production SMTP Configuration:`, maskSMTPConfig({
       source: 'function_secrets',
       host: secretHost,
       port: port,
       username: secretUser,
+      userType: userValidation.userType,
+      provider: userValidation.provider,
       senderEmail: secretUser,
       senderName: 'System',
       encryption: 'TLS'
     }));
+    
+    // Log provider-specific recommendations
+    if (userValidation.provider) {
+      const providerSettings = getProviderSpecificSettings(userValidation.provider, userValidation.userType);
+      console.log(`📧 ${userValidation.provider.toUpperCase()} Settings:`, {
+        recommendedPort: providerSettings.defaultPort,
+        encryption: providerSettings.encryption,
+        authMethod: providerSettings.authMethod,
+        currentPort: port
+      });
+    }
     
     return {
       host: secretHost.trim(),
@@ -306,14 +453,21 @@ Never use placeholder, test, or hashed values in production.
   const normalizedPassword = (config.smtp_pass || '').toString().replace(/\s+/g, '').trim();
   const normalizedUsername = config.smtp_user.trim();
 
-  // Gmail-specific validation for database config too
-  if (config.smtp_host?.includes('gmail.com') && (config.smtp_port || 587) === 587) {
-    if (!normalizedUsername.includes('@')) {
-      throw new Error('Gmail SMTP requires full email address as username');
-    }
+  // Provider-specific validation for database config
+  const dbUserValidation = validateSMTPUser(normalizedUsername, config.smtp_host);
+  
+  // Gmail-specific App Password validation for database config
+  if (dbUserValidation.provider === 'gmail' && (config.smtp_port || 587) === 587) {
     if (normalizedPassword.length !== 16 && normalizedPassword.length > 0) {
-      throw new Error('Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
+      console.warn('⚠️ Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
     }
+  }
+  
+  // Log user type detection for debugging
+  console.log(`📧 Database SMTP User Type: ${dbUserValidation.userType} (Provider: ${dbUserValidation.provider || 'unknown'})`);
+  
+  if (!dbUserValidation.isValid) {
+    console.warn('⚠️ Database SMTP user validation warnings:', dbUserValidation.errors);
   }
 
   return {

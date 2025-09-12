@@ -88,6 +88,9 @@ verify_jwt = true
 [functions.check_upload_rate_limit]
 verify_jwt = false
 
+[functions.smtp-health-check]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

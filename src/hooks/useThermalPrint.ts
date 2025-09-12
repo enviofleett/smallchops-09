@@ -138,28 +138,42 @@ export const useThermalPrint = () => {
             
             ${order.order_type === 'delivery' ? `
               ${deliverySchedule ? `
-                <div>Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB')}</div>
-                <div>Time: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
+                <div>Scheduled Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB', {
+                  weekday: 'short',
+                  year: 'numeric', 
+                  month: 'short',
+                  day: 'numeric'
+                })}</div>
+                <div>Time Window: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
+                ${deliverySchedule.is_flexible ? '<div>Flexible: Yes</div>' : ''}
                 ${deliverySchedule.special_instructions ? 
                   `<div>Special Notes: ${deliverySchedule.special_instructions}</div>` : ''}
               ` : ''}
-              ${deliveryInfo?.address ? `<div>Address: ${deliveryInfo.address}</div>` : ''}
-              ${deliveryInfo?.instructions ? `<div>Instructions: ${deliveryInfo.instructions}</div>` : ''}
+              ${deliveryInfo?.address ? `<div>Delivery Address: ${deliveryInfo.address}</div>` : ''}
+              ${deliveryInfo?.instructions ? `<div>Delivery Instructions: ${deliveryInfo.instructions}</div>` : ''}
+              ${!deliverySchedule && deliveryInfo?.address ? '<div>⚠️ No scheduled delivery window</div>' : ''}
             ` : ''}
             
             ${order.order_type === 'pickup' ? `
               ${deliverySchedule ? `
-                <div>Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB')}</div>
-                <div>Time: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
+                <div>Scheduled Date: ${new Date(deliverySchedule.delivery_date).toLocaleDateString('en-GB', {
+                  weekday: 'short',
+                  year: 'numeric',
+                  month: 'short', 
+                  day: 'numeric'
+                })}</div>
+                <div>Pickup Window: ${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}</div>
+                ${deliverySchedule.is_flexible ? '<div>Flexible: Yes</div>' : ''}
                 ${deliverySchedule.special_instructions ? 
                   `<div>Special Notes: ${deliverySchedule.special_instructions}</div>` : ''}
               ` : ''}
               ${pickupPoint ? `
-                <div>Location: ${pickupPoint.name}</div>
-                <div>Address: ${pickupPoint.address}</div>
-                ${pickupPoint.contact_phone ? `<div>Contact: ${pickupPoint.contact_phone}</div>` : ''}
-                ${pickupPoint.operating_hours ? `<div>Hours: ${JSON.stringify(pickupPoint.operating_hours).replace(/[{}\"]/g, '').replace(/,/g, ', ')}</div>` : ''}
+                <div>Pickup Location: ${pickupPoint.name}</div>
+                <div>Location Address: ${pickupPoint.address}</div>
+                ${pickupPoint.contact_phone ? `<div>Location Phone: ${pickupPoint.contact_phone}</div>` : ''}
+                ${pickupPoint.operating_hours ? `<div>Operating Hours: ${JSON.stringify(pickupPoint.operating_hours).replace(/[{}\"]/g, '').replace(/,/g, ', ')}</div>` : ''}
               ` : ''}
+              ${!deliverySchedule && !pickupPoint ? '<div>⚠️ No pickup schedule or location</div>' : ''}
             ` : ''}
           </div>
           

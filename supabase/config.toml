@@ -52,6 +52,9 @@ enabled = true
 port = 54325
 ip_version = "ipv4"
 
+[functions.admin-security-lockdown]
+verify_jwt = true
+
 [functions.delivery-availability]
 verify_jwt = false
 

@@ -1,33 +1,26 @@
 import { toast } from '@/hooks/use-toast';
-import { isPromotionValidForCurrentDay } from '@/lib/discountCalculations';
+import { isPromotionValid } from '@/lib/discountCalculations';
 import type { Promotion } from '@/api/promotions';
 
-// Production-ready promotion service with error handling
+/**
+ * Production-ready promotion service with simplified logic
+ */
 export class PromotionService {
+  /**
+   * Validate if a promotion can be applied
+   */
   static validatePromotion(promotion: Promotion): boolean {
     try {
-      // Check if promotion is active
-      if (promotion.status !== 'active') {
-        return false;
-      }
-
-      // Check date validity
-      const now = new Date();
-      if (promotion.valid_from && new Date(promotion.valid_from) > now) {
-        return false;
-      }
-      if (promotion.valid_until && new Date(promotion.valid_until) < now) {
-        return false;
-      }
-
-      // Check day validity
-      return isPromotionValidForCurrentDay(promotion);
+      return isPromotionValid(promotion);
     } catch (error) {
       console.error('Promotion validation error:', error);
       return false;
     }
   }
 
+  /**
+   * Apply a promotion to an order and return the discount amount
+   */
   static async applyPromotion(promotion: Promotion, orderTotal: number): Promise<number> {
     try {
       if (!this.validatePromotion(promotion)) {
@@ -36,25 +29,26 @@ export class PromotionService {
 
       // Check minimum order amount
       if (promotion.min_order_amount && orderTotal < promotion.min_order_amount) {
-        throw new Error(`Minimum order amount of ₦${promotion.min_order_amount} required`);
+        throw new Error(`Minimum order amount of ₦${promotion.min_order_amount.toLocaleString()} required`);
       }
 
       let discount = 0;
 
       switch (promotion.type) {
         case 'percentage':
-          discount = (orderTotal * (promotion.value || 0)) / 100;
-          if (promotion.max_discount_amount && discount > promotion.max_discount_amount) {
-            discount = promotion.max_discount_amount;
+          if (promotion.value !== null) {
+            discount = (orderTotal * promotion.value) / 100;
           }
           break;
 
         case 'fixed_amount':
-          discount = Math.min(promotion.value || 0, orderTotal);
+          if (promotion.value !== null) {
+            discount = Math.min(promotion.value, orderTotal);
+          }
           break;
 
         case 'free_delivery':
-          // Return a flag value for free delivery
+          // Return a special flag for free delivery
           discount = -1;
           break;
 
@@ -74,15 +68,16 @@ export class PromotionService {
     }
   }
 
+  /**
+   * Get display text for a promotion
+   */
   static getPromotionDisplayText(promotion: Promotion): string {
     try {
       switch (promotion.type) {
         case 'percentage':
-          return `${promotion.value}% OFF`;
+          return promotion.value ? `${promotion.value}% OFF` : 'DISCOUNT';
         case 'fixed_amount':
-          return `₦${promotion.value} OFF`;
-        case 'buy_one_get_one':
-          return 'BOGO';
+          return promotion.value ? `₦${promotion.value.toLocaleString()} OFF` : 'DISCOUNT';
         case 'free_delivery':
           return 'FREE DELIVERY';
         default:
@@ -92,5 +87,46 @@ export class PromotionService {
       console.error('Error getting promotion display text:', error);
       return 'DISCOUNT';
     }
+  }
+
+  /**
+   * Get promotion description including minimum order requirement
+   */
+  static getPromotionDescription(promotion: Promotion): string {
+    try {
+      let description = this.getPromotionDisplayText(promotion);
+      
+      if (promotion.min_order_amount && promotion.min_order_amount > 0) {
+        description += ` on orders ₦${promotion.min_order_amount.toLocaleString()}+`;
+      }
+
+      return description;
+    } catch (error) {
+      console.error('Error getting promotion description:', error);
+      return 'DISCOUNT';
+    }
+  }
+
+  /**
+   * Check if a promotion code is valid and active
+   */
+  static isPromotionCodeValid(promotions: Promotion[], code: string): Promotion | null {
+    if (!code?.trim()) return null;
+
+    const promotion = promotions.find(p => 
+      p.code?.toUpperCase() === code.toUpperCase() && 
+      this.validatePromotion(p)
+    );
+
+    return promotion || null;
+  }
+
+  /**
+   * Get all currently valid promotions (no code required)
+   */
+  static getValidAutomaticPromotions(promotions: Promotion[]): Promotion[] {
+    return promotions.filter(promotion => 
+      this.validatePromotion(promotion) && !promotion.code
+    );
   }
 }

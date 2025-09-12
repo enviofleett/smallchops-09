@@ -120,7 +120,7 @@ export default function EditPromotionDialog({
         value: promotion.value || undefined,
         min_order_amount: promotion.min_order_amount || undefined,
         code: promotion.code || "",
-        applicable_days: promotion.applicable_days || [],
+        // applicable_days removed in simplified system
         valid_from: promotion.valid_from ? new Date(promotion.valid_from) : undefined,
         valid_until: promotion.valid_until ? new Date(promotion.valid_until) : undefined,
       });

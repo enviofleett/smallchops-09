@@ -533,51 +533,6 @@ export type Database = {
         }
         Relationships: []
       }
-      bogo_allocations: {
-        Row: {
-          created_at: string | null
-          free_quantity: number
-          id: string
-          order_id: string | null
-          paid_quantity: number
-          product_id: string
-          promotion_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          free_quantity?: number
-          id?: string
-          order_id?: string | null
-          paid_quantity?: number
-          product_id: string
-          promotion_id: string
-        }
-        Update: {
-          created_at?: string | null
-          free_quantity?: number
-          id?: string
-          order_id?: string | null
-          paid_quantity?: number
-          product_id?: string
-          promotion_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bogo_allocations_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bogo_allocations_promotion_id_fkey"
-            columns: ["promotion_id"]
-            isOneToOne: false
-            referencedRelation: "promotions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       brand_assets: {
         Row: {
           asset_name: string | null
@@ -6814,139 +6769,6 @@ export type Database = {
         }
         Relationships: []
       }
-      promotion_analytics: {
-        Row: {
-          avg_order_value: number | null
-          conversion_rate: number | null
-          created_at: string | null
-          date: string
-          id: string
-          promotion_id: string
-          total_discount_given: number | null
-          total_revenue_impact: number | null
-          total_usage: number | null
-          unique_customers: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          avg_order_value?: number | null
-          conversion_rate?: number | null
-          created_at?: string | null
-          date?: string
-          id?: string
-          promotion_id: string
-          total_discount_given?: number | null
-          total_revenue_impact?: number | null
-          total_usage?: number | null
-          unique_customers?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          avg_order_value?: number | null
-          conversion_rate?: number | null
-          created_at?: string | null
-          date?: string
-          id?: string
-          promotion_id?: string
-          total_discount_given?: number | null
-          total_revenue_impact?: number | null
-          total_usage?: number | null
-          unique_customers?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "promotion_analytics_promotion_id_fkey"
-            columns: ["promotion_id"]
-            isOneToOne: false
-            referencedRelation: "promotions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      promotion_code_rate_limits: {
-        Row: {
-          attempt_count: number
-          blocked_until: string | null
-          created_at: string | null
-          id: string
-          identifier: string
-          updated_at: string | null
-          window_hour: string
-        }
-        Insert: {
-          attempt_count?: number
-          blocked_until?: string | null
-          created_at?: string | null
-          id?: string
-          identifier: string
-          updated_at?: string | null
-          window_hour?: string
-        }
-        Update: {
-          attempt_count?: number
-          blocked_until?: string | null
-          created_at?: string | null
-          id?: string
-          identifier?: string
-          updated_at?: string | null
-          window_hour?: string
-        }
-        Relationships: []
-      }
-      promotion_security_audit: {
-        Row: {
-          action_type: string
-          created_at: string | null
-          customer_email: string | null
-          customer_id: string | null
-          discount_calculated: number | null
-          failure_reason: string | null
-          id: string
-          ip_address: unknown | null
-          metadata: Json | null
-          order_amount: number | null
-          promotion_id: string | null
-          user_agent: string | null
-        }
-        Insert: {
-          action_type: string
-          created_at?: string | null
-          customer_email?: string | null
-          customer_id?: string | null
-          discount_calculated?: number | null
-          failure_reason?: string | null
-          id?: string
-          ip_address?: unknown | null
-          metadata?: Json | null
-          order_amount?: number | null
-          promotion_id?: string | null
-          user_agent?: string | null
-        }
-        Update: {
-          action_type?: string
-          created_at?: string | null
-          customer_email?: string | null
-          customer_id?: string | null
-          discount_calculated?: number | null
-          failure_reason?: string | null
-          id?: string
-          ip_address?: unknown | null
-          metadata?: Json | null
-          order_amount?: number | null
-          promotion_id?: string | null
-          user_agent?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "promotion_security_audit_promotion_id_fkey"
-            columns: ["promotion_id"]
-            isOneToOne: false
-            referencedRelation: "promotions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       promotion_usage: {
         Row: {
           customer_email: string
@@ -6989,113 +6811,48 @@ export type Database = {
           },
         ]
       }
-      promotion_usage_audit: {
-        Row: {
-          created_at: string | null
-          customer_email: string | null
-          discount_amount: number
-          final_order_amount: number | null
-          id: string
-          metadata: Json | null
-          order_id: string | null
-          original_order_amount: number | null
-          promotion_id: string
-          usage_type: string
-        }
-        Insert: {
-          created_at?: string | null
-          customer_email?: string | null
-          discount_amount?: number
-          final_order_amount?: number | null
-          id?: string
-          metadata?: Json | null
-          order_id?: string | null
-          original_order_amount?: number | null
-          promotion_id: string
-          usage_type: string
-        }
-        Update: {
-          created_at?: string | null
-          customer_email?: string | null
-          discount_amount?: number
-          final_order_amount?: number | null
-          id?: string
-          metadata?: Json | null
-          order_id?: string | null
-          original_order_amount?: number | null
-          promotion_id?: string
-          usage_type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "promotion_usage_audit_promotion_id_fkey"
-            columns: ["promotion_id"]
-            isOneToOne: false
-            referencedRelation: "promotions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       promotions: {
         Row: {
-          applicable_categories: string[] | null
-          applicable_days: string[] | null
-          applicable_products: string[] | null
           code: string | null
           created_at: string
           created_by: string | null
           description: string | null
           id: string
-          max_discount_amount: number | null
           min_order_amount: number | null
           name: string
           status: Database["public"]["Enums"]["promotion_status"]
           type: Database["public"]["Enums"]["promotion_type"]
           updated_at: string
-          usage_count: number | null
-          usage_limit: number | null
           valid_from: string
           valid_until: string | null
           value: number | null
         }
         Insert: {
-          applicable_categories?: string[] | null
-          applicable_days?: string[] | null
-          applicable_products?: string[] | null
           code?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
-          max_discount_amount?: number | null
           min_order_amount?: number | null
           name: string
           status?: Database["public"]["Enums"]["promotion_status"]
           type: Database["public"]["Enums"]["promotion_type"]
           updated_at?: string
-          usage_count?: number | null
-          usage_limit?: number | null
           valid_from?: string
           valid_until?: string | null
           value?: number | null
         }
         Update: {
-          applicable_categories?: string[] | null
-          applicable_days?: string[] | null
-          applicable_products?: string[] | null
           code?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
-          max_discount_amount?: number | null
           min_order_amount?: number | null
           name?: string
           status?: Database["public"]["Enums"]["promotion_status"]
           type?: Database["public"]["Enums"]["promotion_type"]
           updated_at?: string
-          usage_count?: number | null
-          usage_limit?: number | null
           valid_from?: string
           valid_until?: string | null
           value?: number | null
@@ -10207,11 +9964,7 @@ export type Database = {
       permission_level: "none" | "view" | "edit"
       product_status: "active" | "archived" | "draft" | "discontinued"
       promotion_status: "active" | "inactive" | "expired" | "scheduled"
-      promotion_type:
-        | "percentage"
-        | "fixed_amount"
-        | "buy_one_get_one"
-        | "free_delivery"
+      promotion_type: "percentage" | "fixed_amount" | "free_delivery"
       user_role: "admin" | "manager" | "staff" | "dispatch_rider"
       user_status: "active" | "inactive" | "pending"
       vehicle_status: "available" | "assigned" | "maintenance" | "inactive"
@@ -10389,12 +10142,7 @@ export const Constants = {
       permission_level: ["none", "view", "edit"],
       product_status: ["active", "archived", "draft", "discontinued"],
       promotion_status: ["active", "inactive", "expired", "scheduled"],
-      promotion_type: [
-        "percentage",
-        "fixed_amount",
-        "buy_one_get_one",
-        "free_delivery",
-      ],
+      promotion_type: ["percentage", "fixed_amount", "free_delivery"],
       user_role: ["admin", "manager", "staff", "dispatch_rider"],
       user_status: ["active", "inactive", "pending"],
       vehicle_status: ["available", "assigned", "maintenance", "inactive"],

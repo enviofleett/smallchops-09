@@ -1552,7 +1552,6 @@ function AdminOrderCard({
                   </div>
                 </div>
               )}
-            )}
 
             {/* Special Instructions Fallback */}
             {!order.delivery_schedule?.special_instructions && order.special_instructions && (

@@ -11,6 +11,10 @@ interface BusinessInfo {
 
 export const useThermalPrint = () => {
   const [isPrinting, setIsPrinting] = useState(false);
+  const [previewOrder, setPreviewOrder] = useState<OrderWithItems | null>(null);
+  const [previewDeliverySchedule, setPreviewDeliverySchedule] = useState<any>(null);
+  const [previewBusinessInfo, setPreviewBusinessInfo] = useState<BusinessInfo | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const { toast } = useToast();
 
   const printThermalReceipt = async (
@@ -256,8 +260,40 @@ export const useThermalPrint = () => {
     }
   };
 
+  const showPreview = (
+    order: OrderWithItems,
+    deliverySchedule?: any,
+    businessInfo?: BusinessInfo
+  ) => {
+    setPreviewOrder(order);
+    setPreviewDeliverySchedule(deliverySchedule);
+    setPreviewBusinessInfo(businessInfo || null);
+    setIsPreviewOpen(true);
+  };
+
+  const closePreview = () => {
+    setIsPreviewOpen(false);
+    setPreviewOrder(null);
+    setPreviewDeliverySchedule(null);
+    setPreviewBusinessInfo(null);
+  };
+
+  const printFromPreview = async () => {
+    if (previewOrder) {
+      await printThermalReceipt(previewOrder, previewDeliverySchedule, previewBusinessInfo);
+      closePreview();
+    }
+  };
+
   return {
     printThermalReceipt,
-    isPrinting
+    showPreview,
+    closePreview,
+    printFromPreview,
+    isPrinting,
+    isPreviewOpen,
+    previewOrder,
+    previewDeliverySchedule,
+    previewBusinessInfo
   };
 };

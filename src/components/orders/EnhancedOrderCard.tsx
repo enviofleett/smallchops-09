@@ -30,7 +30,7 @@ interface EnhancedOrderCardProps {
   deliverySchedule?: any;
   showExpandedByDefault?: boolean;
   className?: string;
-  onPrintReceipt?: (order: any, deliverySchedule?: any) => void;
+  onPrintPreview?: (order: any, deliverySchedule?: any) => void;
   isPrinting?: boolean;
 }
 
@@ -39,7 +39,7 @@ export function EnhancedOrderCard({
   deliverySchedule, 
   showExpandedByDefault = false,
   className = "",
-  onPrintReceipt,
+  onPrintPreview,
   isPrinting = false
 }: EnhancedOrderCardProps) {
   const [isExpanded, setIsExpanded] = useState(showExpandedByDefault);
@@ -210,22 +210,22 @@ export function EnhancedOrderCard({
                   )}
                 </Button>
               )}
-              {/* Print Receipt Button - Only for paid orders */}
-              {order.payment_status === 'paid' && onPrintReceipt && (
+              {/* Print Preview Button - Only for paid orders */}
+              {order.payment_status === 'paid' && onPrintPreview && (
                 <Button
-                  onClick={() => onPrintReceipt(order, deliverySchedule)}
+                  onClick={() => onPrintPreview(order, deliverySchedule)}
                   disabled={isPrinting}
                   size="sm"
                   variant="outline"
                   className="text-xs sm:text-sm"
-                  title="Print thermal receipt"
+                  title="Preview thermal receipt"
                 >
                   {isPrinting ? (
                     <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                   ) : (
                     <Printer className="h-3 w-3 sm:h-4 sm:w-4" />
                   )}
-                  <span className="hidden sm:inline ml-1 sm:ml-2">Print</span>
+                  <span className="hidden sm:inline ml-1 sm:ml-2">Preview</span>
                 </Button>
               )}
               <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>

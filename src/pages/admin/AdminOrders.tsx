@@ -12,6 +12,7 @@ import { getOrders, OrderWithItems } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
+import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -59,7 +60,16 @@ export default function AdminOrders() {
   const queryClient = useQueryClient();
   
   // Thermal printing functionality
-  const { printThermalReceipt, isPrinting } = useThermalPrint();
+  const { 
+    showPreview, 
+    closePreview, 
+    printFromPreview, 
+    isPrinting, 
+    isPreviewOpen, 
+    previewOrder, 
+    previewDeliverySchedule, 
+    previewBusinessInfo 
+  } = useThermalPrint();
 
   // Fetch business info for receipts
   const { data: businessInfo } = useQuery({
@@ -729,8 +739,19 @@ export default function AdminOrders() {
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 orderCounts={orderCounts}
-              />
-            </div>
+        />
+
+        {/* Thermal Receipt Preview Modal */}
+        <ThermalReceiptPreview
+          isOpen={isPreviewOpen}
+          onClose={closePreview}
+          onPrint={printFromPreview}
+          order={previewOrder}
+          deliverySchedule={previewDeliverySchedule}
+          businessInfo={previewBusinessInfo}
+          isPrinting={isPrinting}
+        />
+      </div>
             
             {/* Desktop: Full grid layout */}
             <div className="hidden md:block">

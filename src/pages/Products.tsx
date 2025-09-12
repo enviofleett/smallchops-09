@@ -143,13 +143,22 @@ const Products = () => {
     } catch (error: any) {
       console.error('Product submission failed:', error);
       
+      // Handle specific error cases with user-friendly messages
       if (error.message?.includes('SKU') && error.message?.includes('already exists')) {
         throw new Error(error.message + ' Try modifying the SKU or leave it blank for auto-generation.');
       }
       
+      if (error.message?.includes('Rate limit') || error.message?.includes('429')) {
+        throw new Error('Upload rate limit reached. Please wait a moment and try again.');
+      }
+      
+      if (error.message?.includes('timeout')) {
+        throw new Error('Upload timed out. Please check your connection and try again.');
+      }
+      
       // Enhance error message for better user feedback
-      if (error.message?.includes('image')) {
-        throw new Error(`Image upload failed: ${error.message}`);
+      if (error.message?.includes('image') || error.message?.includes('upload')) {
+        throw new Error(`Image upload failed: ${error.message}. Please try again or use a different image.`);
       }
       
       throw error;

@@ -12,46 +12,114 @@ const PRODUCT_IMAGE_BUCKET = 'product-images';
  * @returns {Promise<string>} The public URL of the uploaded image.
  */
 export const uploadProductImage = async (imageFile: File): Promise<string> => {
-  try {
-    // Convert file to base64
-    const fileData = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remove data URL prefix to get just the base64 data
-        const base64Data = result.split(',')[1];
-        resolve(base64Data);
-      };
-      reader.readAsDataURL(imageFile);
-    });
+  const maxRetries = 3;
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Image upload attempt ${attempt}/${maxRetries} for file: ${imageFile.name}`);
+      
+      // Convert file to base64
+      const fileData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const result = reader.result as string;
+            // Remove data URL prefix to get just the base64 data
+            const base64Data = result.split(',')[1];
+            resolve(base64Data);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(imageFile);
+      });
 
-    // Call the upload function
-    const { data, error } = await supabase.functions.invoke('upload-product-image', {
-      body: {
-        file: {
-          name: imageFile.name,
-          type: imageFile.type,
-          size: imageFile.size,
-          data: fileData
+      // Call the upload function with timeout
+      const uploadPromise = supabase.functions.invoke('upload-product-image', {
+        body: {
+          file: {
+            name: imageFile.name,
+            type: imageFile.type,
+            size: imageFile.size,
+            data: fileData
+          }
         }
+      });
+
+      // Add timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Upload timeout - please try again')), 30000)
+      );
+
+      const { data, error } = await Promise.race([uploadPromise, timeoutPromise]) as any;
+
+      if (error) {
+        console.error(`Upload function error (attempt ${attempt}):`, error);
+        
+        // Check for specific error types that shouldn't be retried
+        if (error.message?.includes('Unauthorized') || 
+            error.message?.includes('Invalid file type') ||
+            error.message?.includes('File size exceeds')) {
+          throw new Error(error.message || 'Upload failed');
+        }
+        
+        // For rate limiting and network errors, set up for retry
+        lastError = new Error(error.message || 'Upload failed');
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        
+        // Exponential backoff for retries
+        const delay = Math.pow(2, attempt) * 1000;
+        console.log(`Retrying upload in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
       }
-    });
 
-    if (error) {
-      console.error('Upload function error:', error);
-      throw new Error(error.message || 'Upload failed');
+      if (!data?.success) {
+        const errorMsg = data?.error || 'Upload failed - unknown error';
+        console.error(`Upload failed (attempt ${attempt}):`, errorMsg);
+        
+        lastError = new Error(errorMsg);
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        
+        // Retry for server errors
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      console.log('Product image uploaded successfully:', data.data.url);
+      return data.data.url;
+      
+    } catch (error: any) {
+      console.error(`Upload attempt ${attempt} failed:`, error);
+      lastError = error;
+      
+      // Don't retry for client-side errors
+      if (error.message?.includes('timeout') || 
+          error.message?.includes('Failed to read file') ||
+          error.message?.includes('Unauthorized')) {
+        throw error;
+      }
+      
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+      
+      // Wait before retry
+      const delay = Math.pow(2, attempt) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-
-    if (!data?.success) {
-      throw new Error(data?.error || 'Upload failed');
-    }
-
-    console.log('Product image uploaded successfully:', data.data.url);
-    return data.data.url;
-  } catch (error) {
-    console.error('Product image upload error:', error);
-    throw error;
   }
+  
+  throw lastError || new Error('Upload failed after all retry attempts');
 };
 
 /**

@@ -888,12 +888,15 @@ export default function AdminOrders() {
                       {/* Print Receipt Button */}
                       {order.payment_status === 'paid' && (
                         <Button
-                          onClick={() => printThermalReceipt(order, deliverySchedules[order.id], businessInfo)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showPreview(order, deliverySchedules[order.id], businessInfo);
+                          }}
                           disabled={isPrinting}
                           size="sm"
                           variant="outline"
                           className="flex-shrink-0"
-                          title="Print 80mm thermal receipt"
+                          title="Preview thermal receipt"
                         >
                           {isPrinting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -954,6 +957,17 @@ export default function AdminOrders() {
             }} 
           />
         )}
+
+        {/* Thermal Receipt Preview Modal */}
+        <ThermalReceiptPreview
+          isOpen={isPreviewOpen}
+          onClose={closePreview}
+          onPrint={printFromPreview}
+          order={previewOrder}
+          deliverySchedule={previewDeliverySchedule}
+          businessInfo={previewBusinessInfo}
+          isPrinting={isPrinting}
+        />
       </div>
     </>
   );

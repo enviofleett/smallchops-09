@@ -9987,6 +9987,10 @@ export type Database = {
         Args: { order_uuid: string }
         Returns: undefined
       }
+      trigger_review_request_processing: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       update_admin_role: {
         Args: { p_new_role: string; p_user_id: string }
         Returns: Json

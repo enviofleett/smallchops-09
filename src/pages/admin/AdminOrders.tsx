@@ -1345,20 +1345,35 @@ function AdminOrderCard({
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm font-medium text-muted-foreground">
-                            {order.order_type === 'delivery' ? 'Delivery Window' : 'Pickup Time'}
+                            {order.order_type === 'delivery' ? 'Delivery Window' : 'Pickup Time Window'}
                           </span>
                         </div>
                         <div className="space-y-1">
-                          {/* Show actual delivery schedule data from order */}
+                          {/* Show actual pickup time window or delivery schedule data from order */}
                           <p className="text-lg font-bold">
                             {format(new Date(order.order_time), 'EEE, MMM d, yyyy')}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {order.order_type === 'delivery' 
-                              ? (order.delivery_time || order.preferred_delivery_time || 'Same day delivery')
-                              : (order.pickup_time || order.delivery_time || order.preferred_delivery_time || 'Ready for pickup')
-                            }
+                            {order.order_type === 'pickup' ? (
+                              // Pickup time window logic
+                              order.pickup_time
+                                ? `Pickup available: ${order.pickup_time}`
+                                : order.delivery_time
+                                  ? `Pickup window: ${order.delivery_time}`
+                                  : order.preferred_delivery_time
+                                    ? `Preferred time: ${order.preferred_delivery_time}`
+                                    : 'Same day pickup available'
+                            ) : (
+                              // Delivery time window logic
+                              order.delivery_time || order.preferred_delivery_time || 'Same day delivery'
+                            )}
                           </p>
+                          {/* Additional pickup instructions if available */}
+                          {order.order_type === 'pickup' && order.pickup_point_id && (
+                            <p className="text-xs text-blue-600 font-medium">
+                              Pickup location assigned - Check pickup point details
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -50,31 +50,55 @@ export const uploadProductImage = async (imageFile: File): Promise<string> => {
 
       // Add timeout to prevent hanging requests
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Upload timeout - please try again')), 30000)
+        setTimeout(() => reject(new Error('Upload timeout - please try again')), 45000)
       );
 
-      const { data, error } = await Promise.race([uploadPromise, timeoutPromise]) as any;
+      const result = await Promise.race([uploadPromise, timeoutPromise]) as any;
+      const { data, error } = result;
 
+      // Check for successful response
+      if (!error && data && data.success) {
+        console.log('Product image uploaded successfully:', data.data.url);
+        return data.data.url;
+      }
+
+      // Handle error response
       if (error) {
         console.error(`Upload function error (attempt ${attempt}):`, error);
         
         // Check for specific error types that shouldn't be retried
         if (error.message?.includes('Unauthorized') || 
             error.message?.includes('Invalid file type') ||
-            error.message?.includes('File size exceeds')) {
+            error.message?.includes('File size exceeds') ||
+            error.message?.includes('Admin access required')) {
           throw new Error(error.message || 'Upload failed');
         }
         
-        // For rate limiting and network errors, set up for retry
+        // Handle rate limiting with longer delays
+        if (error.message?.includes('Rate limit exceeded') || 
+            error.message?.includes('Maximum 10 uploads per hour')) {
+          lastError = new Error('Upload rate limit exceeded. Please wait an hour and try again.');
+          
+          if (attempt === maxRetries) {
+            throw lastError;
+          }
+          
+          // Very long delay for rate limiting (5 minutes, 10 minutes, 15 minutes)
+          const delay = attempt * 5 * 60 * 1000;
+          console.log(`Rate limited, retrying upload in ${delay/1000/60} minutes...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
         lastError = new Error(error.message || 'Upload failed');
         
         if (attempt === maxRetries) {
           throw lastError;
         }
         
-        // Exponential backoff for retries
-        const delay = Math.pow(2, attempt) * 1000;
-        console.log(`Retrying upload in ${delay}ms...`);
+        // Standard exponential backoff for other errors
+        const delay = Math.pow(2, attempt) * 2000;
+        console.log(`Retrying upload in ${delay/1000}s...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -90,17 +114,37 @@ export const uploadProductImage = async (imageFile: File): Promise<string> => {
         }
         
         // Retry for server errors
-        const delay = Math.pow(2, attempt) * 1000;
+        const delay = Math.pow(2, attempt) * 2000;
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
-
-      console.log('Product image uploaded successfully:', data.data.url);
-      return data.data.url;
       
     } catch (error: any) {
       console.error(`Upload attempt ${attempt} failed:`, error);
       lastError = error;
+      
+      // Handle FunctionsHttpError (429 rate limiting)
+      if (error.name === 'FunctionsHttpError' || 
+          error.message?.includes('Edge Function returned a non-2xx status code')) {
+        
+        // Try to extract more details from the error
+        console.log('FunctionsHttpError details:', {
+          name: error.name,
+          message: error.message,
+          context: error.context,
+          stack: error.stack?.split('\n').slice(0, 3)
+        });
+        
+        if (attempt === maxRetries) {
+          throw new Error('Upload service temporarily unavailable. Please wait a few minutes and try again.');
+        }
+        
+        // Long delay for any edge function errors (30s, 60s, 120s)
+        const delay = Math.pow(2, attempt + 4) * 1000;
+        console.log(`Edge function error, waiting ${delay/1000}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
       
       // Don't retry for client-side errors
       if (error.message?.includes('timeout') || 
@@ -114,7 +158,7 @@ export const uploadProductImage = async (imageFile: File): Promise<string> => {
       }
       
       // Wait before retry
-      const delay = Math.pow(2, attempt) * 1000;
+      const delay = Math.pow(2, attempt) * 2000;
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }

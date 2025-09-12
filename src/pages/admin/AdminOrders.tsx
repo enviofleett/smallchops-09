@@ -1155,15 +1155,116 @@ function AdminOrderCard({
             {/* Customer Delivery/Pickup Schedule Requirements */}
             <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4 border border-primary/20">
               <div className="flex items-center gap-2 mb-4">
-                {order.order_type === 'delivery' ? (
-                  <Truck className="w-5 h-5 text-primary" />
-                ) : (
-                  <Package className="w-5 h-5 text-primary" />
-                )}
-                <h4 className="font-semibold text-base">
-                  Customer {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Requirements
-                </h4>
+                <Calendar className="w-5 h-5 text-primary" />
+                <h4 className="font-semibold text-base">Delivery Schedule</h4>
               </div>
+              
+              {deliverySchedule ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Fulfillment Channel */}
+                  <div className="flex items-center gap-2">
+                    {order.order_type === 'delivery' ? (
+                      <Truck className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      <Package className="w-4 h-4 text-blue-600" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Fulfillment Channel</p>
+                      <p className="text-sm text-blue-800 font-semibold">
+                        {order.order_type === 'delivery' ? 'Home Delivery' : 'Customer Pickup'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Order Status */}
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Order Status</p>
+                      <p className="text-sm text-green-800 font-semibold capitalize">
+                        {order.status}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Delivery/Pickup Date */}
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">
+                        {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Date
+                      </p>
+                      <p className="text-sm text-blue-800 font-semibold">
+                        {format(new Date(deliverySchedule.delivery_date), 'dd/MM/yyyy')}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMM d, yyyy')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Time Window */}
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">
+                        {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Time Window
+                      </p>
+                      <p className="text-sm text-blue-800 font-semibold">
+                        {(() => {
+                          const startTime = format(new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`), 'h:mm a');
+                          const endTime = format(new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_end}`), 'h:mm a');
+                          return `${startTime} – ${endTime}`;
+                        })()}
+                      </p>
+                      <p className="text-xs text-blue-600">
+                        {(() => {
+                          const start = new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_start}`);
+                          const end = new Date(`${deliverySchedule.delivery_date}T${deliverySchedule.delivery_time_end}`);
+                          const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                          return `${hours}-hour window`;
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Flexibility Status */}
+                  {deliverySchedule.is_flexible && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Flexibility</p>
+                        <p className="text-sm text-green-700 font-semibold">Flexible timing accepted</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Special Instructions */}
+                  {deliverySchedule.special_instructions && (
+                    <div className="flex items-start gap-2 md:col-span-2">
+                      <MessageSquare className="w-4 h-4 text-orange-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Special Instructions</p>
+                        <p className="text-sm text-orange-700 font-medium">
+                          {deliverySchedule.special_instructions}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No delivery schedule information available</p>
+                </div>
+              )}
+
+              {/* Schedule Request Info */}
+              {deliverySchedule && (
+                <div className="text-xs text-muted-foreground border-t pt-3 mt-4">
+                  Scheduled on {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                </div>
+              )}
+            </div>
               
               {deliverySchedule ? (
                 <div className="space-y-4">

@@ -25,49 +25,27 @@ export function DaysSelector({
   onDaysChange,
   disabled = false,
 }: DaysSelectorProps) {
-  // PRODUCTION: Enhanced day toggle with validation
-  const handleDayToggle = React.useCallback((day: string, checked: boolean) => {
-    try {
-      if (disabled) return;
-      
-      if (checked) {
-        // Prevent duplicates
-        if (!selectedDays.includes(day)) {
-          onDaysChange([...selectedDays, day]);
-        }
-      } else {
-        onDaysChange(selectedDays.filter((d) => d !== day));
-      }
-    } catch (error) {
-      console.error('Error toggling day selection:', error);
-    }
-  }, [selectedDays, onDaysChange, disabled]);
-
-  // PRODUCTION: Enhanced select all with proper state management
-  const handleSelectAll = React.useCallback(() => {
-    try {
-      if (disabled) return;
-      
-      if (selectedDays.length === DAYS_OF_WEEK.length) {
-        onDaysChange([]);
-      } else {
-        onDaysChange(DAYS_OF_WEEK.map((day) => day.value));
-      }
-    } catch (error) {
-      console.error('Error in select all operation:', error);
-    }
-  }, [selectedDays.length, onDaysChange, disabled]);
-
-  // PRODUCTION: Keyboard navigation support
-  const handleKeyDown = React.useCallback((event: React.KeyboardEvent, day: string) => {
+  const handleDayToggle = (day: string, checked: boolean) => {
     if (disabled) return;
     
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      const isSelected = selectedDays.includes(day);
-      handleDayToggle(day, !isSelected);
+    if (checked) {
+      if (!selectedDays.includes(day)) {
+        onDaysChange([...selectedDays, day]);
+      }
+    } else {
+      onDaysChange(selectedDays.filter((d) => d !== day));
     }
-  }, [selectedDays, handleDayToggle, disabled]);
+  };
+
+  const handleSelectAll = () => {
+    if (disabled) return;
+    
+    if (selectedDays.length === DAYS_OF_WEEK.length) {
+      onDaysChange([]);
+    } else {
+      onDaysChange(DAYS_OF_WEEK.map((day) => day.value));
+    }
+  };
 
   const allSelected = selectedDays.length === DAYS_OF_WEEK.length;
   const noneSelected = selectedDays.length === 0;
@@ -89,11 +67,6 @@ export function DaysSelector({
         </p>
       </CardHeader>
       <CardContent className="space-y-3 md:space-y-4 p-3 md:p-6">
-        {/* PRODUCTION: Accessibility enhancement */}
-        <div id="days-selection-label" className="sr-only">
-          Select applicable days for this promotion
-        </div>
-        
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Checkbox
@@ -114,19 +87,14 @@ export function DaysSelector({
           </div>
         </div>
 
-        {/* PRODUCTION: Enhanced day selection grid with proper accessibility */}
-        <div 
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 md:gap-3"
-          role="group"
-          aria-labelledby="days-selection-label"
-        >
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 md:gap-3">
           {DAYS_OF_WEEK.map((day) => {
             const isSelected = selectedDays.includes(day.value);
             return (
               <div
                 key={day.value}
                 className={`
-                  flex items-center gap-2 p-2 md:p-3 rounded-lg border transition-colors focus-within:ring-2 focus-within:ring-primary/50
+                  flex items-center gap-2 p-2 md:p-3 rounded-lg border transition-colors
                   ${
                     isSelected
                       ? "bg-primary/5 border-primary/30"
@@ -134,13 +102,7 @@ export function DaysSelector({
                   }
                   ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/70"}
                 `}
-                role="button"
-                tabIndex={disabled ? -1 : 0}
-                aria-pressed={isSelected}
-                aria-label={`${day.label} - ${isSelected ? 'selected' : 'not selected'}`}
-                onKeyDown={(e) => handleKeyDown(e, day.value)}
-                onClick={(e) => {
-                  e.preventDefault();
+                onClick={() => {
                   if (!disabled) {
                     handleDayToggle(day.value, !isSelected);
                   }
@@ -155,8 +117,6 @@ export function DaysSelector({
                     }
                   }}
                   disabled={disabled}
-                  tabIndex={-1} // Remove from tab order, parent handles focus
-                  aria-hidden="true" // Hidden from screen readers, parent provides context
                 />
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{day.short}</span>

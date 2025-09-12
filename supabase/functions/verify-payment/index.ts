@@ -1,103 +1,67 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
-// Enhanced CORS headers for production reliability
-function getCorsHeaders(origin?: string): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
-    'Access-Control-Allow-Credentials': 'false',
-    'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin',
-    'Content-Type': 'application/json'
-  };
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface VerifyPaymentRequest {
   reference: string;
   idempotency_key?: string;
 }
 
-serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-
+serve(async (req: Request) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 200,
-      headers: corsHeaders 
-    });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'Method not allowed - POST required' 
-    }), { 
-      status: 405, 
-      headers: corsHeaders 
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+
+    if (!paystackSecretKey) {
+      throw new Error('Paystack secret key not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { reference, idempotency_key }: VerifyPaymentRequest = await req.json();
 
     if (!reference) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Payment reference is required' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: 'Payment reference is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
     }
 
-    console.log('🔍 Verifying payment:', { reference, idempotency_key });
+    console.log(`🔍 Verifying payment for reference: ${reference}`);
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get Paystack configuration
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    if (!paystackSecretKey) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Payment service not configured' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Check if already processed using idempotency
+    // Check if payment has already been verified (idempotency check)
     if (idempotency_key) {
-      const { data: existingOrder } = await supabase
-        .from('orders')
-        .select('id, order_number, status, total_amount, customer_email')
-        .eq('idempotency_key', idempotency_key)
+      const { data: existingTransaction } = await supabase
+        .from('payment_transactions')
+        .select('*')
+        .eq('reference', reference)
+        .eq('status', 'completed')
         .single();
 
-      if (existingOrder && existingOrder.status === 'confirmed') {
-        console.log('✅ Payment already verified via idempotency:', idempotency_key);
-        return new Response(JSON.stringify({
-          success: true,
-          status: 'success',
-          amount: existingOrder.total_amount,
-          order_id: existingOrder.id,
-          order_number: existingOrder.order_number,
-          customer_email: existingOrder.customer_email,
-          message: 'Payment already verified'
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+      if (existingTransaction) {
+        console.log(`✅ Payment ${reference} already verified and completed`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: existingTransaction,
+            message: 'Payment already verified',
+            already_processed: true
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
       }
     }
 
-    // Verify with Paystack API
+    // Verify payment with Paystack
     const paystackResponse = await fetch(
       `https://api.paystack.co/transaction/verify/${reference}`,
       {
@@ -110,231 +74,92 @@ serve(async (req) => {
     );
 
     if (!paystackResponse.ok) {
-      console.error('❌ Paystack verification failed:', paystackResponse.statusText);
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Payment verification failed' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const errorText = await paystackResponse.text();
+      console.error(`❌ Paystack API error:`, errorText);
+      throw new Error(`Paystack verification failed: ${paystackResponse.status}`);
     }
 
-    const paystackData = await paystackResponse.json();
-    
-    console.log('📨 Paystack verification response:', {
-      status: paystackData.status,
-      paymentStatus: paystackData.data?.status,
-      amount: paystackData.data?.amount,
-      reference: paystackData.data?.reference
-    });
+    const verificationData = await paystackResponse.json();
 
-    if (!paystackData.status || paystackData.data?.status !== 'success') {
-      return new Response(JSON.stringify({
-        success: false,
-        status: paystackData.data?.status || 'failed',
-        error: 'Payment not successful'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Process successful payment with updated RPC
-    const amountNaira = paystackData.data.amount / 100; // Convert kobo to naira
-    
-    try {
-      const { data: processResult, error: processError } = await supabase
-        .rpc('verify_and_update_payment_status', {
-          payment_ref: reference,
-          new_status: 'confirmed',
-          payment_amount: amountNaira,
-          payment_gateway_response: paystackData.data
-        });
-
-      if (processError) {
-        console.error('❌ Payment verification RPC failed:', processError);
-        return new Response(JSON.stringify({
+    if (!verificationData.status) {
+      console.error(`❌ Payment verification failed:`, verificationData.message);
+      return new Response(
+        JSON.stringify({
           success: false,
-          error: processError.message || 'Payment processing failed'
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+          error: verificationData.message || 'Payment verification failed'
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
-      // Handle RPC result (can be object or array)
-      let result;
-      if (Array.isArray(processResult)) {
-        result = processResult[0];
+    const paymentData = verificationData.data;
+
+    // Update or create payment transaction record
+    const transactionData = {
+      reference: paymentData.reference,
+      amount: paymentData.amount / 100, // Convert from kobo to naira
+      currency: paymentData.currency,
+      status: paymentData.status === 'success' ? 'completed' : 'failed',
+      gateway_response: paymentData.gateway_response,
+      paid_at: paymentData.paid_at,
+      channel: paymentData.channel,
+      fees: paymentData.fees / 100,
+      customer_email: paymentData.customer.email,
+      authorization_code: paymentData.authorization?.authorization_code,
+      last4: paymentData.authorization?.last4,
+      card_type: paymentData.authorization?.card_type,
+      bank: paymentData.authorization?.bank,
+      metadata: paymentData.metadata,
+      updated_at: new Date().toISOString()
+    };
+
+    // Upsert transaction record
+    const { data: transaction, error: transactionError } = await supabase
+      .from('payment_transactions')
+      .upsert(transactionData, { onConflict: 'reference', ignoreDuplicates: false })
+      .select()
+      .single();
+
+    if (transactionError) {
+      console.error('❌ Database transaction error:', transactionError);
+      throw new Error(`Failed to update transaction: ${transactionError.message}`);
+    }
+
+    // If payment is successful, update related order
+    if (paymentData.status === 'success') {
+      console.log(`✅ Payment successful, updating order for reference: ${reference}`);
+      
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          payment_status: 'paid',
+          payment_reference: reference,
+          updated_at: new Date().toISOString()
+        })
+        .eq('payment_reference', reference);
+
+      if (orderError) {
+        console.error('❌ Order update error:', orderError);
       } else {
-        result = processResult;
+        console.log(`✅ Order updated successfully for reference: ${reference}`);
       }
-      
-      if (!result) {
-        throw new Error('No result from payment processing');
-      }
-
-      // Check if RPC returned error
-      if (result.success === false) {
-        console.error('❌ Payment processing failed:', result.error);
-        return new Response(JSON.stringify({
-          success: false,
-          error: result.error || 'Payment processing failed'
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      console.log('✅ Payment verified and processed successfully:', {
-        reference,
-        orderId: result.order_id,
-        orderNumber: result.order_number,
-        status: result.status,
-        payment_status: result.payment_status,
-        amount: amountNaira,
-        customer_email: paystackData.data.customer?.email
-      });
-
-      // ENHANCED: Use idempotent email confirmation
-      try {
-        console.log('📧 Creating payment confirmation event via RPC...');
-        const { data: emailResult, error: emailError } = await supabase
-          .rpc('upsert_payment_confirmation_event', {
-            p_reference: reference,
-            p_recipient_email: paystackData.data.customer?.email || 'unknown@example.com',
-            p_order_id: result.order_id,
-            p_template_variables: {
-              customerName: paystackData.data.customer?.first_name || 'Customer',
-              orderNumber: result.order_number,
-              amount: amountNaira.toFixed(2),
-              paymentMethod: paystackData.data.channel || 'Online Payment',
-              paidAt: paystackData.data.paid_at
-            }
-          });
-
-        if (emailError) {
-          console.warn('⚠️  Email confirmation RPC failed (non-blocking):', emailError);
-        } else if (emailResult?.existing) {
-          console.log('📧 Email confirmation already exists (idempotent success)');
-        } else {
-          console.log('📧 Email confirmation created successfully');
-        }
-      } catch (emailError) {
-        console.warn('⚠️  Email notification error (non-blocking):', emailError);
-        // Don't fail the payment verification for email issues
-      }
-
-      // ENHANCED: Normalized success response with idempotency handling
-      const successResponse = {
-        success: true,
-        status: 'success',
-        amount: amountNaira,
-        order_id: result.order_id,
-        order_number: result.order_number,
-        customer: paystackData.data.customer,
-        channel: paystackData.data.channel,
-        paid_at: paystackData.data.paid_at,
-        // Enhanced data wrapper for consistency
-        data: {
-          order_id: result.order_id,
-          order_number: result.order_number,
-          amount: amountNaira,
-          status: 'success',
-          customer: paystackData.data.customer,
-          reference: reference,
-          verified_at: new Date().toISOString()
-        }
-      };
-
-      console.log('✅ Returning success response:', { 
-        reference, 
-        order_id: result.order_id,
-        amount: amountNaira 
-      });
-
-      return new Response(JSON.stringify(successResponse), {
-        status: 200,
-        headers: corsHeaders
-      });
-
-    } catch (error) {
-      console.error('❌ Critical verification error:', error);
-      
-      // ENHANCED: Check if this is a duplicate payment scenario
-      const errorMessage = error.message || '';
-      const isDuplicatePayment = errorMessage.includes('duplicate key') || 
-                                errorMessage.includes('already exists') ||
-                                errorMessage.includes('unique constraint');
-      
-      if (isDuplicatePayment) {
-        console.log('🔄 Detected duplicate payment scenario - treating as success');
-        
-        // Return success for duplicate payments (idempotent behavior)
-        const duplicateSuccessResponse = {
-          success: true,
-          status: 'success',
-          amount: amountNaira,
-          order_id: result?.order_id,
-          order_number: result?.order_number,
-          customer: paystackData.data.customer,
-          channel: paystackData.data.channel,
-          paid_at: paystackData.data.paid_at,
-          data: {
-            order_id: result?.order_id,
-            order_number: result?.order_number,
-            amount: amountNaira,
-            status: 'success',
-            customer: paystackData.data.customer,
-            reference: reference,
-            duplicate_handled: true,
-            verified_at: new Date().toISOString()
-          }
-        };
-
-        return new Response(JSON.stringify(duplicateSuccessResponse), {
-          status: 200,
-          headers: corsHeaders
-        });
-      }
-      
-      // Log critical error
-      try {
-        await supabase.from('audit_logs').insert({
-          action: 'payment_verification_critical_error',
-          category: 'Payment Critical',
-          message: `Critical payment verification error: ${error.message}`,
-          new_values: {
-            reference,
-            amount_naira: amountNaira,
-            error: error.message,
-            paystack_data: paystackData.data,
-            is_duplicate: isDuplicatePayment
-          }
-        });
-      } catch (logError) {
-        console.error('Failed to log critical error:', logError);
-      }
-
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Critical payment processing error'
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
     }
 
-  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: { ...transaction, paystack_data: paymentData },
+        message: 'Payment verified successfully'
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+    );
+
+  } catch (error: any) {
     console.error('❌ Payment verification error:', error);
     
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || 'Payment verification failed'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: error.message || 'Payment verification failed' }),
+      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+    );
   }
 });

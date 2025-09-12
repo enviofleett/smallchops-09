@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Settings, Building2 } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 export const PublicFooter = () => {
@@ -22,7 +22,10 @@ const PublicFooterContent = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {/* Address */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-white">Address</h3>
+            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              Address
+            </h3>
             <div className="space-y-2 text-gray-300">
               <div className="font-medium">Headquarters:</div>
               <div>2B Close Off 11 Crescent Kado Estate, Abuja</div>
@@ -33,7 +36,10 @@ const PublicFooterContent = () => {
 
           {/* Services */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-white">Services</h3>
+            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              Services
+            </h3>
             <div className="space-y-2">
               <Link to="/" className="block text-gray-300 hover:text-white transition-colors">Catering services</Link>
             </div>
@@ -41,7 +47,10 @@ const PublicFooterContent = () => {
 
           {/* Company */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-white">Company</h3>
+            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Company
+            </h3>
             <div className="space-y-2">
               <Link to="/about" className="block text-gray-300 hover:text-white transition-colors">About us</Link>
               
@@ -51,7 +60,10 @@ const PublicFooterContent = () => {
 
           {/* Contact Us */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-white">Contact Us</h3>
+            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+              <Phone className="w-5 h-5" />
+              Contact Us
+            </h3>
             <div className="space-y-2 text-gray-300">
               <div>+234 807 3011 100</div>
               

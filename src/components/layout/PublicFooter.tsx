@@ -89,12 +89,11 @@ const PublicFooterContent = () => {
         {/* Bottom Section */}
         <div className="border-t border-gray-800 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-            {/* Logo and Tagline */}
-            <div className="flex items-center space-x-3">
+            {/* Logo */}
+            <div className="flex items-center">
               <img src={logoUrl} alt={`${businessName} Logo`} className="h-8 w-auto" onError={e => {
               e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
             }} />
-              <span className="text-gray-400 text-sm">{settings?.tagline || 'SMALL CHOPS'}</span>
             </div>
 
             {/* Social Media Icons */}

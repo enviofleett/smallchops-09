@@ -66,7 +66,6 @@ const PublicFooterContent = () => {
             </h3>
             <div className="space-y-2 text-gray-300">
               <div className="flex items-center gap-2">
-                <span>+234 807 3011 100</span>
                 <a 
                   href="https://wa.me/2348073011100" 
                   target="_blank" 
@@ -76,6 +75,7 @@ const PublicFooterContent = () => {
                 >
                   <MessageCircle className="w-4 h-4" />
                 </a>
+                <span>+234 807 3011 100</span>
               </div>
               
               <div>support@startersmallchops.com</div>

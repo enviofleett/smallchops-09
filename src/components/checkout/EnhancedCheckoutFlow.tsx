@@ -853,7 +853,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           <CardContent className="space-y-3">
             <div>
               <Label htmlFor="customer_name" className="flex items-center gap-2">
-                Full Name *
+                Full Name <span className="text-red-500">*</span>
                 {isAuthenticated && formData.customer_name && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
@@ -867,7 +867,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 className={cn(
                   "h-10",
                   isAuthenticated && formData.customer_name && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_name && "animate-pulse"
+                  isAuthenticated && !formData.customer_name && "animate-pulse",
+                  !formData.customer_name?.trim() && "border-red-200 focus:border-red-300"
                 )}
                 readOnly={isAuthenticated && !!formData.customer_name}
                 disabled={isAuthenticated && !!formData.customer_name}
@@ -877,10 +878,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   Loading your profile information...
                 </p>
               )}
+              {!isAuthenticated && !formData.customer_name?.trim() && (
+                <p className="text-xs text-red-500 mt-1">
+                  📝 Please enter your full name so we know who to deliver to
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="customer_email" className="flex items-center gap-2">
-                Email *
+                Email <span className="text-red-500">*</span>
                 {isAuthenticated && formData.customer_email && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
@@ -890,12 +896,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 type="email" 
                 value={formData.customer_email} 
                 onChange={e => handleFormChange('customer_email', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your email..." : "Enter your email"} 
+                placeholder={isAuthenticated ? "Loading your email..." : "Enter your email address"} 
                 required 
                 className={cn(
                   "h-10",
                   isAuthenticated && formData.customer_email && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_email && "animate-pulse"
+                  isAuthenticated && !formData.customer_email && "animate-pulse",
+                  (!formData.customer_email?.trim() || (formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email))) && "border-red-200 focus:border-red-300"
                 )}
                 readOnly={isAuthenticated && !!formData.customer_email}
                 disabled={isAuthenticated && !!formData.customer_email}
@@ -905,10 +912,20 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   Loading your email address...
                 </p>
               )}
+              {!isAuthenticated && !formData.customer_email?.trim() && (
+                <p className="text-xs text-red-500 mt-1">
+                  📧 We need your email to send order updates and receipts
+                </p>
+              )}
+              {!isAuthenticated && formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email) && (
+                <p className="text-xs text-red-500 mt-1">
+                  ⚠️ Please enter a valid email address (like: yourname@example.com)
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="customer_phone" className="flex items-center gap-2">
-                Phone Number
+                Phone Number <span className="text-red-500">*</span>
                 {isAuthenticated && formData.customer_phone && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
@@ -919,17 +936,29 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 value={formData.customer_phone} 
                 onChange={e => handleFormChange('customer_phone', e.target.value)} 
                 placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
+                required
                 className={cn(
                   "h-10",
                   isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_phone && "animate-pulse"
+                  isAuthenticated && !formData.customer_phone && "animate-pulse",
+                  (!formData.customer_phone?.trim() || (formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10)) && "border-red-200 focus:border-red-300"
                 )}
                 readOnly={isAuthenticated && !!formData.customer_phone}
                 disabled={isAuthenticated && !!formData.customer_phone}
               />
               {isAuthenticated && !formData.customer_phone && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  You can add a phone number to your profile for better service.
+                <p className="text-xs text-amber-600 mt-1">
+                  Loading your phone number...
+                </p>
+              )}
+              {!isAuthenticated && !formData.customer_phone?.trim() && (
+                <p className="text-xs text-red-500 mt-1">
+                  📱 We need your phone number to coordinate delivery and contact you about your order
+                </p>
+              )}
+              {!isAuthenticated && formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10 && (
+                <p className="text-xs text-red-500 mt-1">
+                  ⚠️ Please enter a complete phone number (at least 10 digits)
                 </p>
               )}
             </div>
@@ -945,7 +974,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              When do you need your order? *
+              When do you need your order? <span className="text-red-500">*</span>
               {formData.delivery_date && formData.delivery_time_slot?.start_time ? (
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Scheduled</span>
               ) : (
@@ -1053,10 +1082,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Truck className="w-4 h-4" />
-                Delivery Zone
+                Delivery Zone <span className="text-red-500">*</span>
               </CardTitle>
-              <CardDescription className="text-sm">
-                Select your delivery zone to calculate delivery fees
+              <CardDescription className={cn(
+                "text-sm transition-colors duration-200",
+                !deliveryZone && "text-red-500"
+              )}>
+                {!deliveryZone ? 
+                  "⚠️ Please select your delivery zone to calculate delivery fees and proceed" :
+                  "Select your delivery zone to calculate delivery fees"
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1067,6 +1102,21 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             };
             setDeliveryZone(zone);
           }} orderSubtotal={subtotal} />
+              
+              {/* Validation feedback for delivery zone */}
+              {formData.fulfillment_type === 'delivery' && !deliveryZone && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-red-700">
+                      <p className="font-medium">Delivery Zone Required</p>
+                      <p className="text-red-600 mt-1">
+                        Please select your delivery area so we can calculate shipping costs and delivery time.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>}
 
@@ -1080,8 +1130,25 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label htmlFor="address_line_1">Street Address *</Label>
-                <Input id="address_line_1" value={formData.delivery_address.address_line_1} onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} placeholder="Enter street address" required className="h-10" />
+                <Label htmlFor="address_line_1" className="flex items-center gap-1">
+                  Street Address <span className="text-red-500">*</span>
+                </Label>
+                <Input 
+                  id="address_line_1" 
+                  value={formData.delivery_address.address_line_1} 
+                  onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} 
+                  placeholder="Enter street address" 
+                  required 
+                  className={cn(
+                    "h-10",
+                    !formData.delivery_address.address_line_1?.trim() && "border-red-200 focus:border-red-300"
+                  )} 
+                />
+                {formData.fulfillment_type === 'delivery' && !formData.delivery_address.address_line_1?.trim() && (
+                  <p className="text-xs text-red-500 mt-1">
+                    📍 Please provide your complete delivery address including street name and number
+                  </p>
+                )}
               </div>
               <div>
                 <Label htmlFor="address_line_2">Apartment, suite, etc. (optional)</Label>

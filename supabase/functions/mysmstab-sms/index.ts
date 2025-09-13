@@ -101,7 +101,7 @@ serve(async (req) => {
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: balanceResponse.ok ? 200 : 400,
+          status: 200, // Always return 200, success/failure in response body
         }
       )
     }
@@ -192,11 +192,12 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message,
+        message: error.message
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 200, // Always return 200, error details in response body
       },
     )
   }

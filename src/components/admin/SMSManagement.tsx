@@ -210,16 +210,16 @@ export const SMSManagement = () => {
 
       if (error) throw error
 
-      if (data.success) {
+      if (data?.success) {
         toast({
           title: "Success",
-          description: "Test SMS sent successfully"
+          description: data.message || "Test SMS sent successfully"
         })
         setTestPhone('')
         setTestMessage('This is a test SMS from your system.')
         fetchSMSData()
       } else {
-        throw new Error(data.error || 'Unknown error')
+        throw new Error(data?.message || data?.error || 'SMS sending failed')
       }
     } catch (error) {
       console.error('Error sending test SMS:', error)
@@ -241,18 +241,14 @@ export const SMSManagement = () => {
 
       if (error) throw error
 
-      if (data.success) {
-        setStats(prev => ({
-          ...prev,
-          walletBalance: data.data?.balance || prev.walletBalance
-        }))
-        
+      if (data?.success) {
         toast({
-          title: "Success",
-          description: `Balance: ₦${data.data?.balance?.toLocaleString() || 0} ${data.data?.currency || 'NGN'}`
+          title: "Balance Check Complete",
+          description: `Current balance: ${data.data?.balance || 'N/A'} ${data.data?.currency || 'NGN'}`
         })
+        fetchSMSData() // Refresh data to show updated balance
       } else {
-        throw new Error(data.error || 'Unknown error')
+        throw new Error(data?.message || data?.error || 'Balance check failed')
       }
     } catch (error) {
       console.error('Error checking balance:', error)

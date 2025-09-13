@@ -46,7 +46,7 @@ export const HeroCarousel = ({
   // Only show uploaded images - no hardcoded fallbacks
   const imagesToShow = heroImages.length > 0 ? heroImages : [];
 
-  // Auto-rotate images every 20 seconds with fade effect
+  // Auto-rotate images every 20 seconds with smooth fade effect
   useEffect(() => {
     if (imagesToShow.length <= 1) return;
 
@@ -59,8 +59,11 @@ export const HeroCarousel = ({
         setCurrentIndex((prevIndex) => 
           (prevIndex + 1) % imagesToShow.length
         );
-        setIsVisible(true);
-      }, 500); // 500ms fade out duration
+        // Small delay before fade in to ensure image change is processed
+        setTimeout(() => {
+          setIsVisible(true);
+        }, 50);
+      }, 600); // Extended fade out duration for smoother transition
     }, 20000); // 20 seconds
 
     return () => clearInterval(interval);
@@ -68,8 +71,11 @@ export const HeroCarousel = ({
 
   // Reset visibility when component mounts or images change
   useEffect(() => {
-    setIsVisible(true);
     setCurrentIndex(0);
+    // Ensure fade in after image list changes
+    setTimeout(() => {
+      setIsVisible(true);
+    }, 100);
   }, [imagesToShow]);
 
   // Don't render anything if no uploaded images available

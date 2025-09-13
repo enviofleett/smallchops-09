@@ -119,11 +119,11 @@ support@startersmallchops.com</p>
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Business Hours</h3>
-                        <div className="text-gray-600 space-y-1">
+                        <div className="text-gray-600">
                           {settings?.working_hours ? <p>{settings.working_hours}</p> : (
-                            <div className="space-y-1">
-                              <p className="font-medium text-gray-700 mb-2">We are open on these days and times:</p>
-                              <div className="text-sm text-gray-600 space-y-1">
+                            <div className="space-y-2">
+                              <p className="text-gray-600 mb-3">We are open on these days and times:</p>
+                              <div className="text-gray-600 space-y-1">
                                 <div>Monday: 8am - 6pm</div>
                                 <div>Tuesday: 8am - 6pm</div>
                                 <div>Wednesday: 8am - 6pm</div>

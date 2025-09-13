@@ -79,7 +79,7 @@ const PublicFooterContent = () => {
               </div>
               
               <div className="flex items-center gap-2">
-                <Mail className="w-5 h-5" />
+                <Mail className="w-7 h-7" />
                 <span>support@startersmallchops.com</span>
               </div>
             </div>

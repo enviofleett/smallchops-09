@@ -45,7 +45,7 @@ const Index = withLazyLoading(() => import("./pages/Index"), undefined, true, 80
 const ProductDetail = withLazyLoading(() => import("./pages/ProductDetail"), undefined, true, 10000);
 const CategoryProducts = withLazyLoading(() => import("./pages/CategoryProducts"), undefined, true, 10000);
 const Promotions = withLazyLoading(() => import("./pages/Promotions"), undefined, false, 10000);
-const BookingManagement = withLazyLoading(() => import("./pages/BookingManagement"), undefined, false, 10000);
+const Bookings = withLazyLoading(() => import("./pages/Bookings"), undefined, false, 10000);
 const DeliveryPickup = withLazyLoading(() => import("./pages/DeliveryPickup"), undefined, false, 10000);
 const AuditLogs = withLazyLoading(() => import("./pages/AuditLogs"), undefined, false, 10000);
 const Settings = withLazyLoading(() => import("./pages/Settings"), undefined, false, 12000); // Larger component
@@ -278,7 +278,7 @@ const App = () => {
                 <Route path="/customers" element={<ErrorBoundaryWrapper context="Customers"><Customers /></ErrorBoundaryWrapper>} />
                 <Route path="/reports" element={<ErrorBoundaryWrapper context="Reports"><Reports /></ErrorBoundaryWrapper>} />
                 <Route path="/promotions" element={<ErrorBoundaryWrapper context="Promotions"><Promotions /></ErrorBoundaryWrapper>} />
-                <Route path="/bookings" element={<ErrorBoundaryWrapper context="Catering Bookings"><BookingManagement /></ErrorBoundaryWrapper>} />
+                <Route path="/bookings" element={<ErrorBoundaryWrapper context="Catering Bookings"><Bookings /></ErrorBoundaryWrapper>} />
                 <Route path="/audit-logs" element={<ErrorBoundaryWrapper context="Audit Logs"><AuditLogs /></ErrorBoundaryWrapper>} />
                 <Route path="/settings" element={<ErrorBoundaryWrapper context="Settings"><Settings /></ErrorBoundaryWrapper>} />
                 <Route path="/payment-settings" element={<ErrorBoundaryWrapper context="Payment Settings"><PaymentSettings /></ErrorBoundaryWrapper>} />

@@ -78,7 +78,10 @@ const PublicFooterContent = () => {
                 <span>+234 807 3011 100</span>
               </div>
               
-              <div>support@startersmallchops.com</div>
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                <span>support@startersmallchops.com</span>
+              </div>
             </div>
           </div>
         </div>

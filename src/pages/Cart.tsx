@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { CartItemRow } from '@/components/cart/CartItemRow';
 import { CartSummary } from '@/components/cart/CartSummary';
-import { CheckoutButton } from '@/components/ui/checkout-button';
+
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
@@ -98,14 +98,6 @@ export default function Cart() {
         )}
       </div>
 
-      {/* Fixed Bottom Checkout Button - Mobile Only */}
-      {cart.items.length > 0 && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-inset-bottom z-50">
-          <div className="max-w-md mx-auto">
-            <CheckoutButton />
-          </div>
-        </div>
-      )}
 
       {/* Public Footer - Hidden on mobile when cart has items to avoid overlap */}
       <div className={cart.items.length > 0 ? "hidden lg:block" : ""}>

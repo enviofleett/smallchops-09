@@ -12,7 +12,7 @@ import { getCategories } from '@/api/categories';
 import { ProductWithDiscount } from '@/lib/discountCalculations';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
-import { CheckoutButton } from '@/components/ui/checkout-button';
+
 import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
 import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
 
@@ -262,8 +262,6 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
         </Card>
       )}
       
-      {/* Floating Checkout Button */}
-      <CheckoutButton />
       
       {/* MOQ Adjustment Modal */}
       <MOQAdjustmentModal

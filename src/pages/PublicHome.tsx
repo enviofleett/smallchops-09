@@ -22,7 +22,7 @@ import { PerformanceMonitor } from '@/utils/performance';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
-import { CheckoutButton } from '@/components/ui/checkout-button';
+
 import ProductsFilters, { FilterState } from '@/components/products/ProductsFilters';
 
 // Memoized components for better performance
@@ -429,8 +429,6 @@ const PublicHome = () => {
       {/* Footer */}
       <PublicFooter />
       
-      {/* Floating Checkout Button */}
-      <CheckoutButton />
     </div>
     </>;
 };

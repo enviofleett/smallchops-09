@@ -1007,20 +1007,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             handleFormChange('delivery_time_slot', timeSlot);
           }} selectedDate={formData.delivery_date} selectedTimeSlot={formData.delivery_time_slot} showHeader={false} />
             
-            {/* Validation feedback */}
-            {(!formData.delivery_date || !formData.delivery_time_slot?.start_time) && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-amber-700">
-                    <p className="font-medium">Schedule Required</p>
-                    <p className="text-amber-600 mt-1">
-                      {!formData.delivery_date ? "Select a delivery date" : "Choose a time slot"} to proceed with checkout.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 

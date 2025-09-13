@@ -94,6 +94,12 @@ verify_jwt = false
 [functions.smtp-health-check]
 verify_jwt = false
 
+[functions.mysmstab-sms]
+verify_jwt = false
+
+[functions.sms-processor]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

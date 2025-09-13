@@ -100,6 +100,9 @@ verify_jwt = false
 [functions.sms-processor]
 verify_jwt = false
 
+[functions.send-whatsapp-booking]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

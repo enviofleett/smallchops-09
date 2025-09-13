@@ -1011,11 +1011,14 @@ export type Database = {
         Row: {
           additional_details: string | null
           admin_notes: string | null
+          company_name: string | null
           created_at: string
           email: string
           event_date: string
+          event_type: string | null
           full_name: string
           id: string
+          is_company_order: boolean | null
           number_of_guests: number
           phone_number: string
           quote_amount: number | null
@@ -1027,11 +1030,14 @@ export type Database = {
         Insert: {
           additional_details?: string | null
           admin_notes?: string | null
+          company_name?: string | null
           created_at?: string
           email: string
           event_date: string
+          event_type?: string | null
           full_name: string
           id?: string
+          is_company_order?: boolean | null
           number_of_guests: number
           phone_number: string
           quote_amount?: number | null
@@ -1043,11 +1049,14 @@ export type Database = {
         Update: {
           additional_details?: string | null
           admin_notes?: string | null
+          company_name?: string | null
           created_at?: string
           email?: string
           event_date?: string
+          event_type?: string | null
           full_name?: string
           id?: string
+          is_company_order?: boolean | null
           number_of_guests?: number
           phone_number?: string
           quote_amount?: number | null

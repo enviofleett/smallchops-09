@@ -7,6 +7,8 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CalendarIcon, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -23,7 +25,10 @@ const Booking = () => {
     email: '',
     phoneNumber: '',
     numberOfGuests: '',
-    additionalDetails: ''
+    additionalDetails: '',
+    eventType: '',
+    isCompanyOrder: false,
+    companyName: ''
   });
   const [eventDate, setEventDate] = useState<Date>();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,8 +61,13 @@ const Booking = () => {
   const handleSubmitBooking = async () => {
     // Validation
     if (!formData.fullName || !formData.email || !formData.phoneNumber || 
-        !eventDate || !formData.numberOfGuests) {
+        !eventDate || !formData.numberOfGuests || !formData.eventType) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.isCompanyOrder && !formData.companyName) {
+      toast.error('Please enter company name for company orders');
       return;
     }
 
@@ -69,18 +79,35 @@ const Booking = () => {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
+      const bookingData = {
+        full_name: formData.fullName,
+        email: formData.email,
+        phone_number: formData.phoneNumber,
+        event_date: format(eventDate, 'yyyy-MM-dd'),
+        number_of_guests: parseInt(formData.numberOfGuests),
+        additional_details: formData.additionalDetails || null,
+        event_type: formData.eventType,
+        is_company_order: formData.isCompanyOrder,
+        company_name: formData.isCompanyOrder ? formData.companyName : null
+      };
+
+      const { data: booking, error } = await supabase
         .from('catering_bookings')
-        .insert({
-          full_name: formData.fullName,
-          email: formData.email,
-          phone_number: formData.phoneNumber,
-          event_date: format(eventDate, 'yyyy-MM-dd'),
-          number_of_guests: parseInt(formData.numberOfGuests),
-          additional_details: formData.additionalDetails || null
-        });
+        .insert(bookingData)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Send WhatsApp notification
+      try {
+        await supabase.functions.invoke('send-whatsapp-booking', {
+          body: { booking: bookingData }
+        });
+      } catch (whatsappError) {
+        console.error('WhatsApp notification failed:', whatsappError);
+        // Don't fail the main submission if WhatsApp fails
+      }
 
       setIsSubmitted(true);
       toast.success('Catering request submitted successfully!');
@@ -91,7 +118,10 @@ const Booking = () => {
         email: '',
         phoneNumber: '',
         numberOfGuests: '',
-        additionalDetails: ''
+        additionalDetails: '',
+        eventType: '',
+        isCompanyOrder: false,
+        companyName: ''
       });
       setEventDate(undefined);
     } catch (error) {
@@ -154,6 +184,54 @@ const Booking = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Event Type <span className="text-red-500">*</span>
+                </label>
+                <Select value={formData.eventType} onValueChange={(value) => handleInputChange('eventType', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select event type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weddings">Weddings</SelectItem>
+                    <SelectItem value="office_event">Office Event</SelectItem>
+                    <SelectItem value="funerals">Funerals</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="company-order" 
+                    checked={formData.isCompanyOrder}
+                    onCheckedChange={(checked) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        isCompanyOrder: checked === true,
+                        companyName: checked === true ? prev.companyName : ''
+                      }));
+                    }}
+                  />
+                  <label htmlFor="company-order" className="text-sm font-medium">
+                    This is a company order
+                  </label>
+                </div>
+
+                {formData.isCompanyOrder && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Company Name <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      value={formData.companyName}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
+                      placeholder="Enter company name"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">

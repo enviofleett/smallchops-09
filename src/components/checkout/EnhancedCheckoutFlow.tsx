@@ -853,7 +853,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           <CardContent className="space-y-3">
             <div>
               <Label htmlFor="customer_name" className="flex items-center gap-2">
-                Full Name *
+                Full Name <span className="text-destructive">*</span>
                 {isAuthenticated && formData.customer_name && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
@@ -867,7 +867,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 className={cn(
                   "h-10",
                   isAuthenticated && formData.customer_name && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_name && "animate-pulse"
+                  isAuthenticated && !formData.customer_name && "animate-pulse",
+                  // Validation styling
+                  !isAuthenticated && !formData.customer_name?.trim() && "border-destructive/50",
+                  !isAuthenticated && formData.customer_name?.trim() && "border-green-500"
                 )}
                 readOnly={isAuthenticated && !!formData.customer_name}
                 disabled={isAuthenticated && !!formData.customer_name}
@@ -877,10 +880,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   Loading your profile information...
                 </p>
               )}
+              {!isAuthenticated && !formData.customer_name?.trim() && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>📝</span> Please enter your full name so we know who to deliver to
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="customer_email" className="flex items-center gap-2">
-                Email *
+                Email <span className="text-destructive">*</span>
                 {isAuthenticated && formData.customer_email && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
@@ -895,7 +903,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 className={cn(
                   "h-10",
                   isAuthenticated && formData.customer_email && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_email && "animate-pulse"
+                  isAuthenticated && !formData.customer_email && "animate-pulse",
+                  // Validation styling
+                  !isAuthenticated && !formData.customer_email?.trim() && "border-destructive/50",
+                  !isAuthenticated && formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email) && "border-destructive/50",
+                  !isAuthenticated && formData.customer_email?.trim() && /\S+@\S+\.\S+/.test(formData.customer_email) && "border-green-500"
                 )}
                 readOnly={isAuthenticated && !!formData.customer_email}
                 disabled={isAuthenticated && !!formData.customer_email}
@@ -905,10 +917,20 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   Loading your email address...
                 </p>
               )}
+              {!isAuthenticated && !formData.customer_email?.trim() && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>📧</span> We need your email address to send you order updates and receipts
+                </p>
+              )}
+              {!isAuthenticated && formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email) && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>⚠️</span> Please enter a valid email address (like: yourname@example.com)
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="customer_phone" className="flex items-center gap-2">
-                Phone Number
+                Phone Number <span className="text-destructive">*</span>
                 {isAuthenticated && formData.customer_phone && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
@@ -919,10 +941,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 value={formData.customer_phone} 
                 onChange={e => handleFormChange('customer_phone', e.target.value)} 
                 placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
+                required
                 className={cn(
                   "h-10",
                   isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_phone && "animate-pulse"
+                  isAuthenticated && !formData.customer_phone && "animate-pulse",
+                  // Validation styling
+                  !isAuthenticated && !formData.customer_phone?.trim() && "border-destructive/50",
+                  !isAuthenticated && formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10 && "border-destructive/50",
+                  !isAuthenticated && formData.customer_phone?.trim() && formData.customer_phone.trim().length >= 10 && "border-green-500"
                 )}
                 readOnly={isAuthenticated && !!formData.customer_phone}
                 disabled={isAuthenticated && !!formData.customer_phone}
@@ -930,6 +957,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               {isAuthenticated && !formData.customer_phone && (
                 <p className="text-xs text-muted-foreground mt-1">
                   You can add a phone number to your profile for better service.
+                </p>
+              )}
+              {!isAuthenticated && !formData.customer_phone?.trim() && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>📱</span> We need your phone number to coordinate delivery or contact you about your order
+                </p>
+              )}
+              {!isAuthenticated && formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10 && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <span>⚠️</span> Please enter a complete phone number (at least 10 digits)
                 </p>
               )}
             </div>
@@ -945,11 +982,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              When do you need your order? *
+              When do you need your order? <span className="text-destructive">*</span>
               {formData.delivery_date && formData.delivery_time_slot?.start_time ? (
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Scheduled</span>
               ) : (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full">⚠ Required</span>
+                <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full">⚠ Required</span>
               )}
             </CardTitle>
             <CardDescription className={cn(
@@ -1053,7 +1090,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Truck className="w-4 h-4" />
-                Delivery Zone
+                Delivery Zone <span className="text-destructive">*</span>
               </CardTitle>
               <CardDescription className="text-sm">
                 Select your delivery zone to calculate delivery fees
@@ -1080,8 +1117,24 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label htmlFor="address_line_1">Street Address *</Label>
-                <Input id="address_line_1" value={formData.delivery_address.address_line_1} onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} placeholder="Enter street address" required className="h-10" />
+                <Label htmlFor="address_line_1">Street Address <span className="text-destructive">*</span></Label>
+                <Input 
+                  id="address_line_1" 
+                  value={formData.delivery_address.address_line_1} 
+                  onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} 
+                  placeholder="Enter street address" 
+                  required 
+                  className={cn(
+                    "h-10",
+                    !formData.delivery_address.address_line_1?.trim() && "border-destructive/50",
+                    formData.delivery_address.address_line_1?.trim() && "border-green-500"
+                  )}
+                />
+                {!formData.delivery_address.address_line_1?.trim() && (
+                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                    <span>🏠</span> Please provide your complete delivery address including street name and number
+                  </p>
+                )}
               </div>
               <div>
                 <Label htmlFor="address_line_2">Apartment, suite, etc. (optional)</Label>
@@ -1123,7 +1176,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             <CardHeader className="pb-4">
               <CardTitle className="text-base text-center flex items-center justify-center gap-2">
                 <MapPin className="w-5 h-5 text-primary" />
-                Select Pickup Location
+                Select Pickup Location <span className="text-destructive">*</span>
               </CardTitle>
               <CardDescription className="text-center text-sm">
                 Choose a convenient location to collect your order

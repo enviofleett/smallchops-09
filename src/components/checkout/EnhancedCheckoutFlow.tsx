@@ -100,6 +100,17 @@ const validateCheckoutForm = (
     friendlyMessages.push("Please choose whether you'd like delivery to your address or pickup from our location");
   }
 
+  // CRITICAL: Delivery date and time validation - prevents incomplete orders
+  if (!formData.delivery_date) {
+    errors.push("delivery_date_required");
+    friendlyMessages.push("Please select your preferred delivery date from the calendar");
+  }
+
+  if (!formData.delivery_time_slot?.start_time) {
+    errors.push("delivery_time_required");
+    friendlyMessages.push("Please choose a delivery time slot that works best for you");
+  }
+
   // Delivery-specific validation with helpful context
   if (formData.fulfillment_type === 'delivery') {
     if (!deliveryZone) {
@@ -127,6 +138,46 @@ const validateCheckoutForm = (
   }
 
   return { errors, friendlyMessages };
+};
+
+// Field validation helpers for real-time feedback
+const getFieldValidationState = (fieldName: string, formData: CheckoutData, deliveryZone: any, pickupPoint: any) => {
+  switch (fieldName) {
+    case 'customer_name':
+      return {
+        isValid: !!formData.customer_name?.trim(),
+        isEmpty: !formData.customer_name?.trim()
+      };
+    case 'customer_email':
+      return {
+        isValid: !!formData.customer_email?.trim() && /\S+@\S+\.\S+/.test(formData.customer_email),
+        isEmpty: !formData.customer_email?.trim(),
+        isInvalid: !!formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email)
+      };
+    case 'customer_phone':
+      return {
+        isValid: !!formData.customer_phone?.trim() && formData.customer_phone.trim().length >= 10,
+        isEmpty: !formData.customer_phone?.trim(),
+        isInvalid: !!formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10
+      };
+    case 'delivery_date':
+      return {
+        isValid: !!formData.delivery_date,
+        isEmpty: !formData.delivery_date
+      };
+    case 'delivery_time':
+      return {
+        isValid: !!formData.delivery_time_slot?.start_time,
+        isEmpty: !formData.delivery_time_slot?.start_time
+      };
+    case 'address':
+      return {
+        isValid: formData.fulfillment_type !== 'delivery' || (!!formData.delivery_address.address_line_1?.trim() && !!deliveryZone),
+        isEmpty: formData.fulfillment_type === 'delivery' && (!formData.delivery_address.address_line_1?.trim() || !deliveryZone)
+      };
+    default:
+      return { isValid: true, isEmpty: false };
+  }
 };
 
 // Error boundary component
@@ -886,14 +937,31 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         </Card>
 
         {/* Order Scheduling - Required for both delivery and pickup */}
-        <Card>
+        {/* Delivery Schedule - Enhanced with validation indicators */}
+        <Card className={cn(
+          "transition-colors duration-200",
+          !formData.delivery_date || !formData.delivery_time_slot?.start_time ? "border-amber-200 bg-amber-50/30" : "border-green-200 bg-green-50/30"
+        )}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Clock className="w-4 h-4" />
               When do you need your order? *
+              {formData.delivery_date && formData.delivery_time_slot?.start_time ? (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Scheduled</span>
+              ) : (
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full">⚠ Required</span>
+              )}
             </CardTitle>
-            <CardDescription>
-              Select your preferred date and time for {formData.fulfillment_type === 'delivery' ? 'delivery' : 'pickup'}
+            <CardDescription className={cn(
+              "text-sm transition-colors duration-200",
+              !formData.delivery_date || !formData.delivery_time_slot?.start_time ? "text-amber-600" : "text-muted-foreground"
+            )}>
+              {!formData.delivery_date ? 
+                "Please select your preferred date and time for delivery" :
+                !formData.delivery_time_slot?.start_time ? 
+                "Please choose a time slot for your selected date" :
+                `Scheduled for ${formData.delivery_date} at ${formData.delivery_time_slot.start_time}`
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -901,6 +969,21 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             handleFormChange('delivery_date', date);
             handleFormChange('delivery_time_slot', timeSlot);
           }} selectedDate={formData.delivery_date} selectedTimeSlot={formData.delivery_time_slot} showHeader={false} />
+            
+            {/* Validation feedback */}
+            {(!formData.delivery_date || !formData.delivery_time_slot?.start_time) && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-amber-700">
+                    <p className="font-medium">Schedule Required</p>
+                    <p className="text-amber-600 mt-1">
+                      {!formData.delivery_date ? "Select a delivery date" : "Choose a time slot"} to proceed with checkout.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

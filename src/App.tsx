@@ -37,6 +37,7 @@ const Orders = withLazyLoading(() => import("./pages/Orders"), undefined, false,
 const AdminOrders = withLazyLoading(() => import("./pages/admin/AdminOrders"), undefined, false, 10000);
 const AdminOrderDetails = withLazyLoading(() => import("./pages/admin/AdminOrderDetails"), undefined, false, 10000);
 const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"), undefined, false, 10000);
+const AdminSMSCommunication = withLazyLoading(() => import("./pages/admin/AdminSMSCommunication"), undefined, false, 10000);
 const Products = withLazyLoading(() => import("./pages/Products"), undefined, false, 10000);
 const Customers = withLazyLoading(() => import("./pages/Customers"), undefined, false, 10000);
 const Reports = withLazyLoading(() => import("./pages/Reports"), undefined, false, 10000);
@@ -273,6 +274,7 @@ const App = () => {
                 <Route path="/admin/orders" element={<ErrorBoundaryWrapper context="Admin Orders"><AdminOrders /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/orders/:id" element={<ErrorBoundaryWrapper context="Admin Order Details"><AdminOrderDetails /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/delivery" element={<ErrorBoundaryWrapper context="Admin Delivery"><AdminDelivery /></ErrorBoundaryWrapper>} />
+                <Route path="/admin/sms" element={<ErrorBoundaryWrapper context="SMS Communication"><AdminSMSCommunication /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/products" element={<ErrorBoundaryWrapper context="Products"><Products /></ErrorBoundaryWrapper>} />
                 <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />
                 <Route path="/customers" element={<ErrorBoundaryWrapper context="Customers"><Customers /></ErrorBoundaryWrapper>} />

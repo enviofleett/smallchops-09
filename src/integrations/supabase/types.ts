@@ -1096,6 +1096,7 @@ export type Database = {
       }
       communication_events: {
         Row: {
+          channel: string | null
           created_at: string
           dedupe_key: string | null
           delivery_status: string | null
@@ -1116,6 +1117,9 @@ export type Database = {
           retry_count: number
           scheduled_at: string | null
           sent_at: string | null
+          sms_cost: number | null
+          sms_phone: string | null
+          sms_sender: string | null
           source: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
@@ -1125,6 +1129,7 @@ export type Database = {
           variables: Json | null
         }
         Insert: {
+          channel?: string | null
           created_at?: string
           dedupe_key?: string | null
           delivery_status?: string | null
@@ -1145,6 +1150,9 @@ export type Database = {
           retry_count?: number
           scheduled_at?: string | null
           sent_at?: string | null
+          sms_cost?: number | null
+          sms_phone?: string | null
+          sms_sender?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
@@ -1154,6 +1162,7 @@ export type Database = {
           variables?: Json | null
         }
         Update: {
+          channel?: string | null
           created_at?: string
           dedupe_key?: string | null
           delivery_status?: string | null
@@ -1174,6 +1183,9 @@ export type Database = {
           retry_count?: number
           scheduled_at?: string | null
           sent_at?: string | null
+          sms_cost?: number | null
+          sms_phone?: string | null
+          sms_sender?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
@@ -7391,6 +7403,203 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_delivery_logs: {
+        Row: {
+          communication_event_id: string | null
+          cost: number | null
+          created_at: string
+          delivery_time: string | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          message_content: string
+          provider_response: Json | null
+          recipient_phone: string
+          retry_count: number | null
+          sender: string
+          status: Database["public"]["Enums"]["sms_delivery_status"]
+          updated_at: string
+        }
+        Insert: {
+          communication_event_id?: string | null
+          cost?: number | null
+          created_at?: string
+          delivery_time?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          message_content: string
+          provider_response?: Json | null
+          recipient_phone: string
+          retry_count?: number | null
+          sender: string
+          status?: Database["public"]["Enums"]["sms_delivery_status"]
+          updated_at?: string
+        }
+        Update: {
+          communication_event_id?: string | null
+          cost?: number | null
+          created_at?: string
+          delivery_time?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          message_content?: string
+          provider_response?: Json | null
+          recipient_phone?: string
+          retry_count?: number | null
+          sender?: string
+          status?: Database["public"]["Enums"]["sms_delivery_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_delivery_logs_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_provider_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          default_sender: string | null
+          id: string
+          is_active: boolean
+          password: string | null
+          provider_name: string
+          updated_at: string
+          updated_by: string | null
+          username: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          default_sender?: string | null
+          id?: string
+          is_active?: boolean
+          password?: string | null
+          provider_name?: string
+          updated_at?: string
+          updated_by?: string | null
+          username?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          default_sender?: string | null
+          id?: string
+          is_active?: boolean
+          password?: string | null
+          provider_name?: string
+          updated_at?: string
+          updated_by?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      sms_suppression_list: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          id: string
+          notes: string | null
+          phone_number: string
+          reason: string | null
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          notes?: string | null
+          phone_number: string
+          reason?: string | null
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          notes?: string | null
+          phone_number?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
+      sms_templates: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          template_type: Database["public"]["Enums"]["sms_template_type"]
+          updated_at: string
+          updated_by: string | null
+          variables: Json | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          template_type: Database["public"]["Enums"]["sms_template_type"]
+          updated_at?: string
+          updated_by?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          template_type?: Database["public"]["Enums"]["sms_template_type"]
+          updated_at?: string
+          updated_by?: string | null
+          variables?: Json | null
+        }
+        Relationships: []
+      }
+      sms_wallet_balance: {
+        Row: {
+          balance: number
+          created_at: string
+          currency: string
+          id: string
+          last_checked: string
+          low_balance_threshold: number | null
+          provider_name: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          last_checked?: string
+          low_balance_threshold?: number | null
+          provider_name?: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          last_checked?: string
+          low_balance_threshold?: number | null
+          provider_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       smtp_connection_audit: {
         Row: {
           connection_attempt_at: string | null
@@ -9223,6 +9432,7 @@ export type Database = {
       get_queued_communication_events: {
         Args: { batch_size?: number }
         Returns: {
+          channel: string | null
           created_at: string
           dedupe_key: string | null
           delivery_status: string | null
@@ -9243,6 +9453,9 @@ export type Database = {
           retry_count: number
           scheduled_at: string | null
           sent_at: string | null
+          sms_cost: number | null
+          sms_phone: string | null
+          sms_sender: string | null
           source: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
@@ -9368,6 +9581,10 @@ export type Database = {
       }
       is_email_suppressed: {
         Args: { email_address: string }
+        Returns: boolean
+      }
+      is_phone_suppressed: {
+        Args: { phone_text: string }
         Returns: boolean
       }
       link_guest_to_authenticated_customer: {
@@ -9590,6 +9807,20 @@ export type Database = {
           user_context?: Json
         }
         Returns: undefined
+      }
+      log_sms_delivery: {
+        Args: {
+          p_communication_event_id: string
+          p_cost?: number
+          p_error_code?: string
+          p_error_message?: string
+          p_message_content: string
+          p_provider_response?: Json
+          p_recipient_phone: string
+          p_sender: string
+          p_status: Database["public"]["Enums"]["sms_delivery_status"]
+        }
+        Returns: string
       }
       manual_payment_verification: {
         Args: { p_payment_reference: string }
@@ -9834,6 +10065,10 @@ export type Database = {
         }
         Returns: Json
       }
+      update_sms_wallet_balance: {
+        Args: { new_balance: number; provider?: string }
+        Returns: undefined
+      }
       update_user_permissions_secure: {
         Args:
           | { p_change_reason?: string; p_permissions: Json; p_user_id: string }
@@ -10023,6 +10258,20 @@ export type Database = {
       product_status: "active" | "archived" | "draft" | "discontinued"
       promotion_status: "active" | "inactive" | "expired" | "scheduled"
       promotion_type: "percentage" | "fixed_amount" | "free_delivery"
+      sms_delivery_status:
+        | "queued"
+        | "sent"
+        | "delivered"
+        | "failed"
+        | "cancelled"
+      sms_template_type:
+        | "order_confirmation"
+        | "order_shipped"
+        | "order_delivered"
+        | "order_cancelled"
+        | "payment_confirmation"
+        | "welcome"
+        | "custom"
       user_role: "admin" | "manager" | "staff" | "dispatch_rider"
       user_status: "active" | "inactive" | "pending"
       vehicle_status: "available" | "assigned" | "maintenance" | "inactive"
@@ -10201,6 +10450,22 @@ export const Constants = {
       product_status: ["active", "archived", "draft", "discontinued"],
       promotion_status: ["active", "inactive", "expired", "scheduled"],
       promotion_type: ["percentage", "fixed_amount", "free_delivery"],
+      sms_delivery_status: [
+        "queued",
+        "sent",
+        "delivered",
+        "failed",
+        "cancelled",
+      ],
+      sms_template_type: [
+        "order_confirmation",
+        "order_shipped",
+        "order_delivered",
+        "order_cancelled",
+        "payment_confirmation",
+        "welcome",
+        "custom",
+      ],
       user_role: ["admin", "manager", "staff", "dispatch_rider"],
       user_status: ["active", "inactive", "pending"],
       vehicle_status: ["available", "assigned", "maintenance", "inactive"],

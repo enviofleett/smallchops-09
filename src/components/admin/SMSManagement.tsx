@@ -54,6 +54,8 @@ export const SMSManagement = () => {
   const [loading, setLoading] = useState(true)
   const [testPhone, setTestPhone] = useState('')
   const [testMessage, setTestMessage] = useState('This is a test SMS from your system.')
+  const [isSaving, setIsSaving] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   useEffect(() => {
     fetchSMSData()
@@ -137,43 +139,53 @@ export const SMSManagement = () => {
     }
   }
 
-  const updateProvider = async (providerId: string, updates: Partial<SMSProvider>) => {
-    try {
-      // Update local state first
-      setProviders(prev => 
-        prev.map(provider => 
-          provider.id === providerId 
-            ? { ...provider, ...updates }
-            : provider
-        )
+  const updateProvider = (providerId: string, updates: Partial<SMSProvider>) => {
+    // Update local state only (don't save to database yet)
+    setProviders(prev => 
+      prev.map(provider => 
+        provider.id === providerId 
+          ? { ...provider, ...updates }
+          : provider
       )
+    )
+    setHasUnsavedChanges(true)
+  }
 
-      // Save to database
-      const { error } = await supabase
-        .from('sms_provider_settings')
-        .upsert({
-          provider_name: 'MySMSTab',
-          username: updates.api_username,
-          password: updates.api_password,
-          default_sender: updates.default_sender || 'MySMSTab',
-          is_active: updates.is_active ?? false,
-          updated_at: new Date().toISOString()
-        })
+  const saveProviderChanges = async () => {
+    try {
+      setIsSaving(true)
+      
+      // Save all providers to database
+      for (const provider of providers) {
+        const { error } = await supabase
+          .from('sms_provider_settings')
+          .upsert({
+            provider_name: provider.provider_name,
+            username: provider.api_username,
+            password: provider.api_password,
+            default_sender: provider.default_sender || 'MySMSTab',
+            is_active: provider.is_active ?? false,
+            updated_at: new Date().toISOString()
+          })
 
-      if (error) throw error
+        if (error) throw error
+      }
 
+      setHasUnsavedChanges(false)
       toast({
         title: "Success",
         description: "SMS provider settings saved successfully"
       })
       
     } catch (error) {
-      console.error('Error updating provider:', error)
+      console.error('Error saving provider settings:', error)
       toast({
         title: "Error",
         description: "Failed to save SMS provider settings",
         variant: "destructive"
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -342,6 +354,13 @@ export const SMSManagement = () => {
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">SMS Providers</h3>
             <div className="space-x-2">
+              <Button 
+                onClick={saveProviderChanges} 
+                disabled={!hasUnsavedChanges || isSaving}
+                variant={hasUnsavedChanges ? "default" : "outline"}
+              >
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
               <Button onClick={checkBalance} variant="outline">
                 Check Balance  
               </Button>
@@ -350,6 +369,15 @@ export const SMSManagement = () => {
               </Button>
             </div>
           </div>
+          
+          {hasUnsavedChanges && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-yellow-800">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm">You have unsaved changes. Click "Save Changes" to apply them.</span>
+              </div>
+            </div>
+          )}
           
           {providers.map((provider) => (
             <Card key={provider.id}>

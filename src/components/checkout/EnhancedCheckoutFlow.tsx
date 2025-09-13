@@ -965,6 +965,28 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           </CardContent>
         </Card>
 
+        {/* Delivery Zone Selection - Moved before delivery address */}
+        {formData.fulfillment_type === 'delivery' && <Card className="mb-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Truck className="w-4 h-4" />
+                Delivery Zone
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Select your delivery zone to calculate delivery fees
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DeliveryZoneDropdown selectedZoneId={deliveryZone?.id} onZoneSelect={(zoneId, fee) => {
+            const zone = {
+              id: zoneId,
+              base_fee: fee
+            };
+            setDeliveryZone(zone);
+          }} orderSubtotal={subtotal} />
+            </CardContent>
+          </Card>}
+
         {/* Delivery Address */}
         {formData.fulfillment_type === 'delivery' && <Card>
             <CardHeader className="pb-3">
@@ -1009,14 +1031,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   </div>
                 </div>
               </div>
-              
-              <DeliveryZoneDropdown selectedZoneId={deliveryZone?.id} onZoneSelect={(zoneId, fee) => {
-            const zone = {
-              id: zoneId,
-              base_fee: fee
-            };
-            setDeliveryZone(zone);
-          }} orderSubtotal={subtotal} />
             </CardContent>
           </Card>}
 

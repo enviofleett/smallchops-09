@@ -349,7 +349,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                 📅 <strong>Booking Window:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
               </p>
               <p className="text-xs text-muted-foreground">
-                ⏰ <strong>Delivery Hours:</strong> Mon-Sat: 8:00AM - 7:00PM | Sunday: 10:00AM - 4:00PM
+                ⏰ <strong>Delivery Hours:</strong> Mon-Sat: 8:00AM - 7:00PM | Sunday: 10:00AM - 5:00PM
               </p>
               <p className="text-xs text-muted-foreground">
                 🕐 <strong>Lead Time:</strong> Minimum {dateValidation.leadTimeMinutes} minutes from booking

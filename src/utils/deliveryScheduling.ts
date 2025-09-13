@@ -122,7 +122,7 @@ class DeliverySchedulingService {
         thursday: { open: '08:00', close: '19:00', is_open: true },
         friday: { open: '08:00', close: '19:00', is_open: true },
         saturday: { open: '08:00', close: '19:00', is_open: true },
-        sunday: { open: '10:00', close: '16:00', is_open: true },
+        sunday: { open: '10:00', close: '17:00', is_open: true },
       }
     };
   }

@@ -88,9 +88,9 @@ export const SMSManagement = () => {
         provider = {
           id: providerData.id,
           provider_name: providerData.provider_name,
-          api_username: providerData.username || '',
-          api_password: providerData.password || '',
-          base_url: 'https://sms.mysmstab.com/api/',
+          api_username: providerData.api_username || '',
+          api_password: providerData.api_password || '',
+          base_url: providerData.api_url || 'https://sms.mysmstab.com/api/',
           default_sender: providerData.default_sender || 'MySMSTab',
           is_active: providerData.is_active || false
         }
@@ -161,8 +161,9 @@ export const SMSManagement = () => {
           .from('sms_provider_settings')
           .upsert({
             provider_name: provider.provider_name,
-            username: provider.api_username,
-            password: provider.api_password,
+            api_username: provider.api_username,
+            api_password: provider.api_password,
+            api_url: provider.base_url,
             default_sender: provider.default_sender || 'MySMSTab',
             is_active: provider.is_active ?? false,
             updated_at: new Date().toISOString()

@@ -248,7 +248,6 @@ export function CartSummary({ cart }: CartSummaryProps) {
 
           {/* Checkout Button - Responsive for all devices */}
           <Button 
-            data-checkout-button
             onClick={() => {
               if (hasMOQViolations) {
                 toast.error('Please meet minimum order requirements before checkout');

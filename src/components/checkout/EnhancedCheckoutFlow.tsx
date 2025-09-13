@@ -64,11 +64,10 @@ interface EnhancedCheckoutFlowProps {
 }
 
 // Enhanced validation function with friendly messages
-const validateCheckoutForm = (
-  formData: CheckoutData, 
-  deliveryZone: any, 
-  pickupPoint: any
-): { errors: string[], friendlyMessages: string[] } => {
+const validateCheckoutForm = (formData: CheckoutData, deliveryZone: any, pickupPoint: any): {
+  errors: string[];
+  friendlyMessages: string[];
+} => {
   const errors: string[] = [];
   const friendlyMessages: string[] = [];
 
@@ -80,12 +79,10 @@ const validateCheckoutForm = (
     errors.push("email_invalid");
     friendlyMessages.push("Please enter a valid email address (like: yourname@example.com)");
   }
-
   if (!formData.customer_name?.trim()) {
     errors.push("name_required");
     friendlyMessages.push("Please enter your full name so we know who to deliver to");
   }
-
   if (!formData.customer_phone?.trim()) {
     errors.push("phone_required");
     friendlyMessages.push("We need your phone number to coordinate delivery or contact you about your order");
@@ -100,29 +97,16 @@ const validateCheckoutForm = (
     friendlyMessages.push("Please choose whether you'd like delivery to your address or pickup from our location");
   }
 
-  // CRITICAL: Delivery date and time validation - prevents incomplete orders
-  if (!formData.delivery_date) {
-    errors.push("delivery_date_required");
-    friendlyMessages.push("Please select your preferred delivery date from the calendar");
-  }
-
-  if (!formData.delivery_time_slot?.start_time) {
-    errors.push("delivery_time_required");
-    friendlyMessages.push("Please choose a delivery time slot that works best for you");
-  }
-
   // Delivery-specific validation with helpful context
   if (formData.fulfillment_type === 'delivery') {
     if (!deliveryZone) {
       errors.push("delivery_zone_required");
       friendlyMessages.push("Please select your delivery area so we can calculate shipping costs and delivery time");
     }
-    
     if (!formData.delivery_address.address_line_1?.trim()) {
       errors.push("address_required");
       friendlyMessages.push("Please provide your complete delivery address including street name and number");
     }
-    
     if (!formData.delivery_address.city?.trim()) {
       errors.push("city_required");
       friendlyMessages.push("Please specify which city you're located in for accurate delivery");
@@ -136,48 +120,10 @@ const validateCheckoutForm = (
       friendlyMessages.push("Please choose a convenient pickup location from our available spots");
     }
   }
-
-  return { errors, friendlyMessages };
-};
-
-// Field validation helpers for real-time feedback
-const getFieldValidationState = (fieldName: string, formData: CheckoutData, deliveryZone: any, pickupPoint: any) => {
-  switch (fieldName) {
-    case 'customer_name':
-      return {
-        isValid: !!formData.customer_name?.trim(),
-        isEmpty: !formData.customer_name?.trim()
-      };
-    case 'customer_email':
-      return {
-        isValid: !!formData.customer_email?.trim() && /\S+@\S+\.\S+/.test(formData.customer_email),
-        isEmpty: !formData.customer_email?.trim(),
-        isInvalid: !!formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email)
-      };
-    case 'customer_phone':
-      return {
-        isValid: !!formData.customer_phone?.trim() && formData.customer_phone.trim().length >= 10,
-        isEmpty: !formData.customer_phone?.trim(),
-        isInvalid: !!formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10
-      };
-    case 'delivery_date':
-      return {
-        isValid: !!formData.delivery_date,
-        isEmpty: !formData.delivery_date
-      };
-    case 'delivery_time':
-      return {
-        isValid: !!formData.delivery_time_slot?.start_time,
-        isEmpty: !formData.delivery_time_slot?.start_time
-      };
-    case 'address':
-      return {
-        isValid: formData.fulfillment_type !== 'delivery' || (!!formData.delivery_address.address_line_1?.trim() && !!deliveryZone),
-        isEmpty: formData.fulfillment_type === 'delivery' && (!formData.delivery_address.address_line_1?.trim() || !deliveryZone)
-      };
-    default:
-      return { isValid: true, isEmpty: false };
-  }
+  return {
+    errors,
+    friendlyMessages
+  };
 };
 
 // Error boundary component
@@ -236,7 +182,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   const items = cart.items || [];
   // Initialize guest session for guest checkout support
   useGuestSessionCleanup();
-  const { guestSession, generateGuestSession } = useGuestSession();
+  const {
+    guestSession,
+    generateGuestSession
+  } = useGuestSession();
   const guestSessionId = guestSession?.sessionId;
   const {
     user,
@@ -324,7 +273,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       setCheckoutStep('details');
       toast({
         title: "Guest Checkout",
-        description: "You can proceed without creating an account.",
+        description: "You can proceed without creating an account."
       });
     } catch (error) {
       console.error('Error generating guest session:', error);
@@ -370,22 +319,18 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   // Handle fulfillment type changes and provide price feedback
   useEffect(() => {
     if (prevFulfillmentTypeRef.current !== formData.fulfillment_type) {
-      const currentFee = formData.fulfillment_type === 'pickup' ? 0 : (deliveryZone?.base_fee || 0);
-      const prevFee = prevFulfillmentTypeRef.current === 'pickup' ? 0 : (deliveryZone?.base_fee || 0);
-      
+      const currentFee = formData.fulfillment_type === 'pickup' ? 0 : deliveryZone?.base_fee || 0;
+      const prevFee = prevFulfillmentTypeRef.current === 'pickup' ? 0 : deliveryZone?.base_fee || 0;
+
       // Only show toast if this isn't the initial render and fees actually changed
       if (prevFulfillmentTypeRef.current !== 'delivery' && currentFee !== prevFee) {
         const feeChange = currentFee - prevFee;
         const isRemoving = feeChange < 0;
-        
         toast({
           title: isRemoving ? "Delivery Fee Removed" : "Delivery Fee Added",
-          description: isRemoving 
-            ? `₦${Math.abs(feeChange).toLocaleString()} delivery fee removed for pickup`
-            : `₦${feeChange.toLocaleString()} delivery fee added`,
+          description: isRemoving ? `₦${Math.abs(feeChange).toLocaleString()} delivery fee removed for pickup` : `₦${feeChange.toLocaleString()} delivery fee added`
         });
       }
-      
       prevFulfillmentTypeRef.current = formData.fulfillment_type;
     }
   }, [formData.fulfillment_type, deliveryZone?.base_fee]);
@@ -405,14 +350,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       if (profile) {
-        console.log('✅ Successfully loaded authenticated customer profile:', { 
+        console.log('✅ Successfully loaded authenticated customer profile:', {
           profileId: (profile as any).id,
-          name: (profile as any).name, 
+          name: (profile as any).name,
           email: (profile as any).email,
           phone: (profile as any).phone,
-          hasCompleteProfile: !!(profile as any).name && !!(profile as any).email 
+          hasCompleteProfile: !!(profile as any).name && !!(profile as any).email
         });
-        
         setFormData(prev => ({
           ...prev,
           customer_email: (profile as any).email || user?.email || '',
@@ -425,16 +369,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         setFormData(prev => ({
           ...prev,
           customer_email: user.email || '',
-          customer_name: prev.customer_name || '', 
+          customer_name: prev.customer_name || '',
           customer_phone: prev.customer_phone || ''
         }));
-        
+
         // Retry profile loading after a short delay
         const retryTimeout = setTimeout(() => {
           console.log('🔄 Retrying profile load...');
           // The useCustomerProfile hook should handle this automatically
         }, 2000);
-        
         return () => clearTimeout(retryTimeout);
       }
     } else if (!isAuthenticated && !isLoading) {
@@ -569,21 +512,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       if (validation.errors.length > 0) {
         // Show friendly validation message with helpful guidance
         const errorCount = validation.errors.length;
-        const title = errorCount === 1 
-          ? "Let's complete your checkout information" 
-          : `Just ${errorCount} more details needed`;
-        
+        const title = errorCount === 1 ? "Let's complete your checkout information" : `Just ${errorCount} more details needed`;
+
         // Show the most helpful message with context
         const primaryMessage = validation.friendlyMessages[0];
-        const description = errorCount === 1 
-          ? primaryMessage
-          : `${primaryMessage}${errorCount > 1 ? ` (${errorCount - 1} more field${errorCount > 2 ? 's' : ''} also needed)` : ''}`;
-
+        const description = errorCount === 1 ? primaryMessage : `${primaryMessage}${errorCount > 1 ? ` (${errorCount - 1} more field${errorCount > 2 ? 's' : ''} also needed)` : ''}`;
         toast({
           title,
           description,
           variant: "destructive",
-          duration: 6000, // Longer duration for better readability
+          duration: 6000 // Longer duration for better readability
         });
         setIsSubmitting(false);
         return;
@@ -624,11 +562,18 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       console.log('📦 Submitting checkout data:', sanitizedData);
 
       // Call Supabase edge function with authentication when available
-      const invokeOptions: any = { body: sanitizedData };
+      const invokeOptions: any = {
+        body: sanitizedData
+      };
       if (session?.access_token) {
-        invokeOptions.headers = { Authorization: `Bearer ${session.access_token}` };
+        invokeOptions.headers = {
+          Authorization: `Bearer ${session.access_token}`
+        };
       }
-      const { data, error } = await supabase.functions.invoke('process-checkout', invokeOptions);
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('process-checkout', invokeOptions);
 
       // 🚨 CRITICAL: Stop flow immediately on order creation failure
       if (error || !data?.success) {
@@ -818,11 +763,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   }, [formData, deliveryZone, pickupPoint, checkoutStep, termsRequired, termsAccepted]);
   const renderAuthStep = () => <div className="space-y-6">
       
-      <GuestOrLoginChoice 
-        onContinueAsGuest={handleContinueAsGuest} 
-        onLogin={handleLogin} 
-        totalAmount={total} 
-      />
+      <GuestOrLoginChoice onContinueAsGuest={handleContinueAsGuest} onLogin={handleLogin} totalAmount={total} />
     </div>;
   const renderDetailsStep = () => <div className="space-y-6">
       <div className="space-y-4">
@@ -838,159 +779,57 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               Customer Information
-              {isAuthenticated && (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+              {isAuthenticated && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
                   Verified Account
-                </span>
-              )}
+                </span>}
             </CardTitle>
-            {isAuthenticated && (
-              <CardDescription className="text-sm text-muted-foreground">
+            {isAuthenticated && <CardDescription className="text-sm text-muted-foreground">
                 Your account information is automatically loaded and secured.
-              </CardDescription>
-            )}
+              </CardDescription>}
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
               <Label htmlFor="customer_name" className="flex items-center gap-2">
-                Full Name <span className="text-red-500">*</span>
-                {isAuthenticated && formData.customer_name && (
-                  <span className="text-xs text-green-600">✓ Verified</span>
-                )}
+                Full Name *
+                {isAuthenticated && formData.customer_name && <span className="text-xs text-green-600">✓ Verified</span>}
               </Label>
-              <Input 
-                id="customer_name" 
-                value={formData.customer_name} 
-                onChange={e => handleFormChange('customer_name', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your name..." : "Enter your full name"} 
-                required 
-                className={cn(
-                  "h-10",
-                  isAuthenticated && formData.customer_name && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_name && "animate-pulse",
-                  !formData.customer_name?.trim() && "border-red-200 focus:border-red-300"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_name}
-                disabled={isAuthenticated && !!formData.customer_name}
-              />
-              {isAuthenticated && !formData.customer_name && (
-                <p className="text-xs text-amber-600 mt-1">
+              <Input id="customer_name" value={formData.customer_name} onChange={e => handleFormChange('customer_name', e.target.value)} placeholder={isAuthenticated ? "Loading your name..." : "Enter your full name"} required className={cn("h-10", isAuthenticated && formData.customer_name && "bg-muted border-green-200", isAuthenticated && !formData.customer_name && "animate-pulse")} readOnly={isAuthenticated && !!formData.customer_name} disabled={isAuthenticated && !!formData.customer_name} />
+              {isAuthenticated && !formData.customer_name && <p className="text-xs text-amber-600 mt-1">
                   Loading your profile information...
-                </p>
-              )}
-              {!isAuthenticated && !formData.customer_name?.trim() && (
-                <p className="text-xs text-red-500 mt-1">
-                  📝 Please enter your full name so we know who to deliver to
-                </p>
-              )}
+                </p>}
             </div>
             <div>
               <Label htmlFor="customer_email" className="flex items-center gap-2">
-                Email <span className="text-red-500">*</span>
-                {isAuthenticated && formData.customer_email && (
-                  <span className="text-xs text-green-600">✓ Verified</span>
-                )}
+                Email *
+                {isAuthenticated && formData.customer_email && <span className="text-xs text-green-600">✓ Verified</span>}
               </Label>
-              <Input 
-                id="customer_email" 
-                type="email" 
-                value={formData.customer_email} 
-                onChange={e => handleFormChange('customer_email', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your email..." : "Enter your email address"} 
-                required 
-                className={cn(
-                  "h-10",
-                  isAuthenticated && formData.customer_email && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_email && "animate-pulse",
-                  (!formData.customer_email?.trim() || (formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email))) && "border-red-200 focus:border-red-300"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_email}
-                disabled={isAuthenticated && !!formData.customer_email}
-              />
-              {isAuthenticated && !formData.customer_email && (
-                <p className="text-xs text-amber-600 mt-1">
+              <Input id="customer_email" type="email" value={formData.customer_email} onChange={e => handleFormChange('customer_email', e.target.value)} placeholder={isAuthenticated ? "Loading your email..." : "Enter your email"} required className={cn("h-10", isAuthenticated && formData.customer_email && "bg-muted border-green-200", isAuthenticated && !formData.customer_email && "animate-pulse")} readOnly={isAuthenticated && !!formData.customer_email} disabled={isAuthenticated && !!formData.customer_email} />
+              {isAuthenticated && !formData.customer_email && <p className="text-xs text-amber-600 mt-1">
                   Loading your email address...
-                </p>
-              )}
-              {!isAuthenticated && !formData.customer_email?.trim() && (
-                <p className="text-xs text-red-500 mt-1">
-                  📧 We need your email to send order updates and receipts
-                </p>
-              )}
-              {!isAuthenticated && formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email) && (
-                <p className="text-xs text-red-500 mt-1">
-                  ⚠️ Please enter a valid email address (like: yourname@example.com)
-                </p>
-              )}
+                </p>}
             </div>
             <div>
               <Label htmlFor="customer_phone" className="flex items-center gap-2">
-                Phone Number <span className="text-red-500">*</span>
-                {isAuthenticated && formData.customer_phone && (
-                  <span className="text-xs text-green-600">✓ Verified</span>
-                )}
+                Phone Number
+                {isAuthenticated && formData.customer_phone && <span className="text-xs text-green-600">✓ Verified</span>}
               </Label>
-              <Input 
-                id="customer_phone" 
-                type="tel" 
-                value={formData.customer_phone} 
-                onChange={e => handleFormChange('customer_phone', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
-                required
-                className={cn(
-                  "h-10",
-                  isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_phone && "animate-pulse",
-                  (!formData.customer_phone?.trim() || (formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10)) && "border-red-200 focus:border-red-300"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_phone}
-                disabled={isAuthenticated && !!formData.customer_phone}
-              />
-              {isAuthenticated && !formData.customer_phone && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Loading your phone number...
-                </p>
-              )}
-              {!isAuthenticated && !formData.customer_phone?.trim() && (
-                <p className="text-xs text-red-500 mt-1">
-                  📱 We need your phone number to coordinate delivery and contact you about your order
-                </p>
-              )}
-              {!isAuthenticated && formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10 && (
-                <p className="text-xs text-red-500 mt-1">
-                  ⚠️ Please enter a complete phone number (at least 10 digits)
-                </p>
-              )}
+              <Input id="customer_phone" type="tel" value={formData.customer_phone} onChange={e => handleFormChange('customer_phone', e.target.value)} placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} className={cn("h-10", isAuthenticated && formData.customer_phone && "bg-muted border-green-200", isAuthenticated && !formData.customer_phone && "animate-pulse")} readOnly={isAuthenticated && !!formData.customer_phone} disabled={isAuthenticated && !!formData.customer_phone} />
+              {isAuthenticated && !formData.customer_phone && <p className="text-xs text-muted-foreground mt-1">
+                  You can add a phone number to your profile for better service.
+                </p>}
             </div>
           </CardContent>
         </Card>
 
         {/* Order Scheduling - Required for both delivery and pickup */}
-        {/* Delivery Schedule - Enhanced with validation indicators */}
-        <Card className={cn(
-          "transition-colors duration-200",
-          !formData.delivery_date || !formData.delivery_time_slot?.start_time ? "border-amber-200 bg-amber-50/30" : "border-green-200 bg-green-50/30"
-        )}>
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              When do you need your order? <span className="text-red-500">*</span>
-              {formData.delivery_date && formData.delivery_time_slot?.start_time ? (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Scheduled</span>
-              ) : (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full">⚠ Required</span>
-              )}
+              When do you need your order? *
             </CardTitle>
-            <CardDescription className={cn(
-              "text-sm transition-colors duration-200",
-              !formData.delivery_date || !formData.delivery_time_slot?.start_time ? "text-amber-600" : "text-muted-foreground"
-            )}>
-              {!formData.delivery_date ? 
-                "Please select your preferred date and time for delivery" :
-                !formData.delivery_time_slot?.start_time ? 
-                "Please choose a time slot for your selected date" :
-                `Scheduled for ${formData.delivery_date} at ${formData.delivery_time_slot.start_time}`
-              }
+            <CardDescription>
+              Select your preferred date and time for {formData.fulfillment_type === 'delivery' ? 'delivery' : 'pickup'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -998,21 +837,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             handleFormChange('delivery_date', date);
             handleFormChange('delivery_time_slot', timeSlot);
           }} selectedDate={formData.delivery_date} selectedTimeSlot={formData.delivery_time_slot} showHeader={false} />
-            
-            {/* Validation feedback */}
-            {(!formData.delivery_date || !formData.delivery_time_slot?.start_time) && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-amber-700">
-                    <p className="font-medium">Schedule Required</p>
-                    <p className="text-amber-600 mt-1">
-                      {!formData.delivery_date ? "Select a delivery date" : "Choose a time slot"} to proceed with checkout.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -1025,44 +849,24 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <RadioGroup 
-              value={formData.fulfillment_type} 
-              onValueChange={value => handleFormChange('fulfillment_type', value)} 
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
-            >
+            <RadioGroup value={formData.fulfillment_type} onValueChange={value => handleFormChange('fulfillment_type', value)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="relative">
                 <RadioGroupItem value="delivery" id="delivery" className="peer sr-only" />
-                <Label 
-                  htmlFor="delivery" 
-                  className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
-                    "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
-                  )}
-                >
+                <Label htmlFor="delivery" className={cn("flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all", "hover:border-primary/20 hover:bg-accent/5", "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md")}>
                   <Truck className="w-8 h-8 mb-3 text-primary" />
                   <span className="font-medium text-base">Delivery</span>
                   <span className="text-sm text-muted-foreground text-center mt-1">
                     We'll deliver to your address
                   </span>
-                  {deliveryFee > 0 && (
-                    <span className="text-xs text-primary mt-2 font-medium">
+                  {deliveryFee > 0 && <span className="text-xs text-primary mt-2 font-medium">
                       Fee: ₦{deliveryFee.toLocaleString()}
-                    </span>
-                  )}
+                    </span>}
                 </Label>
               </div>
               
               <div className="relative">
                 <RadioGroupItem value="pickup" id="pickup" className="peer sr-only" />
-                <Label 
-                  htmlFor="pickup" 
-                  className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
-                    "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
-                  )}
-                >
+                <Label htmlFor="pickup" className={cn("flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all", "hover:border-primary/20 hover:bg-accent/5", "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md")}>
                   <MapPin className="w-8 h-8 mb-3 text-primary" />
                   <span className="font-medium text-base">Pickup</span>
                   <span className="text-sm text-muted-foreground text-center mt-1">
@@ -1077,49 +881,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           </CardContent>
         </Card>
 
-        {/* Delivery Zone Selection - Moved before delivery address */}
-        {formData.fulfillment_type === 'delivery' && <Card className="mb-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Truck className="w-4 h-4" />
-                Delivery Zone <span className="text-red-500">*</span>
-              </CardTitle>
-              <CardDescription className={cn(
-                "text-sm transition-colors duration-200",
-                !deliveryZone && "text-red-500"
-              )}>
-                {!deliveryZone ? 
-                  "⚠️ Please select your delivery zone to calculate delivery fees and proceed" :
-                  "Select your delivery zone to calculate delivery fees"
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DeliveryZoneDropdown selectedZoneId={deliveryZone?.id} onZoneSelect={(zoneId, fee) => {
-            const zone = {
-              id: zoneId,
-              base_fee: fee
-            };
-            setDeliveryZone(zone);
-          }} orderSubtotal={subtotal} />
-              
-              {/* Validation feedback for delivery zone */}
-              {formData.fulfillment_type === 'delivery' && !deliveryZone && (
-                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-red-700">
-                      <p className="font-medium">Delivery Zone Required</p>
-                      <p className="text-red-600 mt-1">
-                        Please select your delivery area so we can calculate shipping costs and delivery time.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>}
-
         {/* Delivery Address */}
         {formData.fulfillment_type === 'delivery' && <Card>
             <CardHeader className="pb-3">
@@ -1130,25 +891,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label htmlFor="address_line_1" className="flex items-center gap-1">
-                  Street Address <span className="text-red-500">*</span>
-                </Label>
-                <Input 
-                  id="address_line_1" 
-                  value={formData.delivery_address.address_line_1} 
-                  onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} 
-                  placeholder="Enter street address" 
-                  required 
-                  className={cn(
-                    "h-10",
-                    !formData.delivery_address.address_line_1?.trim() && "border-red-200 focus:border-red-300"
-                  )} 
-                />
-                {formData.fulfillment_type === 'delivery' && !formData.delivery_address.address_line_1?.trim() && (
-                  <p className="text-xs text-red-500 mt-1">
-                    📍 Please provide your complete delivery address including street name and number
-                  </p>
-                )}
+                <Label htmlFor="address_line_1">Street Address *</Label>
+                <Input id="address_line_1" value={formData.delivery_address.address_line_1} onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} placeholder="Enter street address" required className="h-10" />
               </div>
               <div>
                 <Label htmlFor="address_line_2">Apartment, suite, etc. (optional)</Label>
@@ -1181,12 +925,19 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   </div>
                 </div>
               </div>
+              
+              <DeliveryZoneDropdown selectedZoneId={deliveryZone?.id} onZoneSelect={(zoneId, fee) => {
+            const zone = {
+              id: zoneId,
+              base_fee: fee
+            };
+            setDeliveryZone(zone);
+          }} orderSubtotal={subtotal} />
             </CardContent>
           </Card>}
 
           {/* Pickup Point Selection - Centered */}
-        {formData.fulfillment_type === 'pickup' && (
-          <Card>
+        {formData.fulfillment_type === 'pickup' && <Card>
             <CardHeader className="pb-4">
               <CardTitle className="text-base text-center flex items-center justify-center gap-2">
                 <MapPin className="w-5 h-5 text-primary" />
@@ -1197,26 +948,20 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <PickupPointSelector 
-                selectedPointId={pickupPoint?.id} 
-                onSelect={point => {
-                  setPickupPoint(point);
-                  handleFormChange('pickup_point_id', point?.id);
-                }} 
-              />
-              {pickupPoint && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <PickupPointSelector selectedPointId={pickupPoint?.id} onSelect={point => {
+            setPickupPoint(point);
+            handleFormChange('pickup_point_id', point?.id);
+          }} />
+              {pickupPoint && <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-sm text-green-800 font-medium">
                     ✅ Selected: {pickupPoint.name}
                   </p>
                   <p className="text-xs text-green-700 mt-1">
                     {pickupPoint.address}
                   </p>
-                </div>
-              )}
+                </div>}
             </CardContent>
-          </Card>
-        )}
+          </Card>}
 
       </div>
 
@@ -1269,9 +1014,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             <div className="hidden lg:block lg:col-span-1 bg-muted/30 border-r overflow-y-auto">
               <div className="p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-                    <X className="h-4 w-4" />
-                  </Button>
+                  
                   <h2 className="text-lg font-semibold">Order Details</h2>
                 </div>
                 
@@ -1325,22 +1068,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                       </Label>
                     </div>}
 
-                  <Button 
-                    onClick={handleFormSubmit} 
-                    disabled={!canProceedToDetails || isSubmitting || (!isAuthenticated && !guestSession)} 
-                    className="w-full h-11 md:h-14 text-sm md:text-lg font-medium" 
-                    size="lg"
-                  >
-                    {isSubmitting ? (
-                      <>
+                  <Button onClick={handleFormSubmit} disabled={!canProceedToDetails || isSubmitting || !isAuthenticated && !guestSession} className="w-full h-11 md:h-14 text-sm md:text-lg font-medium" size="lg">
+                    {isSubmitting ? <>
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                         Processing...
-                      </>
-                    ) : (!isAuthenticated && !guestSession) ? (
-                      "Please choose checkout method"
-                    ) : (
-                      `Proceed to Payment • ₦${total.toLocaleString()}`
-                    )}
+                      </> : !isAuthenticated && !guestSession ? "Please choose checkout method" : `Proceed to Payment • ₦${total.toLocaleString()}`}
                   </Button>
                   
                   {lastPaymentError && <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">

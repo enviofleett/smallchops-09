@@ -1058,9 +1058,46 @@ export type Database = {
         }
         Relationships: []
       }
+      communication_event_warnings: {
+        Row: {
+          attempted_recipient_email: string | null
+          created_at: string | null
+          error_reason: string
+          event_type: string | null
+          id: string
+          order_id: string | null
+          original_payload: Json | null
+          resolution_notes: string | null
+          resolved_at: string | null
+        }
+        Insert: {
+          attempted_recipient_email?: string | null
+          created_at?: string | null
+          error_reason: string
+          event_type?: string | null
+          id?: string
+          order_id?: string | null
+          original_payload?: Json | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+        }
+        Update: {
+          attempted_recipient_email?: string | null
+          created_at?: string | null
+          error_reason?: string
+          event_type?: string | null
+          id?: string
+          order_id?: string | null
+          original_payload?: Json | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
       communication_events: {
         Row: {
           created_at: string
+          dedupe_key: string | null
           delivery_status: string | null
           email_provider: string | null
           email_type: string | null
@@ -1079,6 +1116,7 @@ export type Database = {
           retry_count: number
           scheduled_at: string | null
           sent_at: string | null
+          source: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
           template_key: string | null
@@ -1088,6 +1126,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          dedupe_key?: string | null
           delivery_status?: string | null
           email_provider?: string | null
           email_type?: string | null
@@ -1106,6 +1145,7 @@ export type Database = {
           retry_count?: number
           scheduled_at?: string | null
           sent_at?: string | null
+          source?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
           template_key?: string | null
@@ -1115,6 +1155,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          dedupe_key?: string | null
           delivery_status?: string | null
           email_provider?: string | null
           email_type?: string | null
@@ -1133,6 +1174,7 @@ export type Database = {
           retry_count?: number
           scheduled_at?: string | null
           sent_at?: string | null
+          source?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
           template_key?: string | null
@@ -8846,6 +8888,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      generate_dedupe_key: {
+        Args: {
+          p_event_type: string
+          p_order_id: string
+          p_recipient_email: string
+          p_template_key: string
+        }
+        Returns: string
+      }
       generate_guest_session_id: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -9168,6 +9219,7 @@ export type Database = {
         Args: { batch_size?: number }
         Returns: {
           created_at: string
+          dedupe_key: string | null
           delivery_status: string | null
           email_provider: string | null
           email_type: string | null
@@ -9186,6 +9238,7 @@ export type Database = {
           retry_count: number
           scheduled_at: string | null
           sent_at: string | null
+          source: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
           template_key: string | null

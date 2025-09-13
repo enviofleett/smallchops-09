@@ -8755,6 +8755,15 @@ export type Database = {
         }
         Returns: Json
       }
+      create_customer_record: {
+        Args: {
+          p_email: string
+          p_name: string
+          p_phone?: string
+          p_user_id?: string
+        }
+        Returns: string
+      }
       create_customer_with_validation: {
         Args: {
           p_admin_id?: string

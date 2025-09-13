@@ -63,60 +63,70 @@ interface EnhancedCheckoutFlowProps {
   onClose: () => void;
 }
 
-// Validation function for checkout form
+// Enhanced validation function with friendly messages
 const validateCheckoutForm = (
   formData: CheckoutData, 
   deliveryZone: any, 
   pickupPoint: any
-): string[] => {
+): { errors: string[], friendlyMessages: string[] } => {
   const errors: string[] = [];
+  const friendlyMessages: string[] = [];
 
-  // Basic customer information
+  // Basic customer information with helpful guidance
   if (!formData.customer_email?.trim()) {
-    errors.push("Please enter your email address");
+    errors.push("email_required");
+    friendlyMessages.push("We need your email address to send you order updates and receipts");
   } else if (!/\S+@\S+\.\S+/.test(formData.customer_email)) {
-    errors.push("Please enter a valid email address");
+    errors.push("email_invalid");
+    friendlyMessages.push("Please enter a valid email address (like: yourname@example.com)");
   }
 
   if (!formData.customer_name?.trim()) {
-    errors.push("Please enter your full name");
+    errors.push("name_required");
+    friendlyMessages.push("Please enter your full name so we know who to deliver to");
   }
 
   if (!formData.customer_phone?.trim()) {
-    errors.push("Please enter your phone number");
+    errors.push("phone_required");
+    friendlyMessages.push("We need your phone number to coordinate delivery or contact you about your order");
   } else if (formData.customer_phone.trim().length < 10) {
-    errors.push("Please enter a valid phone number");
+    errors.push("phone_invalid");
+    friendlyMessages.push("Please enter a complete phone number (at least 10 digits)");
   }
 
-  // Fulfillment type validation
+  // Fulfillment type validation with context
   if (!formData.fulfillment_type) {
-    errors.push("Please select delivery or pickup option");
+    errors.push("fulfillment_required");
+    friendlyMessages.push("Please choose whether you'd like delivery to your address or pickup from our location");
   }
 
-  // Delivery-specific validation
+  // Delivery-specific validation with helpful context
   if (formData.fulfillment_type === 'delivery') {
     if (!deliveryZone) {
-      errors.push("Please select a delivery zone");
+      errors.push("delivery_zone_required");
+      friendlyMessages.push("Please select your delivery area so we can calculate shipping costs and delivery time");
     }
     
     if (!formData.delivery_address.address_line_1?.trim()) {
-      errors.push("Please enter your delivery address");
+      errors.push("address_required");
+      friendlyMessages.push("Please provide your complete delivery address including street name and number");
     }
     
     if (!formData.delivery_address.city?.trim()) {
-      errors.push("Please enter your city");
+      errors.push("city_required");
+      friendlyMessages.push("Please specify which city you're located in for accurate delivery");
     }
-    
   }
 
-  // Pickup-specific validation
+  // Pickup-specific validation with guidance
   if (formData.fulfillment_type === 'pickup') {
     if (!formData.pickup_point_id || !pickupPoint) {
-      errors.push("Please select a pickup location");
+      errors.push("pickup_location_required");
+      friendlyMessages.push("Please choose a convenient pickup location from our available spots");
     }
   }
 
-  return errors;
+  return { errors, friendlyMessages };
 };
 
 // Error boundary component
@@ -503,23 +513,26 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         }
       }
 
-      // Enhanced validation with friendly messages
-      const validationErrors = validateCheckoutForm(formData, deliveryZone, pickupPoint);
-      if (validationErrors.length > 0) {
+      // Enhanced validation with friendly, explanatory messages
+      const validation = validateCheckoutForm(formData, deliveryZone, pickupPoint);
+      if (validation.errors.length > 0) {
         // Show friendly validation message with helpful guidance
-        const errorCount = validationErrors.length;
+        const errorCount = validation.errors.length;
         const title = errorCount === 1 
-          ? "Please complete this required field" 
-          : `Please complete ${errorCount} required fields`;
+          ? "Let's complete your checkout information" 
+          : `Just ${errorCount} more details needed`;
         
+        // Show the most helpful message with context
+        const primaryMessage = validation.friendlyMessages[0];
         const description = errorCount === 1 
-          ? validationErrors[0]
-          : `${validationErrors[0]} ${errorCount > 1 ? `and ${errorCount - 1} other field${errorCount > 2 ? 's' : ''}` : ''}`;
+          ? primaryMessage
+          : `${primaryMessage}${errorCount > 1 ? ` (${errorCount - 1} more field${errorCount > 2 ? 's' : ''} also needed)` : ''}`;
 
         toast({
           title,
           description,
-          variant: "destructive"
+          variant: "destructive",
+          duration: 6000, // Longer duration for better readability
         });
         setIsSubmitting(false);
         return;

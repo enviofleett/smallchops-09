@@ -16,8 +16,11 @@ interface SMSProvider {
   provider_name: string
   api_key?: string
   api_secret?: string
+  api_username?: string
+  api_password?: string
   base_url?: string
   sender_id?: string
+  default_sender?: string
   is_active: boolean
 }
 
@@ -60,15 +63,36 @@ export const SMSManagement = () => {
     try {
       setLoading(true)
       
-      // Mock data for SMS providers until migration completes
-      const mockProviders: SMSProvider[] = [{
-        id: '1',
-        provider_name: 'MySMSTab',
-        api_key: '',
-        base_url: 'https://api.mysmstab.com',
-        sender_id: '',
-        is_active: false
-      }]
+      // Fetch SMS provider settings from database
+      const { data: providerData, error: providerError } = await supabase
+        .from('sms_provider_settings')
+        .select('*')
+        .eq('provider_name', 'MySMSTab')
+        .single()
+
+      let provider: SMSProvider
+      if (providerError || !providerData) {
+        // Default provider if not found
+        provider = {
+          id: '1',
+          provider_name: 'MySMSTab',
+          api_username: '',
+          api_password: '',
+          base_url: 'https://sms.mysmstab.com/api/',
+          default_sender: 'MySMSTab',
+          is_active: false
+        }
+      } else {
+        provider = {
+          id: providerData.id,
+          provider_name: providerData.provider_name,
+          api_username: providerData.username || '',
+          api_password: providerData.password || '',
+          base_url: 'https://sms.mysmstab.com/api/',
+          default_sender: providerData.default_sender || 'MySMSTab',
+          is_active: providerData.is_active || false
+        }
+      }
 
       // Mock templates for now
       const mockTemplates: SMSTemplate[] = [
@@ -92,7 +116,7 @@ export const SMSManagement = () => {
         }
       ]
 
-      setProviders(mockProviders)
+      setProviders([provider])
       setTemplates(mockTemplates)
       setStats({
         totalSent: 0,
@@ -115,7 +139,7 @@ export const SMSManagement = () => {
 
   const updateProvider = async (providerId: string, updates: Partial<SMSProvider>) => {
     try {
-      // For now, just update local state until migration is complete
+      // Update local state first
       setProviders(prev => 
         prev.map(provider => 
           provider.id === providerId 
@@ -124,17 +148,31 @@ export const SMSManagement = () => {
         )
       )
 
+      // Save to database
+      const { error } = await supabase
+        .from('sms_provider_settings')
+        .upsert({
+          provider_name: 'MySMSTab',
+          username: updates.api_username,
+          password: updates.api_password,
+          default_sender: updates.default_sender || 'MySMSTab',
+          is_active: updates.is_active ?? false,
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) throw error
+
       toast({
         title: "Success",
-        description: "SMS provider settings saved locally"
+        description: "SMS provider settings saved successfully"
       })
       
     } catch (error) {
       console.error('Error updating provider:', error)
       toast({
-        title: "Info",
-        description: "SMS system will be fully functional after migration completes",
-        variant: "default"
+        title: "Error",
+        description: "Failed to save SMS provider settings",
+        variant: "destructive"
       })
     }
   }
@@ -176,6 +214,39 @@ export const SMSManagement = () => {
       toast({
         title: "Error",
         description: `Failed to send test SMS: ${error.message}`,
+        variant: "destructive"
+      })
+    }
+  }
+
+  const checkBalance = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('mysmstab-sms', {
+        body: {
+          checkBalance: true
+        }
+      })
+
+      if (error) throw error
+
+      if (data.success) {
+        setStats(prev => ({
+          ...prev,
+          walletBalance: data.data?.balance || prev.walletBalance
+        }))
+        
+        toast({
+          title: "Success",
+          description: `Balance: ₦${data.data?.balance?.toLocaleString() || 0} ${data.data?.currency || 'NGN'}`
+        })
+      } else {
+        throw new Error(data.error || 'Unknown error')
+      }
+    } catch (error) {
+      console.error('Error checking balance:', error)
+      toast({
+        title: "Error",
+        description: `Failed to check balance: ${error.message}`,
         variant: "destructive"
       })
     }
@@ -270,9 +341,14 @@ export const SMSManagement = () => {
         <TabsContent value="providers" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">SMS Providers</h3>
-            <Button onClick={processSMSQueue} variant="outline">
-              Process Queue
-            </Button>
+            <div className="space-x-2">
+              <Button onClick={checkBalance} variant="outline">
+                Check Balance  
+              </Button>
+              <Button onClick={processSMSQueue} variant="outline">
+                Process Queue
+              </Button>
+            </div>
           </div>
           
           {providers.map((provider) => (
@@ -294,34 +370,45 @@ export const SMSManagement = () => {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor={`api_key_${provider.id}`}>API Key</Label>
+                    <Label htmlFor={`username_${provider.id}`}>Username</Label>
                     <Input
-                      id={`api_key_${provider.id}`}
-                      type="password"
-                      value={provider.api_key || ''}
-                      placeholder="Enter API Key"
-                      onChange={(e) => updateProvider(provider.id, { api_key: e.target.value })}
+                      id={`username_${provider.id}`}
+                      value={provider.api_username || ''}
+                      placeholder="Enter MySMSTab username"
+                      onChange={(e) => updateProvider(provider.id, { api_username: e.target.value })}
                     />
                   </div>
                   <div>
-                    <Label htmlFor={`sender_id_${provider.id}`}>Sender ID</Label>
+                    <Label htmlFor={`password_${provider.id}`}>Password</Label>
                     <Input
-                      id={`sender_id_${provider.id}`}
-                      value={provider.sender_id || ''}
-                      placeholder="Enter Sender ID"
-                      onChange={(e) => updateProvider(provider.id, { sender_id: e.target.value })}
+                      id={`password_${provider.id}`}
+                      type="password"
+                      value={provider.api_password || ''}
+                      placeholder="Enter MySMSTab password"
+                      onChange={(e) => updateProvider(provider.id, { api_password: e.target.value })}
                     />
                   </div>
                 </div>
                 
-                <div>
-                  <Label htmlFor={`base_url_${provider.id}`}>Base URL</Label>
-                  <Input
-                    id={`base_url_${provider.id}`}
-                    value={provider.base_url || ''}
-                    placeholder="https://api.mysmstab.com"
-                    onChange={(e) => updateProvider(provider.id, { base_url: e.target.value })}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`base_url_${provider.id}`}>API URL</Label>
+                    <Input
+                      id={`base_url_${provider.id}`}
+                      value={provider.base_url || ''}
+                      placeholder="https://sms.mysmstab.com/api/"
+                      onChange={(e) => updateProvider(provider.id, { base_url: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`default_sender_${provider.id}`}>Default Sender</Label>
+                    <Input
+                      id={`default_sender_${provider.id}`}
+                      value={provider.default_sender || ''}
+                      placeholder="MySMSTab"
+                      onChange={(e) => updateProvider(provider.id, { default_sender: e.target.value })}
+                    />
+                  </div>
                 </div>
                 
                 <div className="flex items-center space-x-2">

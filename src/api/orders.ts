@@ -240,8 +240,19 @@ export const updateOrder = async (
       }
     });
 
-    if (error || !data.success) {
-      throw new Error(data?.error || error?.message || 'Failed to update order');
+    if (error) {
+      console.error('❌ Error updating order via admin function:', error);
+      // Provide more specific error messaging
+      const errorMessage = error.message || 'Edge Function returned a non-2xx status code';
+      if (errorMessage.includes('non-2xx status code')) {
+        throw new Error('Order update service is temporarily unavailable. Please try again.');
+      }
+      throw new Error(`Order update failed: ${errorMessage}`);
+    }
+
+    if (!data?.success) {
+      console.error('❌ Order update failed:', data?.error);
+      throw new Error(data?.error || 'Order update failed due to server error');
     }
 
     if (process.env.NODE_ENV === 'development') {

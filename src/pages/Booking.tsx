@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,8 +12,12 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useLocation } from 'react-router-dom';
 
 const Booking = () => {
+  const location = useLocation();
+  const eventType = location.state?.eventType;
+  
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -24,6 +28,23 @@ const Booking = () => {
   const [eventDate, setEventDate] = useState<Date>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (eventType) {
+      const eventTypeNames = {
+        weddings: 'Weddings & Celebrations',
+        corporate: 'Corporate Events', 
+        memorial: 'Memorial Services'
+      };
+      const eventName = eventTypeNames[eventType as keyof typeof eventTypeNames];
+      if (eventName) {
+        setFormData(prev => ({
+          ...prev,
+          additionalDetails: `Event Type: ${eventName}\n\n`
+        }));
+      }
+    }
+  }, [eventType]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({

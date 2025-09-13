@@ -7464,40 +7464,37 @@ export type Database = {
       }
       sms_provider_settings: {
         Row: {
-          created_at: string
-          created_by: string | null
+          api_password: string | null
+          api_url: string | null
+          api_username: string | null
+          created_at: string | null
           default_sender: string | null
           id: string
-          is_active: boolean
-          password: string | null
+          is_active: boolean | null
           provider_name: string
-          updated_at: string
-          updated_by: string | null
-          username: string | null
+          updated_at: string | null
         }
         Insert: {
-          created_at?: string
-          created_by?: string | null
+          api_password?: string | null
+          api_url?: string | null
+          api_username?: string | null
+          created_at?: string | null
           default_sender?: string | null
           id?: string
-          is_active?: boolean
-          password?: string | null
-          provider_name?: string
-          updated_at?: string
-          updated_by?: string | null
-          username?: string | null
+          is_active?: boolean | null
+          provider_name: string
+          updated_at?: string | null
         }
         Update: {
-          created_at?: string
-          created_by?: string | null
+          api_password?: string | null
+          api_url?: string | null
+          api_username?: string | null
+          created_at?: string | null
           default_sender?: string | null
           id?: string
-          is_active?: boolean
-          password?: string | null
+          is_active?: boolean | null
           provider_name?: string
-          updated_at?: string
-          updated_by?: string | null
-          username?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }

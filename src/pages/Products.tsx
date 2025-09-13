@@ -12,6 +12,7 @@ import ProductsTable from '@/components/products/ProductsTable';
 import { ProductDialog } from '@/components/products/ProductDialog';
 import { DeleteProductDialog } from '@/components/products/DeleteProductDialog';
 import { useNetworkResilience } from '@/hooks/useNetworkResilience';
+import { UploadRateLimitStatus } from '@/components/admin/UploadRateLimitStatus';
 
 const Products = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -170,6 +171,7 @@ const Products = () => {
   return (
     <div className="space-y-6">
       <ProductsHeader onAddProduct={handleAddProduct} />
+      <UploadRateLimitStatus />
       
       <SimpleProductsFilters 
         categoryFilter={categoryFilter}

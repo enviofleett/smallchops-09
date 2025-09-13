@@ -86,15 +86,17 @@ Deno.serve(async (req) => {
 
     console.log('Admin access confirmed');
 
-    // Check rate limiting using direct database query instead of RPC
+    // Smart rate limiting based on user role
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     
     const { data: recentUploads, error: rateLimitError } = await supabase
       .from('audit_logs')
-      .select('id')
+      .select('id, created_at')
       .eq('action', 'product_image_upload')
       .eq('user_id', user.id)
-      .gte('created_at', oneHourAgo);
+      .gte('created_at', oneHourAgo)
+      .order('created_at', { ascending: false });
 
     if (rateLimitError) {
       console.error('Rate limit check error:', rateLimitError);
@@ -114,13 +116,56 @@ Deno.serve(async (req) => {
     }
 
     const uploadCount = recentUploads?.length || 0;
-    if (uploadCount >= 10) {
-      console.log(`Rate limit exceeded for user ${user.id}: ${uploadCount} uploads in last hour`);
+    const recentBurstUploads = recentUploads?.filter(upload => upload.created_at >= fiveMinutesAgo).length || 0;
+    
+    // Rate limits based on role
+    const hourlyLimit = profile?.role === 'admin' ? 100 : 20;
+    const burstLimit = 10; // Max 10 uploads in 5 minutes for any user
+    
+    // Check burst limit first (5 minutes)
+    if (recentBurstUploads >= burstLimit) {
+      const nextAllowedTime = new Date(Date.now() + 5 * 60 * 1000);
+      console.log(`Burst rate limit exceeded for user ${user.id}: ${recentBurstUploads} uploads in last 5 minutes`);
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Rate limit exceeded. Maximum 10 uploads per hour.',
-          retry_after: 3600 // seconds
+          error: `Too many uploads in quick succession. Please wait 5 minutes before uploading again.`,
+          retry_after: 300, // 5 minutes
+          rate_limit_info: {
+            current_hourly: uploadCount,
+            hourly_limit: hourlyLimit,
+            current_burst: recentBurstUploads,
+            burst_limit: burstLimit,
+            reset_time: nextAllowedTime.toISOString()
+          }
+        }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': '300'
+          }
+        }
+      );
+    }
+    
+    // Check hourly limit
+    if (uploadCount >= hourlyLimit) {
+      const nextAllowedTime = new Date(Date.now() + 60 * 60 * 1000);
+      console.log(`Hourly rate limit exceeded for user ${user.id}: ${uploadCount}/${hourlyLimit} uploads in last hour`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Upload limit reached. ${profile?.role === 'admin' ? 'Admin' : 'User'} accounts are limited to ${hourlyLimit} uploads per hour.`,
+          retry_after: 3600,
+          rate_limit_info: {
+            current_hourly: uploadCount,
+            hourly_limit: hourlyLimit,
+            current_burst: recentBurstUploads,
+            burst_limit: burstLimit,
+            reset_time: nextAllowedTime.toISOString()
+          }
         }),
         {
           status: 429,
@@ -133,7 +178,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Rate limit check passed: ${uploadCount}/10 uploads used`);
+    console.log(`Rate limit check passed: ${uploadCount}/${hourlyLimit} uploads used (${recentBurstUploads}/${burstLimit} in last 5 minutes)`);
 
     if (req.method === 'POST') {
       const body: ProductImageUploadRequest = await req.json();

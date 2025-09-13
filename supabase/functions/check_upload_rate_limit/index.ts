@@ -7,6 +7,7 @@ const corsHeaders = {
 
 interface RateLimitCheck {
   user_id: string;
+  user_role?: string;
 }
 
 Deno.serve(async (req) => {
@@ -29,14 +30,26 @@ Deno.serve(async (req) => {
 
     if (req.method === 'POST') {
       const body: RateLimitCheck = await req.json();
-      const { user_id } = body;
+      const { user_id, user_role } = body;
 
-      // Check upload rate limit: 10 uploads per hour per user
+      // Get user role if not provided
+      let userRole = user_role;
+      if (!userRole) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user_id)
+          .single();
+        userRole = profile?.role;
+      }
+
+      // Smart rate limiting based on user role
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       
       const { data: recentUploads, error } = await supabase
         .from('audit_logs')
-        .select('id')
+        .select('id, created_at')
         .eq('action', 'product_image_upload')
         .eq('user_id', user_id)
         .gte('created_at', oneHourAgo);
@@ -53,14 +66,27 @@ Deno.serve(async (req) => {
       }
 
       const uploadCount = recentUploads?.length || 0;
-      const allowed = uploadCount < 10;
+      const burstCount = recentUploads?.filter(upload => upload.created_at >= fiveMinutesAgo).length || 0;
+      
+      // Rate limits based on role
+      const hourlyLimit = userRole === 'admin' ? 100 : 20;
+      const burstLimit = 10;
+      
+      const hourlyAllowed = uploadCount < hourlyLimit;
+      const burstAllowed = burstCount < burstLimit;
+      const allowed = hourlyAllowed && burstAllowed;
 
       return new Response(
         JSON.stringify({
           allowed,
           current_count: uploadCount,
-          limit: 10,
-          reset_time: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+          limit: hourlyLimit,
+          burst_count: burstCount,
+          burst_limit: burstLimit,
+          reset_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          burst_reset_time: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+          user_role: userRole,
+          reason: !allowed ? (!burstAllowed ? 'burst_limit_exceeded' : 'hourly_limit_exceeded') : 'allowed'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

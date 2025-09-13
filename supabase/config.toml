@@ -94,21 +94,6 @@ verify_jwt = false
 [functions.smtp-health-check]
 verify_jwt = false
 
-[functions.production-deployment-check]
-verify_jwt = true
-
-[functions.supabase-auth-email-sender]
-verify_jwt = false
-
-[functions.get-products-by-category]
-verify_jwt = false
-
-[functions.get-public-categories]
-verify_jwt = false
-
-[functions.calculate-vat-breakdown]
-verify_jwt = false
-
 [analytics]
 enabled = false
 port = 54327

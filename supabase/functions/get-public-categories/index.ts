@@ -1,67 +1,54 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Environment-aware CORS headers for production security
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  // Allow any Lovable project domain for development/preview
+  const allowedOrigins = [
+    'https://oknnklksdiqaifhxaccs.lovableproject.com', // Production
+    /^https:\/\/[\w-]+\.lovableproject\.com$/, // Dev/Preview domains
+    /^https:\/\/[\w-]+\.lovable\.dev$/ // lovable.dev domains
+  ];
+  
+  const isAllowed = origin && allowedOrigins.some(allowed => 
+    typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
+  );
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://oknnklksdiqaifhxaccs.lovableproject.com',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
+}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.50.0");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Fetching public categories');
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name, description, banner_url, slug")
+    .order("name", { ascending: true });
 
-    const { data: categories, error } = await supabase
-      .from('categories')
-      .select(`
-        id,
-        name,
-        description,
-        display_order,
-        is_active,
-        image_url
-      `)
-      .eq('is_active', true)
-      .order('display_order', { ascending: true })
-      .order('name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching categories:', error);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch categories' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    console.log(`Found ${categories?.length || 0} active categories`);
-
+  if (error) {
     return new Response(
-      JSON.stringify({ categories: categories || [] }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: error.message }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
+
+  return new Response(
+    JSON.stringify(data ?? []),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 });

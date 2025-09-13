@@ -9128,11 +9128,7 @@ export type Database = {
       }
       get_environment_config: {
         Args: Record<PropertyKey, never>
-        Returns: {
-          environment: string
-          is_live_mode: boolean
-          webhook_url: string
-        }[]
+        Returns: Json
       }
       get_menu_structure_secure: {
         Args: Record<PropertyKey, never>

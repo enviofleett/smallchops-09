@@ -386,6 +386,80 @@ serve(async (req) => {
         });
       }
 
+      // Handle SMS credentials check
+      if (reqBody?.action === 'check_sms_credentials') {
+        try {
+          // Check if SMS credentials are available in environment
+          const smsCredentials = [];
+          if (Deno.env.get('MYSMSTAB_API_KEY')) {
+            smsCredentials.push('MYSMSTAB_API_KEY');
+          }
+          if (Deno.env.get('MYSMSTAB_SENDER_ID')) {
+            smsCredentials.push('MYSMSTAB_SENDER_ID');
+          }
+
+          return new Response(JSON.stringify({
+            success: true,
+            sms_credentials: smsCredentials,
+            message: 'SMS credentials checked successfully'
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Failed to check SMS credentials: ${error.message}`
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // Handle SMS balance check
+      if (reqBody?.action === 'check_sms_balance') {
+        try {
+          // Invoke SMS sender function to check balance
+          const { data, error } = await supabaseClient.functions.invoke('sms-sender', {
+            headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+            body: { check_balance: true }
+          });
+
+          if (error) {
+            throw error;
+          }
+
+          // Update provider settings with new balance
+          if (data?.balance !== undefined) {
+            await supabaseClient
+              .from('sms_provider_settings')
+              .update({
+                wallet_balance: data.balance,
+                last_balance_check: new Date().toISOString()
+              })
+              .eq('provider_name', 'mysmstab');
+          }
+
+          return new Response(JSON.stringify({
+            success: true,
+            balance: data?.balance || 0,
+            message: 'SMS balance checked successfully'
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Failed to check SMS balance: ${error.message}`
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Handle regular business settings update
       const body = reqBody;
       

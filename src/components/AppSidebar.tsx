@@ -11,7 +11,8 @@ import {
   Calendar,
   BarChart3, 
   FileSearch, 
-  Settings
+  Settings,
+  MessageSquare
 } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { usePermissionGuard, MENU_PERMISSION_KEYS, type MenuPermissionKey } from '@/hooks/usePermissionGuard';
@@ -91,6 +92,12 @@ const management: MenuItem[] = [
 ];
 
 const administration: MenuItem[] = [
+  {
+    icon: MessageSquare,
+    label: 'SMS Communication',
+    path: '/admin/sms',
+    permissionKey: MENU_PERMISSION_KEYS.settingsCommunications
+  },
   {
     icon: BarChart3,
     label: 'Reports',

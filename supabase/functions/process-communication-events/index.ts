@@ -96,6 +96,14 @@ Deno.serve(async (req) => {
               case 'customer_welcome': // FIXED: Handle the correct event type
                 success = await processCustomerWelcomeEmail(supabase, event)
                 break
+              // SMS event types
+              case 'order_status_sms':
+              case 'payment_confirmation_sms':
+              case 'welcome_sms':
+              case 'order_ready_sms':
+              case 'order_completed_sms':
+                success = await processSMSEvent(supabase, event)
+                break
               default:
                 console.log(`Unknown event type: ${event.event_type}`)
                 success = false
@@ -439,4 +447,46 @@ async function getSupportEmail(supabase: any): Promise<string> {
     .maybeSingle()
   
   return data?.email || 'support@yourdomain.com'
+}
+
+// SMS processing function
+async function processSMSEvent(supabase: any, event: any): Promise<boolean> {
+  console.log(`Processing SMS event ${event.event_type} for ${event.recipient_phone}`)
+  
+  if (!event.recipient_phone) {
+    console.error('Missing recipient phone for SMS event')
+    return false
+  }
+
+  // Check if SMS is enabled and phone is not suppressed
+  const { data: suppressed } = await supabase
+    .rpc('is_phone_suppressed', { phone_number: event.recipient_phone })
+
+  if (suppressed) {
+    console.log(`Phone number ${event.recipient_phone} is suppressed, marking as suppressed`)
+    
+    await supabase
+      .from('communication_events')
+      .update({ 
+        sms_status: 'suppressed',
+        sms_error_message: 'Phone number is in suppression list'
+      })
+      .eq('id', event.id)
+    
+    return true // Consider as successfully processed (just suppressed)
+  }
+
+  // Delegate to SMS sender function
+  const { data: smsResult, error: smsError } = await supabase.functions.invoke('sms-sender', {
+    headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+    body: { event_id: event.id }
+  })
+
+  if (smsError) {
+    console.error('Failed to invoke SMS sender:', smsError)
+    return false
+  }
+
+  console.log(`SMS processing result:`, smsResult)
+  return smsResult?.success || false
 }

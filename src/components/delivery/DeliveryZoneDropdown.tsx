@@ -98,42 +98,42 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full h-auto min-h-[44px] justify-between bg-background border-border hover:border-primary/50 transition-colors"
+            className="w-full h-auto min-h-[48px] sm:min-h-[44px] justify-between bg-background border-border hover:border-primary/50 transition-colors touch-manipulation text-left"
           >
             {selectedZone ? (
-              <div className="flex items-center justify-between w-full py-1">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  <span className="font-medium">{selectedZone.name}</span>
+              <div className="flex items-center justify-between w-full py-2 sm:py-1">
+                <div className="flex items-center gap-3 sm:gap-2 min-w-0 flex-1">
+                  <MapPin className="h-5 w-5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+                  <span className="font-medium text-base sm:text-sm truncate">{selectedZone.name}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                   {selectedDeliveryFee === 0 ? (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                      'FREE'
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-1">
+                      FREE
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-primary border-primary/30">
+                    <Badge variant="outline" className="text-primary border-primary/30 text-xs px-2 py-1">
                       ₦{selectedDeliveryFee.toFixed(2)}
                     </Badge>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Search className="h-4 w-4" />
-                <span>Search and select delivery zone...</span>
+              <div className="flex items-center gap-3 sm:gap-2 text-muted-foreground py-2 sm:py-1">
+                <Search className="h-5 w-5 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="text-base sm:text-sm">Search and select delivery zone...</span>
               </div>
             )}
-            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronDown className="ml-2 h-5 w-5 sm:h-4 sm:w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         
-        <PopoverContent className="w-full p-0 z-[300] bg-popover/95 backdrop-blur-sm border shadow-xl" align="start" sideOffset={4}>
+        <PopoverContent className="w-[calc(100vw-2rem)] sm:w-full max-w-sm p-0 z-[300] bg-popover/95 backdrop-blur-sm border shadow-xl" align="start" sideOffset={4}>
           <Command>
-            <CommandInput placeholder="Search delivery zones..." className="h-9" />
-            <CommandEmpty>No delivery zone found.</CommandEmpty>
+            <CommandInput placeholder="Search delivery zones..." className="h-12 text-base px-4" />
+            <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">No delivery zone found.</CommandEmpty>
             <CommandGroup>
-              <CommandList className="max-h-[200px] overflow-y-auto">
+              <CommandList className="max-h-[300px] sm:max-h-[200px] overflow-y-auto">
                 {zones.map((zone) => {
                   const deliveryFee = calculateDeliveryFee(zone);
                   const isSelected = selectedZoneId === zone.id;
@@ -146,19 +146,19 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
                         handleZoneSelect(zone.id);
                         setOpen(false);
                       }}
-                      className="cursor-pointer p-3 border-b last:border-b-0"
+                      className="cursor-pointer p-4 sm:p-3 border-b last:border-b-0 min-h-[60px] sm:min-h-auto active:bg-accent/80 touch-manipulation"
                     >
                       <div className="flex items-center justify-between w-full">
                         <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-primary" />
-                            <span className="font-medium">{zone.name}</span>
-                            {isSelected && <Check className="h-4 w-4 text-primary" />}
+                          <div className="flex items-center gap-3 sm:gap-2">
+                            <MapPin className="h-5 w-5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+                            <span className="font-medium text-base sm:text-sm leading-tight">{zone.name}</span>
+                            {isSelected && <Check className="h-5 w-5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />}
                           </div>
                         </div>
                         
-                        <div className="ml-3">
-                          <Badge variant="outline" className="text-primary border-primary/30">
+                        <div className="ml-4 sm:ml-3 flex-shrink-0">
+                          <Badge variant="outline" className="text-primary border-primary/30 text-sm px-2 py-1">
                             ₦{deliveryFee.toFixed(2)}
                           </Badge>
                         </div>

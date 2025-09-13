@@ -198,7 +198,7 @@ class DeliverySchedulingService {
     const slots: DeliveryTimeSlot[] = [];
     
     // Production: Use dynamic hours based on day of week
-    // Monday-Saturday: 8am-7pm, Sunday: 10am-4pm
+    // Monday-Saturday: 8am-7pm, Sunday: 10am-5pm
     const openTime = this.parseTime(businessHours.open);
     const closeTime = this.parseTime(businessHours.close);
     const slotDuration = this.config.default_delivery_duration_minutes; // Use config duration

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Settings, Building2 } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Settings, Building2, MessageCircle } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 export const PublicFooter = () => {
@@ -65,7 +65,18 @@ const PublicFooterContent = () => {
               Contact Us
             </h3>
             <div className="space-y-2 text-gray-300">
-              <div>+234 807 3011 100</div>
+              <div className="flex items-center gap-2">
+                <span>+234 807 3011 100</span>
+                <a 
+                  href="https://wa.me/2348073011100" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-green-500 hover:text-green-400 transition-colors"
+                  aria-label="Contact us on WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </a>
+              </div>
               
               <div>support@startersmallchops.com</div>
             </div>

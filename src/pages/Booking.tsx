@@ -59,20 +59,67 @@ const Booking = () => {
   };
 
   const handleSubmitBooking = async () => {
-    // Validation
-    if (!formData.fullName || !formData.email || !formData.phoneNumber || 
-        !eventDate || !formData.numberOfGuests || !formData.eventType) {
-      toast.error('Please fill in all required fields');
-      return;
+    // Comprehensive validation
+    const errors = [];
+    
+    if (!formData.fullName?.trim()) {
+      errors.push('Full name is required');
+    }
+    
+    if (!formData.email?.trim()) {
+      errors.push('Email address is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    if (!formData.phoneNumber?.trim()) {
+      errors.push('Phone number is required');
+    } else if (!/^[\d\s\+\-\(\)]+$/.test(formData.phoneNumber.trim())) {
+      errors.push('Please enter a valid phone number');
+    }
+    
+    if (!formData.eventType) {
+      errors.push('Please select an event type');
+    }
+    
+    if (!eventDate) {
+      errors.push('Event date is required');
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(eventDate);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        errors.push('Event date cannot be in the past');
+      }
+      
+      // Check if event is too far in the future (optional business rule)
+      const maxDate = new Date();
+      maxDate.setFullYear(maxDate.getFullYear() + 2);
+      if (selectedDate > maxDate) {
+        errors.push('Please select an event date within the next 2 years');
+      }
+    }
+    
+    if (!formData.numberOfGuests?.trim()) {
+      errors.push('Number of guests is required');
+    } else {
+      const guestCount = parseInt(formData.numberOfGuests);
+      if (isNaN(guestCount) || guestCount < 1) {
+        errors.push('Number of guests must be at least 1');
+      } else if (guestCount > 10000) {
+        errors.push('Please contact us directly for events over 10,000 guests');
+      }
     }
 
-    if (formData.isCompanyOrder && !formData.companyName) {
-      toast.error('Please enter company name for company orders');
-      return;
+    if (formData.isCompanyOrder && !formData.companyName?.trim()) {
+      errors.push('Company name is required for company orders');
     }
 
-    if (parseInt(formData.numberOfGuests) < 1) {
-      toast.error('Number of guests must be at least 1');
+    // Display all validation errors
+    if (errors.length > 0) {
+      toast.error('Please fix the following issues:\n• ' + errors.join('\n• '));
       return;
     }
 
@@ -80,15 +127,15 @@ const Booking = () => {
 
     try {
       const bookingData = {
-        full_name: formData.fullName,
-        email: formData.email,
-        phone_number: formData.phoneNumber,
-        event_date: format(eventDate, 'yyyy-MM-dd'),
+        full_name: formData.fullName.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone_number: formData.phoneNumber.trim(),
+        event_date: format(eventDate!, 'yyyy-MM-dd'),
         number_of_guests: parseInt(formData.numberOfGuests),
-        additional_details: formData.additionalDetails || null,
+        additional_details: formData.additionalDetails?.trim() || null,
         event_type: formData.eventType,
         is_company_order: formData.isCompanyOrder,
-        company_name: formData.isCompanyOrder ? formData.companyName : null
+        company_name: formData.isCompanyOrder ? formData.companyName?.trim() : null
       };
 
       const { data: booking, error } = await supabase
@@ -97,9 +144,12 @@ const Booking = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw new Error('Failed to save booking. Please try again.');
+      }
 
-      // Send WhatsApp notification
+      // Send WhatsApp notification (non-blocking)
       try {
         await supabase.functions.invoke('send-whatsapp-booking', {
           body: { booking: bookingData }
@@ -110,7 +160,7 @@ const Booking = () => {
       }
 
       setIsSubmitted(true);
-      toast.success('Catering request submitted successfully!');
+      toast.success('🎉 Catering request submitted successfully! We\'ll contact you within 24 hours.');
       
       // Reset form
       setFormData({
@@ -124,9 +174,9 @@ const Booking = () => {
         companyName: ''
       });
       setEventDate(undefined);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting catering request:', error);
-      toast.error('Failed to submit request. Please try again.');
+      toast.error(error.message || 'Failed to submit request. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -292,9 +342,14 @@ const Booking = () => {
                         mode="single"
                         selected={eventDate}
                         onSelect={setEventDate}
-                        disabled={(date) => date < new Date()}
+                        disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date < today;
+                        }}
                         initialFocus
-                        className="pointer-events-auto"
+                        className="p-3 pointer-events-auto"
+                        numberOfMonths={1}
                       />
                     </PopoverContent>
                   </Popover>
@@ -332,7 +387,14 @@ const Booking = () => {
                 className="w-full"
                 size="lg"
               >
-                {isSubmitting ? 'Submitting Request...' : 'Submit Catering Request'}
+                {isSubmitting ? (
+                  <>
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                    Submitting Request...
+                  </>
+                ) : (
+                  'Submit Catering Request'
+                )}
               </Button>
             </CardContent>
           </Card>

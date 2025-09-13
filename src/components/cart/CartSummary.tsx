@@ -246,8 +246,9 @@ export function CartSummary({ cart }: CartSummaryProps) {
             </div>
           )}
 
-          {/* Checkout Button - Hidden on mobile (fixed button used instead) */}
+          {/* Checkout Button - Responsive for all devices */}
           <Button 
+            data-checkout-button
             onClick={() => {
               if (hasMOQViolations) {
                 toast.error('Please meet minimum order requirements before checkout');
@@ -256,11 +257,16 @@ export function CartSummary({ cart }: CartSummaryProps) {
               console.log('Checkout button clicked, opening checkout flow');
               setShowCheckout(true);
             }} 
-            className="w-full hidden lg:block"
+            className="w-full"
             size="lg"
             disabled={cart.items.length === 0 || hasMOQViolations}
           >
-            {hasMOQViolations ? 'MOQ Requirements Not Met' : `Proceed to Checkout ${formatCurrency(cart.summary.total_amount)}`}
+            <span className="hidden sm:inline">
+              {hasMOQViolations ? 'MOQ Requirements Not Met' : `Proceed to Checkout ${formatCurrency(cart.summary.total_amount)}`}
+            </span>
+            <span className="sm:hidden">
+              {hasMOQViolations ? 'MOQ Not Met' : `Checkout ${formatCurrency(cart.summary.total_amount)}`}
+            </span>
           </Button>
         </CardContent>
       </Card>

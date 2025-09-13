@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { CartItemRow } from '@/components/cart/CartItemRow';
 import { CartSummary } from '@/components/cart/CartSummary';
+import { formatCurrency } from '@/lib/discountCalculations';
 
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
@@ -98,6 +99,28 @@ export default function Cart() {
         )}
       </div>
 
+
+      {/* Fixed Bottom Checkout Button - Mobile Only */}
+      {cart.items.length > 0 && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 safe-area-pb z-50">
+          <div className="max-w-md mx-auto">
+            <Button 
+              onClick={() => {
+                // Scroll to cart summary to trigger checkout
+                const cartSummary = document.querySelector('[data-checkout-button]');
+                if (cartSummary) {
+                  (cartSummary as HTMLButtonElement).click();
+                }
+              }}
+              className="w-full"
+              size="lg"
+              disabled={cart.items.length === 0}
+            >
+              Proceed to Checkout {formatCurrency(cart.summary.total_amount)}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Public Footer - Hidden on mobile when cart has items to avoid overlap */}
       <div className={cart.items.length > 0 ? "hidden lg:block" : ""}>

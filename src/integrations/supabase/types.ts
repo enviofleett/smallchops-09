@@ -1109,12 +1109,14 @@ export type Database = {
           external_id: string | null
           id: string
           last_error: string | null
+          last_retry_at: string | null
           order_id: string | null
           payload: Json | null
           priority: string | null
           processed_at: string | null
           processing_started_at: string | null
           processing_time_ms: number | null
+          provider_response: Json | null
           recipient_email: string | null
           retry_count: number
           scheduled_at: string | null
@@ -1142,12 +1144,14 @@ export type Database = {
           external_id?: string | null
           id?: string
           last_error?: string | null
+          last_retry_at?: string | null
           order_id?: string | null
           payload?: Json | null
           priority?: string | null
           processed_at?: string | null
           processing_started_at?: string | null
           processing_time_ms?: number | null
+          provider_response?: Json | null
           recipient_email?: string | null
           retry_count?: number
           scheduled_at?: string | null
@@ -1175,12 +1179,14 @@ export type Database = {
           external_id?: string | null
           id?: string
           last_error?: string | null
+          last_retry_at?: string | null
           order_id?: string | null
           payload?: Json | null
           priority?: string | null
           processed_at?: string | null
           processing_started_at?: string | null
           processing_time_ms?: number | null
+          provider_response?: Json | null
           recipient_email?: string | null
           retry_count?: number
           scheduled_at?: string | null
@@ -8660,7 +8666,17 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      email_queue_health: {
+        Row: {
+          failed_count: number | null
+          last_email_sent: string | null
+          oldest_queued_email: string | null
+          queued_count: number | null
+          sent_count: number | null
+          stuck_emails: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       activate_admin_user: {
@@ -9469,12 +9485,14 @@ export type Database = {
           external_id: string | null
           id: string
           last_error: string | null
+          last_retry_at: string | null
           order_id: string | null
           payload: Json | null
           priority: string | null
           processed_at: string | null
           processing_started_at: string | null
           processing_time_ms: number | null
+          provider_response: Json | null
           recipient_email: string | null
           retry_count: number
           scheduled_at: string | null
@@ -10013,6 +10031,14 @@ export type Database = {
       }
       safe_get_order_details: {
         Args: { p_order_id: string }
+        Returns: Json
+      }
+      safe_update_order_status: {
+        Args: {
+          p_admin_notes?: string
+          p_new_status: string
+          p_order_id: string
+        }
         Returns: Json
       }
       set_limit: {

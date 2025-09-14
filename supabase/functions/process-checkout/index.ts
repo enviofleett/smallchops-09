@@ -52,6 +52,9 @@ serve(async (req) => {
     console.log("📨 Checkout request received:", {
       customer_email: requestBody.customer?.email,
       items_count: requestBody.items?.length,
+      has_discount: !!requestBody.discount,
+      discount_code: requestBody.discount?.code,
+      cart_total: requestBody.cart_totals?.final_total,
     });
 
     // ✅ Validate request
@@ -241,6 +244,41 @@ serve(async (req) => {
       }
     }
 
+    // 🔧 CRITICAL: Apply discount if provided
+    let finalAmount = order.total_amount;
+    let discountApplied = 0;
+    
+    if (requestBody.discount && requestBody.cart_totals) {
+      console.log('💸 Processing discount:', {
+        code: requestBody.discount.code,
+        discount_amount: requestBody.discount.discount_amount,
+        client_final_total: requestBody.cart_totals.final_total
+      });
+      
+      // Use the client-calculated discounted total as authoritative
+      // This ensures the exact same amount the customer sees is charged
+      finalAmount = requestBody.cart_totals.final_total;
+      discountApplied = requestBody.discount.discount_amount;
+      
+      // Update the order with discount information
+      const { error: discountUpdateError } = await supabaseAdmin
+        .from('orders')
+        .update({ 
+          total_amount: finalAmount,
+          discount_amount: discountApplied,
+          discount_code: requestBody.discount.code,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+      
+      if (discountUpdateError) {
+        console.error('⚠️ Failed to update order with discount:', discountUpdateError);
+      } else {
+        console.log('✅ Order updated with discount. Final amount:', finalAmount);
+        order.total_amount = finalAmount;
+      }
+    }
+
     console.log("💰 Order details:", order);
 
     // ✅ Build payment callback URL
@@ -249,6 +287,13 @@ serve(async (req) => {
 
     // ✅ Initialize payment with service role for internal authorization
     console.log("💳 Initializing payment via paystack-secure...");
+    console.log("💰 Payment amount details:", {
+      original_total: order.total_amount,
+      delivery_fee: deliveryFee,
+      discount_applied: discountApplied,
+      final_amount: finalAmount
+    });
+    
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
       headers: {
         Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
@@ -257,16 +302,18 @@ serve(async (req) => {
       body: {
         action: "initialize",
         email: order.customer_email,
-        amount: order.total_amount,
+        amount: finalAmount, // Use final discounted amount
         metadata: {
           order_id: order.id,
           customer_name: requestBody.customer.name,
           order_number: order.order_number,
           fulfillment_type: requestBody.fulfillment.type,
-          items_subtotal: order.total_amount - deliveryFee,
+          items_subtotal: requestBody.cart_totals?.subtotal || (finalAmount - deliveryFee),
           delivery_fee: deliveryFee,
-          client_total: order.total_amount,
-          authoritative_total: order.total_amount,
+          discount_amount: discountApplied,
+          discount_code: requestBody.discount?.code || null,
+          client_total: finalAmount,
+          authoritative_total: finalAmount,
         },
         callback_url: callbackUrl,
       },

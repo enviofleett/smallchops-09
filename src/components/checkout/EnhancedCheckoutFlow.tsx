@@ -477,9 +477,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     return deliveryZone?.base_fee || 0;
   }, [formData.fulfillment_type, deliveryZone?.base_fee]);
 
-  // Calculate totals
-  const subtotal = getCartTotal();
-  const total = subtotal + deliveryFee;
+  // Calculate totals - use cart's calculated values including discounts
+  const subtotal = cart.summary.subtotal; // Pre-discount subtotal
+  const total = cart.summary.total_amount + deliveryFee; // Use discounted amount from cart
   const handleFormChange = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -619,6 +619,21 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         } : null,
         payment: {
           method: formData.payment_method || 'paystack'
+        },
+        // 🔧 CRITICAL: Include discount information for backend
+        discount: cart.appliedDiscount ? {
+          code: cart.appliedDiscount.code,
+          discount_code_id: cart.appliedDiscount.discount_code_id,
+          discount_amount: cart.appliedDiscount.discount_amount,
+          final_amount: cart.appliedDiscount.final_amount
+        } : null,
+        // Include cart totals for validation
+        cart_totals: {
+          subtotal: cart.summary.subtotal,
+          discount_amount: cart.summary.discount_amount,
+          total_amount: cart.summary.total_amount,
+          delivery_fee: deliveryFee,
+          final_total: total // This includes delivery fee
         }
       };
       console.log('📦 Submitting checkout data:', sanitizedData);

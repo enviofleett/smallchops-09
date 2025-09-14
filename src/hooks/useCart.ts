@@ -43,11 +43,15 @@ const isProduction = !window.location.hostname.includes('localhost');
 
 export interface AppliedDiscount {
   code: string;
+  discount_code_id?: string;
   discount_amount: number;
   final_amount: number;
+  valid?: boolean;
   code_details: {
     name: string;
     description?: string;
+    type?: string;
+    value?: number;
   };
 }
 

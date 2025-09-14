@@ -38,6 +38,36 @@ serve(async (req) => {
       user_agent 
     }: ApplyDiscountRequest = await req.json();
 
+    // Validation helper function
+    function validateDiscountRequest(discountCodeId: string, email: string, discountAmount: number, originalAmount: number, finalAmount: number): boolean {
+      if (!discountCodeId || typeof discountCodeId !== 'string') {
+        console.error('Invalid discount_code_id:', discountCodeId);
+        return false;
+      }
+      
+      if (!email || typeof email !== 'string' || !email.includes('@')) {
+        console.error('Invalid customer_email:', email);
+        return false;
+      }
+      
+      if (typeof discountAmount !== 'number' || discountAmount < 0) {
+        console.error('Invalid discount_amount:', discountAmount);
+        return false;
+      }
+      
+      if (typeof originalAmount !== 'number' || originalAmount < 0) {
+        console.error('Invalid original_amount:', originalAmount);
+        return false;
+      }
+      
+      if (typeof finalAmount !== 'number' || finalAmount < 0) {
+        console.error('Invalid final_amount:', finalAmount);
+        return false;
+      }
+      
+      return true;
+    }
+
     console.log('Apply discount request:', { 
       discount_code_id, 
       customer_email, 
@@ -64,41 +94,69 @@ serve(async (req) => {
     const actualDiscountCodeId = discount_code_id;
     console.log('Using discount code ID:', actualDiscountCodeId);
 
-    // Record the discount usage with proper UUID
-    const { data: usage, error: usageError } = await supabase
-      .from('discount_code_usage')
-      .insert({
-        discount_code_id: actualDiscountCodeId,
-        order_id,
-        customer_email,
-        discount_amount,
-        original_amount,
-        final_amount,
-        ip_address,
-        user_agent
-      })
-      .select()
-      .single();
+        // Validate that we have all required fields
+        if (!validateDiscountRequest(actualDiscountCodeId, customer_email, discount_amount, original_amount, final_amount)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid discount application data' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-    if (usageError) {
-      console.error('Usage recording error:', usageError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to record discount usage' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+        // Record the discount usage with proper UUID and error handling
+        const { data: usage, error: usageError } = await supabase
+          .from('discount_code_usage')
+          .insert({
+            discount_code_id: actualDiscountCodeId,
+            order_id,
+            customer_email,
+            discount_amount,
+            original_amount,
+            final_amount,
+            ip_address,
+            user_agent
+          })
+          .select()
+          .single();
 
-    // Update usage count on discount code using actual UUID
-    const { error: updateError } = await supabase
-      .from('discount_codes')
-      .update({ 
-        usage_count: supabase.raw('usage_count + 1') 
-      })
-      .eq('id', actualDiscountCodeId);
+        if (usageError) {
+          console.error('Usage recording error:', usageError);
+          
+          // Log the failure for audit
+          await supabase.from('audit_logs').insert({
+            action: 'discount_usage_recording_failed',
+            category: 'Promotion Processing',
+            message: `Failed to record discount usage for code ${discount_code_id}`,
+            entity_id: actualDiscountCodeId,
+            new_values: { 
+              error: usageError.message,
+              customer_email,
+              discount_amount,
+              original_amount,
+              final_amount 
+            }
+          });
+          
+          return new Response(
+            JSON.stringify({ error: 'Failed to record discount usage' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+    // Update usage count using database function for atomicity
+    const { error: updateError } = await supabase.rpc('increment_discount_usage_count', {
+      p_discount_code_id: actualDiscountCodeId
+    });
 
     if (updateError) {
       console.error('Usage count update error:', updateError);
-      // Don't return error as usage was already recorded
+      // Log error but don't fail the transaction as usage was already recorded
+      await supabase.from('audit_logs').insert({
+        action: 'discount_usage_count_update_failed',
+        category: 'Promotion Processing',
+        message: `Failed to update usage count for discount code ${discount_code_id}`,
+        entity_id: actualDiscountCodeId,
+        new_values: { error: updateError.message }
+      });
     }
 
     // Log the application for audit trail with proper UUID

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { CheckoutFlow } from '@/components/checkout/CheckoutFlow';
 import { DiscountCodeInput } from '@/components/checkout/DiscountCodeInput';
-import { useCart, Cart } from '@/hooks/useCart';
+import { useCart, Cart, AppliedDiscount } from '@/hooks/useCart';
 import { useMOQValidation } from '@/hooks/useMOQValidation';
 import { formatCurrency } from '@/lib/formatCurrency';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
@@ -28,11 +28,13 @@ export function CartSummary({ cart }: CartSummaryProps) {
   // Get customer email for discount validation
   const customerEmail = customerAccount?.email || '';
 
-  const handleDiscountApplied = (discount: any) => {
+  const handleDiscountApplied = (discount: AppliedDiscount & { code_details: any }) => {
+    console.log('Discount applied in CartSummary:', discount);
     applyDiscount(discount);
   };
 
   const handleDiscountRemoved = () => {
+    console.log('Discount removed in CartSummary');
     removeDiscount();
   };
 

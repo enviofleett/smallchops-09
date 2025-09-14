@@ -7,20 +7,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useDiscountManagement } from "@/hooks/useDiscountManagement";
+import { AppliedDiscount } from "@/hooks/useCart";
 
 interface DiscountCodeInputProps {
   orderAmount: number;
   customerEmail: string;
-  appliedDiscount?: {
-    code: string;
-    discount_amount: number;
-    final_amount: number;
+  appliedDiscount?: AppliedDiscount & {
     code_details: {
       name: string;
       description?: string;
     };
   };
-  onDiscountApplied: (discount: any) => void;
+  onDiscountApplied: (discount: AppliedDiscount & { code_details: any }) => void;
   onDiscountRemoved: () => void;
 }
 
@@ -42,7 +40,10 @@ export function DiscountCodeInput({
     onSuccess: async (data) => {
       const discount = {
         code: code.toUpperCase(),
-        ...data
+        discount_code_id: data.discount_code_id, // Include the UUID from validation
+        discount_amount: data.discount_amount,
+        final_amount: data.final_amount,
+        code_details: data.code_details
       };
       
       onDiscountApplied(discount);

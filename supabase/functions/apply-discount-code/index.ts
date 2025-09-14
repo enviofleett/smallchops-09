@@ -45,11 +45,28 @@ serve(async (req) => {
       );
     }
 
-    // Record the discount usage
+    // First, get the actual discount code record by code to get the UUID
+    const { data: discountCodeData, error: lookupError } = await supabase
+      .from('discount_codes')
+      .select('id')
+      .eq('code', discount_code_id.toUpperCase())
+      .single();
+
+    if (lookupError || !discountCodeData) {
+      console.error('Discount code lookup error:', lookupError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid discount code - not found in database' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const actualDiscountCodeId = discountCodeData.id;
+
+    // Record the discount usage with proper UUID
     const { data: usage, error: usageError } = await supabase
       .from('discount_code_usage')
       .insert({
-        discount_code_id,
+        discount_code_id: actualDiscountCodeId,
         order_id,
         customer_email,
         discount_amount,
@@ -69,26 +86,27 @@ serve(async (req) => {
       );
     }
 
-    // Update usage count on discount code
+    // Update usage count on discount code using actual UUID
     const { error: updateError } = await supabase
       .from('discount_codes')
       .update({ 
         usage_count: supabase.raw('usage_count + 1') 
       })
-      .eq('id', discount_code_id);
+      .eq('id', actualDiscountCodeId);
 
     if (updateError) {
       console.error('Usage count update error:', updateError);
       // Don't return error as usage was already recorded
     }
 
-    // Log the application for audit trail
+    // Log the application for audit trail with proper UUID
     await supabase.from('audit_logs').insert({
       action: 'discount_code_applied',
       category: 'Promotion Processing',
-      message: `Discount code applied for customer ${customer_email}`,
-      entity_id: discount_code_id,
+      message: `Discount code ${discount_code_id} applied for customer ${customer_email}`,
+      entity_id: actualDiscountCodeId,
       new_values: {
+        discount_code: discount_code_id,
         customer_email,
         discount_amount,
         original_amount,

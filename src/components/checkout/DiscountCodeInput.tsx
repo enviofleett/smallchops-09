@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useDiscountManagement } from "@/hooks/useDiscountManagement";
 
 interface DiscountCodeInputProps {
   orderAmount: number;
@@ -33,27 +33,29 @@ export function DiscountCodeInput({
 }: DiscountCodeInputProps) {
   const [code, setCode] = useState("");
   const { toast } = useToast();
+  const { validateDiscountCode, trackDiscountApplication } = useDiscountManagement();
 
   const validateMutation = useMutation({
     mutationFn: async (discountCode: string) => {
-      const { data, error } = await supabase.functions.invoke('validate-discount-code', {
-        body: {
-          code: discountCode,
-          customer_email: customerEmail,
-          order_amount: orderAmount,
-        }
-      });
-
-      if (error) throw error;
-      if (!data.valid) throw new Error(data.error);
-      return data;
+      return await validateDiscountCode(discountCode, customerEmail, orderAmount);
     },
-    onSuccess: (data) => {
-      onDiscountApplied({
+    onSuccess: async (data) => {
+      const discount = {
         code: code.toUpperCase(),
         ...data
-      });
+      };
+      
+      onDiscountApplied(discount);
       setCode("");
+      
+      // Track the discount application for analytics
+      try {
+        await trackDiscountApplication(discount, customerEmail, orderAmount);
+      } catch (error) {
+        console.error('Failed to track discount application:', error);
+        // Continue without disrupting user experience
+      }
+      
       toast({
         title: "Discount Applied!",
         description: `You saved ₦${data.discount_amount.toLocaleString()}`,
@@ -62,7 +64,7 @@ export function DiscountCodeInput({
     onError: (error: any) => {
       toast({
         title: "Invalid Discount Code",
-        description: error.message,
+        description: error.message || "Please check your discount code and try again.",
         variant: "destructive",
       });
     }

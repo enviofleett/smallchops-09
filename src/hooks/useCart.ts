@@ -41,11 +41,21 @@ const FREE_DELIVERY_THRESHOLD = 30;
 // Optimize cart operations for production
 const isProduction = !window.location.hostname.includes('localhost');
 
+export interface AppliedDiscount {
+  code: string;
+  discount_amount: number;
+  final_amount: number;
+  code_details: {
+    name: string;
+    description?: string;
+  };
+}
+
 export interface Cart {
   items: CartItem[];
   summary: OrderSummary;
   itemCount: number;
-  
+  appliedDiscount?: AppliedDiscount;
 }
 
 export const useCartInternal = () => {
@@ -64,7 +74,8 @@ export const useCartInternal = () => {
       delivery_discount: 0,
       total_amount: 0,
     },
-    itemCount: 0
+    itemCount: 0,
+    appliedDiscount: undefined
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -91,8 +102,16 @@ export const useCartInternal = () => {
       if (savedCart) {
         const parsedCart = JSON.parse(savedCart);
         
-        // Validate the parsed cart structure
+        // Validate the parsed cart structure and ensure discount integrity
         if (parsedCart && typeof parsedCart === 'object' && Array.isArray(parsedCart.items)) {
+          // Ensure appliedDiscount is properly structured if it exists
+          if (parsedCart.appliedDiscount && !parsedCart.appliedDiscount.code) {
+            console.warn('🛒 useCart - Invalid discount structure, removing...');
+            parsedCart.appliedDiscount = undefined;
+            parsedCart.summary.discount_amount = 0;
+            parsedCart.summary.total_amount = parsedCart.summary.subtotal + parsedCart.summary.delivery_fee;
+          }
+          
           setCart(parsedCart);
           console.log('🛒 useCart - Cart restored from localStorage');
         } else {
@@ -128,7 +147,8 @@ export const useCartInternal = () => {
   // Memoized cart calculations for performance
   const calculateCartSummary = useCallback((
     items: CartItem[], 
-    deliveryFee = 0
+    deliveryFee = 0,
+    appliedDiscount?: AppliedDiscount
   ): Cart => {
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -145,7 +165,8 @@ export const useCartInternal = () => {
       deliveryFee
     );
 
-    const total_amount = subtotal + deliveryFee;
+    const discount_amount = appliedDiscount?.discount_amount || 0;
+    const total_amount = Math.max(0, subtotal + deliveryFee - discount_amount);
 
     return {
       items: items,
@@ -155,11 +176,12 @@ export const useCartInternal = () => {
         total_vat: Math.round(vatSummary.total_vat * 100) / 100,
         tax_amount: 0,
         delivery_fee: Math.round(deliveryFee * 100) / 100,
-        discount_amount: 0,
+        discount_amount: Math.round(discount_amount * 100) / 100,
         delivery_discount: 0,
         total_amount: Math.round(total_amount * 100) / 100
       },
-      itemCount
+      itemCount,
+      appliedDiscount
     };
   }, []);
 
@@ -241,7 +263,7 @@ export const useCartInternal = () => {
       }
       
       console.log('🛒 Updated items:', updatedItems);
-      const newCart = calculateCartSummary(updatedItems, 0); // No delivery fee in cart
+      const newCart = calculateCartSummary(updatedItems, 0, cart.appliedDiscount); // No delivery fee in cart
       console.log('🛒 New cart calculated:', newCart);
       setCart(newCart);
       console.log('🛒 Cart state updated successfully');
@@ -255,7 +277,7 @@ export const useCartInternal = () => {
     const updatedItems = cart.items.filter(item => item.id !== cartItemId);
     
     // Immediate calculation and state update
-    const newCart = calculateCartSummary(updatedItems, 0);
+    const newCart = calculateCartSummary(updatedItems, 0, cart.appliedDiscount);
     setCart(newCart);
   }, [cart.items, calculateCartSummary]);
 
@@ -276,7 +298,7 @@ export const useCartInternal = () => {
     });
     
     // Immediate calculation and state update
-    const newCart = calculateCartSummary(updatedItems, 0);
+    const newCart = calculateCartSummary(updatedItems, 0, cart.appliedDiscount);
     setCart(newCart);
   }, [cart.items, calculateCartSummary, removeItem]);
 
@@ -295,7 +317,8 @@ export const useCartInternal = () => {
         total_amount: 0,
         
       },
-      itemCount: 0
+      itemCount: 0,
+      appliedDiscount: undefined
     });
     localStorage.removeItem(CART_STORAGE_KEY);
     localStorage.removeItem('guest_session');
@@ -304,8 +327,18 @@ export const useCartInternal = () => {
   };
 
   const updateDeliveryFee = (deliveryFee: number) => {
-    setCart(calculateCartSummary(cart.items, deliveryFee));
+    setCart(calculateCartSummary(cart.items, deliveryFee, cart.appliedDiscount));
   };
+
+  const applyDiscount = useCallback((discount: AppliedDiscount) => {
+    const newCart = calculateCartSummary(cart.items, cart.summary.delivery_fee, discount);
+    setCart(newCart);
+  }, [cart.items, cart.summary.delivery_fee, calculateCartSummary]);
+
+  const removeDiscount = useCallback(() => {
+    const newCart = calculateCartSummary(cart.items, cart.summary.delivery_fee, undefined);
+    setCart(newCart);
+  }, [cart.items, cart.summary.delivery_fee, calculateCartSummary]);
 
 
   const getCartTotal = () => cart.summary.total_amount;
@@ -319,6 +352,8 @@ export const useCartInternal = () => {
     updateQuantity,
     clearCart,
     updateDeliveryFee,
+    applyDiscount,
+    removeDiscount,
     getCartTotal,
     getItemCount,
     isEmpty

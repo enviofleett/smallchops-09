@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { CheckoutFlow } from '@/components/checkout/CheckoutFlow';
+import { DiscountCodeInput } from '@/components/checkout/DiscountCodeInput';
 import { useCart, Cart } from '@/hooks/useCart';
 import { useMOQValidation } from '@/hooks/useMOQValidation';
 import { formatCurrency } from '@/lib/formatCurrency';
@@ -17,11 +18,23 @@ interface CartSummaryProps {
 export function CartSummary({ cart }: CartSummaryProps) {
   const { validateMOQ } = useMOQValidation();
   const { customerAccount } = useCustomerAuth();
+  const { applyDiscount, removeDiscount } = useCart();
   const [showCheckout, setShowCheckout] = useState(false);
 
   // Check for MOQ violations
   const moqValidation = validateMOQ(cart.items, cart.items);
   const hasMOQViolations = !moqValidation.isValid;
+
+  // Get customer email for discount validation
+  const customerEmail = customerAccount?.email || '';
+
+  const handleDiscountApplied = (discount: any) => {
+    applyDiscount(discount);
+  };
+
+  const handleDiscountRemoved = () => {
+    removeDiscount();
+  };
 
 
   return (
@@ -49,6 +62,13 @@ export function CartSummary({ cart }: CartSummaryProps) {
               <span>{formatCurrency(cart.summary.subtotal)}</span>
             </div>
 
+            {/* Discount Section */}
+            {cart.summary.discount_amount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Discount Applied</span>
+                <span>-{formatCurrency(cart.summary.discount_amount)}</span>
+              </div>
+            )}
 
             {/* Delivery costs are calculated at checkout - removed from cart summary */}
 
@@ -60,6 +80,15 @@ export function CartSummary({ cart }: CartSummaryProps) {
             </div>
 
           </div>
+
+          {/* Discount Code Input - Show for both authenticated and guest users */}
+          <DiscountCodeInput
+            orderAmount={cart.summary.subtotal}
+            customerEmail={customerEmail || 'guest@example.com'}
+            appliedDiscount={cart.appliedDiscount}
+            onDiscountApplied={handleDiscountApplied}
+            onDiscountRemoved={handleDiscountRemoved}
+          />
 
 
           {/* MOQ Violation Warning */}

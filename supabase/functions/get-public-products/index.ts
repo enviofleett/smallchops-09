@@ -27,13 +27,13 @@ serve(async (req) => {
       const body = await req.json();
       categoryId = body.category_id;
       page = parseInt(body.page || '1');
-      limit = Math.min(parseInt(body.limit || '20'), 50);
+      limit = Math.min(parseInt(body.limit || '20'), 200); // Increased limit for production
       search = body.q;
     } else {
       const url = new URL(req.url);
       categoryId = url.searchParams.get('category_id');
       page = parseInt(url.searchParams.get('page') || '1');
-      limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
+      limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 200); // Increased limit for production
       search = url.searchParams.get('q');
     }
     

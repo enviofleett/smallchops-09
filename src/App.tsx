@@ -38,6 +38,7 @@ const AdminOrders = withLazyLoading(() => import("./pages/admin/AdminOrders"), u
 const AdminOrderDetails = withLazyLoading(() => import("./pages/admin/AdminOrderDetails"), undefined, false, 10000);
 const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"), undefined, false, 10000);
 const Products = withLazyLoading(() => import("./pages/Products"), undefined, false, 10000);
+const DiscountCodes = withLazyLoading(() => import("./pages/DiscountCodes"), undefined, false, 10000);
 const Customers = withLazyLoading(() => import("./pages/Customers"), undefined, false, 10000);
 const Reports = withLazyLoading(() => import("./pages/Reports"), undefined, false, 10000);
 const PaymentSettings = withLazyLoading(() => import("./pages/PaymentSettings").then(m => ({ default: m.PaymentSettings })), undefined, false, 10000);
@@ -274,6 +275,7 @@ const App = () => {
                 <Route path="/admin/orders/:id" element={<ErrorBoundaryWrapper context="Admin Order Details"><AdminOrderDetails /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/delivery" element={<ErrorBoundaryWrapper context="Admin Delivery"><AdminDelivery /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/products" element={<ErrorBoundaryWrapper context="Products"><Products /></ErrorBoundaryWrapper>} />
+                <Route path="/admin/discount-codes" element={<ErrorBoundaryWrapper context="Discount Codes"><DiscountCodes /></ErrorBoundaryWrapper>} />
                 <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />
                 <Route path="/customers" element={<ErrorBoundaryWrapper context="Customers"><Customers /></ErrorBoundaryWrapper>} />
                 <Route path="/reports" element={<ErrorBoundaryWrapper context="Reports"><Reports /></ErrorBoundaryWrapper>} />

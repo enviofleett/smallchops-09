@@ -2950,6 +2950,116 @@ export type Database = {
         }
         Relationships: []
       }
+      discount_code_usage: {
+        Row: {
+          customer_email: string
+          discount_amount: number
+          discount_code_id: string
+          final_amount: number
+          id: string
+          ip_address: unknown | null
+          order_id: string | null
+          original_amount: number
+          used_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          customer_email: string
+          discount_amount: number
+          discount_code_id: string
+          final_amount: number
+          id?: string
+          ip_address?: unknown | null
+          order_id?: string | null
+          original_amount: number
+          used_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          customer_email?: string
+          discount_amount?: number
+          discount_code_id?: string
+          final_amount?: number
+          id?: string
+          ip_address?: unknown | null
+          order_id?: string | null
+          original_amount?: number
+          used_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_code_usage_discount_code_id_fkey"
+            columns: ["discount_code_id"]
+            isOneToOne: false
+            referencedRelation: "discount_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discount_codes: {
+        Row: {
+          applicable_days: string[] | null
+          code: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          max_discount_amount: number | null
+          min_order_amount: number | null
+          name: string
+          new_customers_only: boolean | null
+          type: string
+          updated_at: string
+          usage_count: number | null
+          usage_limit: number | null
+          valid_from: string
+          valid_until: string | null
+          value: number
+        }
+        Insert: {
+          applicable_days?: string[] | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_discount_amount?: number | null
+          min_order_amount?: number | null
+          name: string
+          new_customers_only?: boolean | null
+          type: string
+          updated_at?: string
+          usage_count?: number | null
+          usage_limit?: number | null
+          valid_from?: string
+          valid_until?: string | null
+          value: number
+        }
+        Update: {
+          applicable_days?: string[] | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_discount_amount?: number | null
+          min_order_amount?: number | null
+          name?: string
+          new_customers_only?: boolean | null
+          type?: string
+          updated_at?: string
+          usage_count?: number | null
+          usage_limit?: number | null
+          valid_from?: string
+          valid_until?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
       dispatch_analytics: {
         Row: {
           average_completion_time_minutes: number | null

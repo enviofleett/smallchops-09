@@ -46,8 +46,13 @@ export function DiscountCodeInput({
         code_details: data.code_details
       };
       
+      console.log('✅ Discount applied successfully:', discount);
+      
       onDiscountApplied(discount);
       setCode("");
+      
+      // ✅ Wait for state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Track the discount application for analytics
       try {
@@ -71,7 +76,7 @@ export function DiscountCodeInput({
     }
   });
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!code.trim()) {
       toast({
         title: "Enter Discount Code",
@@ -81,6 +86,7 @@ export function DiscountCodeInput({
       return;
     }
 
+    console.log('🎫 Applying discount code:', code.trim().toUpperCase());
     validateMutation.mutate(code.trim().toUpperCase());
   };
 

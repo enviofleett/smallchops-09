@@ -335,14 +335,49 @@ export const useCartInternal = () => {
   };
 
   const applyDiscount = useCallback((discount: AppliedDiscount) => {
+    console.log('🎫 Applying discount to cart:', discount);
     const newCart = calculateCartSummary(cart.items, cart.summary.delivery_fee, discount);
+    console.log('🧮 Cart recalculated after discount:', newCart.summary);
     setCart(newCart);
   }, [cart.items, cart.summary.delivery_fee, calculateCartSummary]);
 
   const removeDiscount = useCallback(() => {
+    console.log('🎫 Removing discount from cart');
     const newCart = calculateCartSummary(cart.items, cart.summary.delivery_fee, undefined);
+    console.log('🧮 Cart recalculated after discount removal:', newCart.summary);
     setCart(newCart);
   }, [cart.items, cart.summary.delivery_fee, calculateCartSummary]);
+
+  // ✅ Force recalculation of cart summary
+  const recalculateCartSummary = useCallback(() => {
+    const subtotal = cart.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    let discount_amount = 0;
+    if (cart.appliedDiscount) {
+      if (cart.appliedDiscount.discount_amount) {
+        discount_amount = cart.appliedDiscount.discount_amount;
+      }
+    }
+    
+    const total_amount = Math.max(0, subtotal - discount_amount);
+    
+    console.log('🧮 Cart Summary Recalculated:', {
+      subtotal,
+      discount_amount,
+      total_amount,
+      applied_discount: cart.appliedDiscount
+    });
+    
+    const newCart = calculateCartSummary(cart.items, cart.summary.delivery_fee, cart.appliedDiscount);
+    setCart(newCart);
+  }, [cart.items, cart.appliedDiscount, cart.summary.delivery_fee, calculateCartSummary]);
+
+  // ✅ Trigger recalculation when discount changes
+  useEffect(() => {
+    if (cart.appliedDiscount) {
+      recalculateCartSummary();
+    }
+  }, [cart.appliedDiscount]);
 
 
   const getCartTotal = () => cart.summary.total_amount;
@@ -358,6 +393,7 @@ export const useCartInternal = () => {
     updateDeliveryFee,
     applyDiscount,
     removeDiscount,
+    recalculateCartSummary,
     getCartTotal,
     getItemCount,
     isEmpty

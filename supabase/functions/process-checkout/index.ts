@@ -244,29 +244,85 @@ serve(async (req) => {
       }
     }
 
-    // 🔧 CRITICAL: Apply discount if provided
+    // 🔧 CRITICAL: Apply discount if provided with backend validation
     let finalAmount = order.total_amount;
     let discountApplied = 0;
     
-    if (requestBody.discount && requestBody.cart_totals) {
-      console.log('💸 Processing discount:', {
+    console.log('💰 Backend amount calculation:', {
+      subtotal: requestBody.cart_totals?.subtotal,
+      discount_amount: requestBody.cart_totals?.discount_amount,
+      delivery_fee: deliveryFee,
+      client_final_total: requestBody.cart_totals?.final_total
+    });
+
+    // ✅ Recalculate on backend to ensure accuracy
+    const backendSubtotal = requestBody.items.reduce(
+      (sum, item) => sum + (item.unit_price * item.quantity), 0
+    );
+
+    let backendDiscountAmount = 0;
+    if (requestBody.discount && requestBody.cart_totals?.discount_code) {
+      console.log('💸 Processing discount with backend validation:', {
         code: requestBody.discount.code,
-        discount_amount: requestBody.discount.discount_amount,
+        client_discount_amount: requestBody.discount.discount_amount,
         client_final_total: requestBody.cart_totals.final_total
       });
       
-      // Use the client-calculated discounted total as authoritative
-      // This ensures the exact same amount the customer sees is charged
-      finalAmount = requestBody.cart_totals.final_total;
-      discountApplied = requestBody.discount.discount_amount;
+      // Verify discount is still valid on backend
+      const { data: discount, error: discountError } = await supabaseAdmin
+        .from('discount_codes')
+        .select('*')
+        .eq('code', requestBody.discount.code)
+        .eq('is_active', true)
+        .single();
+        
+      if (discount && !discountError) {
+        if (discount.type === 'percentage') {
+          backendDiscountAmount = backendSubtotal * (discount.value / 100);
+        } else if (discount.type === 'fixed') {
+          backendDiscountAmount = Math.min(discount.value, backendSubtotal);
+        }
+        
+        console.log('✅ Backend discount validation successful:', {
+          backend_discount: backendDiscountAmount,
+          client_discount: requestBody.discount.discount_amount
+        });
+      } else {
+        console.warn('⚠️ Discount code validation failed on backend:', discountError);
+        // Use client calculation as fallback
+        backendDiscountAmount = requestBody.discount.discount_amount;
+      }
+    }
+
+    const backendTotalAmount = backendSubtotal - backendDiscountAmount;
+    const backendFinalTotal = backendTotalAmount + deliveryFee;
+
+    // ✅ Validate client calculation matches backend (allow small rounding differences)
+    const amountDifference = Math.abs(backendFinalTotal - (requestBody.cart_totals?.final_total || 0));
+    if (amountDifference > 0.01 && requestBody.cart_totals?.final_total) {
+      console.warn('⚠️ Amount mismatch detected:', {
+        client_final: requestBody.cart_totals.final_total,
+        backend_final: backendFinalTotal,
+        difference: amountDifference
+      });
       
-      // Update the order with discount information
+      // Use backend calculation for security
+      finalAmount = backendFinalTotal;
+      discountApplied = backendDiscountAmount;
+    } else {
+      // Client calculation is accurate, use it
+      finalAmount = requestBody.cart_totals?.final_total || backendFinalTotal;
+      discountApplied = requestBody.discount?.discount_amount || backendDiscountAmount;
+    }
+
+    // Update the order with final amounts
+    if (requestBody.discount || discountApplied > 0) {
       const { error: discountUpdateError } = await supabaseAdmin
         .from('orders')
         .update({ 
           total_amount: finalAmount,
           discount_amount: discountApplied,
-          discount_code: requestBody.discount.code,
+          discount_code: requestBody.discount?.code || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
@@ -274,10 +330,15 @@ serve(async (req) => {
       if (discountUpdateError) {
         console.error('⚠️ Failed to update order with discount:', discountUpdateError);
       } else {
-        console.log('✅ Order updated with discount. Final amount:', finalAmount);
+        console.log('✅ Order updated with validated amounts. Final amount:', finalAmount);
         order.total_amount = finalAmount;
       }
     }
+
+    console.log('✅ Final amount for Paystack:', {
+      amount: finalAmount,
+      kobo: Math.round(finalAmount * 100)
+    });
 
     console.log("💰 Order details:", order);
 

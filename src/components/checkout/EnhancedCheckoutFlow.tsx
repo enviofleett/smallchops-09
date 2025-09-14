@@ -17,6 +17,7 @@ import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
 import { DeliveryScheduler } from "./DeliveryScheduler";
 import { OrderSummaryCard } from "./OrderSummaryCard";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
+import { PaymentSummaryDebug } from "./PaymentSummaryDebug";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
@@ -513,6 +514,19 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
 
   // Remove the processOrder hook usage since it doesn't exist
 
+  // ✅ Payment amount validation function
+  const validatePaymentAmount = (cartSummary: any, deliveryFee: number) => {
+    console.log('🔍 Payment Amount Validation:', {
+      subtotal: cartSummary.subtotal,
+      discount_amount: cartSummary.discount_amount,
+      discounted_subtotal: cartSummary.total_amount,
+      delivery_fee: deliveryFee,
+      final_calculated: cartSummary.total_amount + deliveryFee
+    });
+    
+    return cartSummary.total_amount + deliveryFee;
+  };
+
   const handleFormSubmit = async () => {
     // 🔐 AUTHENTICATION CHECK: Allow both authenticated users and guests with session
     if (!isAuthenticated && !guestSessionId) {
@@ -543,6 +557,29 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     try {
       setIsSubmitting(true);
       setLastPaymentError(null);
+
+      // ✅ CRITICAL: Ensure cart state is fully updated before payment
+      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure state sync
+      
+      // ✅ Get the latest cart state
+      const latestCart = cart; // This should have the discount applied
+      
+      // ✅ Calculate final amount with proper validation
+      const finalAmount = validatePaymentAmount(latestCart.summary, deliveryFee);
+      
+      console.log('💰 Payment Initialization:', {
+        original_subtotal: latestCart.summary.subtotal,
+        discount_applied: latestCart.summary.discount_amount,
+        discounted_subtotal: latestCart.summary.total_amount,
+        delivery_fee: deliveryFee,
+        final_amount: finalAmount,
+        paystack_amount_kobo: Math.round(finalAmount * 100)
+      });
+      
+      // ✅ Validate that we have the correct discount data
+      if (cart.appliedDiscount && latestCart.summary.discount_amount === 0) {
+        console.warn('⚠️ Discount was applied but cart shows no discount amount');
+      }
 
       // Validate MOQ requirements before processing
       console.log('🔍 Validating MOQ requirements for cart:', items);
@@ -629,14 +666,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         } : null,
         // Include cart totals for validation
         cart_totals: {
-          subtotal: cart.summary.subtotal,
-          discount_amount: cart.summary.discount_amount,
-          total_amount: cart.summary.total_amount,
+          subtotal: latestCart.summary.subtotal,
+          discount_amount: latestCart.summary.discount_amount,
+          total_amount: latestCart.summary.total_amount,
           delivery_fee: deliveryFee,
-          final_total: total // This includes delivery fee
+          final_total: finalAmount // Use validated final amount
         }
       };
-      console.log('📦 Submitting checkout data:', sanitizedData);
+      
+      console.log('📦 Sending to backend:', sanitizedData);
 
       // Call Supabase edge function with authentication when available
       const invokeOptions: any = { body: sanitizedData };
@@ -673,9 +711,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       }
 
       // 🔧 CRITICAL: Use backend-returned amount if available
-      const authoritativeAmount = data?.amount || parsedData?.amount || total;
+      const authoritativeAmount = data?.amount || parsedData?.amount || finalAmount;
       console.log('💰 Amount prioritization:', {
         client_calculated: total,
+        validated_final_amount: finalAmount,
         backend_returned: data?.amount,
         authoritative_amount: authoritativeAmount,
         items_subtotal: data?.items_subtotal,

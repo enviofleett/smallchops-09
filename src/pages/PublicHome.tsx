@@ -82,7 +82,7 @@ const PublicHome = () => {
     onlyPromotions: false,
     minRating: 0
   });
-  const itemsPerPage = 9;
+  const itemsPerPage = 12; // Increased from 9 to show more products
   const {
     addItem
   } = useCart();
@@ -101,7 +101,10 @@ const PublicHome = () => {
     refetch: refetchProducts
   } = useQuery({
     queryKey: ['public-products', activeCategory === 'all' ? undefined : activeCategory],
-    queryFn: () => getPublicProducts({ category_id: activeCategory === 'all' ? undefined : activeCategory }),
+    queryFn: () => getPublicProducts({ 
+      category_id: activeCategory === 'all' ? undefined : activeCategory,
+      limit: 200 // Show all products instead of default 20
+    }),
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 2,

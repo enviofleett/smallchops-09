@@ -731,13 +731,6 @@ export type Database = {
             foreignKeyName: "business_sensitive_data_business_settings_id_fkey"
             columns: ["business_settings_id"]
             isOneToOne: false
-            referencedRelation: "business_info"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "business_sensitive_data_business_settings_id_fkey"
-            columns: ["business_settings_id"]
-            isOneToOne: false
             referencedRelation: "business_settings"
             referencedColumns: ["id"]
           },
@@ -8667,128 +8660,7 @@ export type Database = {
       }
     }
     Views: {
-      business_info: {
-        Row: {
-          accent_color: string | null
-          allow_guest_checkout: boolean | null
-          business_hours: Json | null
-          created_at: string | null
-          default_vat_rate: number | null
-          delivery_scheduling_config: Json | null
-          facebook_url: string | null
-          favicon_url: string | null
-          id: string | null
-          instagram_url: string | null
-          linkedin_url: string | null
-          logo_alt_text: string | null
-          logo_dark_url: string | null
-          logo_url: string | null
-          name: string | null
-          primary_color: string | null
-          secondary_color: string | null
-          seo_description: string | null
-          seo_keywords: string | null
-          seo_title: string | null
-          site_url: string | null
-          social_card_url: string | null
-          tagline: string | null
-          tiktok_url: string | null
-          twitter_url: string | null
-          updated_at: string | null
-          website_url: string | null
-          working_hours: string | null
-          youtube_url: string | null
-        }
-        Insert: {
-          accent_color?: string | null
-          allow_guest_checkout?: boolean | null
-          business_hours?: Json | null
-          created_at?: string | null
-          default_vat_rate?: number | null
-          delivery_scheduling_config?: Json | null
-          facebook_url?: string | null
-          favicon_url?: string | null
-          id?: string | null
-          instagram_url?: string | null
-          linkedin_url?: string | null
-          logo_alt_text?: string | null
-          logo_dark_url?: string | null
-          logo_url?: string | null
-          name?: string | null
-          primary_color?: string | null
-          secondary_color?: string | null
-          seo_description?: string | null
-          seo_keywords?: string | null
-          seo_title?: string | null
-          site_url?: string | null
-          social_card_url?: string | null
-          tagline?: string | null
-          tiktok_url?: string | null
-          twitter_url?: string | null
-          updated_at?: string | null
-          website_url?: string | null
-          working_hours?: string | null
-          youtube_url?: string | null
-        }
-        Update: {
-          accent_color?: string | null
-          allow_guest_checkout?: boolean | null
-          business_hours?: Json | null
-          created_at?: string | null
-          default_vat_rate?: number | null
-          delivery_scheduling_config?: Json | null
-          facebook_url?: string | null
-          favicon_url?: string | null
-          id?: string | null
-          instagram_url?: string | null
-          linkedin_url?: string | null
-          logo_alt_text?: string | null
-          logo_dark_url?: string | null
-          logo_url?: string | null
-          name?: string | null
-          primary_color?: string | null
-          secondary_color?: string | null
-          seo_description?: string | null
-          seo_keywords?: string | null
-          seo_title?: string | null
-          site_url?: string | null
-          social_card_url?: string | null
-          tagline?: string | null
-          tiktok_url?: string | null
-          twitter_url?: string | null
-          updated_at?: string | null
-          website_url?: string | null
-          working_hours?: string | null
-          youtube_url?: string | null
-        }
-        Relationships: []
-      }
-      business_info_public: {
-        Row: {
-          accent_color: string | null
-          business_hours: Json | null
-          facebook_url: string | null
-          favicon_url: string | null
-          instagram_url: string | null
-          linkedin_url: string | null
-          logo_dark_url: string | null
-          logo_url: string | null
-          name: string | null
-          primary_color: string | null
-          secondary_color: string | null
-          seo_description: string | null
-          seo_keywords: string | null
-          seo_title: string | null
-          site_url: string | null
-          tagline: string | null
-          tiktok_url: string | null
-          twitter_url: string | null
-          website_url: string | null
-          working_hours: string | null
-          youtube_url: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       activate_admin_user: {
@@ -9298,6 +9170,10 @@ export type Database = {
           test_mode: boolean
           webhook_secret: string
         }[]
+      }
+      get_admin_business_info: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_admin_invitation_metrics: {
         Args: Record<PropertyKey, never>
@@ -10353,6 +10229,10 @@ export type Database = {
           p_otp_code: string
           p_otp_type: string
         }
+        Returns: Json
+      }
+      verify_final_security_compliance: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       verify_payment_atomic: {

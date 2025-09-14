@@ -43,7 +43,7 @@ const isProduction = !window.location.hostname.includes('localhost');
 
 export interface AppliedDiscount {
   code: string;
-  discount_code_id?: string;
+  discount_code_id: string; // UUID from validation - required for tracking
   discount_amount: number;
   final_amount: number;
   valid?: boolean;

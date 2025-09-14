@@ -45,7 +45,7 @@ export const useDiscountManagement = () => {
       const userAgent = navigator.userAgent;
       
       await applyDiscountMutation.mutateAsync({
-        discount_code_id: appliedDiscount.code, // In production, this should be the actual ID
+        discount_code_id: appliedDiscount.discount_code_id, // Use the actual UUID from validation
         order_id: orderId,
         customer_email: customerEmail,
         discount_amount: appliedDiscount.discount_amount,

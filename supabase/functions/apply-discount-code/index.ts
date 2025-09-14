@@ -38,29 +38,31 @@ serve(async (req) => {
       user_agent 
     }: ApplyDiscountRequest = await req.json();
 
+    console.log('Apply discount request:', { 
+      discount_code_id, 
+      customer_email, 
+      discount_amount, 
+      original_amount, 
+      final_amount 
+    });
+
     if (!discount_code_id || !customer_email || !discount_amount || !original_amount || !final_amount) {
+      console.error('Missing required fields:', { 
+        has_discount_code_id: !!discount_code_id,
+        has_customer_email: !!customer_email,
+        has_discount_amount: !!discount_amount,
+        has_original_amount: !!original_amount,
+        has_final_amount: !!final_amount
+      });
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // First, get the actual discount code record by code to get the UUID
-    const { data: discountCodeData, error: lookupError } = await supabase
-      .from('discount_codes')
-      .select('id')
-      .eq('code', discount_code_id.toUpperCase())
-      .single();
-
-    if (lookupError || !discountCodeData) {
-      console.error('Discount code lookup error:', lookupError);
-      return new Response(
-        JSON.stringify({ error: 'Invalid discount code - not found in database' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const actualDiscountCodeId = discountCodeData.id;
+    // discount_code_id should already be a UUID from validation step
+    const actualDiscountCodeId = discount_code_id;
+    console.log('Using discount code ID:', actualDiscountCodeId);
 
     // Record the discount usage with proper UUID
     const { data: usage, error: usageError } = await supabase

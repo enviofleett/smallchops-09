@@ -26,7 +26,7 @@ export const validatePaymentFlow = async (): Promise<DiagnosticResult[]> => {
     // Test 1: Verify business settings
     try {
       const { data: settings, error } = await supabase
-        .from('business_info')
+        .from('business_settings')
         .select('allow_guest_checkout')
         .single();
       

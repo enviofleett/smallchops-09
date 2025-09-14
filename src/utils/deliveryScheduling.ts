@@ -67,7 +67,7 @@ class DeliverySchedulingService {
   private async loadConfiguration(): Promise<void> {
     try {
       const { data, error } = await supabase
-        .from('business_info')
+        .from('business_settings')
         .select('delivery_scheduling_config, business_hours')
         .single();
 

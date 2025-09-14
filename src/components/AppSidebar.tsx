@@ -8,6 +8,7 @@ import {
   User, 
   Truck, 
   Calendar,
+  Percent,
   BarChart3, 
   FileSearch, 
   Settings
@@ -74,6 +75,12 @@ const management: MenuItem[] = [
     label: 'Catering Bookings',
     path: '/bookings',
     permissionKey: MENU_PERMISSION_KEYS.bookings
+  },
+  {
+    icon: Percent,
+    label: 'Discount Codes',
+    path: '/admin/discount-codes',
+    permissionKey: MENU_PERMISSION_KEYS.discountCodes
   },
   {
     icon: Truck,

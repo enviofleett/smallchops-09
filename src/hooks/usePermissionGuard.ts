@@ -46,6 +46,7 @@ export const MENU_PERMISSION_KEYS = {
   customers: 'customers_view',
   bookings: 'catering_bookings',
   delivery: 'delivery_zones',
+  discountCodes: 'discount_codes_view',
   promotions: 'promotions_view',
   reports: 'reports-sales',
   auditLogs: 'audit_logs',

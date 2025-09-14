@@ -8,7 +8,7 @@ import { toImagesArray } from '@/lib/imageUtils';
 import { Input } from '@/components/ui/input';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
+import { getPublicProducts } from '@/api/publicProducts';
 import { getCategories } from '@/api/categories';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
@@ -95,13 +95,13 @@ const PublicHome = () => {
 
   // Fetch products with discounts - Production Ready
   const {
-    data: products = [],
+    data: productsResponse,
     isLoading: isLoadingProducts,
     error: productsError,
     refetch: refetchProducts
   } = useQuery({
-    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
-    queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
+    queryKey: ['public-products', activeCategory === 'all' ? undefined : activeCategory],
+    queryFn: () => getPublicProducts({ category_id: activeCategory === 'all' ? undefined : activeCategory }),
     staleTime: 2 * 60 * 1000,
     // 2 minutes for better UX
     gcTime: 10 * 60 * 1000,
@@ -109,6 +109,9 @@ const PublicHome = () => {
     retry: 2,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000)
   });
+
+  // Extract products from response
+  const products = productsResponse?.products || [];
 
   // Debug logging for production troubleshooting
   console.log('🏠 PublicHome Debug:', {
@@ -137,7 +140,7 @@ const PublicHome = () => {
   // Calculate price range from products for filters
   const priceRange: [number, number] = useMemo(() => {
     if (!products.length) return [0, 50000];
-    const prices = products.map(p => p.discounted_price || p.price);
+    const prices = products.map(p => p.price);
     return [Math.floor(Math.min(...prices) / 1000) * 1000, Math.ceil(Math.max(...prices) / 1000) * 1000];
   }, [products]);
 
@@ -214,21 +217,21 @@ const PublicHome = () => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || product.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Price filter
-      const productPrice = product.discounted_price || product.price;
+      const productPrice = product.price;
       const matchesPrice = productPrice >= filters.priceRange[0] && productPrice <= filters.priceRange[1];
 
-      // Promotion filter
-      const matchesPromotion = !filters.onlyPromotions || product.discount_percentage && product.discount_percentage > 0;
+      // Promotion filter (no longer needed as promotions are removed)
+      const matchesPromotion = true;
 
       // Rating filter (placeholder for future rating implementation)
       const matchesRating = filters.minRating === 0;
       return matchesSearch && matchesPrice && matchesPromotion && matchesRating;
     });
 
-    // Sort by price (lowest to highest) as default
+      // Sort by price (lowest to highest) as default
     const sorted = filtered.sort((a, b) => {
-      const priceA = a.discounted_price || a.price;
-      const priceB = b.discounted_price || b.price;
+      const priceA = a.price;
+      const priceB = b.price;
       return priceA - priceB;
     });
 
@@ -252,9 +255,7 @@ const PublicHome = () => {
       addItem({
         id: product.id,
         name: product.name,
-        price: product.discounted_price || product.price,
-        original_price: product.price,
-        discount_amount: product.discount_amount,
+        price: product.price,
         vat_rate: product.vat_rate || 7.5,
         image_url: product.image_url,
         minimum_order_quantity: moq

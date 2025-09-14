@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { getProducts, createProduct, updateProduct } from '@/api/products';
-import { getOptimizedCategories } from '@/api/optimizedProducts';
+import { getCategories } from '@/api/categories';
 import { ProductWithCategory, Category } from '@/types/database';
 import { ProductFormData } from '@/lib/validations/product';
 
@@ -41,7 +41,7 @@ const Products = () => {
 
   const rawCategoriesQuery = useQuery({
     queryKey: ['categories', 'optimized'],
-    queryFn: getOptimizedCategories,
+    queryFn: getCategories,
     staleTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
   });

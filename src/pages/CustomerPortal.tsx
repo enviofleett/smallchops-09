@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
 
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
-import { ProductCatalog } from '@/components/products/ProductCatalog';
+// ProductCatalog component removed with promotions
 import { CustomerReviewsTab } from '@/components/customer/CustomerReviewsTab';
 import { PaymentDebugger } from '@/components/admin/PaymentDebugger';
 
@@ -153,7 +153,9 @@ export default function CustomerPortal() {
 
         <div className="container mx-auto px-4 py-8">
           {/* Show only the public product catalog */}
-          <ProductCatalog />
+            <div className="text-center py-8 text-muted-foreground">
+              Product catalog is not available at this time.
+            </div>
         </div>
       </div>
     );
@@ -359,7 +361,9 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="menu" className="space-y-6">
-            <ProductCatalog />
+            <div className="text-center py-8 text-muted-foreground">
+              Product catalog is not available at this time.
+            </div>
           </TabsContent>
 
           <TabsContent value="favorites" className="space-y-6">
@@ -387,7 +391,9 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="loyalty">
-            <LoyaltyDashboard customerEmail={user?.email || ''} />
+            <div className="text-center py-8 text-muted-foreground">
+              Loyalty program is not available at this time.
+            </div>
           </TabsContent>
         </Tabs>
       </div>

@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { formatDiscount } from "@/lib/discountCalculations";
+import { calculateDiscountPercentage } from "@/lib/formatPrice";
 import { cn } from "@/lib/utils";
 
 interface DiscountBadgeProps {
@@ -30,7 +30,7 @@ export function DiscountBadge({
         className
       )}
     >
-      {formatDiscount(discountPercentage)}
+      {discountPercentage}% OFF
     </Badge>
   );
 }

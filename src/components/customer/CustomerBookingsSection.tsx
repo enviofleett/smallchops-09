@@ -17,7 +17,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { formatCurrency } from '@/lib/discountCalculations';
+import { formatCurrency } from '@/lib/formatCurrency';
 import { useNavigate } from 'react-router-dom';
 
 // Loading skeleton component

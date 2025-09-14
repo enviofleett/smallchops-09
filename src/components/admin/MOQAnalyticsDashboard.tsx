@@ -12,7 +12,7 @@ import {
   Download,
   Filter
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/discountCalculations';
+import { formatCurrency } from '@/lib/formatCurrency';
 import { MOQValidationService } from '@/services/MOQValidationService';
 import { supabase } from '@/integrations/supabase/client';
 

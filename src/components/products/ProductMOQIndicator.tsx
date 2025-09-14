@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ShoppingCart, Info, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/discountCalculations';
+import { formatCurrency } from '@/lib/formatCurrency';
 
 interface ProductMOQIndicatorProps {
   minimumOrderQuantity: number;

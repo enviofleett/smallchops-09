@@ -10,7 +10,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
-import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
+import { getPublicProducts } from '@/api/publicProducts';
 import { getCategories } from '@/api/categories';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
@@ -43,11 +43,13 @@ const CategoryProductsContent = () => {
   const itemsPerPage = 12;
 
   // Fetch products for this category
-  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['products-with-discounts', categoryId],
-    queryFn: () => getProductsWithDiscounts(categoryId),
+  const { data: productsResponse, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['public-products', categoryId],
+    queryFn: () => getPublicProducts({ category_id: categoryId }),
     enabled: !!categoryId,
   });
+
+  const products = productsResponse?.products || [];
 
   // Fetch categories to get category name
   const { data: categories = [] } = useQuery({

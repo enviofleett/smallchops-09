@@ -8,7 +8,7 @@ import { toImagesArray } from '@/lib/imageUtils';
 import { Input } from '@/components/ui/input';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
+import { getPublicProducts } from '@/api/publicProducts';
 import { getCategories } from '@/api/categories';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 import { useCart } from '@/hooks/useCart';
@@ -42,20 +42,23 @@ const PublicProducts = () => {
   
   // Fetch products with discounts - Production Ready
   const { 
-    data: products = [], 
+    data: productsResponse, 
     isLoading: isLoadingProducts, 
     error: productsError,
     refetch: refetchProducts 
   } = useQuery({
-    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
-    queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
+    queryKey: ['public-products', activeCategory === 'all' ? undefined : activeCategory],
+    queryFn: () => getPublicProducts({ category_id: activeCategory === 'all' ? undefined : activeCategory }),
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: false,
   });
 
-  const { 
+  // Extract products from response
+  const products = productsResponse?.products || [];
+
+  const {
     favorites, 
     addToFavorites, 
     removeFromFavorites 

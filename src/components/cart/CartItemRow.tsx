@@ -4,7 +4,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react';
 import { CartItem } from '@/hooks/useCart';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { MOQBadge } from '@/components/ui/moq-badge';
-import { formatCurrency } from '@/lib/discountCalculations';
+import { formatCurrency } from '@/lib/formatCurrency';
 
 interface CartItemRowProps {
   item: CartItem;

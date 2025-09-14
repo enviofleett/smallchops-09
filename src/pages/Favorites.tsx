@@ -11,7 +11,7 @@ import { DiscountBadge } from '@/components/ui/discount-badge';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/discountCalculations';
+import { formatCurrency } from '@/lib/formatCurrency';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const Favorites = () => {

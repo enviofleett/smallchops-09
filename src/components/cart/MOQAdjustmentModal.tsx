@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ShoppingCart, AlertTriangle, TrendingUp } from 'lucide-react';
-import { formatCurrency } from '@/lib/discountCalculations';
+import { formatCurrency } from '@/lib/formatCurrency';
 
 interface MOQAdjustmentModalProps {
   isOpen: boolean;

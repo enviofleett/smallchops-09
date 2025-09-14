@@ -29,7 +29,8 @@ import { ProductRatingsSummary } from '@/components/reviews/ProductRatingsSummar
 import { ReviewCard } from '@/components/reviews/ReviewCard';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
-import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
+import { getProducts } from '@/api/products';
+import { getPublicProducts } from '@/api/publicProducts';
 import { useProductRatings } from '@/hooks/useProductRatings';
 import { RatingSummaryComponent } from '@/components/product/RatingSummary';
 import { ReviewsList } from '@/components/product/ReviewsList';
@@ -40,7 +41,7 @@ import { PriceDisplay } from '@/components/ui/price-display';
 import { StarRating } from '@/components/ui/star-rating';
 import { FavoriteButton } from '@/components/ui/favorite-button';
 import { DiscountBadge } from '@/components/ui/discount-badge';
-import { ProductWithDiscount, formatCurrency } from '@/lib/discountCalculations';
+import { formatCurrency } from '@/lib/formatCurrency';
 import { sanitizeHtml } from '@/utils/htmlSanitizer';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 import { ProductMOQIndicator } from '@/components/products/ProductMOQIndicator';
@@ -53,8 +54,8 @@ const ProductDetail = () => {
   const { addItem, cart } = useCart();
   const { toast } = useToast();
 
-  const [product, setProduct] = useState<ProductWithDiscount | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<ProductWithDiscount[]>([]);
+  const [product, setProduct] = useState<any | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [quantity, setQuantity] = useState(1);
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
@@ -124,7 +125,8 @@ const ProductDetail = () => {
       console.log('Fetching product with ID:', id);
       
       // Fetch individual product with discounts
-      const productData = await getProductWithDiscounts(id!);
+      const products = await getProducts();
+      const productData = products?.find(p => p.id === id);
       console.log('Product data received:', productData);
       
       if (productData) {
@@ -137,9 +139,9 @@ const ProductDetail = () => {
         }
         
         // Fetch related products from same category - show up to 4 products
-        const allProducts = await getProductsWithDiscounts(productData.category_id);
-        const related = allProducts
-          .filter((p: ProductWithDiscount) => p.id !== id)
+        const relatedResponse = await getPublicProducts({ category_id: productData.category_id });
+        const related = (relatedResponse?.products || [])
+          .filter((p: any) => p.id !== id)
           .slice(0, 4);
         setRelatedProducts(related);
         console.log('Related products:', related);

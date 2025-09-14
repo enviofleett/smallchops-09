@@ -82,7 +82,7 @@ const PublicHome = () => {
     onlyPromotions: false,
     minRating: 0
   });
-  const itemsPerPage = 12; // Increased from 9 to show more products
+  const itemsPerPage = 500; // Show all products without pagination
   const {
     addItem
   } = useCart();

@@ -48,7 +48,8 @@ export const useHasPermission = (menuKey: string, requiredLevel: 'view' | 'edit'
       'customers_view': 'customers',
       'promotions_view': 'promotions',
       'reports-sales': 'reports',
-      'delivery_zones': 'delivery'
+      'delivery_zones': 'delivery',
+      'discount_codes_view': 'discount_codes_view'
     };
     
     const legacyKey = legacyKeyMap[menuKey];

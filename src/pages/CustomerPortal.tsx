@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Star, TrendingUp, User, LogOut, Loader2, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
-import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
+
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
 import { ProductCatalog } from '@/components/products/ProductCatalog';
 import { CustomerReviewsTab } from '@/components/customer/CustomerReviewsTab';

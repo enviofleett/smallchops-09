@@ -7,7 +7,6 @@ import {
   Tag, 
   User, 
   Truck, 
-  Trophy,
   Calendar,
   BarChart3, 
   FileSearch, 
@@ -82,12 +81,6 @@ const management: MenuItem[] = [
     path: '/admin/delivery',
     permissionKey: MENU_PERMISSION_KEYS.delivery
   },
-  {
-    icon: Trophy,
-    label: 'Promotions & Loyalty',
-    path: '/promotions',
-    permissionKey: MENU_PERMISSION_KEYS.promotions
-  }
 ];
 
 const administration: MenuItem[] = [

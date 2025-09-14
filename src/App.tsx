@@ -44,7 +44,7 @@ const PaymentSettings = withLazyLoading(() => import("./pages/PaymentSettings").
 const Index = withLazyLoading(() => import("./pages/Index"), undefined, true, 8000); // Critical page - fast loader
 const ProductDetail = withLazyLoading(() => import("./pages/ProductDetail"), undefined, true, 10000);
 const CategoryProducts = withLazyLoading(() => import("./pages/CategoryProducts"), undefined, true, 10000);
-const Promotions = withLazyLoading(() => import("./pages/Promotions"), undefined, false, 10000);
+
 const Bookings = withLazyLoading(() => import("./pages/Bookings"), undefined, false, 10000);
 const DeliveryPickup = withLazyLoading(() => import("./pages/DeliveryPickup"), undefined, false, 10000);
 const AuditLogs = withLazyLoading(() => import("./pages/AuditLogs"), undefined, false, 10000);
@@ -277,7 +277,7 @@ const App = () => {
                 <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />
                 <Route path="/customers" element={<ErrorBoundaryWrapper context="Customers"><Customers /></ErrorBoundaryWrapper>} />
                 <Route path="/reports" element={<ErrorBoundaryWrapper context="Reports"><Reports /></ErrorBoundaryWrapper>} />
-                <Route path="/promotions" element={<ErrorBoundaryWrapper context="Promotions"><Promotions /></ErrorBoundaryWrapper>} />
+                
                 <Route path="/bookings" element={<ErrorBoundaryWrapper context="Catering Bookings"><Bookings /></ErrorBoundaryWrapper>} />
                 <Route path="/audit-logs" element={<ErrorBoundaryWrapper context="Audit Logs"><AuditLogs /></ErrorBoundaryWrapper>} />
                 <Route path="/settings" element={<ErrorBoundaryWrapper context="Settings"><Settings /></ErrorBoundaryWrapper>} />

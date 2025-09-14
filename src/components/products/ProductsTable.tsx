@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PromotionalBadge } from '@/components/ui/promotional-badge';
+
 import { FavoriteButton } from '@/components/ui/favorite-button';
 import { BulkDeleteDialog } from './BulkDeleteDialog';
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';

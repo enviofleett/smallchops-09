@@ -8763,6 +8763,32 @@ export type Database = {
         }
         Relationships: []
       }
+      business_info_public: {
+        Row: {
+          accent_color: string | null
+          business_hours: Json | null
+          facebook_url: string | null
+          favicon_url: string | null
+          instagram_url: string | null
+          linkedin_url: string | null
+          logo_dark_url: string | null
+          logo_url: string | null
+          name: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          seo_description: string | null
+          seo_keywords: string | null
+          seo_title: string | null
+          site_url: string | null
+          tagline: string | null
+          tiktok_url: string | null
+          twitter_url: string | null
+          website_url: string | null
+          working_hours: string | null
+          youtube_url: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       activate_admin_user: {

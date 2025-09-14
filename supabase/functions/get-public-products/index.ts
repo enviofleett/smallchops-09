@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, if-none-match',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
 serve(async (req) => {
@@ -20,12 +20,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const url = new URL(req.url)
-    const categoryId = url.searchParams.get('category_id')
-    const page = parseInt(url.searchParams.get('page') || '1')
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50) // Max 50 items
-    const search = url.searchParams.get('q')
-    const offset = (page - 1) * limit
+    // Parse request body for POST requests or URL params for GET
+    let categoryId, page, limit, search;
+    
+    if (req.method === 'POST') {
+      const body = await req.json();
+      categoryId = body.category_id;
+      page = parseInt(body.page || '1');
+      limit = Math.min(parseInt(body.limit || '20'), 50);
+      search = body.q;
+    } else {
+      const url = new URL(req.url);
+      categoryId = url.searchParams.get('category_id');
+      page = parseInt(url.searchParams.get('page') || '1');
+      limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50);
+      search = url.searchParams.get('q');
+    }
+    
+    const offset = (page - 1) * limit;
 
     // Build cache key for ETag
     const cacheKey = `products-${categoryId || 'all'}-${page}-${limit}-${search || ''}`
@@ -34,8 +46,9 @@ serve(async (req) => {
     console.log(`[get-public-products] Request: category=${categoryId}, page=${page}, limit=${limit}, search=${search}`)
 
     let query = supabase
-      .from('public_products_view')
+      .from('products')
       .select('*', { count: 'exact' })
+      .eq('status', 'active')
 
     // Apply filters
     if (categoryId && categoryId !== 'all') {

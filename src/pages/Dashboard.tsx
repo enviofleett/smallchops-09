@@ -87,25 +87,25 @@ const Dashboard = () => {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <DashboardCard
             title="Total Products"
-            value={formatNumber(data?.stats.totalProducts || 0)}
+            value={formatNumber(data?.stats?.totalProducts || 0)}
             icon={<Package />}
             className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900"
           />
           <DashboardCard
             title="Total Orders"
-            value={formatNumber(data?.stats.totalOrders || 0)}
+            value={formatNumber(data?.stats?.totalOrders || 0)}
             icon={<ShoppingCart />}
             className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900"
           />
           <DashboardCard
             title="Total Customers"
-            value={formatNumber(data?.stats.totalCustomers || 0)}
+            value={formatNumber(data?.stats?.totalCustomers || 0)}
             icon={<Users />}
             className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900"
           />
           <DashboardCard
             title="Total Revenue"
-            value={formatCurrency(data?.stats.totalRevenue || 0)}
+            value={formatCurrency(data?.stats?.totalRevenue || 0)}
             icon={<TrendingUp />}
             className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900"
           />
@@ -120,7 +120,7 @@ const Dashboard = () => {
         />
       </ProgressiveLoader>
 
-      {(!data || (!data.stats.totalProducts && !data.stats.totalOrders)) && !isLoading && (
+      {(!data || (!data?.stats?.totalProducts && !data?.stats?.totalOrders)) && !isLoading && (
         <div className="text-center py-8 space-y-4">
           <div className="text-muted-foreground">
             <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />

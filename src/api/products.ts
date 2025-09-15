@@ -279,7 +279,7 @@ export const createProduct = async (productData: NewProduct & { imageFile?: File
 
     try {
         if (productData.imageFile) {
-            imageUrl = await uploadProductImage(productData.imageFile);
+            imageUrl = await import('@/api/productImageUpload').then(m => m.uploadProductImage(productData.imageFile!));
         }
         
         const { imageFile, ...productToInsert } = productData;
@@ -352,7 +352,7 @@ export const updateProduct = async (id: string, updates: UpdatedProduct & { imag
         if (updates.imageFile) {
             uploadAttempted = true;
             console.log('Uploading new product image...');
-            newImageUrl = await uploadProductImage(updates.imageFile);
+            newImageUrl = await import('@/api/productImageUpload').then(m => m.uploadProductImage(updates.imageFile!));
             console.log('New image uploaded successfully:', newImageUrl);
             
             if (!newImageUrl) {

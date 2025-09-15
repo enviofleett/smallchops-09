@@ -1,1 +1,4 @@
 project_id = "oknnklksdiqaifhxaccs"
+
+[functions.simplified-product-upload]
+verify_jwt = true

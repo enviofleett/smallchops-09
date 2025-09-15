@@ -1,229 +1,156 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+// Production-ready SMTP health check with enhanced user validation
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { validateSMTPUser, isValidSMTPConfig, maskSMTPConfig, getProviderSpecificSettings } from '../_shared/smtp-config.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface SMTPHealthCheck {
-  component: string;
-  status: 'pass' | 'fail' | 'warning';
-  message: string;
-  details?: any;
-}
-
-// Basic SMTP validation functions
-function validateSMTPConfig(host: string, user: string, pass: string): { isValid: boolean; errors: string[] } {
-  const errors: string[] = [];
+Deno.serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
   
-  if (!host || host.length < 3) {
-    errors.push('Invalid SMTP host');
-  }
-  
-  if (!user || user.length < 3) {
-    errors.push('Invalid SMTP user');
-  }
-  
-  if (!pass || pass.length < 6) {
-    errors.push('Invalid SMTP password (too short)');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-}
-
-const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing Supabase configuration');
-    }
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    const healthChecks: SMTPHealthCheck[] = [];
-    let overallStatus = 'ready';
+    console.log('🔍 SMTP Health Check Started');
 
-    // Check SMTP environment variables
-    const smtpHost = Deno.env.get('SMTP_HOST');
-    const smtpUser = Deno.env.get('SMTP_USER');
-    const smtpPass = Deno.env.get('SMTP_PASS');
-    const smtpSender = Deno.env.get('SMTP_SENDER_EMAIL');
+    // Check Function Secrets first (production)
+    const secretHost = Deno.env.get('SMTP_HOST');
+    const secretPort = Deno.env.get('SMTP_PORT') || '587';
+    const secretUser = Deno.env.get('SMTP_USER');
+    const secretPass = Deno.env.get('SMTP_PASS');
 
-    if (!smtpHost || !smtpUser || !smtpPass || !smtpSender) {
-      healthChecks.push({
-        component: 'SMTP Environment Variables',
-        status: 'fail',
-        message: 'Missing required SMTP environment variables',
-        details: {
-          smtp_host: !!smtpHost,
-          smtp_user: !!smtpUser,
-          smtp_pass: !!smtpPass,
-          smtp_sender: !!smtpSender
-        }
-      });
-      overallStatus = 'not_ready';
-    } else {
-      // Validate SMTP configuration
-      const validation = validateSMTPConfig(smtpHost, smtpUser, smtpPass);
+    let healthResult = {
+      configured: false,
+      connection_healthy: false,
+      user_type: 'unknown',
+      provider: 'unknown',
+      source: 'none',
+      validation_errors: [] as string[],
+      suggestions: [] as string[],
+      provider_settings: {} as any
+    };
+
+    if (secretHost && secretUser && secretPass) {
+      console.log('✅ Function Secrets SMTP configuration found');
       
-      if (validation.isValid) {
-        healthChecks.push({
-          component: 'SMTP Configuration',
-          status: 'pass',
-          message: 'SMTP configuration is valid',
-          details: {
-            host: smtpHost,
-            user_length: smtpUser.length,
-            password_length: smtpPass.length
-          }
-        });
-      } else {
-        healthChecks.push({
-          component: 'SMTP Configuration',
-          status: 'fail',
-          message: 'SMTP configuration validation failed',
-          details: {
-            errors: validation.errors
-          }
-        });
-        overallStatus = 'not_ready';
-      }
-    }
+      // Validate configuration
+      const validation = isValidSMTPConfig(secretHost, secretPort, secretUser, secretPass);
+      const userValidation = validateSMTPUser(secretUser, secretHost);
+      
+      healthResult = {
+        configured: true,
+        connection_healthy: validation.isValid,
+        user_type: userValidation.userType,
+        provider: userValidation.provider || 'unknown',
+        source: 'function_secrets',
+        validation_errors: validation.errors,
+        suggestions: validation.suggestions,
+        provider_settings: userValidation.provider ? 
+          getProviderSpecificSettings(userValidation.provider, userValidation.userType) : {}
+      };
 
-    // Check database communication settings
-    const { data: commSettings, error: commError } = await supabase
-      .from('communication_settings')
-      .select('*')
-      .limit(1)
-      .single();
-
-    if (commError || !commSettings) {
-      healthChecks.push({
-        component: 'Database Settings',
-        status: 'warning',
-        message: 'No communication settings found in database',
-        details: { error: commError?.message }
+      console.log('📧 SMTP Config Analysis:', {
+        host: secretHost,
+        port: secretPort,
+        userType: userValidation.userType,
+        provider: userValidation.provider,
+        isValid: validation.isValid,
+        errors: validation.errors.length
       });
+
     } else {
-      healthChecks.push({
-        component: 'Database Settings',
-        status: commSettings.use_smtp ? 'pass' : 'warning',
-        message: commSettings.use_smtp ? 'SMTP enabled in database' : 'SMTP not enabled in database',
-        details: {
-          use_smtp: commSettings.use_smtp,
-          email_provider: commSettings.email_provider,
-          sender_email: commSettings.sender_email
-        }
-      });
-    }
+      // Check database configuration as fallback
+      console.log('⚠️ No Function Secrets found, checking database configuration');
+      
+      const { data: config } = await supabase
+        .from('communication_settings')
+        .select('*')
+        .eq('use_smtp', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    // Check recent email failures
-    const { data: recentFailures, error: failureError } = await supabase
-      .from('communication_events')
-      .select('id')
-      .eq('status', 'failed')
-      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      if (config?.smtp_host && config?.smtp_user) {
+        const validation = isValidSMTPConfig(
+          config.smtp_host,
+          (config.smtp_port || 587).toString(),
+          config.smtp_user,
+          config.smtp_pass || ''
+        );
+        const userValidation = validateSMTPUser(config.smtp_user, config.smtp_host);
 
-    if (!failureError && recentFailures) {
-      const failureCount = recentFailures.length;
-      if (failureCount > 5) {
-        healthChecks.push({
-          component: 'Email Delivery',
-          status: 'warning',
-          message: `${failureCount} email failures in last 24 hours`,
-          details: { failure_count: failureCount }
-        });
-        if (overallStatus === 'ready') overallStatus = 'needs_attention';
-      } else {
-        healthChecks.push({
-          component: 'Email Delivery',
-          status: 'pass',
-          message: `Low failure rate: ${failureCount} failures in last 24 hours`,
-          details: { failure_count: failureCount }
+        healthResult = {
+          configured: true,
+          connection_healthy: validation.isValid,
+          user_type: userValidation.userType,
+          provider: userValidation.provider || 'unknown',
+          source: 'database',
+          validation_errors: validation.errors,
+          suggestions: validation.suggestions,
+          provider_settings: userValidation.provider ? 
+            getProviderSpecificSettings(userValidation.provider, userValidation.userType) : {}
+        };
+
+        console.log('📧 Database SMTP Config Analysis:', {
+          host: config.smtp_host,
+          port: config.smtp_port || 587,
+          userType: userValidation.userType,
+          provider: userValidation.provider,
+          isValid: validation.isValid
         });
       }
     }
 
-    // Generate recommendations
-    const recommendations: string[] = [];
-    const criticalIssues = healthChecks.filter(check => check.status === 'fail');
-    const warnings = healthChecks.filter(check => check.status === 'warning');
-
-    if (criticalIssues.length > 0) {
-      recommendations.push('Configure all required SMTP environment variables');
-      recommendations.push('Verify SMTP credentials with your email provider');
-    }
-
-    if (warnings.length > 0) {
-      recommendations.push('Enable SMTP in communication settings');
-      recommendations.push('Monitor email delivery success rates');
-    }
-
-    if (criticalIssues.length === 0 && warnings.length === 0) {
-      recommendations.push('SMTP configuration is healthy - ready for production');
-    }
-
-    // Log the health check
+    // Log health check results
     await supabase.from('audit_logs').insert({
       action: 'smtp_health_check',
       category: 'Email System',
-      message: `SMTP health check completed - Status: ${overallStatus}`,
+      message: `SMTP health check completed - ${healthResult.configured ? 'configured' : 'not configured'}`,
       new_values: {
-        overall_status: overallStatus,
-        checks_passed: healthChecks.filter(c => c.status === 'pass').length,
-        checks_failed: healthChecks.filter(c => c.status === 'fail').length,
-        checks_warned: healthChecks.filter(c => c.status === 'warning').length
+        configured: healthResult.configured,
+        healthy: healthResult.connection_healthy,
+        user_type: healthResult.user_type,
+        provider: healthResult.provider,
+        source: healthResult.source,
+        validation_errors_count: healthResult.validation_errors.length
       }
     });
 
-    const response = {
+    return new Response(JSON.stringify({
       success: true,
+      smtp_health: healthResult,
       timestamp: new Date().toISOString(),
-      overall_status: overallStatus,
-      health_checks: healthChecks,
-      recommendations,
-      summary: {
-        total_checks: healthChecks.length,
-        passed: healthChecks.filter(c => c.status === 'pass').length,
-        failed: healthChecks.filter(c => c.status === 'fail').length,
-        warnings: healthChecks.filter(c => c.status === 'warning').length
-      },
-      ready_for_production: overallStatus === 'ready'
-    };
-
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders,
-      },
+      recommendations: healthResult.validation_errors.length === 0 
+        ? ['SMTP configuration appears valid']
+        : healthResult.suggestions
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    console.error('SMTP health check failed:', error);
+    console.error('❌ SMTP health check error:', error);
     
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      smtp_health: {
+        configured: false,
+        connection_healthy: false,
+        user_type: 'unknown',
+        provider: 'unknown',
+        source: 'none',
+        validation_errors: ['Health check failed'],
+        suggestions: ['Check SMTP configuration and Function Secrets']
+      }
     }), {
       status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders,
-      },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-};
-
-serve(handler);
+});

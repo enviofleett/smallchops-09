@@ -1,188 +1,575 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getCorsHeaders } from '../_shared/cors.ts'
+import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-caller',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+interface PaystackInitializePayload {
+  email: string
+  amount: number
+  currency: string
+  reference: string
+  callback_url?: string
+  channels?: string[]
+  metadata?: any
+}
 
-// Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+interface PaystackResponse {
+  status: boolean
+  message: string
+  data?: {
+    authorization_url: string
+    access_code: string
+    reference: string
+  }
+  meta?: any
+}
+
+const VERSION = "v2025-08-22-centralized-config"
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🚀 Paystack Secure Payment Initialization');
-    console.log('📊 Request method:', req.method);
-    console.log('📊 Request headers:', Object.fromEntries(req.headers.entries()));
-
-    if (req.method !== 'POST') {
-      throw new Error('Only POST method allowed');
-    }
-
-    const requestData = await req.json();
-    console.log('📦 Request data:', {
-      action: requestData.action,
-      email: requestData.email,
-      amount: requestData.amount,
-      has_metadata: !!requestData.metadata,
-      has_callback_url: !!requestData.callback_url
-    });
-
-    const { action, email, amount, metadata, callback_url } = requestData;
-
-    if (action !== 'initialize') {
-      throw new Error('Invalid action. Only "initialize" is supported');
-    }
-
-    if (!email || !amount || amount <= 0) {
-      throw new Error('Email and valid amount are required');
-    }
-
-    // Get Paystack configuration from environment
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    if (!paystackSecretKey) {
-      console.error('❌ PAYSTACK_SECRET_KEY not found in environment');
-      
-      // List available environment variables for debugging
-      const availableKeys = Object.keys(Deno.env.toObject()).filter(key => 
-        key.includes('PAYSTACK') || key.includes('SECRET')
-      );
-      console.log('🔍 Available keys:', availableKeys);
-      
-      throw new Error('Payment system configuration error. Please contact support.');
-    }
-
-    // Detect environment and select appropriate key
-    const isTestKey = paystackSecretKey.startsWith('sk_test_');
-    const isLiveKey = paystackSecretKey.startsWith('sk_live_');
+    console.log(`🔄 Paystack secure function called [${VERSION}]`)
     
-    if (!isTestKey && !isLiveKey) {
-      throw new Error('Invalid Paystack secret key format');
+    // Get and validate JWT token
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Authorization required',
+        code: 'UNAUTHORIZED'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    console.log('🔑 Using', isTestKey ? 'TEST' : 'LIVE', 'Paystack environment');
-    console.log('🔑 Key prefix:', paystackSecretKey.substring(0, 10) + '...');
-
-    // Convert amount to kobo (Paystack uses kobo, not naira)
-    const amountInKobo = Math.round(amount * 100);
+    const jwt = authHeader.replace('Bearer ', '')
     
-    console.log('💰 Payment details:', {
-      email,
-      amount_naira: amount,
-      amount_kobo: amountInKobo,
-      order_id: metadata?.order_id
-    });
-
-    // Initialize payment with Paystack
-    const paystackPayload = {
-      email,
-      amount: amountInKobo,
-      callback_url: callback_url,
-      metadata: {
-        ...metadata,
-        custom_fields: [
-          {
-            display_name: "Order Number",
-            variable_name: "order_number",
-            value: metadata?.order_number || "N/A"
+    // Initialize Supabase clients
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+    
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: authHeader
           }
-        ]
+        }
       }
-    };
+    )
 
-    console.log('🔗 Calling Paystack API...');
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${paystackSecretKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(paystackPayload)
-    });
+    // Determine if this is an internal service call (service role token)
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const isInternal = jwt === serviceRoleKey
 
-    const paystackData = await paystackResponse.json();
-    console.log('📤 Paystack API response status:', paystackResponse.status);
-    console.log('📤 Paystack API response:', {
-      status: paystackData.status,
-      message: paystackData.message,
-      has_data: !!paystackData.data,
-      reference: paystackData.data?.reference
-    });
+    // Verify user authentication unless internal
+    let user: any = null
+    if (isInternal) {
+      console.log('🛡️ Internal service call authorized via service role')
+      user = { id: 'service-role', email: 'internal@service.local' }
+    } else {
+      const { data: userData, error: authError } = await supabaseClient.auth.getUser(jwt)
+      if (authError || !userData?.user) {
+        console.error('❌ Authentication failed:', authError)
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Invalid authentication token',
+          code: 'AUTH_INVALID'
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
 
-    if (!paystackResponse.ok || !paystackData.status) {
-      console.error('❌ Paystack API error:', paystackData);
-      throw new Error(`Paystack API error: ${paystackData.message || 'Unknown error'}`);
+      user = userData.user
+      console.log('✅ User authenticated:', user.id)
     }
 
-    // Log successful payment initialization
+    // Get environment-specific Paystack configuration
+    let paystackConfig;
     try {
-      await supabase.from('audit_logs').insert({
-        action: 'paystack_payment_initialized',
-        category: 'Payment Processing',
-        message: `Payment initialized for order ${metadata?.order_id}`,
-        new_values: {
-          reference: paystackData.data.reference,
-          amount: amount,
-          email: email,
-          order_id: metadata?.order_id,
-          environment: isTestKey ? 'test' : 'live'
-        }
-      });
-    } catch (logError) {
-      console.warn('⚠️ Failed to log payment initialization:', logError);
-      // Don't fail the payment for logging issues
+      paystackConfig = getPaystackConfig(req);
+      const validation = validatePaystackConfig(paystackConfig);
+      
+      if (!validation.isValid) {
+        console.error('❌ Paystack configuration invalid:', validation.errors);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Payment service configuration error',
+          code: 'PAYSTACK_CONFIG_INVALID',
+          details: validation.errors.join(', ')
+        }), {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      
+      logPaystackConfigStatus(paystackConfig);
+      
+    } catch (configError) {
+      console.error('❌ Environment config failed:', configError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Payment service configuration error',
+        code: 'CONFIG_ERROR',
+        details: configError.message
+      }), {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    console.log('✅ Payment initialization successful');
-    
-    return new Response(JSON.stringify({
-      success: true,
-      data: paystackData.data,
-      reference: paystackData.data.reference,
-      authorization_url: paystackData.data.authorization_url,
-      access_code: paystackData.data.access_code
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const requestBody = await req.json()
+    console.log('📨 Request payload:', JSON.stringify(requestBody))
 
-  } catch (error) {
-    console.error('❌ Paystack Secure Error:', {
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    });
+    const { action, email, amount, reference, metadata, callback_url } = requestBody
 
-    // Log error for monitoring
-    try {
-      await supabase.from('audit_logs').insert({
-        action: 'paystack_payment_error',
-        category: 'Payment Processing',
-        message: `Payment initialization failed: ${error.message}`,
-        new_values: {
-          error: error.message,
-          timestamp: new Date().toISOString()
-        }
-      });
-    } catch (logError) {
-      console.warn('⚠️ Failed to log error:', logError);
+    if (action === 'initialize') {
+      return await initializePayment({
+        supabaseAdmin,
+        supabaseClient,
+        user,
+        paystackConfig,
+        email,
+        amount,
+        reference,
+        metadata,
+        callback_url,
+        corsHeaders,
+        isInternal
+      })
+    }
+
+    if (action === 'verify') {
+      return await verifyPayment({
+        supabaseAdmin,
+        supabaseClient,
+        user,
+        paystackConfig,
+        reference: reference || requestBody.reference,
+        corsHeaders,
+        isInternal
+      })
     }
 
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
-      code: 'PAYMENT_INITIALIZATION_FAILED'
+      error: 'Invalid action'
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error: any) {
+    console.error('❌ Paystack secure function error:', error)
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Internal server error'
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
-});
+})
+
+async function initializePayment({
+  supabaseAdmin,
+  supabaseClient,
+  user,
+  paystackConfig,
+  email,
+  amount,
+  reference,
+  metadata,
+  callback_url,
+  corsHeaders,
+  isInternal
+}: any) {
+  try {
+    const orderId = metadata?.order_id
+    if (!orderId) {
+      throw new Error('order_id is required in metadata')
+    }
+
+    console.log('🔍 Fetching authoritative order data:', orderId)
+
+    // Check if user is admin
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = isInternal || profile?.role === 'admin'
+
+    // Get order details for authorization check
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .select('id, total_amount, delivery_fee, delivery_zone_id, payment_reference, customer_name, order_number, order_type, customer_email, user_id')
+      .eq('id', orderId)
+      .single()
+
+    if (orderError || !order) {
+      throw new Error(`Order not found: ${orderId}`)
+    }
+
+    // Authorization check: admin or order owner
+    if (!isAdmin && order.user_id !== user.id) {
+      // For guest orders, check if email matches
+      if (!order.user_id && order.customer_email === user.email) {
+        console.log('✅ Guest order email match authorization')
+      } else {
+        console.error('❌ Authorization failed - user not order owner', {
+          userId: user.id,
+          orderUserId: order.user_id,
+          userEmail: user.email,
+          orderEmail: order.customer_email,
+          isAdmin
+        })
+        throw new Error('Access denied: not authorized for this order')
+      }
+    }
+
+    console.log('✅ User authorized for order:', { userId: user.id, isAdmin, orderId })
+
+    // Get business settings for website URL
+    const { data: businessSettings } = await supabaseAdmin
+      .from('business_settings')
+      .select('website_url')
+      .single()
+
+    const frontendUrl = businessSettings?.website_url || 'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.sandbox.lovable.dev'
+
+    // Order already fetched above for authorization
+
+    // Compute authoritative amount to ensure delivery fee is included
+    let deliveryFee = Number(order.delivery_fee) || 0
+
+    // If delivery fee isn't set but order is delivery, try to derive from delivery zone
+    if ((!deliveryFee || deliveryFee <= 0) && order.order_type === 'delivery' && order.delivery_zone_id) {
+      const { data: zone, error: zoneError } = await supabaseAdmin
+        .from('delivery_zones')
+        .select('base_fee')
+        .eq('id', order.delivery_zone_id)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (!zoneError && zone?.base_fee) {
+        deliveryFee = Number(zone.base_fee) || 0
+      }
+    }
+
+    // Sum items subtotal directly from order_items to avoid stale totals
+    const { data: orderItems, error: itemsError } = await supabaseAdmin
+      .from('order_items')
+      .select('total_price')
+      .eq('order_id', orderId)
+    const itemsSubtotal = (orderItems || []).reduce((sum: number, it: any) => sum + (Number(it.total_price) || 0), 0)
+
+    // Prefer the computed total (items + delivery) if it differs meaningfully
+    let authoritativeAmount = Number(order.total_amount) || 0
+    const computedTotal = Number(itemsSubtotal) + Number(deliveryFee)
+
+    // If order.total_amount is missing or out-of-sync (> 1 naira diff), correct it
+    if (!authoritativeAmount || Math.abs(authoritativeAmount - computedTotal) > 1) {
+      authoritativeAmount = computedTotal
+      await supabaseAdmin
+        .from('orders')
+        .update({ 
+          delivery_fee: deliveryFee,
+          total_amount: authoritativeAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+    }
+
+    console.log('💰 AUTHORITATIVE AMOUNT (Backend-derived):', {
+      client_provided: amount,
+      db_total_amount: order.total_amount,
+      db_delivery_fee: order.delivery_fee,
+      items_subtotal: itemsSubtotal,
+      authoritative_amount: authoritativeAmount,
+      amount_source: 'database+recomputed'
+    })
+
+    // Check if order already has a pending/initialized transaction
+    const { data: existingTransaction } = await supabaseAdmin
+      .from('payment_transactions')
+      .select('reference, authorization_url, access_code, status')
+      .eq('order_id', orderId)
+      .in('status', ['pending', 'initialized'])
+      .maybeSingle()
+
+    if (existingTransaction) {
+      console.log('✅ Reusing existing pending transaction:', existingTransaction.reference)
+      return new Response(JSON.stringify({
+        success: true,
+        status: true,
+        data: {
+          authorization_url: existingTransaction.authorization_url,
+          access_code: existingTransaction.access_code,
+          reference: existingTransaction.reference
+        },
+        message: 'Reusing existing pending transaction'
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Use existing reference or generate new one
+    let finalReference = reference || order.payment_reference
+    if (!finalReference) {
+      finalReference = `txn_${Date.now()}_${orderId.replace(/-/g, '').substring(0, 8)}`
+      
+      // Update order with new reference
+      await supabaseAdmin
+        .from('orders')
+        .update({ 
+          payment_reference: finalReference,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+      
+      console.log('📝 Updated order with new canonical reference')
+    } else {
+      console.log('✅ Using existing order payment_reference:', finalReference)
+    }
+
+    const amountInKobo = Math.round(authoritativeAmount * 100)
+
+    console.log('💰 FINAL AMOUNT DETAILS:', {
+      authoritative_amount_naira: authoritativeAmount,
+      amount_in_kobo: amountInKobo,
+      reference: finalReference,
+      order_found: true
+    })
+
+    // Prepare Paystack payload with frontend callback URL
+    const frontendCallbackUrl = `${frontendUrl}/payment/callback?order_id=${orderId}`
+    const paystackPayload: PaystackInitializePayload = {
+      email: email,
+      amount: amountInKobo.toString(),
+      currency: 'NGN',
+      reference: finalReference,
+      callback_url: callback_url || frontendCallbackUrl,
+      channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
+      metadata: {
+        order_id: orderId,
+        customer_name: order.customer_name,
+        order_number: order.order_number,
+        fulfillment_type: order.order_type,
+        items_subtotal: authoritativeAmount - deliveryFee,
+        delivery_fee: deliveryFee,
+        client_total: amount,
+        authoritative_total: authoritativeAmount,
+        amount_source: 'database',
+        authoritative_amount: authoritativeAmount,
+        generated_by: 'paystack-secure-v3'
+      }
+    }
+
+    const keyEnvironment = paystackConfig.isTestMode ? 'TEST' : 'LIVE';
+    // Secure logging - no sensitive data exposure
+    console.log('🔑 Using Paystack key environment:', keyEnvironment)
+    console.log('💳 Initializing payment for reference:', finalReference, 'amount: ₦' + authoritativeAmount)
+    console.log('🔗 Callback URL configured for order_id:', orderId)
+    console.log('📝 Payment reference generated:', finalReference)
+    // Note: Full payload not logged to prevent secret exposure
+
+    // Initialize with Paystack (with retry on duplicate reference)
+    let paystackResponse: PaystackResponse
+    let retryAttempt = 0
+    const maxRetries = 1
+
+    while (retryAttempt <= maxRetries) {
+      const response = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${paystackConfig.secretKey}`,
+          'Content-Type': 'application/json',
+          'User-Agent': `PaystackSecure/${VERSION}`
+        },
+        body: JSON.stringify(paystackPayload),
+        signal: AbortSignal.timeout(15000) // 15 second timeout
+      })
+
+      console.log('📡 Paystack response status:', response.status)
+      paystackResponse = await response.json()
+
+      if (response.ok && paystackResponse.status) {
+        console.log('📦 Paystack response data:', JSON.stringify(paystackResponse))
+        break
+      }
+
+      // Handle duplicate reference error
+      if (response.status === 400 && 
+          paystackResponse.message?.includes('Duplicate Transaction Reference')) {
+        
+        console.log('❌ Paystack HTTP error:', response.status, JSON.stringify(paystackResponse))
+        
+        if (retryAttempt < maxRetries) {
+          // Generate new reference and retry
+          const newReference = `txn_${Date.now()}_${crypto.randomUUID().substring(0, 8)}`
+          console.log('🔄 Retrying with new reference:', newReference)
+          
+          // Update order and payload with new reference
+          await supabaseAdmin
+            .from('orders')
+            .update({ 
+              payment_reference: newReference,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', orderId)
+          
+          paystackPayload.reference = newReference
+          paystackPayload.callback_url = callback_url || frontendCallbackUrl
+          
+          retryAttempt++
+          continue
+        }
+      }
+
+      // Other errors or max retries reached
+      console.error('❌ Paystack HTTP error:', response.status, JSON.stringify(paystackResponse))
+      throw new Error(`Paystack API error (${response.status}): ${paystackResponse.message}`)
+    }
+
+    console.log('✅ Paystack payment initialized successfully:', paystackPayload.reference)
+
+    // Create payment transaction record with all required fields
+    const { error: transactionError } = await supabaseAdmin
+      .from('payment_transactions')
+      .upsert({
+        reference: paystackPayload.reference,
+        provider_reference: paystackPayload.reference,
+        order_id: orderId,
+        amount: authoritativeAmount,
+        currency: 'NGN',
+        status: 'pending',
+        provider: 'paystack',
+        customer_email: email,
+        authorization_url: paystackResponse.data!.authorization_url,
+        access_code: paystackResponse.data!.access_code,
+        raw_provider_payload: paystackResponse,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'reference'
+      })
+
+    if (transactionError) {
+      console.error('⚠️ Failed to create payment transaction record:', transactionError)
+      // Don't fail the payment initialization - log and continue
+    } else {
+      console.log('✅ Payment transaction record created/updated')
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      status: true,
+      data: {
+        authorization_url: paystackResponse.data!.authorization_url,
+        access_code: paystackResponse.data!.access_code,
+        reference: paystackPayload.reference
+      },
+      order_id: orderId,
+      amount: authoritativeAmount
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error: any) {
+    console.error('❌ Payment initialization error:', error)
+    throw error
+  }
+}
+
+async function verifyPayment({
+  supabaseAdmin,
+  supabaseClient,
+  user,
+  paystackConfig,
+  reference,
+  corsHeaders
+}: any) {
+  try {
+    console.log('🔍 Verifying payment:', reference)
+
+    // Check if user is admin
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = profile?.role === 'admin'
+
+    // Get payment transaction to check authorization
+    const { data: transaction } = await supabaseAdmin
+      .from('payment_transactions')
+      .select('order_id, customer_email')
+      .eq('reference', reference)
+      .single()
+
+    if (transaction) {
+      // Get order to check ownership
+      const { data: order } = await supabaseAdmin
+        .from('orders')
+        .select('user_id, customer_email')
+        .eq('id', transaction.order_id)
+        .single()
+
+      if (order && !isAdmin && order.user_id !== user.id) {
+        // For guest orders, check email match
+        if (!order.user_id && order.customer_email === user.email) {
+          console.log('✅ Guest order verification authorized')
+        } else {
+          throw new Error('Access denied: not authorized for this payment')
+        }
+      }
+    }
+
+    console.log('✅ User authorized for payment verification:', { userId: user.id, isAdmin, reference })
+
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${paystackConfig.secretKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': `PaystackSecure/${VERSION}`
+      },
+      signal: AbortSignal.timeout(15000)
+    })
+
+    const verificationData = await response.json()
+
+    if (!response.ok) {
+      throw new Error(`Paystack verification failed: ${response.status}`)
+    }
+
+    return new Response(JSON.stringify({
+      success: verificationData.status,
+      status: verificationData.status,
+      data: verificationData.data
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error: any) {
+    console.error('❌ Payment verification error:', error)
+    throw error
+  }
+}

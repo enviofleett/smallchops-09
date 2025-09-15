@@ -33,156 +33,131 @@ interface GetOrdersParams {
  * Fetches orders and their associated items from the database with pagination and filtering.
  * Uses admin edge function to bypass RLS for authenticated admin users.
  */
-// Enhanced retry mechanism with fresh token and exponential backoff
-const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries: number = 3): Promise<any> => {
-  let lastError: any;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await operation();
-      
-      // Check if the result indicates an auth error
-      if (result.error && (
-        result.error.code === 'AUTH_TOKEN_EXPIRED' ||
-        result.error.code === 'AUTH_SESSION_MISSING' ||
-        result.error.code === 'AUTH_TOKEN_INVALID' ||
-        result.error.code === 'AUTH_TOKEN_MALFORMED'
-      )) {
-        console.warn(`Auth token issue detected on attempt ${attempt}, refreshing session...`);
-        
-        // Try to refresh the session
-        await supabase.auth.refreshSession();
-        
-        // If this isn't the last attempt, continue to retry
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          continue;
-        }
-      }
-      
-      return result;
-    } catch (error: any) {
-      console.warn(`Attempt ${attempt} failed:`, error.message);
-      lastError = error;
-      
-      // Don't retry for certain non-transient errors
-      if (error.message?.includes('not found') || 
-          error.message?.includes('Invalid status') ||
-          error.message?.includes('Missing required fields') ||
-          error.message?.includes('Access denied') ||
-          error.message?.includes('Forbidden')) {
-        throw error;
-      }
-      
-      // Wait before retry with exponential backoff
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
-      }
-    }
-  }
-  
-  throw lastError;
-};
-
-export const getOrders = async (params: GetOrdersParams = {}) => {
+export const getOrders = async ({
+  page = 1,
+  pageSize = 10,
+  status = 'all',
+  searchQuery = '',
+  startDate,
+  endDate,
+}: GetOrdersParams): Promise<{ orders: OrderWithItems[]; count: number }> => {
   try {
-    const result = await retryWithFreshToken(async () => {
-      return await supabase.functions.invoke('admin-orders-manager', {
-        body: {
-          action: 'list',
-          ...params
-        }
-      });
+    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      body: {
+        action: 'list',
+        page,
+        pageSize,
+        status,
+        searchQuery,
+        startDate,
+        endDate
+      }
     });
-    
-    const { data, error } = result;
 
     if (error) {
-      console.error('❌ Supabase function error:', error);
-      throw new Error(`Function invocation failed: ${error.message}`);
+      // Only log errors in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching orders via admin function:', error);
+      }
+      throw new Error(error.message || 'Failed to fetch orders');
     }
 
-    if (!data || !data.success) {
-      console.error('❌ Function returned error:', data);
-      throw new Error(data?.error || 'Unknown error occurred');
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch orders');
     }
 
-    console.log('✅ Orders fetched successfully via Edge Function');
-    return data;
-  } catch (error: any) {
-    console.error('❌ Error fetching orders via admin function:', error);
-    
-    // Fallback to direct query for development/debugging
+    return { orders: data.orders || [], count: data.count || 0 };
+  } catch (error) {
+    // Only log errors in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔄 Falling back to direct query...');
-      
-      let query = supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (*),
-          delivery_zones (*)
-        `)
-        .order('created_at', { ascending: false });
+      console.error('Error fetching orders:', error);
+    }
+    
+    // Fallback to direct Supabase query for backward compatibility
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
 
-      // Apply filters
-      if (params.status && params.status !== 'all') {
-        query = query.eq('status', params.status);
-      }
+    let query = supabase
+      .from('orders')
+      .select(`*, 
+        order_items (*),
+        order_delivery_schedule (*)
+      `, { count: 'exact' });
 
-      if (params.searchQuery) {
-        query = query.or(`order_number.ilike.%${params.searchQuery}%,customer_name.ilike.%${params.searchQuery}%,customer_email.ilike.%${params.searchQuery}%`);
-      }
-
-      if (params.startDate) {
-        query = query.gte('created_at', params.startDate);
-      }
-
-      if (params.endDate) {
-        query = query.lte('created_at', params.endDate);
-      }
-
-      // Add pagination
-      const page = params.page || 1;
-      const pageSize = params.pageSize || 20;
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      query = query.range(from, to);
-
-      const { data: fallbackData, error: fallbackError, count } = await query;
-
-      if (fallbackError) {
-        console.error('❌ Fallback query also failed:', fallbackError);
-        throw new Error(fallbackError.message);
-      }
-
-      // Try to get delivery zones for fallback data
-      if (fallbackData && fallbackData.length > 0) {
-        const { data: zonesData } = await supabase
-          .from('delivery_zones')
-          .select('*')
-          .in('id', fallbackData.map(order => order.delivery_zone_id).filter(Boolean));
-
-        const zonesMap = new Map(zonesData?.map(zone => [zone.id, zone]) || []);
-        
-        const ordersWithZones = fallbackData.map(order => ({
-          ...order,
-          delivery_zones: order.delivery_zone_id ? zonesMap.get(order.delivery_zone_id) : null
-        }));
-
-        // Get total count for pagination
-        const { count: noZoneCount } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true });
-
-        return { orders: ordersWithZones as unknown as OrderWithItems[], count: noZoneCount || 0 };
-      }
-
-      return { orders: fallbackData as unknown as OrderWithItems[] || [], count: count || 0 };
+    if (status !== 'all') {
+      query = query.eq('status', status);
     }
 
-    throw error;
+    if (searchQuery) {
+      const searchString = `%${searchQuery}%`;
+      query = query.or(
+        `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
+      );
+    }
+
+    const { data: fallbackData, error: fallbackError, count } = await query
+      .order('order_time', { ascending: false })
+      .range(from, to);
+
+    // If query with delivery zones fails, try without them and manually fetch
+    if (fallbackError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Query with delivery zones failed, trying fallback:', fallbackError.message);
+      }
+      
+      let fallbackQuery = supabase
+        .from('orders')
+        .select(`*, order_items (*), order_delivery_schedule (*)`, { count: 'exact' });
+
+      if (status !== 'all') {
+        fallbackQuery = fallbackQuery.eq('status', status);
+      }
+
+      if (searchQuery) {
+        const searchString = `%${searchQuery}%`;
+        fallbackQuery = fallbackQuery.or(
+          `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
+        );
+      }
+
+      const { data: noZoneData, error: noZoneError, count: noZoneCount } = await fallbackQuery
+        .order('order_time', { ascending: false })
+        .range(from, to);
+
+      if (noZoneError) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Fallback query also failed:', noZoneError);
+        }
+        throw new Error(noZoneError.message);
+      }
+
+      // Manually fetch delivery zones for each order
+      const ordersWithZones = await Promise.all(
+        (noZoneData || []).map(async (order: any) => {
+          if (order.delivery_zone_id) {
+            try {
+              const { data: zone } = await supabase
+                .from('delivery_zones')
+                .select('id, name, base_fee, is_active')
+                .eq('id', order.delivery_zone_id)
+                .single();
+              
+              return { ...order, delivery_zones: zone };
+            } catch (zoneError) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn(`Failed to fetch zone for order ${order.id}:`, zoneError);
+              }
+              return { ...order, delivery_zones: null };
+            }
+          }
+          return { ...order, delivery_zones: null };
+        })
+      );
+
+      return { orders: ordersWithZones as unknown as OrderWithItems[], count: noZoneCount || 0 };
+    }
+
+    return { orders: fallbackData as unknown as OrderWithItems[] || [], count: count || 0 };
   }
 };
 
@@ -193,63 +168,8 @@ export const updateOrder = async (
   orderId: string,
   updates: { status?: OrderStatus; assigned_rider_id?: string | null; phone?: string; customer_phone?: string; [key: string]: any }
 ): Promise<OrderWithItems> => {
-  console.log('🔄 Starting enhanced order update:', orderId, updates);
-  
-  // Validate required parameters with enhanced checks
-  if (!orderId || orderId.trim() === '' || orderId === 'undefined' || orderId === 'null') {
-    throw new Error('Valid Order ID is required');
-  }
-
-  if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
-    throw new Error('Updates are required and must be a valid object');
-  }
-
-  // CRITICAL: Enhanced cleaning and validation - filter out invalid values
-  const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-    // Skip undefined, null, empty string, or 'undefined'/'null' string values
-    if (value !== undefined && 
-        value !== null && 
-        value !== '' && 
-        value !== 'undefined' && 
-        value !== 'null') {
-      
-      // Additional field-specific validation
-      if (key === 'status') {
-        // CRITICAL: Strict status enum validation
-        const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'completed', 'returned'];
-        if (typeof value !== 'string' || !validStatuses.includes(value)) {
-          console.error(`❌ BLOCKED: Invalid status value rejected: ${value} (type: ${typeof value})`);
-          throw new Error(`Invalid status value: ${value}. Valid values are: ${validStatuses.join(', ')}`);
-        }
-        console.log(`✅ Status validation passed: ${value}`);
-      }
-      
-      if (key === 'customer_email' && typeof value === 'string') {
-        // Basic email validation
-        if (!value.includes('@') || value.length < 5) {
-          console.warn(`⚠️ Invalid email format: ${value}`);
-          return acc;
-        }
-        acc[key] = value.toLowerCase().trim();
-      } else if (key === 'customer_phone' && typeof value === 'string') {
-        // Clean phone number
-        acc[key] = value.trim();
-      } else {
-        acc[key] = value;
-      }
-    } else {
-      console.warn(`⚠️ Filtering out invalid value for ${key}:`, value);
-    }
-    return acc;
-  }, {} as Record<string, any>);
-
-  // Check if we have any valid updates after enhanced cleaning
-  if (Object.keys(cleanedUpdates).length === 0) {
-    throw new Error('No valid updates provided after validation');
-  }
-
   // CRITICAL: Fix field mapping to prevent database column errors
-  const sanitizedUpdates = { ...cleanedUpdates };
+  const sanitizedUpdates = { ...updates };
   
   // Always sanitize phone field to customer_phone for orders table compatibility
   if ('phone' in sanitizedUpdates) {
@@ -257,160 +177,112 @@ export const updateOrder = async (
     sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
     delete sanitizedUpdates.phone;
   }
+  try {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 Updating order via production-safe method:', orderId, updates);
+    }
 
-  // Enhanced retry logic for transient errors
-  let lastError: Error;
-  const maxRetries = 5; // Increased for production reliability
-  const retryDelays = [500, 1000, 2000, 4000, 8000]; // Progressive backoff
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      console.log(`🔄 Enhanced order update attempt ${attempt + 1}:`, orderId, sanitizedUpdates);
-
-      // If we're assigning a rider, use the secure RPC-based assignment
-      if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
+    // If we're assigning a rider, use the secure RPC-based assignment
+    if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
+      if (process.env.NODE_ENV === 'development') {
         console.log('🎯 Assigning/reassigning rider using secure RPC:', sanitizedUpdates.assigned_rider_id);
-        
-        const assignmentResult = await retryWithFreshToken(async () => {
-          return await supabase.functions.invoke('admin-orders-manager', {
-            body: {
-              action: 'assign_rider',
-              orderId,
-              riderId: sanitizedUpdates.assigned_rider_id
-            }
-          });
-        });
-        
-        const { data, error: assignmentError } = assignmentResult;
-
-        if (assignmentError || !data?.success) {
-          const errorMsg = data?.error || assignmentError?.message || 'Failed to assign rider';
-          throw new Error(errorMsg);
+      }
+      
+      const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'assign_rider',
+          orderId,
+          riderId: sanitizedUpdates.assigned_rider_id
         }
+      });
 
-        console.log('✅ Rider assignment successful via secure RPC');
-
-        // If there are other updates besides rider assignment, apply them separately
-        const otherUpdates = { ...sanitizedUpdates };
-        delete otherUpdates.assigned_rider_id;
-        
-        if (Object.keys(otherUpdates).length > 0) {
-          const updateResult = await retryWithFreshToken(async () => {
-            return await supabase.functions.invoke('admin-orders-manager', {
-              body: {
-                action: 'update',
-                orderId,
-                updates: otherUpdates
-              }
-            });
-          });
-          
-          const { data: updateData, error: updateError } = updateResult;
-
-          if (updateError || !updateData?.success) {
-            throw new Error(updateData?.error || updateError?.message || 'Failed to update order');
-          }
-          
-          return updateData.order;
+      if (assignmentError || !assignmentResult?.success) {
+        const errorMsg = assignmentResult?.error || assignmentError?.message || 'Failed to assign rider';
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ Rider assignment failed:', errorMsg);
         }
-        
-        return data.order;
+        throw new Error(errorMsg);
       }
 
-      // For non-rider updates, use the standard update path with enhanced validation
-      const result = await retryWithFreshToken(async () => {
-        return await supabase.functions.invoke('admin-orders-manager', {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Rider assignment successful via secure RPC');
+      }
+
+      // If there are other updates besides rider assignment, apply them separately
+      const otherUpdates = { ...sanitizedUpdates };
+      delete otherUpdates.assigned_rider_id;
+      
+      if (Object.keys(otherUpdates).length > 0) {
+        const { data: updateResult, error: updateError } = await supabase.functions.invoke('admin-orders-manager', {
           body: {
             action: 'update',
             orderId,
-            updates: sanitizedUpdates
+            updates: otherUpdates
           }
         });
-      });
-      
-      const { data, error } = result;
 
-      if (error) {
-        console.error('❌ Supabase function error:', error);
-        throw new Error(`Function invocation failed: ${error.message}`);
-      }
-
-      if (!data || !data.success) {
-        console.error('❌ Function returned error:', data);
-        throw new Error(data?.error || 'Unknown error occurred');
-      }
-
-      console.log('✅ Order updated successfully via Enhanced Edge Function');
-      return data.order;
-
-    } catch (error: any) {
-      console.warn(`⚠️ Enhanced order update attempt ${attempt + 1} failed:`, error.message);
-      lastError = error;
-      
-      // Don't retry for permanent errors (client-side issues)
-      if (error.message.includes('Valid Order ID is required') ||
-          error.message.includes('No valid updates') ||
-          error.message.includes('not found') || 
-          error.message.includes('Invalid status') ||
-          error.message.includes('Access denied') ||
-          error.message.includes('Forbidden') ||
-          error.message.includes('must be a valid object')) {
-        console.error('❌ Permanent error, not retrying:', error.message);
-        throw error;
+        if (updateError || !updateResult?.success) {
+          throw new Error(updateResult?.error || updateError?.message || 'Failed to update order');
+        }
+        
+        return updateResult.order;
       }
       
-      // Use progressive backoff for retries
-      if (attempt < maxRetries - 1) {
-        const baseDelay = retryDelays[attempt] || 1000;
-        const jitteredDelay = baseDelay + Math.random() * 1000; // Add jitter
-        console.log(`⏳ Waiting ${jitteredDelay.toFixed(0)}ms before retry ${attempt + 2}`);
-        await new Promise(resolve => setTimeout(resolve, jitteredDelay));
-      }
+      return assignmentResult.order;
     }
-  }
-  
-  // All retries failed - provide enhanced user-friendly error messages
-  console.error('❌ All enhanced update attempts failed:', lastError?.message || 'Unknown error');
-  
-  // Enhanced error categorization for better user experience
-  const errorMessage = lastError?.message || 'Unknown error occurred';
-  
-  if (errorMessage.includes('duplicate key') || errorMessage.includes('being processed')) {
-    throw new Error('Order is currently being processed by another admin. Please refresh and try again.');
-  } else if (errorMessage.includes('non-2xx status code') || errorMessage.includes('Server error') || errorMessage.includes('Internal server error')) {
-    throw new Error('Order service is temporarily busy. Please try again in a moment.');
-  } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
-    throw new Error('Request timed out. Please check your connection and try again.');
-  } else if (errorMessage.includes('Network error') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
-    throw new Error('Network connection issue. Please check your internet and try again.');
-  } else if (errorMessage.includes('Database temporarily unavailable') || errorMessage.includes('connection')) {
-    throw new Error('Database service is temporarily unavailable. Please try again in a few moments.');
-  } else if (errorMessage.includes('Invalid status') || errorMessage.includes('enum')) {
-    throw new Error('Invalid order status provided. Please refresh the page and try again.');
-  } else if (errorMessage.includes('AUTH_TOKEN') || errorMessage.includes('Authentication')) {
-    throw new Error('Session expired. Please refresh the page and log in again.');
-  } else {
-    throw new Error(`Order update failed: ${errorMessage}`);
+
+    // For non-rider updates, use the standard update path
+    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      body: {
+        action: 'update',
+        orderId,
+        updates: sanitizedUpdates
+      }
+    });
+
+    if (error) {
+      console.error('❌ Error updating order via admin function:', error);
+      // Provide more specific error messaging
+      const errorMessage = error.message || 'Edge Function returned a non-2xx status code';
+      if (errorMessage.includes('non-2xx status code')) {
+        throw new Error('Order update service is temporarily unavailable. Please try again.');
+      }
+      throw new Error(`Order update failed: ${errorMessage}`);
+    }
+
+    if (!data?.success) {
+      console.error('❌ Order update failed:', data?.error);
+      throw new Error(data?.error || 'Order update failed due to server error');
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Order updated successfully via admin function');
+    }
+    return data.order;
+    
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Error updating order via admin function:', error);
+    }
+    
+    // NO FALLBACK: For production security, we only allow updates through the hardened edge function
+    throw new Error(`Order update failed: ${error.message}`);
   }
 };
 
 export const deleteOrder = async (orderId: string): Promise<void> => {
   try {
-    const result = await retryWithFreshToken(async () => {
-      return await supabase.functions.invoke('admin-orders-manager', {
-        body: {
-          action: 'delete',
-          orderId
-        }
-      });
+    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      body: {
+        action: 'delete',
+        orderId
+      }
     });
-    
-    const { data, error } = result;
 
     if (error || !data.success) {
       throw new Error(data?.error || error?.message || 'Failed to delete order');
     }
-  } catch (error: any) {
+  } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('Error deleting order via admin function:', error);
     }
@@ -432,21 +304,17 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
 
 export const bulkDeleteOrders = async (orderIds: string[]): Promise<void> => {
   try {
-    const result = await retryWithFreshToken(async () => {
-      return await supabase.functions.invoke('admin-orders-manager', {
-        body: {
-          action: 'bulk_delete',
-          orderIds
-        }
-      });
+    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      body: {
+        action: 'bulk_delete',
+        orderIds
+      }
     });
-    
-    const { data, error } = result;
 
     if (error || !data.success) {
       throw new Error(data?.error || error?.message || 'Failed to delete orders');
     }
-  } catch (error: any) {
+  } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('Error bulk deleting orders via admin function:', error);
     }

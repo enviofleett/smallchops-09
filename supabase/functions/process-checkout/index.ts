@@ -25,38 +25,37 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Log request for debugging
-  console.log(`🚀 ${req.method} /process-checkout - ${new Date().toISOString()}`);
-  console.log("📊 Request headers:", Object.fromEntries(req.headers.entries()));
-
   try {
+    // Extract and validate Authorization header
+    const authHeader = req.headers.get("Authorization");
+    console.log("🔐 Authorization header present:", !!authHeader);
     
-    console.log("🛒 Processing checkout request...");
-
-    let requestBody;
-    try {
-      requestBody = await req.json();
-      console.log("📨 Checkout request received:", {
-        customer_email: requestBody.customer?.email,
-        items_count: requestBody.items?.length,
-        has_discount: !!requestBody.discount,
-        discount_code: requestBody.discount?.code,
-        cart_total: requestBody.cart_totals?.final_total,
-      });
-    } catch (parseError) {
-      console.error("❌ Failed to parse request body:", parseError);
+    if (!authHeader) {
+      console.log("❌ No JWT provided - checkout requires authentication");
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Invalid JSON in request body",
-          code: "INVALID_JSON"
+          error: "Authentication required for checkout",
+          code: "REQUIRES_AUTH"
         }),
         {
-          status: 400,
+          status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
+    
+    console.log("🛒 Processing checkout request...");
+
+    const requestBody = await req.json();
+
+    console.log("📨 Checkout request received:", {
+      customer_email: requestBody.customer?.email,
+      items_count: requestBody.items?.length,
+      has_discount: !!requestBody.discount,
+      discount_code: requestBody.discount?.code,
+      cart_total: requestBody.cart_totals?.final_total,
+    });
 
     // ✅ Validate request
     if (!requestBody.customer?.email) throw new Error("Customer email is required");
@@ -143,14 +142,7 @@ serve(async (req) => {
       delivery_instructions: delivery_instructions
     } : null;
 
-    // ✅ Call database function with detailed logging
-    console.log("🔧 Calling create_order_with_items with params:", {
-      customer_id: customerId,
-      fulfillment_type: requestBody.fulfillment.type,
-      has_delivery_address: !!enhanced_delivery_address,
-      items_count: orderItems.length,
-    });
-
+    // ✅ Call database function
     const { data: orderId, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", {
       p_customer_id: customerId,
       p_fulfillment_type: requestBody.fulfillment.type,
@@ -162,30 +154,8 @@ serve(async (req) => {
     });
 
     if (orderError) {
-      console.error("❌ Order creation failed:", {
-        error: orderError,
-        message: orderError.message,
-        details: orderError.details,
-        hint: orderError.hint,
-        code: orderError.code
-      });
-      
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Order creation failed: ${orderError.message}`,
-          code: "ORDER_CREATION_FAILED",
-          details: {
-            db_error: orderError.code,
-            db_message: orderError.message,
-            timestamp: new Date().toISOString()
-          }
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      console.error("❌ Order creation failed:", orderError);
+      throw new Error(`Order creation failed: ${orderError.message}`);
     }
 
     console.log("✅ Order created successfully:", orderId);
@@ -450,42 +420,18 @@ serve(async (req) => {
       },
     );
   } catch (error) {
-    console.error("❌ Checkout processing error:", {
-      error: error,
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      timestamp: new Date().toISOString()
-    });
-
-    // Determine appropriate status code
-    let statusCode = 500;
-    let errorCode = "INTERNAL_ERROR";
-    
-    if (error.message?.includes("required") || error.message?.includes("validation")) {
-      statusCode = 400;
-      errorCode = "VALIDATION_ERROR";
-    } else if (error.message?.includes("not found")) {
-      statusCode = 404;
-      errorCode = "NOT_FOUND";
-    } else if (error.message?.includes("authentication") || error.message?.includes("unauthorized")) {
-      statusCode = 401;
-      errorCode = "AUTH_ERROR";
-    }
-
+    console.error("❌ Checkout processing error:", error);
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message || "Checkout processing failed",
-        code: errorCode,
         details: {
           timestamp: new Date().toISOString(),
           error_type: error.constructor.name,
-          request_id: crypto.randomUUID(),
         },
       }),
       {
-        status: statusCode,
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );

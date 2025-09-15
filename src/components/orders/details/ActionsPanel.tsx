@@ -104,7 +104,6 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
           <label className="text-sm font-medium text-foreground">
             {selectedStatus === 'out_for_delivery' ? 'Reassign Dispatch Rider' : 'Assign Dispatch Rider'}
           </label>
-          
           <Select
             value={assignedRider ?? 'unassigned'}
             onValueChange={(value) => onRiderChange(value === 'unassigned' ? null : value)}
@@ -122,7 +121,7 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
             <SelectContent className="bg-background border shadow-lg z-50 max-h-[200px] overflow-y-auto">
               <SelectItem value="unassigned">Unassigned</SelectItem>
               {riders?.length === 0 && !isLoadingRiders && (
-                <SelectItem value="no-riders" disabled>No active riders available</SelectItem>
+                <SelectItem value="" disabled>No active riders available</SelectItem>
               )}
               {riders?.map((rider) => (
                 <SelectItem key={rider.id} value={rider.id}>

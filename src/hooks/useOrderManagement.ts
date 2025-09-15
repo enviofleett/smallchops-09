@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { publicAPI, CheckoutData } from '@/api/public';
 import { CartItem } from '@/hooks/useCart';
 import { toast } from 'sonner';
@@ -17,24 +17,6 @@ export interface OrderTrackingInfo {
 
 export const useOrderManagement = () => {
   const [loading, setLoading] = useState(false);
-  const [processingOperations, setProcessingOperations] = useState(new Set<string>());
-
-  // Enhanced operation tracking
-  const trackOperation = useCallback((operationId: string, isProcessing: boolean) => {
-    setProcessingOperations(prev => {
-      const newSet = new Set(prev);
-      if (isProcessing) {
-        newSet.add(operationId);
-      } else {
-        newSet.delete(operationId);
-      }
-      return newSet;
-    });
-  }, []);
-
-  const isOperationProcessing = useCallback((operationId: string) => {
-    return processingOperations.has(operationId);
-  }, [processingOperations]);
 
   const placeOrder = async (
     checkoutData: CheckoutData,
@@ -49,37 +31,16 @@ export const useOrderManagement = () => {
       total_amount: number;
     }
   ) => {
-    const operationId = 'place-order';
     setLoading(true);
-    trackOperation(operationId, true);
-    
     try {
-      // Enhanced validation
-      if (!checkoutData.customer_email || !checkoutData.customer_name) {
-        throw new Error('Customer email and name are required');
-      }
+      // Register customer if new
+      await publicAPI.registerCustomer({
+        name: checkoutData.customer_name,
+        email: checkoutData.customer_email,
+        phone: checkoutData.customer_phone
+      });
 
-      if (!items || items.length === 0) {
-        throw new Error('Order must contain at least one item');
-      }
-
-      if (summary.total_amount <= 0) {
-        throw new Error('Order total must be greater than zero');
-      }
-
-      // Register customer if new with enhanced error handling
-      try {
-        await publicAPI.registerCustomer({
-          name: checkoutData.customer_name,
-          email: checkoutData.customer_email,
-          phone: checkoutData.customer_phone
-        });
-      } catch (customerError) {
-        console.warn('Customer registration warning (non-blocking):', customerError);
-        // Continue with order creation even if customer registration has issues
-      }
-
-      // Create order with pending payment status with enhanced validation
+      // Create order with pending payment status
       const orderResponse = await publicAPI.createOrder({
         ...checkoutData,
         items,
@@ -90,27 +51,16 @@ export const useOrderManagement = () => {
         throw new Error(orderResponse.error || 'Failed to create order');
       }
 
-      // Create pending payment transaction with enhanced error handling
-      try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        const { error: paymentError } = await supabase.from('payment_transactions').insert({
-          order_id: orderResponse.data.id,
-          amount: summary.total_amount,
-          currency: 'NGN',
-          status: 'pending',
-          transaction_type: 'payment',
-          provider_reference: `order_${orderResponse.data.id}_${Date.now()}`
-        });
-
-        if (paymentError) {
-          console.error('Payment transaction creation failed:', paymentError);
-          // Don't fail the order creation, but log the error
-          toast.warning('Order created, but payment tracking setup had issues. Please contact support if needed.');
-        }
-      } catch (paymentTrackingError) {
-        console.error('Payment tracking error (non-blocking):', paymentTrackingError);
-        toast.warning('Order created successfully, but payment tracking may be affected.');
-      }
+      // Create pending payment transaction
+      const { supabase } = await import('@/integrations/supabase/client');
+      await supabase.from('payment_transactions').insert({
+        order_id: orderResponse.data.id,
+        amount: summary.total_amount,
+        currency: 'NGN',
+        status: 'pending',
+        transaction_type: 'payment',
+        provider_reference: `order_${orderResponse.data.id}_${Date.now()}`
+      });
 
       // Note: Order confirmation email will be automatically triggered by database trigger
       console.log('Order placed successfully, confirmation email will be sent automatically');
@@ -120,39 +70,15 @@ export const useOrderManagement = () => {
     } catch (error) {
       console.error('Error placing order:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to place order';
-      
-      // Enhanced error categorization
-      if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-        toast.error('Network error. Please check your connection and try again.');
-      } else if (errorMessage.includes('timeout')) {
-        toast.error('Request timed out. Please try again.');
-      } else if (errorMessage.includes('duplicate')) {
-        toast.error('This order may have already been placed. Please check your orders.');
-      } else {
-        toast.error(errorMessage);
-      }
-      
+      toast.error(errorMessage);
       throw error;
     } finally {
       setLoading(false);
-      trackOperation(operationId, false);
     }
   };
 
   const updateOrderPaymentStatus = async (orderId: string, paymentStatus: 'paid' | 'failed') => {
-    const operationId = `payment-status-${orderId}`;
-    trackOperation(operationId, true);
-    
     try {
-      // Enhanced validation
-      if (!orderId || orderId.trim() === '') {
-        throw new Error('Order ID is required');
-      }
-
-      if (!['paid', 'failed'].includes(paymentStatus)) {
-        throw new Error('Invalid payment status');
-      }
-
       const { supabase } = await import('@/integrations/supabase/client');
       
       const { error } = await supabase
@@ -164,38 +90,20 @@ export const useOrderManagement = () => {
         })
         .eq('id', orderId);
 
-      if (error) {
-        console.error('Payment status update error:', error);
-        throw new Error(`Failed to update payment status: ${error.message}`);
-      }
+      if (error) throw error;
 
       // Note: Payment confirmation email will be automatically triggered by database trigger
       console.log('Order payment status updated, notification email will be sent automatically');
 
-      const successMessage = `Order ${paymentStatus === 'paid' ? 'confirmed' : 'cancelled'} successfully`;
-      toast.success(successMessage);
-      
+      toast.success(`Order ${paymentStatus === 'paid' ? 'confirmed' : 'cancelled'} successfully`);
     } catch (error) {
       console.error('Error updating order payment status:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update payment status';
-      toast.error(errorMessage);
       throw error;
-    } finally {
-      trackOperation(operationId, false);
     }
   };
 
-  // Enhanced order tracking with better error handling
   const trackOrder = async (orderIdOrNumber: string): Promise<OrderTrackingInfo> => {
-    const operationId = `track-${orderIdOrNumber}`;
-    trackOperation(operationId, true);
-    
     try {
-      // Enhanced validation
-      if (!orderIdOrNumber || orderIdOrNumber.trim() === '') {
-        throw new Error('Order ID or number is required');
-      }
-
       const response = await publicAPI.getOrder(orderIdOrNumber);
       
       if (!response.success) {
@@ -204,19 +112,13 @@ export const useOrderManagement = () => {
 
       const order = response.data;
       
-      // Generate tracking steps based on order status with enhanced logic
+      // Generate tracking steps based on order status
       const allSteps = [
         { step: 'Order Placed', status: 'pending' },
         { step: 'Order Confirmed', status: 'confirmed' },
         { step: 'Preparing', status: 'preparing' },
-        { 
-          step: order.order_type === 'delivery' ? 'Out for Delivery' : 'Ready for Pickup', 
-          status: order.order_type === 'delivery' ? 'out_for_delivery' : 'ready' 
-        },
-        { 
-          step: order.order_type === 'delivery' ? 'Delivered' : 'Picked Up', 
-          status: 'delivered' 
-        }
+        { step: order.order_type === 'delivery' ? 'Out for Delivery' : 'Ready for Pickup', status: order.order_type === 'delivery' ? 'out_for_delivery' : 'ready' },
+        { step: order.order_type === 'delivery' ? 'Delivered' : 'Picked Up', status: 'delivered' }
       ];
 
       const trackingSteps = allSteps.map(step => ({
@@ -225,7 +127,7 @@ export const useOrderManagement = () => {
         timestamp: step.status === order.status ? order.updated_at : undefined
       }));
 
-      const trackingInfo: OrderTrackingInfo = {
+      return {
         orderId: order.id,
         orderNumber: order.order_number,
         status: order.status,
@@ -233,73 +135,30 @@ export const useOrderManagement = () => {
         trackingSteps
       };
 
-      return trackingInfo;
-
     } catch (error) {
       console.error('Error tracking order:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to track order';
-      
-      // Enhanced error categorization for tracking
-      if (errorMessage.includes('not found')) {
-        toast.error('Order not found. Please check the order number and try again.');
-      } else if (errorMessage.includes('network')) {
-        toast.error('Network error while tracking order. Please try again.');
-      } else {
-        toast.error(errorMessage);
-      }
-      
       throw error;
-    } finally {
-      trackOperation(operationId, false);
     }
   };
 
   const getOrderHistory = async (customerEmail: string) => {
-    const operationId = `history-${customerEmail}`;
-    trackOperation(operationId, true);
-    
     try {
-      // Enhanced validation
-      if (!customerEmail || !customerEmail.includes('@')) {
-        throw new Error('Valid customer email is required');
-      }
-
       // This would require a new endpoint in public-api for customer order history
-      // For now, we'll return an empty array with a warning
-      console.warn('Order history endpoint not yet implemented');
-      toast.info('Order history feature is coming soon');
+      // For now, we'll return an empty array
       return [];
     } catch (error) {
       console.error('Error fetching order history:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch order history';
-      toast.error(errorMessage);
       throw error;
-    } finally {
-      trackOperation(operationId, false);
     }
   };
 
   const cancelOrder = async (orderId: string) => {
-    const operationId = `cancel-${orderId}`;
-    trackOperation(operationId, true);
-    
     try {
-      // Enhanced validation
-      if (!orderId || orderId.trim() === '') {
-        throw new Error('Order ID is required');
-      }
-
       // This would require a new endpoint in public-api for order cancellation
-      // For now, show success message
       toast.success('Order cancellation requested');
-      console.warn('Order cancellation endpoint not yet implemented');
     } catch (error) {
       console.error('Error cancelling order:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to cancel order';
-      toast.error(errorMessage);
       throw error;
-    } finally {
-      trackOperation(operationId, false);
     }
   };
 
@@ -309,10 +168,7 @@ export const useOrderManagement = () => {
     trackOrder,
     getOrderHistory,
     cancelOrder,
-    updateOrderPaymentStatus,
-    // Enhanced state tracking
-    isOperationProcessing,
-    processingOperations: Array.from(processingOperations)
+    updateOrderPaymentStatus
   };
 };
 

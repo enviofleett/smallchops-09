@@ -117,12 +117,13 @@ export const ProductionReadinessChecker = () => {
       }
 
       // Check Business Settings (using business_info for public data)
-      const { data } = await supabase
-        .from('business_settings')
-        .select('name')
-        .single();
+      const { data: businessSettings } = await supabase
+        .from('business_info')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
 
-      if (!data?.name) {
+      if (!businessSettings?.name) {
         checkResults.push({
           name: 'Business Configuration',
           status: 'warning',

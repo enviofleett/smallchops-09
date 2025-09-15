@@ -70,82 +70,35 @@ serve(async (req) => {
 
   const corsHeaders = getCorsHeaders(origin)
 
-  // ✅ FIXED AUTHENTICATION - Proper JWT handling
+  // ADMIN AUTHENTICATION: Validate JWT and admin role manually since verify_jwt = false
   try {
     const authHeader = req.headers.get('authorization')
-    console.log('🔍 Auth header present:', !!authHeader)
-    
-    if (!authHeader) {
-      console.log('❌ No authorization header provided')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Missing or invalid authorization header')
       return new Response(JSON.stringify({
         success: false,
-        error: 'Unauthorized: No authentication token provided',
-        code: 'AUTH_TOKEN_MISSING'
+        error: 'Unauthorized: Missing authentication token'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
       })
     }
 
-    if (!authHeader.startsWith('Bearer ')) {
-      console.log('❌ Invalid authorization header format')
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    
+    if (authError || !user) {
+      console.log('❌ Invalid JWT token:', authError?.message)
       return new Response(JSON.stringify({
         success: false,
-        error: 'Unauthorized: Invalid token format',
-        code: 'AUTH_TOKEN_INVALID_FORMAT'
+        error: 'Unauthorized: Invalid authentication token'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
       })
     }
 
-    // Extract JWT token
-    const jwt = authHeader.replace('Bearer ', '')
-    console.log('🔍 JWT token extracted, length:', jwt.length)
-    
-    // Use service role client with auth header to verify JWT
-    const authClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    )
-
-    // Get user from the JWT token
-    const { data: { user }, error: userError } = await authClient.auth.getUser(jwt)
-    
-    console.log('🔍 User verification result:', { 
-      hasUser: !!user, 
-      userId: user?.id, 
-      userEmail: user?.email,
-      error: userError?.message 
-    })
-    
-    if (userError) {
-      console.log('❌ JWT verification failed:', userError.message)
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Invalid or expired token. Please log in again.',
-        code: 'AUTH_TOKEN_INVALID'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 401
-      })
-    }
-    
-    if (!user) {
-      console.log('❌ No user found in valid JWT')
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Authentication failed. Please log in again.',
-        code: 'AUTH_USER_NOT_FOUND'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 401
-      })
-    }
-
-    console.log('✅ User authenticated:', user.id)
-
-    // Check if user is admin using service role client for reliable access
+    // Check if user is admin
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role, is_active')
@@ -156,8 +109,7 @@ serve(async (req) => {
       console.log('❌ User is not an active admin:', { 
         userId: user.id, 
         role: profile?.role, 
-        isActive: profile?.is_active,
-        profileError: profileError?.message
+        isActive: profile?.is_active 
       })
       return new Response(JSON.stringify({
         success: false,
@@ -183,34 +135,14 @@ serve(async (req) => {
   try {
     let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
     
-    // CRITICAL: Comprehensive field sanitization to prevent ALL enum/column errors
+    // CRITICAL: Comprehensive phone field sanitization to prevent ALL column errors
     if (updates && typeof updates === 'object') {
-      // Phone field mapping
       if ('phone' in updates) {
         console.log('🚨 GLOBAL SANITIZATION: Found phone field in updates, mapping to customer_phone');
         updates.customer_phone = updates.phone;
         delete updates.phone;
+        console.log('✅ GLOBAL SANITIZED: Updates after phone field cleanup:', updates);
       }
-      
-      // CRITICAL: Status field validation at entry point
-      if ('status' in updates) {
-        if (!updates.status || 
-            updates.status === 'undefined' || 
-            updates.status === 'null' || 
-            typeof updates.status !== 'string' ||
-            updates.status.trim() === '') {
-          console.error('❌ ENTRY POINT BLOCKED: Invalid status in request body:', updates.status);
-          return new Response(JSON.stringify({
-            success: false,
-            error: `Invalid status in request: ${updates.status}`
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          });
-        }
-      }
-      
-      console.log('✅ GLOBAL SANITIZATION: Updates after field cleanup:', updates);
     }
 
     switch (action) {
@@ -465,251 +397,156 @@ serve(async (req) => {
       case 'update': {
         console.log('Admin function: Updating order', orderId, 'with updates:', JSON.stringify(updates))
 
-        // Validate required parameters
-        if (!orderId) {
-          console.error('❌ Missing orderId parameter')
+        // Get the current order to compare status changes
+        const { data: currentOrder, error: fetchError } = await supabaseClient
+          .from('orders')
+          .select('status, customer_email, customer_name, order_number')
+          .eq('id', orderId)
+          .single()
+
+        if (fetchError) {
+          console.error('Error fetching current order:', fetchError)
           return new Response(JSON.stringify({
             success: false,
-            error: 'Order ID is required'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          })
-        }
-
-        if (!updates || Object.keys(updates).length === 0) {
-          console.error('❌ No updates provided')
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Updates are required'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          })
-        }
-
-        // If it's a status update, use the safe database function
-        if (updates && updates.status && Object.keys(updates).length === 1) {
-          console.log('🔄 Using safe database function for status update:', updates.status)
-          
-          // CRITICAL: Comprehensive status validation
-          if (!updates.status || 
-              updates.status === 'undefined' || 
-              updates.status === 'null' || 
-              typeof updates.status !== 'string' ||
-              updates.status.trim() === '') {
-            console.error('❌ BLOCKED: Invalid status value:', updates.status, 'Type:', typeof updates.status)
-            return new Response(JSON.stringify({
-              success: false,
-              error: `Invalid status value: ${updates.status}. Status must be a valid non-empty string.`
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400
-            })
-          }
-
-          // Validate against allowed enum values
-          const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'completed', 'returned'];
-          if (!validStatuses.includes(updates.status)) {
-            console.error('❌ BLOCKED: Status not in allowed enum values:', updates.status)
-            return new Response(JSON.stringify({
-              success: false,
-              error: `Invalid status: ${updates.status}. Valid statuses are: ${validStatuses.join(', ')}`
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400
-            })
-          }
-
-          console.log('✅ Status validation passed in Edge Function:', updates.status)
-
-          try {
-            // Use enhanced version with better validation
-            const { data: result, error: dbError } = await supabaseClient.rpc('admin_safe_update_order_status_enhanced', {
-              p_order_id: orderId,
-              p_new_status: updates.status,
-              p_admin_id: null // We could pass the authenticated user ID here if needed
-            })
-
-            if (dbError) {
-              console.error('❌ Enhanced safe update function error:', dbError)
-              return new Response(JSON.stringify({
-                success: false,
-                error: `Database error: ${dbError.message}`,
-                code: 'DATABASE_ERROR'
-              }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500
-              })
-            }
-
-            if (!result) {
-              console.error('❌ No result from enhanced safe update function')
-              return new Response(JSON.stringify({
-                success: false,
-                error: 'No result from database function'
-              }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500
-              })
-            }
-
-            console.log('✅ Enhanced safe update result:', result)
-
-            if (!result.success) {
-              return new Response(JSON.stringify(result), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400
-              })
-            }
-
-            return new Response(JSON.stringify({
-              success: true,
-              message: 'Order status updated successfully',
-              order: result.order
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
-          } catch (functionError) {
-            console.error('❌ Exception in enhanced safe update function:', functionError)
-            return new Response(JSON.stringify({
-              success: false,
-              error: `Status update failed: ${functionError.message}`,
-              code: 'STATUS_UPDATE_FAILED'
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 500
-            })
-          }
-      } else {
-        // For other field updates (non-status), use direct table update with enhanced validation
-        console.log('🔄 Using direct table update for non-status fields with enhanced validation')
-        
-        // Enhanced validation - clean and validate updates
-        const cleanUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-          // Skip null, undefined, empty string, or string representations of these
-          if (value !== undefined && 
-              value !== null && 
-              value !== 'undefined' && 
-              value !== 'null' && 
-              value !== '') {
-            
-            // Additional validation for specific fields
-            if (key === 'status') {
-              // Should not reach here since status updates go through the enhanced function
-              console.warn('⚠️ Status update detected in non-status path - skipping');
-              return acc;
-            }
-            
-            if (key === 'customer_phone' && typeof value === 'string') {
-              // Clean phone number format
-              acc[key] = value.trim();
-            } else if (key === 'customer_email' && typeof value === 'string') {
-              // Clean email format
-              acc[key] = value.toLowerCase().trim();
-            } else {
-              acc[key] = value;
-            }
-          } else {
-            console.warn(`⚠️ Skipping invalid field ${key} with value:`, value);
-          }
-          return acc;
-        }, {} as Record<string, any>);
-
-        if (Object.keys(cleanUpdates).length === 0) {
-          console.error('❌ No valid updates after enhanced cleaning')
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'No valid updates provided after validation'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          })
-        }
-
-        try {
-          console.log('🔄 Applying clean updates:', cleanUpdates);
-          
-          const { data: updatedOrder, error: updateError } = await supabaseClient
-            .from('orders')
-            .update({
-              ...cleanUpdates,
-              updated_at: new Date().toISOString() // Ensure updated_at is always set
-            })
-            .eq('id', orderId)
-            .select(`*, 
-              order_items (*),
-              order_delivery_schedule (*),
-              delivery_zones (id, name, base_fee, is_active)
-            `)
-            .single()
-
-          if (updateError) {
-            console.error('❌ Enhanced direct update error:', updateError)
-            
-            // Provide more specific error messages
-            let errorMessage = updateError.message;
-            if (updateError.code === '23505') {
-              errorMessage = 'Update failed due to duplicate data constraint';
-            } else if (updateError.code === '23503') {
-              errorMessage = 'Update failed due to invalid reference data';
-            } else if (updateError.code === '22P02') {
-              errorMessage = 'Update failed due to invalid data format';
-            }
-            
-            return new Response(JSON.stringify({
-              success: false,
-              error: errorMessage,
-              code: 'UPDATE_FAILED',
-              details: updateError.code
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 500
-            })
-          }
-
-          console.log('✅ Order updated successfully via enhanced direct update')
-
-          return new Response(JSON.stringify({
-            success: true,
-            order: updatedOrder,
-            message: 'Order updated successfully'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        } catch (directUpdateError) {
-          console.error('❌ Exception in enhanced direct update:', directUpdateError)
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Failed to update order: ' + directUpdateError.message,
-            code: 'DIRECT_UPDATE_EXCEPTION'
+            error: fetchError.message
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
           })
         }
+
+        // SECURITY: Strict whitelist of allowed columns for order updates
+        const allowedColumns = [
+          'status', 'customer_name', 'customer_phone', 'customer_email',
+          'delivery_address', 'delivery_instructions', 'order_notes',
+          'assigned_rider_id', 'payment_status', 'total_amount',
+          'delivery_zone_id', 'order_type', 'special_instructions',
+          'internal_notes', 'updated_at'
+        ];
+
+        // Sanitize and validate updates
+        const sanitizedUpdates = {};
+        console.log('Raw updates before sanitization:', updates);
+        
+        if (updates && typeof updates === 'object') {
+          for (const [key, value] of Object.entries(updates)) {
+            if (key === 'phone') {
+              // Map legacy phone field to customer_phone
+              console.log('🔧 Mapping phone to customer_phone:', value);
+              sanitizedUpdates.customer_phone = value;
+            } else if (allowedColumns.includes(key)) {
+              sanitizedUpdates[key] = value;
+            } else {
+              console.warn(`⚠️ Blocked unauthorized column update attempt: ${key}`);
+            }
+          }
         }
-        break;
+
+        // Ensure we always set updated_at for tracking
+        sanitizedUpdates.updated_at = new Date().toISOString();
+        
+        console.log('Sanitized and whitelisted updates:', sanitizedUpdates);
+
+        const { data, error } = await supabaseClient
+          .from('orders')
+          .update(sanitizedUpdates)
+          .eq('id', orderId)
+          .select(`*, 
+            order_items (*),
+            delivery_zones (id, name, base_fee, is_active),
+            order_delivery_schedule (*)
+          `)
+          .single()
+
+        if (error) {
+          console.error('Error updating order:', error)
+          return new Response(JSON.stringify({
+            success: false,
+            error: error.message
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
+        }
+
+        // Trigger status change email if status has changed and customer has email
+        if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
+          try {
+            console.log(`Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
+            
+            // Create HMAC signature for internal authentication
+            const timestamp = Math.floor(Date.now() / 1000).toString()
+            const message = `${timestamp}:user-journey-automation`
+            const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
+            
+            const encoder = new TextEncoder()
+            const keyData = await crypto.subtle.importKey(
+              'raw',
+              encoder.encode(secret),
+              { name: 'HMAC', hash: 'SHA-256' },
+              false,
+              ['sign']
+            )
+            
+            const signature = await crypto.subtle.sign(
+              'HMAC',
+              keyData,
+              encoder.encode(message)
+            )
+            
+            const signatureHex = Array.from(new Uint8Array(signature))
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('')
+            
+            const { error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
+              body: {
+                journey_type: 'order_status_change',
+                user_data: {
+                  email: currentOrder.customer_email,
+                  name: currentOrder.customer_name
+                },
+                order_data: {
+                  order_id: orderId,
+                  order_number: currentOrder.order_number,
+                  status: updates.status
+                },
+                metadata: {
+                  old_status: currentOrder.status,
+                  new_status: updates.status,
+                  updated_at: new Date().toISOString()
+                }
+              },
+              headers: {
+                'x-internal-secret': signatureHex,
+                'x-timestamp': timestamp
+              }
+            })
+
+            if (emailError) {
+              console.error('Failed to trigger status change email:', emailError)
+              // Don't fail the order update if email fails
+            } else {
+              console.log('✅ Status change email triggered successfully')
+            }
+          } catch (emailError) {
+            console.error('Error triggering status change email:', emailError)
+            // Don't fail the order update if email fails
+          }
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          order: data
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+        break
       }
 
       case 'delete': {
         console.log('Admin function: Deleting order', orderId)
 
-        // Delete related records to avoid foreign key constraints
-        const deleteOperations = [
-          supabaseClient.from('order_items').delete().eq('order_id', orderId),
-          supabaseClient.from('order_delivery_schedule').delete().eq('order_id', orderId),
-          supabaseClient.from('order_status_changes').delete().eq('order_id', orderId),
-          supabaseClient.from('communication_events').delete().eq('order_id', orderId)
-        ]
-
-        try {
-          await Promise.all(deleteOperations)
-        } catch (relatedError) {
-          console.warn('⚠️ Some related record deletions failed (non-blocking):', relatedError)
-        }
-
-        const { data, error } = await supabaseClient
+        const { error } = await supabaseClient
           .from('orders')
           .delete()
           .eq('id', orderId)
@@ -737,31 +574,7 @@ serve(async (req) => {
       case 'bulk_delete': {
         console.log('Admin function: Bulk deleting orders', orderIds)
 
-        if (!Array.isArray(orderIds) || orderIds.length === 0) {
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Invalid order IDs provided'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          })
-        }
-
-        // Delete related records for all orders
-        const deleteOperations = [
-          supabaseClient.from('order_items').delete().in('order_id', orderIds),
-          supabaseClient.from('order_delivery_schedule').delete().in('order_id', orderIds),
-          supabaseClient.from('order_status_changes').delete().in('order_id', orderIds),
-          supabaseClient.from('communication_events').delete().in('order_id', orderIds)
-        ]
-
-        try {
-          await Promise.all(deleteOperations)
-        } catch (relatedError) {
-          console.warn('⚠️ Some related record deletions failed (non-blocking):', relatedError)
-        }
-
-        const { data, error } = await supabaseClient
+        const { error } = await supabaseClient
           .from('orders')
           .delete()
           .in('id', orderIds)
@@ -779,7 +592,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({
           success: true,
-          message: `${orderIds.length} orders deleted successfully`
+          message: 'Orders deleted successfully'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })

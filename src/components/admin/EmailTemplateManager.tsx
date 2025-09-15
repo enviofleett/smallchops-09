@@ -215,7 +215,7 @@ export const EmailTemplateManager: React.FC = () => {
     try {
       // Get business settings for production branding
       const { data: businessSettings } = await supabase
-        .from('business_settings')
+        .from('business_info')
         .select('name, tagline, website_url, working_hours')
         .limit(1)
         .maybeSingle();

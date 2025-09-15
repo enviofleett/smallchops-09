@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
@@ -346,7 +346,6 @@ export type Database = {
         Row: {
           action: string
           category: string | null
-          created_at: string | null
           entity_id: string | null
           entity_type: string | null
           event_time: string
@@ -355,7 +354,6 @@ export type Database = {
           message: string | null
           new_values: Json | null
           old_values: Json | null
-          updated_at: string | null
           user_agent: string | null
           user_id: string | null
           user_name: string | null
@@ -363,7 +361,6 @@ export type Database = {
         Insert: {
           action: string
           category?: string | null
-          created_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           event_time?: string
@@ -372,7 +369,6 @@ export type Database = {
           message?: string | null
           new_values?: Json | null
           old_values?: Json | null
-          updated_at?: string | null
           user_agent?: string | null
           user_id?: string | null
           user_name?: string | null
@@ -380,7 +376,6 @@ export type Database = {
         Update: {
           action?: string
           category?: string | null
-          created_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           event_time?: string
@@ -389,7 +384,6 @@ export type Database = {
           message?: string | null
           new_values?: Json | null
           old_values?: Json | null
-          updated_at?: string | null
           user_agent?: string | null
           user_id?: string | null
           user_name?: string | null
@@ -1115,14 +1109,12 @@ export type Database = {
           external_id: string | null
           id: string
           last_error: string | null
-          last_retry_at: string | null
           order_id: string | null
           payload: Json | null
           priority: string | null
           processed_at: string | null
           processing_started_at: string | null
           processing_time_ms: number | null
-          provider_response: Json | null
           recipient_email: string | null
           retry_count: number
           scheduled_at: string | null
@@ -1150,14 +1142,12 @@ export type Database = {
           external_id?: string | null
           id?: string
           last_error?: string | null
-          last_retry_at?: string | null
           order_id?: string | null
           payload?: Json | null
           priority?: string | null
           processed_at?: string | null
           processing_started_at?: string | null
           processing_time_ms?: number | null
-          provider_response?: Json | null
           recipient_email?: string | null
           retry_count?: number
           scheduled_at?: string | null
@@ -1185,14 +1175,12 @@ export type Database = {
           external_id?: string | null
           id?: string
           last_error?: string | null
-          last_retry_at?: string | null
           order_id?: string | null
           payload?: Json | null
           priority?: string | null
           processed_at?: string | null
           processing_started_at?: string | null
           processing_time_ms?: number | null
-          provider_response?: Json | null
           recipient_email?: string | null
           retry_count?: number
           scheduled_at?: string | null
@@ -6373,51 +6361,6 @@ export type Database = {
         }
         Relationships: []
       }
-      paystack_secure_config: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          is_active: boolean
-          live_public_key: string | null
-          live_secret_key: string | null
-          test_mode: boolean
-          test_public_key: string | null
-          test_secret_key: string | null
-          updated_at: string
-          updated_by: string | null
-          webhook_secret: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_active?: boolean
-          live_public_key?: string | null
-          live_secret_key?: string | null
-          test_mode?: boolean
-          test_public_key?: string | null
-          test_secret_key?: string | null
-          updated_at?: string
-          updated_by?: string | null
-          webhook_secret?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_active?: boolean
-          live_public_key?: string | null
-          live_secret_key?: string | null
-          test_mode?: boolean
-          test_public_key?: string | null
-          test_secret_key?: string | null
-          updated_at?: string
-          updated_by?: string | null
-          webhook_secret?: string | null
-        }
-        Relationships: []
-      }
       performance_analytics: {
         Row: {
           cache_hit: boolean | null
@@ -8717,17 +8660,7 @@ export type Database = {
       }
     }
     Views: {
-      email_queue_health: {
-        Row: {
-          failed_count: number | null
-          last_email_sent: string | null
-          oldest_queued_email: string | null
-          queued_count: number | null
-          sent_count: number | null
-          stuck_emails: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       activate_admin_user: {
@@ -8736,18 +8669,6 @@ export type Database = {
       }
       adjust_quantities_for_moq: {
         Args: { order_items: Json }
-        Returns: Json
-      }
-      admin_queue_order_email: {
-        Args: { p_order_id: string; p_status: string }
-        Returns: undefined
-      }
-      admin_safe_update_order_status: {
-        Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
-        Returns: Json
-      }
-      admin_safe_update_order_status_enhanced: {
-        Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
       assess_production_readiness: {
@@ -8788,7 +8709,7 @@ export type Database = {
       }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
-        Returns: undefined
+        Returns: Json
       }
       calculate_delivery_metrics: {
         Args: { p_date: string }
@@ -8915,7 +8836,7 @@ export type Database = {
               p_target_user_id: string
               p_window_minutes?: number
             }
-        Returns: Json
+        Returns: boolean
       }
       check_production_readiness: {
         Args: Record<PropertyKey, never>
@@ -9022,10 +8943,6 @@ export type Database = {
       cleanup_promotion_rate_limits: {
         Args: Record<PropertyKey, never>
         Returns: number
-      }
-      cleanup_stuck_emails: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
       }
       clear_production_data: {
         Args: Record<PropertyKey, never>
@@ -9536,11 +9453,7 @@ export type Database = {
       }
       get_public_paystack_config: {
         Args: Record<PropertyKey, never>
-        Returns: {
-          is_valid: boolean
-          public_key: string
-          test_mode: boolean
-        }[]
+        Returns: Json
       }
       get_queued_communication_events: {
         Args: { batch_size?: number }
@@ -9556,14 +9469,12 @@ export type Database = {
           external_id: string | null
           id: string
           last_error: string | null
-          last_retry_at: string | null
           order_id: string | null
           payload: Json | null
           priority: string | null
           processed_at: string | null
           processing_started_at: string | null
           processing_time_ms: number | null
-          provider_response: Json | null
           recipient_email: string | null
           retry_count: number
           scheduled_at: string | null
@@ -9989,10 +9900,6 @@ export type Database = {
         Args: { batch_size?: number; priority_filter?: string }
         Returns: Json
       }
-      process_queued_communication_events: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -10108,12 +10015,6 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: Json
       }
-      safe_update_order_status: {
-        Args:
-          | { p_admin_id?: string; p_new_status: string; p_order_id: string }
-          | { p_admin_notes?: string; p_new_status: string; p_order_id: string }
-        Returns: Json
-      }
       set_limit: {
         Args: { "": number }
         Returns: number
@@ -10202,38 +10103,6 @@ export type Database = {
         Args:
           | { p_change_reason?: string; p_permissions: Json; p_user_id: string }
           | { permissions_data: Json; target_user_id: string }
-        Returns: Json
-      }
-      upsert_communication_event: {
-        Args:
-          | {
-              p_dedupe_key?: string
-              p_event_type: string
-              p_order_id?: string
-              p_recipient_email: string
-              p_template_key: string
-              p_template_variables?: Json
-            }
-          | {
-              p_dedupe_key?: string
-              p_event_type: string
-              p_recipient_email: string
-              p_recipient_name: string
-              p_related_order_id: string
-              p_template_key: string
-              p_template_variables: Json
-            }
-        Returns: string
-      }
-      upsert_communication_event_enhanced: {
-        Args: {
-          p_dedupe_key?: string
-          p_event_type: string
-          p_order_id?: string
-          p_recipient_email: string
-          p_template_key: string
-          p_template_variables?: Json
-        }
         Returns: Json
       }
       upsert_payment_confirmation_event: {

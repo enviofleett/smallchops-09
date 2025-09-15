@@ -30,9 +30,9 @@ const SUPPORTED_MIME_TYPES = new Set([
 ]);
 
 /**
- * Maximum file size (20MB) - Production limit
+ * Maximum file size (10MB)
  */
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 /**
  * Validates image file format and properties
@@ -66,7 +66,7 @@ export const validateImageFile = (file: File): FileValidationResult => {
     const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
     return {
       isValid: false,
-      error: `File size (${sizeMB}MB) exceeds the 20MB limit`,
+      error: `File size (${sizeMB}MB) exceeds the 10MB limit`,
       suggestedAction: 'Please compress your image or choose a smaller file'
     };
   }

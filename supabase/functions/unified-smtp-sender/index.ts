@@ -8,14 +8,20 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  to: string;
-  subject: string;
+  to?: string;
+  subject?: string;
   html?: string;
   text?: string;
+  content?: string;
   from?: string;
   replyTo?: string;
   priority?: 'high' | 'normal' | 'low';
   metadata?: Record<string, any>;
+  // Template-based email fields
+  recipient_email?: string;
+  email?: string;
+  template_key?: string;
+  template_variables?: Record<string, any>;
 }
 
 // Helper function to mask SMTP config for logging
@@ -76,10 +82,6 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Missing required field: subject or template_key');
     }
 
-    if (!emailRequest.html && !emailRequest.text) {
-      throw new Error('Either html or text content is required');
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -89,28 +91,137 @@ const handler = async (req: Request): Promise<Response> => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get SMTP configuration from environment
-    const smtpHost = Deno.env.get('SMTP_HOST');
-    const smtpUser = Deno.env.get('SMTP_USER');
-    const smtpPass = Deno.env.get('SMTP_PASS');
-    const smtpSender = Deno.env.get('SMTP_SENDER_EMAIL');
-
-    if (!smtpHost || !smtpUser || !smtpPass || !smtpSender) {
-      throw new Error('Missing SMTP configuration. Please configure SMTP settings.');
+    // Get SMTP configuration from database first, fallback to env vars
+    let smtpConfig;
+    try {
+      const { data: commSettings } = await supabase
+        .from('communication_settings')
+        .select('*')
+        .eq('use_smtp', true)
+        .single();
+        
+      if (commSettings) {
+        smtpConfig = {
+          hostname: commSettings.smtp_host,
+          port: commSettings.smtp_port || 587,
+          username: commSettings.smtp_user,
+          password: commSettings.smtp_pass,
+          senderEmail: commSettings.sender_email,
+          senderName: commSettings.sender_name || 'Starters'
+        };
+        console.log('✅ Using SMTP config from database:', { 
+          host: smtpConfig.hostname, 
+          port: smtpConfig.port,
+          sender: smtpConfig.senderEmail 
+        });
+      }
+    } catch (dbError) {
+      console.warn('Failed to get SMTP config from database:', dbError);
     }
 
-    // Create SMTP client configuration
-    const smtpConfig = {
-      hostname: smtpHost,
-      port: 587,
-      username: smtpUser,
-      password: smtpPass,
-    };
+    // Fallback to environment variables
+    if (!smtpConfig) {
+      const smtpHost = Deno.env.get('SMTP_HOST');
+      const smtpUser = Deno.env.get('SMTP_USER');
+      const smtpPass = Deno.env.get('SMTP_PASS');
+      const smtpSender = Deno.env.get('SMTP_SENDER_EMAIL');
+
+      if (!smtpHost || !smtpUser || !smtpPass || !smtpSender) {
+        throw new Error('Missing SMTP configuration in both database and environment variables');
+      }
+
+      smtpConfig = {
+        hostname: smtpHost,
+        port: 587,
+        username: smtpUser,
+        password: smtpPass,
+        senderEmail: smtpSender,
+        senderName: 'Starters'
+      };
+    }
+
+    // Prepare email content - handle template-based emails
+    let finalSubject = emailSubject;
+    let finalContent = emailContent;
+    
+    // If template-based email, generate content from template
+    if (emailRequest.template_key && emailRequest.template_variables) {
+      console.log('📧 Processing template-based email:', emailRequest.template_key);
+      
+      // Generate content based on template key
+      switch (emailRequest.template_key) {
+        case 'order_status_update':
+          const vars = emailRequest.template_variables;
+          finalSubject = `Order ${vars.orderNumber || 'Update'} - Status Updated`;
+          finalContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #333; border-bottom: 2px solid #f59e0b; padding-bottom: 10px;">Order Status Update</h2>
+              <p>Dear ${vars.customerName || 'Customer'},</p>
+              <p>Your order <strong>#${vars.orderNumber || 'N/A'}</strong> status has been updated to:</p>
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <strong style="color: #f59e0b; font-size: 18px;">${vars.newStatus || 'Updated'}</strong>
+              </div>
+              <p><strong>Order Date:</strong> ${vars.orderDate ? new Date(vars.orderDate).toLocaleDateString() : 'N/A'}</p>
+              <p>We'll keep you updated on any further changes to your order.</p>
+              <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+              <p style="color: #666; font-size: 14px;">Thank you for choosing Starters!</p>
+              <p style="color: #666; font-size: 12px;">If you have any questions, please contact us.</p>
+            </div>
+          `;
+          break;
+        case 'order_confirmation':
+          const confVars = emailRequest.template_variables;
+          finalSubject = `Order Confirmation - ${confVars.orderNumber || 'Thank you!'}`;
+          finalContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #333; border-bottom: 2px solid #22c55e; padding-bottom: 10px;">Order Confirmed!</h2>
+              <p>Dear ${confVars.customerName || 'Customer'},</p>
+              <p>Thank you for your order! We've received it and are now processing it.</p>
+              <div style="background: #f0f9ff; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #22c55e;">
+                <p><strong>Order Number:</strong> ${confVars.orderNumber || 'N/A'}</p>
+                <p><strong>Total Amount:</strong> ₦${confVars.totalAmount || '0'}</p>
+              </div>
+              <p>We'll keep you updated on your order status via email and SMS.</p>
+              <p style="color: #666; margin-top: 20px;">Thank you for choosing Starters!</p>
+            </div>
+          `;
+          break;
+        case 'order_ready':
+          const readyVars = emailRequest.template_variables;
+          finalSubject = `Order Ready - ${readyVars.orderNumber || 'Ready for pickup!'}`;
+          finalContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #333; border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">Order Ready!</h2>
+              <p>Great news ${readyVars.customerName || 'Customer'}!</p>
+              <p>Your order <strong>#${readyVars.orderNumber || 'N/A'}</strong> is ready.</p>
+              <div style="background: #ecfdf5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #22c55e;">
+                <p style="margin: 0; color: #166534; font-weight: bold;">✅ Your order is ready for ${readyVars.orderType === 'delivery' ? 'delivery' : 'pickup'}!</p>
+              </div>
+              <p>Thank you for your business!</p>
+            </div>
+          `;
+          break;
+        default:
+          finalSubject = emailSubject || `Notification from Starters`;
+          finalContent = emailContent || `<p>You have a new notification.</p>`;
+      }
+    }
+
+    console.log('📧 Final email details:', { 
+      to: emailTo, 
+      subject: finalSubject, 
+      contentLength: finalContent.length 
+    });
 
     console.log('Attempting SMTP connection with config:', maskSMTPConfig(smtpConfig));
 
     // Initialize SMTP client
-    const client = new SMTPClient(smtpConfig);
+    const client = new SMTPClient({
+      hostname: smtpConfig.hostname,
+      port: smtpConfig.port,
+      username: smtpConfig.username,
+      password: smtpConfig.password,
+    });
 
     try {
       // Connect to SMTP server
@@ -118,23 +229,23 @@ const handler = async (req: Request): Promise<Response> => {
       console.log('SMTP connection established successfully');
 
       // Prepare email content
-      const emailContent = {
-        from: emailRequest.from || smtpSender,
-        to: emailRequest.to,
-        subject: emailRequest.subject,
-        content: emailRequest.html || emailRequest.text,
-        html: emailRequest.html,
+      const emailContentObj = {
+        from: emailRequest.from || `${smtpConfig.senderName} <${smtpConfig.senderEmail}>`,
+        to: emailTo,
+        subject: finalSubject,
+        content: finalContent,
+        html: finalContent,
       };
 
       // Add reply-to if specified
       if (emailRequest.replyTo) {
-        emailContent['replyTo'] = emailRequest.replyTo;
+        emailContentObj['replyTo'] = emailRequest.replyTo;
       }
 
-      console.log(`Sending email to: ${emailRequest.to}, Subject: ${emailRequest.subject}`);
+      console.log(`Sending email to: ${emailTo}, Subject: ${finalSubject}`);
 
       // Send the email
-      await client.send(emailContent);
+      await client.send(emailContentObj);
       
       console.log('Email sent successfully via SMTP');
 
@@ -142,14 +253,15 @@ const handler = async (req: Request): Promise<Response> => {
       await supabase.from('audit_logs').insert({
         action: 'smtp_email_sent',
         category: 'Email System',
-        message: `Email sent successfully via SMTP to ${emailRequest.to}`,
+        message: `Email sent successfully via SMTP to ${emailTo}`,
         new_values: {
-          recipient: emailRequest.to,
-          subject: emailRequest.subject,
+          recipient: emailTo,
+          subject: finalSubject,
           provider: 'smtp',
-          smtp_host: smtpHost,
+          smtp_host: smtpConfig.hostname,
           priority: emailRequest.priority || 'normal',
-          metadata: emailRequest.metadata
+          metadata: emailRequest.metadata,
+          template_key: emailRequest.template_key
         }
       });
 
@@ -178,11 +290,12 @@ const handler = async (req: Request): Promise<Response> => {
         category: 'Email System',
         message: `SMTP email failed: ${smtpError.message}`,
         new_values: {
-          recipient: emailRequest.to,
-          subject: emailRequest.subject,
+          recipient: emailTo,
+          subject: finalSubject,
           error: smtpError.message,
           smtp_config: maskSMTPConfig(smtpConfig),
-          troubleshooting_tips: troubleshooting
+          troubleshooting_tips: troubleshooting,
+          template_key: emailRequest.template_key
         }
       });
 

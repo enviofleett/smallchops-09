@@ -610,6 +610,7 @@ serve(async (req) => {
             status: 500
           })
         }
+      }
         break;
       }
 

@@ -6373,6 +6373,51 @@ export type Database = {
         }
         Relationships: []
       }
+      paystack_secure_config: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          live_public_key: string | null
+          live_secret_key: string | null
+          test_mode: boolean
+          test_public_key: string | null
+          test_secret_key: string | null
+          updated_at: string
+          updated_by: string | null
+          webhook_secret: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          live_public_key?: string | null
+          live_secret_key?: string | null
+          test_mode?: boolean
+          test_public_key?: string | null
+          test_secret_key?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          live_public_key?: string | null
+          live_secret_key?: string | null
+          test_mode?: boolean
+          test_public_key?: string | null
+          test_secret_key?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret?: string | null
+        }
+        Relationships: []
+      }
       performance_analytics: {
         Row: {
           cache_hit: boolean | null
@@ -9479,7 +9524,11 @@ export type Database = {
       }
       get_public_paystack_config: {
         Args: Record<PropertyKey, never>
-        Returns: Json
+        Returns: {
+          is_valid: boolean
+          public_key: string
+          test_mode: boolean
+        }[]
       }
       get_queued_communication_events: {
         Args: { batch_size?: number }

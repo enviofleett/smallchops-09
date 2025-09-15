@@ -445,6 +445,49 @@ serve(async (req) => {
       case 'update': {
         console.log('Admin function: Updating order', orderId, 'with updates:', JSON.stringify(updates))
 
+        // If it's a status update, use the safe database function
+        if (updates && updates.status && Object.keys(updates).length === 1) {
+          console.log('🔄 Using safe database function for status update')
+          
+          const { data: result, error: dbError } = await supabaseClient.rpc('admin_safe_update_order_status', {
+            p_order_id: orderId,
+            p_new_status: updates.status,
+            p_admin_id: null
+          })
+
+          if (dbError) {
+            console.error('❌ Safe update function error:', dbError)
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Database error: ${dbError.message}`
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500
+            })
+          }
+
+          const parsedResult = typeof result === 'string' ? JSON.parse(result) : result
+          console.log('✅ Safe update result:', parsedResult)
+
+          if (!parsedResult.success) {
+            return new Response(JSON.stringify(parsedResult), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            })
+          }
+
+          return new Response(JSON.stringify({
+            success: true,
+            order: parsedResult.order,
+            message: parsedResult.message
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        // For other updates, continue with the existing logic
+        console.log('🔄 Using existing update logic for non-status updates')
+
         // Get the current order to compare status changes
         const { data: currentOrder, error: fetchError } = await supabaseClient
           .from('orders')

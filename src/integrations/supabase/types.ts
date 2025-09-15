@@ -8738,6 +8738,14 @@ export type Database = {
         Args: { order_items: Json }
         Returns: Json
       }
+      admin_queue_order_email: {
+        Args: { p_order_id: string; p_status: string }
+        Returns: undefined
+      }
+      admin_safe_update_order_status: {
+        Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
       assess_production_readiness: {
         Args: Record<PropertyKey, never>
         Returns: Json

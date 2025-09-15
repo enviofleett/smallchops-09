@@ -151,10 +151,36 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     }
   }, [ridersError, riders, toast]);
   const updateMutation = useMutation({
-    mutationFn: (updates: {
+    mutationFn: async (updates: {
       status?: OrderStatus;
       assigned_rider_id?: string | null;
-    }) => updateOrder(order.id, updates),
+    }) => {
+      console.log('🔄 Starting order update mutation:', { orderId: order.id, updates });
+      
+      try {
+        const result = await updateOrder(order.id, updates);
+        console.log('✅ Order update succeeded:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ Order update failed:', error);
+        
+        // Enhanced error categorization
+        if (error.message.includes('temporarily unavailable')) {
+          throw new Error('Order service is temporarily busy. Please try again in a moment.');
+        } else if (error.message.includes('being processed by another admin')) {
+          throw new Error('This order is currently being updated by another admin. Please refresh and try again.');
+        } else if (error.message.includes('not found')) {
+          throw new Error('Order not found. It may have been deleted or moved.');
+        } else if (error.message.includes('Access denied') || error.message.includes('Forbidden')) {
+          throw new Error('You do not have permission to update this order.');
+        } else if (error.message.includes('Invalid status')) {
+          throw new Error('Invalid order status. Please select a valid status.');
+        } else {
+          // Generic fallback with retry hint
+          throw new Error(`Update failed: ${error.message.includes('after') ? error.message : error.message + '. Please try again.'}`);
+        }
+      }
+    },
     onSuccess: () => {
       const statusChanged = selectedStatus !== order.status;
       toast({
@@ -169,9 +195,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       onClose();
     },
     onError: error => {
+      console.error('❌ Order update mutation failed:', error);
       toast({
-        title: 'Error',
-        description: `Failed to update order: ${error.message}`,
+        title: 'Update Failed',
+        description: error.message,
         variant: 'destructive'
       });
     }

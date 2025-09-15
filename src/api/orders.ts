@@ -301,28 +301,123 @@ export const updateOrder = async (
     sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
     delete sanitizedUpdates.phone;
   }
-  try {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔄 Updating order via production-safe method:', orderId, updates);
-    }
 
-    // If we're assigning a rider, use the secure RPC-based assignment
-    if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
-      if (process.env.NODE_ENV === 'development') {
+  // Retry logic for transient errors
+  let lastError: Error;
+  const maxRetries = 3;
+  const retryDelays = [1000, 2000, 3000]; // 1s, 2s, 3s
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Order update attempt ${attempt + 1}:`, orderId, sanitizedUpdates);
+
+      // If we're assigning a rider, use the secure RPC-based assignment
+      if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
         console.log('🎯 Assigning/reassigning rider using secure RPC:', sanitizedUpdates.assigned_rider_id);
+        
+        const assignmentResult = await retryWithFreshToken(async () => {
+          return await supabase.functions.invoke('admin-orders-manager', {
+            body: {
+              action: 'assign_rider',
+              orderId,
+              riderId: sanitizedUpdates.assigned_rider_id
+            }
+          });
+        });
+        
+        const { data, error: assignmentError } = assignmentResult;
+
+        if (assignmentError || !data?.success) {
+          const errorMsg = data?.error || assignmentError?.message || 'Failed to assign rider';
+          throw new Error(errorMsg);
+        }
+
+        console.log('✅ Rider assignment successful via secure RPC');
+
+        // If there are other updates besides rider assignment, apply them separately
+        const otherUpdates = { ...sanitizedUpdates };
+        delete otherUpdates.assigned_rider_id;
+        
+        if (Object.keys(otherUpdates).length > 0) {
+          const updateResult = await retryWithFreshToken(async () => {
+            return await supabase.functions.invoke('admin-orders-manager', {
+              body: {
+                action: 'update',
+                orderId,
+                updates: otherUpdates
+              }
+            });
+          });
+          
+          const { data: updateData, error: updateError } = updateResult;
+
+          if (updateError || !updateData?.success) {
+            throw new Error(updateData?.error || updateError?.message || 'Failed to update order');
+          }
+          
+          return updateData.order;
+        }
+        
+        return data.order;
       }
-      
-      const assignmentResult = await retryWithFreshToken(async () => {
+
+      // For non-rider updates, use the standard update path
+      const result = await retryWithFreshToken(async () => {
         return await supabase.functions.invoke('admin-orders-manager', {
           body: {
-            action: 'assign_rider',
+            action: 'update',
             orderId,
-            riderId: sanitizedUpdates.assigned_rider_id
+            updates: sanitizedUpdates
           }
         });
       });
       
-      const { data, error: assignmentError } = assignmentResult;
+      const { data, error } = result;
+
+      if (error) {
+        console.error('❌ Supabase function error:', error);
+        throw new Error(`Function invocation failed: ${error.message}`);
+      }
+
+      if (!data || !data.success) {
+        console.error('❌ Function returned error:', data);
+        throw new Error(data?.error || 'Unknown error occurred');
+      }
+
+      console.log('✅ Order updated successfully via Edge Function');
+      return data.order;
+
+    } catch (error) {
+      console.warn(`⚠️ Order update attempt ${attempt + 1} failed:`, error.message);
+      lastError = error;
+      
+      // Don't retry for certain errors
+      if (error.message.includes('not found') || 
+          error.message.includes('Invalid status') ||
+          error.message.includes('Missing required fields') ||
+          error.message.includes('Access denied') ||
+          error.message.includes('Forbidden')) {
+        throw error;
+      }
+      
+      // Wait before retry (except on last attempt)
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+      }
+    }
+  }
+  
+  // All retries failed - provide user-friendly error messages
+  console.error('❌ All update attempts failed:', lastError.message);
+  
+  if (lastError.message.includes('duplicate key')) {
+    throw new Error('Order is being processed by another admin. Please try again.');
+  } else if (lastError.message.includes('non-2xx status code')) {
+    throw new Error('Order update service temporarily unavailable. Please try again in a moment.');
+  } else {
+    throw new Error(`Failed to update order after ${maxRetries} attempts. ${lastError.message}`);
+  }
+};
 
       if (assignmentError || !data?.success) {
         const errorMsg = data?.error || assignmentError?.message || 'Failed to assign rider';

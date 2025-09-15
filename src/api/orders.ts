@@ -33,11 +33,11 @@ interface GetOrdersParams {
  * Fetches orders and their associated items from the database with pagination and filtering.
  * Uses admin edge function to bypass RLS for authenticated admin users.
  */
-// Helper function to handle authentication errors and retry with fresh token
-const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries = 1) => {
-  let attempt = 0;
+// Enhanced retry mechanism with fresh token and exponential backoff
+const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries: number = 3): Promise<any> => {
+  let lastError: any;
   
-  while (attempt <= maxRetries) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await operation();
       
@@ -45,31 +45,80 @@ const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries = 1
       if (result.error && (
         result.error.code === 'AUTH_TOKEN_EXPIRED' ||
         result.error.code === 'AUTH_SESSION_MISSING' ||
-        result.error.code === 'AUTH_TOKEN_INVALID'
+        result.error.code === 'AUTH_TOKEN_INVALID' ||
+        result.error.code === 'AUTH_TOKEN_MALFORMED'
       )) {
         throw new Error(`AUTH_ERROR: ${result.error.code}`);
       }
       
-      return result;
-    } catch (error: any) {
-      if (attempt < maxRetries && error.message?.includes('AUTH_ERROR')) {
-        console.log('🔄 Authentication error detected, refreshing session...');
-        
-        // Attempt to refresh the session
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          console.error('❌ Failed to refresh session:', refreshError);
-          throw new Error('Session expired. Please log in again.');
-        }
-        
-        console.log('✅ Session refreshed successfully, retrying...');
-        attempt++;
-        continue;
+      // Check for 500 errors that might be transient (like communication event failures)
+      if (result.error && result.error.status === 500 && attempt < maxRetries) {
+        console.log(`Server error detected on attempt ${attempt}, retrying...`);
+        throw new Error(`SERVER_ERROR: ${result.error.message || 'Internal server error'}`);
       }
       
-      throw error;
+      return result;
+    } catch (error: any) {
+      console.log(`Attempt ${attempt} failed:`, error?.message || error);
+      lastError = error;
+      
+      // Handle authentication errors
+      if (error.message?.includes('AUTH_ERROR')) {
+        console.log('🔄 Authentication error detected, refreshing session...');
+        
+        try {
+          // Attempt to refresh the session
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            console.error('❌ Failed to refresh session:', refreshError);
+            if (attempt === maxRetries) {
+              throw new Error('Authentication failed - please log in again');
+            }
+          } else {
+            console.log('✅ Session refreshed successfully, retrying...');
+          }
+        } catch (refreshError) {
+          console.error('Session refresh error:', refreshError);
+          if (attempt === maxRetries) {
+            throw new Error('Authentication failed - please log in again');
+          }
+        }
+      } 
+      // Handle server errors with exponential backoff
+      else if (error.message?.includes('SERVER_ERROR') && attempt < maxRetries) {
+        const delay = 1000 * Math.pow(2, attempt - 1);
+        console.log(`Server error detected, waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      // Handle network or other transient errors
+      else if (attempt < maxRetries && (
+        error?.code === 'NETWORK_ERROR' ||
+        error?.message?.includes('non-2xx status code') ||
+        error?.message?.includes('fetch')
+      )) {
+        const delay = 1000 * attempt;
+        console.log(`Transient error detected, waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      // For other errors, only retry on first attempt if it might be transient
+      else if (attempt === 1 && error?.status >= 500) {
+        console.log('Server error on first attempt, will retry once...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } else {
+        // Don't retry for other types of errors
+        throw error;
+      }
+      
+      // Add exponential backoff between attempts for auth errors
+      if (attempt < maxRetries && error.message?.includes('AUTH_ERROR')) {
+        const delay = 1000 * Math.pow(2, attempt - 1);
+        console.log(`Waiting ${delay}ms before auth retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
   }
+  
+  throw lastError;
 };
 
 export const getOrders = async ({

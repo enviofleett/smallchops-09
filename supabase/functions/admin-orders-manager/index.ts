@@ -488,11 +488,16 @@ serve(async (req) => {
         }
 
         // Trigger status change email if status has changed and customer has email
-        if (updates.status && updates.status !== currentOrder.status) {
+        if (updates.status && updates.status !== currentOrder.status && data.customer_email) {
           console.log('📧 Status changed, queuing email notification...')
           
-          // Queue communication event using the enhanced upsert function
+          // Queue communication event with improved error handling and unique key generation
           try {
+            // Generate truly unique dedupe key to prevent collisions
+            const uniqueId = crypto.randomUUID();
+            const timestamp = Date.now();
+            const microTime = performance.now().toString().replace('.', '');
+            
             const { data: eventId, error: commError } = await supabaseClient
               .rpc('upsert_communication_event', {
                 p_event_type: 'order_status_update',
@@ -506,19 +511,62 @@ serve(async (req) => {
                   orderDate: data.order_time
                 },
                 p_related_order_id: orderId,
-                p_dedupe_key: `order_status_${orderId}_${updates.status}_${Date.now()}`
+                p_dedupe_key: `order_status_${orderId}_${updates.status}_${timestamp}_${microTime}_${uniqueId}`
               })
 
             if (commError) {
-              console.error('⚠️ Failed to queue communication event:', commError)
-              // Don't fail the order update if communication fails
+              console.error('⚠️ Failed to queue communication event:', commError.message || commError)
+              
+              // Log the failure but don't block order update
+              console.log('📝 Logging communication event failure to audit logs')
+              try {
+                await supabaseClient
+                  .from('audit_logs')
+                  .insert({
+                    action: 'communication_event_failed',
+                    category: 'Email System',
+                    message: `Failed to queue status update email for order ${data.order_number}: ${commError.message}`,
+                    entity_id: orderId,
+                    new_values: {
+                      order_id: orderId,
+                      order_number: data.order_number,
+                      new_status: updates.status,
+                      old_status: currentOrder.status,
+                      customer_email: data.customer_email,
+                      error: commError.message || 'Unknown error'
+                    }
+                  })
+              } catch (logError) {
+                console.error('⚠️ Failed to log communication error:', logError)
+              }
             } else {
               console.log('✅ Communication event queued successfully with ID:', eventId)
             }
           } catch (commError) {
-            console.error('⚠️ Error queuing communication event:', commError)
-            // Don't fail the order update if communication fails
+            console.error('⚠️ Unexpected error queuing communication event:', commError)
+            
+            // Log unexpected errors for debugging
+            try {
+              await supabaseClient
+                .from('audit_logs')
+                .insert({
+                  action: 'communication_event_exception',
+                  category: 'Email System',
+                  message: `Unexpected error queuing status update email for order ${data.order_number}`,
+                  entity_id: orderId,
+                  new_values: {
+                    order_id: orderId,
+                    order_number: data.order_number,
+                    error: commError.message || 'Unexpected error',
+                    stack: commError.stack || 'No stack trace'
+                  }
+                })
+            } catch (logError) {
+              console.error('⚠️ Failed to log unexpected communication error:', logError)
+            }
           }
+        } else if (updates.status && updates.status !== currentOrder.status && !data.customer_email) {
+          console.log('⚠️ Status changed but no customer email available for notification')
         }
 
         return new Response(JSON.stringify({

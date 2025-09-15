@@ -8746,6 +8746,10 @@ export type Database = {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
+      admin_safe_update_order_status_enhanced: {
+        Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
       assess_production_readiness: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -10220,6 +10224,17 @@ export type Database = {
               p_template_variables: Json
             }
         Returns: string
+      }
+      upsert_communication_event_enhanced: {
+        Args: {
+          p_dedupe_key?: string
+          p_event_type: string
+          p_order_id?: string
+          p_recipient_email: string
+          p_template_key: string
+          p_template_variables?: Json
+        }
+        Returns: Json
       }
       upsert_payment_confirmation_event: {
         Args: {

@@ -193,40 +193,62 @@ export const updateOrder = async (
   orderId: string,
   updates: { status?: OrderStatus; assigned_rider_id?: string | null; phone?: string; customer_phone?: string; [key: string]: any }
 ): Promise<OrderWithItems> => {
-  console.log('🔄 Starting order update:', orderId, updates);
+  console.log('🔄 Starting enhanced order update:', orderId, updates);
   
-  // Validate required parameters
-  if (!orderId || orderId.trim() === '') {
-    throw new Error('Order ID is required');
+  // Validate required parameters with enhanced checks
+  if (!orderId || orderId.trim() === '' || orderId === 'undefined' || orderId === 'null') {
+    throw new Error('Valid Order ID is required');
   }
 
   if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
-    throw new Error('Updates are required');
+    throw new Error('Updates are required and must be a valid object');
   }
 
-  // Clean and validate updates - filter out invalid values
+  // Enhanced cleaning and validation - filter out invalid values
   const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-    // Skip undefined, null, empty string, or 'undefined' string values
+    // Skip undefined, null, empty string, or 'undefined'/'null' string values
     if (value !== undefined && 
         value !== null && 
         value !== '' && 
         value !== 'undefined' && 
         value !== 'null') {
-      acc[key] = value;
+      
+      // Additional field-specific validation
+      if (key === 'status') {
+        // Validate status enum values
+        const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'completed', 'returned'];
+        if (!validStatuses.includes(value as string)) {
+          console.warn(`⚠️ Invalid status value: ${value}`);
+          return acc;
+        }
+      }
+      
+      if (key === 'customer_email' && typeof value === 'string') {
+        // Basic email validation
+        if (!value.includes('@') || value.length < 5) {
+          console.warn(`⚠️ Invalid email format: ${value}`);
+          return acc;
+        }
+        acc[key] = value.toLowerCase().trim();
+      } else if (key === 'customer_phone' && typeof value === 'string') {
+        // Clean phone number
+        acc[key] = value.trim();
+      } else {
+        acc[key] = value;
+      }
     } else {
       console.warn(`⚠️ Filtering out invalid value for ${key}:`, value);
     }
     return acc;
   }, {} as Record<string, any>);
 
-  // Check if we have any valid updates after cleaning
+  // Check if we have any valid updates after enhanced cleaning
   if (Object.keys(cleanedUpdates).length === 0) {
     throw new Error('No valid updates provided after validation');
   }
 
   // CRITICAL: Fix field mapping to prevent database column errors
   const sanitizedUpdates = { ...cleanedUpdates };
-  console.log('🔄 Starting order update:', orderId, updates);
   
   // Always sanitize phone field to customer_phone for orders table compatibility
   if ('phone' in sanitizedUpdates) {
@@ -235,14 +257,14 @@ export const updateOrder = async (
     delete sanitizedUpdates.phone;
   }
 
-  // Retry logic for transient errors
+  // Enhanced retry logic for transient errors
   let lastError: Error;
-  const maxRetries = 3;
-  const retryDelays = [1000, 2000, 3000]; // 1s, 2s, 3s
+  const maxRetries = 5; // Increased for production reliability
+  const retryDelays = [500, 1000, 2000, 4000, 8000]; // Progressive backoff
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      console.log(`🔄 Order update attempt ${attempt + 1}:`, orderId, sanitizedUpdates);
+      console.log(`🔄 Enhanced order update attempt ${attempt + 1}:`, orderId, sanitizedUpdates);
 
       // If we're assigning a rider, use the secure RPC-based assignment
       if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
@@ -294,7 +316,7 @@ export const updateOrder = async (
         return data.order;
       }
 
-      // For non-rider updates, use the standard update path
+      // For non-rider updates, use the standard update path with enhanced validation
       const result = await retryWithFreshToken(async () => {
         return await supabase.functions.invoke('admin-orders-manager', {
           body: {
@@ -317,50 +339,55 @@ export const updateOrder = async (
         throw new Error(data?.error || 'Unknown error occurred');
       }
 
-      console.log('✅ Order updated successfully via Edge Function');
+      console.log('✅ Order updated successfully via Enhanced Edge Function');
       return data.order;
 
     } catch (error: any) {
-      console.warn(`⚠️ Order update attempt ${attempt + 1} failed:`, error.message);
+      console.warn(`⚠️ Enhanced order update attempt ${attempt + 1} failed:`, error.message);
       lastError = error;
       
       // Don't retry for permanent errors (client-side issues)
-      if (error.message.includes('Order ID is required') ||
+      if (error.message.includes('Valid Order ID is required') ||
           error.message.includes('No valid updates') ||
           error.message.includes('not found') || 
-          error.message.includes('Invalid status update') ||
+          error.message.includes('Invalid status') ||
           error.message.includes('Access denied') ||
-          error.message.includes('Forbidden')) {
+          error.message.includes('Forbidden') ||
+          error.message.includes('must be a valid object')) {
         console.error('❌ Permanent error, not retrying:', error.message);
         throw error;
       }
       
-      // Use exponential backoff for retries
+      // Use progressive backoff for retries
       if (attempt < maxRetries - 1) {
         const baseDelay = retryDelays[attempt] || 1000;
-        const exponentialDelay = Math.min(baseDelay * Math.pow(2, attempt), 10000);
-        console.log(`⏳ Waiting ${exponentialDelay}ms before retry ${attempt + 2}`);
-        await new Promise(resolve => setTimeout(resolve, exponentialDelay));
+        const jitteredDelay = baseDelay + Math.random() * 1000; // Add jitter
+        console.log(`⏳ Waiting ${jitteredDelay.toFixed(0)}ms before retry ${attempt + 2}`);
+        await new Promise(resolve => setTimeout(resolve, jitteredDelay));
       }
     }
   }
   
-  // All retries failed - provide user-friendly error messages
-  console.error('❌ All update attempts failed:', lastError?.message || 'Unknown error');
+  // All retries failed - provide enhanced user-friendly error messages
+  console.error('❌ All enhanced update attempts failed:', lastError?.message || 'Unknown error');
   
-  // Categorize errors for better user experience
+  // Enhanced error categorization for better user experience
   const errorMessage = lastError?.message || 'Unknown error occurred';
   
   if (errorMessage.includes('duplicate key') || errorMessage.includes('being processed')) {
-    throw new Error('Order is being processed by another admin. Please refresh and try again.');
-  } else if (errorMessage.includes('non-2xx status code') || errorMessage.includes('Server error')) {
+    throw new Error('Order is currently being processed by another admin. Please refresh and try again.');
+  } else if (errorMessage.includes('non-2xx status code') || errorMessage.includes('Server error') || errorMessage.includes('Internal server error')) {
     throw new Error('Order service is temporarily busy. Please try again in a moment.');
-  } else if (errorMessage.includes('timeout')) {
+  } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
     throw new Error('Request timed out. Please check your connection and try again.');
-  } else if (errorMessage.includes('Network error') || errorMessage.includes('network')) {
+  } else if (errorMessage.includes('Network error') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
     throw new Error('Network connection issue. Please check your internet and try again.');
-  } else if (errorMessage.includes('Database temporarily unavailable')) {
+  } else if (errorMessage.includes('Database temporarily unavailable') || errorMessage.includes('connection')) {
     throw new Error('Database service is temporarily unavailable. Please try again in a few moments.');
+  } else if (errorMessage.includes('Invalid status') || errorMessage.includes('enum')) {
+    throw new Error('Invalid order status provided. Please refresh the page and try again.');
+  } else if (errorMessage.includes('AUTH_TOKEN') || errorMessage.includes('Authentication')) {
+    throw new Error('Session expired. Please refresh the page and log in again.');
   } else {
     throw new Error(`Order update failed: ${errorMessage}`);
   }

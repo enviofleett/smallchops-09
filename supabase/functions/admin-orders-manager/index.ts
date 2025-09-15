@@ -485,14 +485,15 @@ serve(async (req) => {
           }
 
           try {
-            const { data: result, error: dbError } = await supabaseClient.rpc('admin_safe_update_order_status', {
+            // Use enhanced version with better validation
+            const { data: result, error: dbError } = await supabaseClient.rpc('admin_safe_update_order_status_enhanced', {
               p_order_id: orderId,
               p_new_status: updates.status,
               p_admin_id: null // We could pass the authenticated user ID here if needed
             })
 
             if (dbError) {
-              console.error('❌ Safe update function error:', dbError)
+              console.error('❌ Enhanced safe update function error:', dbError)
               return new Response(JSON.stringify({
                 success: false,
                 error: `Database error: ${dbError.message}`,
@@ -504,7 +505,7 @@ serve(async (req) => {
             }
 
             if (!result) {
-              console.error('❌ No result from safe update function')
+              console.error('❌ No result from enhanced safe update function')
               return new Response(JSON.stringify({
                 success: false,
                 error: 'No result from database function'
@@ -514,7 +515,7 @@ serve(async (req) => {
               })
             }
 
-            console.log('✅ Safe update result:', result)
+            console.log('✅ Enhanced safe update result:', result)
 
             if (!result.success) {
               return new Response(JSON.stringify(result), {
@@ -531,24 +532,45 @@ serve(async (req) => {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             })
           } catch (functionError) {
-          console.error('❌ Exception in safe update function:', functionError)
-          return new Response(JSON.stringify({
-            success: false,
-            error: `Status update failed: ${functionError.message}`,
-            code: 'STATUS_UPDATE_FAILED'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          })
-        }
+            console.error('❌ Exception in enhanced safe update function:', functionError)
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Status update failed: ${functionError.message}`,
+              code: 'STATUS_UPDATE_FAILED'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500
+            })
+          }
       } else {
-        // For other field updates (non-status), use direct table update
-        console.log('🔄 Using direct table update for non-status fields')
+        // For other field updates (non-status), use direct table update with enhanced validation
+        console.log('🔄 Using direct table update for non-status fields with enhanced validation')
         
-        // Validate updates don't contain problematic values
+        // Enhanced validation - clean and validate updates
         const cleanUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-          if (value !== undefined && value !== null && value !== 'undefined' && value !== '') {
-            acc[key] = value;
+          // Skip null, undefined, empty string, or string representations of these
+          if (value !== undefined && 
+              value !== null && 
+              value !== 'undefined' && 
+              value !== 'null' && 
+              value !== '') {
+            
+            // Additional validation for specific fields
+            if (key === 'status') {
+              // Should not reach here since status updates go through the enhanced function
+              console.warn('⚠️ Status update detected in non-status path - skipping');
+              return acc;
+            }
+            
+            if (key === 'customer_phone' && typeof value === 'string') {
+              // Clean phone number format
+              acc[key] = value.trim();
+            } else if (key === 'customer_email' && typeof value === 'string') {
+              // Clean email format
+              acc[key] = value.toLowerCase().trim();
+            } else {
+              acc[key] = value;
+            }
           } else {
             console.warn(`⚠️ Skipping invalid field ${key} with value:`, value);
           }
@@ -556,10 +578,10 @@ serve(async (req) => {
         }, {} as Record<string, any>);
 
         if (Object.keys(cleanUpdates).length === 0) {
-          console.error('❌ No valid updates after cleaning')
+          console.error('❌ No valid updates after enhanced cleaning')
           return new Response(JSON.stringify({
             success: false,
-            error: 'No valid updates provided'
+            error: 'No valid updates provided after validation'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400
@@ -567,9 +589,14 @@ serve(async (req) => {
         }
 
         try {
+          console.log('🔄 Applying clean updates:', cleanUpdates);
+          
           const { data: updatedOrder, error: updateError } = await supabaseClient
             .from('orders')
-            .update(cleanUpdates)
+            .update({
+              ...cleanUpdates,
+              updated_at: new Date().toISOString() // Ensure updated_at is always set
+            })
             .eq('id', orderId)
             .select(`*, 
               order_items (*),
@@ -579,18 +606,30 @@ serve(async (req) => {
             .single()
 
           if (updateError) {
-            console.error('❌ Direct update error:', updateError)
+            console.error('❌ Enhanced direct update error:', updateError)
+            
+            // Provide more specific error messages
+            let errorMessage = updateError.message;
+            if (updateError.code === '23505') {
+              errorMessage = 'Update failed due to duplicate data constraint';
+            } else if (updateError.code === '23503') {
+              errorMessage = 'Update failed due to invalid reference data';
+            } else if (updateError.code === '22P02') {
+              errorMessage = 'Update failed due to invalid data format';
+            }
+            
             return new Response(JSON.stringify({
               success: false,
-              error: updateError.message,
-              code: 'UPDATE_FAILED'
+              error: errorMessage,
+              code: 'UPDATE_FAILED',
+              details: updateError.code
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 500
             })
           }
 
-          console.log('✅ Order updated successfully via direct update')
+          console.log('✅ Order updated successfully via enhanced direct update')
 
           return new Response(JSON.stringify({
             success: true,
@@ -600,7 +639,7 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         } catch (directUpdateError) {
-          console.error('❌ Exception in direct update:', directUpdateError)
+          console.error('❌ Exception in enhanced direct update:', directUpdateError)
           return new Response(JSON.stringify({
             success: false,
             error: 'Failed to update order: ' + directUpdateError.message,
@@ -610,7 +649,7 @@ serve(async (req) => {
             status: 500
           })
         }
-      }
+        }
         break;
       }
 

@@ -42,7 +42,6 @@ interface HeroImage {
 export const HeroImagesManager = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<HeroImage | null>(null);
-  const [visibleImages, setVisibleImages] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { uploadImage, isUploading } = useImageUpload();
 
@@ -70,17 +69,6 @@ export const HeroImagesManager = () => {
       return data as HeroImage[];
     },
   });
-
-  // Fade in images after they load
-  useEffect(() => {
-    if (heroImages.length > 0) {
-      const timer = setTimeout(() => {
-        const newVisibleImages = new Set(heroImages.map(img => img.id));
-        setVisibleImages(newVisibleImages);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [heroImages]);
 
   // Create/Update hero image mutation
   const saveImageMutation = useMutation({
@@ -357,15 +345,10 @@ export const HeroImagesManager = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {heroImages.map((image, index) => (
+            {heroImages.map((image) => (
               <div 
                 key={image.id} 
-                className={`flex items-center gap-4 p-4 border rounded-lg transition-all duration-500 ease-out ${
-                  visibleImages.has(image.id) 
-                    ? 'opacity-100 transform translate-y-0' 
-                    : 'opacity-0 transform translate-y-2'
-                }`}
-                style={{ transitionDelay: `${index * 100}ms` }}
+                className="flex items-center gap-4 p-4 border rounded-lg"
               >
                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
                 
@@ -373,7 +356,7 @@ export const HeroImagesManager = () => {
                   <img 
                     src={image.image_url} 
                     alt={image.alt_text || 'Hero image'} 
-                    className="w-16 h-16 object-cover rounded transition-opacity duration-300 hover:opacity-80"
+                    className="w-16 h-16 object-cover rounded"
                   />
                 </div>
                 

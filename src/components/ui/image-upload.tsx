@@ -75,13 +75,13 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         throw new Error(validation.error + (validation.suggestedAction ? ` - ${validation.suggestedAction}` : ''));
       }
       
-        // Resize image to max 1200x1200 for better performance and quality
-        const resizedBlob = await resizeImage(file, {
-          targetWidth: 1200,
-          targetHeight: 1200,
-          quality: 0.9,
-          format: 'jpeg'
-        });
+      // Resize image to max 1000x1000 for better performance
+      const resizedBlob = await resizeImage(file, {
+        targetWidth: 1000,
+        targetHeight: 1000,
+        quality: 0.9,
+        format: 'jpeg'
+      });
 
       // Convert blob back to file
       const processedFile = new File(
@@ -194,8 +194,8 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         let userFriendlyMessage = errorMessage;
         if (errorMessage.includes('corrupted') || errorMessage.includes('unreadable')) {
           userFriendlyMessage = 'This image file appears to be corrupted. Please try a different image or re-save the file.';
-                 } else if (errorMessage.includes('too large') || errorMessage.includes('size')) {
-          userFriendlyMessage = 'Image is too large to process. Please use a smaller image (under 20MB).';
+        } else if (errorMessage.includes('too large') || errorMessage.includes('size')) {
+          userFriendlyMessage = 'Image is too large to process. Please use a smaller image (under 10MB).';
         } else if (errorMessage.includes('format') || errorMessage.includes('type')) {
           userFriendlyMessage = 'Unsupported image format. Please use PNG, JPG, or WebP format.';
         } else if (errorMessage.includes('timeout')) {
@@ -293,7 +293,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
                 <div className="text-white text-center">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                   <p className="text-sm">Processing image...</p>
-                  <p className="text-xs opacity-75">Optimizing for web use</p>
+                  <p className="text-xs opacity-75">Resizing to 1000x1000px</p>
                 </div>
               </div>
             )}
@@ -310,7 +310,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
             </Button>
           )}
           <div className="mt-2 text-xs text-gray-500 text-center">
-            Image will be automatically optimized for web
+            Image will be automatically resized to 1000×1000px
           </div>
         </div>
       ) : (
@@ -335,10 +335,10 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
             Drop an image here, or click to select
           </p>
           <p className="text-xs text-gray-400">
-            PNG, JPG, WebP up to 20MB
+            PNG, JPG, WebP up to 10MB
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            Images will be automatically optimized for web
+            Images will be automatically resized to 1000×1000px
           </p>
           <input
             ref={fileInputRef}

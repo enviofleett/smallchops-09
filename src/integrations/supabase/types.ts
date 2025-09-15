@@ -9977,6 +9977,10 @@ export type Database = {
         Args: { batch_size?: number; priority_filter?: string }
         Returns: Json
       }
+      process_queued_communication_events: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
         Returns: number

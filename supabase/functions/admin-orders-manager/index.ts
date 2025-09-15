@@ -445,36 +445,153 @@ serve(async (req) => {
       case 'update': {
         console.log('Admin function: Updating order', orderId, 'with updates:', JSON.stringify(updates))
 
+        // Validate required parameters
+        if (!orderId) {
+          console.error('❌ Missing orderId parameter')
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Order ID is required'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
+        }
+
+        if (!updates || Object.keys(updates).length === 0) {
+          console.error('❌ No updates provided')
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Updates are required'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
+        }
+
         // If it's a status update, use the safe database function
         if (updates && updates.status && Object.keys(updates).length === 1) {
-          console.log('🔄 Using safe database function for status update')
+          console.log('🔄 Using safe database function for status update:', updates.status)
           
-          const { data: result, error: dbError } = await supabaseClient.rpc('admin_safe_update_order_status', {
-            p_order_id: orderId,
-            p_new_status: updates.status,
-            p_admin_id: null
-          })
-
-          if (dbError) {
-            console.error('❌ Safe update function error:', dbError)
+          // Validate status value is not undefined/null
+          if (!updates.status || updates.status === 'undefined' || updates.status === 'null') {
+            console.error('❌ Invalid status value:', updates.status)
             return new Response(JSON.stringify({
               success: false,
-              error: `Database error: ${dbError.message}`
+              error: 'Invalid status value provided'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            })
+          }
+
+          try {
+            const { data: result, error: dbError } = await supabaseClient.rpc('admin_safe_update_order_status', {
+              p_order_id: orderId,
+              p_new_status: updates.status,
+              p_admin_id: null // We could pass the authenticated user ID here if needed
+            })
+
+            if (dbError) {
+              console.error('❌ Safe update function error:', dbError)
+              return new Response(JSON.stringify({
+                success: false,
+                error: `Database error: ${dbError.message}`,
+                code: 'DATABASE_ERROR'
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500
+              })
+            }
+
+            if (!result) {
+              console.error('❌ No result from safe update function')
+              return new Response(JSON.stringify({
+                success: false,
+                error: 'No result from database function'
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500
+              })
+            }
+
+            console.log('✅ Safe update result:', result)
+
+            if (!result.success) {
+              return new Response(JSON.stringify(result), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 400
+              })
+            }
+
+            success: true,
+            message: 'Order status updated successfully',
+            order: result.order
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+          
+        } catch (functionError) {
+          console.error('❌ Exception in safe update function:', functionError)
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Status update failed: ${functionError.message}`,
+            code: 'STATUS_UPDATE_FAILED'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
+        }
+      }
+
+        // For other field updates (non-status), use direct table update
+        console.log('🔄 Using direct table update for non-status fields')
+        
+        // Validate updates don't contain problematic values
+        const cleanUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
+          if (value !== undefined && value !== null && value !== 'undefined' && value !== '') {
+            acc[key] = value;
+          } else {
+            console.warn(`⚠️ Skipping invalid field ${key} with value:`, value);
+          }
+          return acc;
+        }, {} as Record<string, any>);
+
+        if (Object.keys(cleanUpdates).length === 0) {
+          console.error('❌ No valid updates after cleaning')
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'No valid updates provided'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
+        }
+
+        try {
+          const { data: updatedOrder, error: updateError } = await supabaseClient
+            .from('orders')
+            .update(cleanUpdates)
+            .eq('id', orderId)
+            .select(`*, 
+              order_items (*),
+              order_delivery_schedule (*),
+              delivery_zones (id, name, base_fee, is_active)
+            `)
+            .single()
+
+          if (updateError) {
+            console.error('❌ Direct update error:', updateError)
+            return new Response(JSON.stringify({
+              success: false,
+              error: updateError.message,
+              code: 'UPDATE_FAILED'
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 500
             })
           }
 
-          const parsedResult = typeof result === 'string' ? JSON.parse(result) : result
-          console.log('✅ Safe update result:', parsedResult)
-
-          if (!parsedResult.success) {
-            return new Response(JSON.stringify(parsedResult), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400
-            })
-          }
+          console.log('✅ Order updated successfully via direct update')
 
           return new Response(JSON.stringify({
             success: true,

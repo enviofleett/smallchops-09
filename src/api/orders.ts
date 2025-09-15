@@ -193,8 +193,72 @@ export const updateOrder = async (
   orderId: string,
   updates: { status?: OrderStatus; assigned_rider_id?: string | null; phone?: string; customer_phone?: string; [key: string]: any }
 ): Promise<OrderWithItems> => {
+  console.log('🔄 Starting order update:', orderId, updates);
+  
+  // Validate required parameters
+  if (!orderId || orderId.trim() === '') {
+    throw new Error('Order ID is required');
+  }
+
+  if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
+    throw new Error('Updates are required');
+  }
+
+  // Clean and validate updates - filter out invalid values
+  const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
+    // Skip undefined, null, empty string, or 'undefined' string values
+    if (value !== undefined && 
+        value !== null && 
+        value !== '' && 
+        value !== 'undefined' && 
+        value !== 'null') {
+      acc[key] = value;
+    } else {
+      console.warn(`⚠️ Filtering out invalid value for ${key}:`, value);
+    }
+    return acc;
+  }, {} as Record<string, any>);
+
+  // Check if we have any valid updates after cleaning
+  if (Object.keys(cleanedUpdates).length === 0) {
+    throw new Error('No valid updates provided after validation');
+  }
+
   // CRITICAL: Fix field mapping to prevent database column errors
-  const sanitizedUpdates = { ...updates };
+  const sanitizedUpdates = { ...cleanedUpdates };
+  console.log('🔄 Starting order update:', orderId, updates);
+  
+  // Validate required parameters
+  if (!orderId || orderId.trim() === '') {
+    throw new Error('Order ID is required');
+  }
+
+  if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
+    throw new Error('Updates are required');
+  }
+
+  // Clean and validate updates - filter out invalid values
+  const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
+    // Skip undefined, null, empty string, or 'undefined' string values
+    if (value !== undefined && 
+        value !== null && 
+        value !== '' && 
+        value !== 'undefined' && 
+        value !== 'null') {
+      acc[key] = value;
+    } else {
+      console.warn(`⚠️ Filtering out invalid value for ${key}:`, value);
+    }
+    return acc;
+  }, {} as Record<string, any>);
+
+  // Check if we have any valid updates after cleaning
+  if (Object.keys(cleanedUpdates).length === 0) {
+    throw new Error('No valid updates provided after validation');
+  }
+
+  // CRITICAL: Fix field mapping to prevent database column errors
+  const sanitizedUpdates = { ...cleanedUpdates };
   
   // Always sanitize phone field to customer_phone for orders table compatibility
   if ('phone' in sanitizedUpdates) {
@@ -292,31 +356,45 @@ export const updateOrder = async (
       console.warn(`⚠️ Order update attempt ${attempt + 1} failed:`, error.message);
       lastError = error;
       
-      // Don't retry for certain errors
-      if (error.message.includes('not found') || 
-          error.message.includes('Invalid status') ||
-          error.message.includes('Missing required fields') ||
+      // Don't retry for permanent errors (client-side issues)
+      if (error.message.includes('Order ID is required') ||
+          error.message.includes('No valid updates') ||
+          error.message.includes('not found') || 
+          error.message.includes('Invalid status update') ||
           error.message.includes('Access denied') ||
           error.message.includes('Forbidden')) {
+        console.error('❌ Permanent error, not retrying:', error.message);
         throw error;
       }
       
-      // Wait before retry (except on last attempt)
+      // Use exponential backoff for retries
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+        const baseDelay = retryDelays[attempt] || 1000;
+        const exponentialDelay = Math.min(baseDelay * Math.pow(2, attempt), 10000);
+        console.log(`⏳ Waiting ${exponentialDelay}ms before retry ${attempt + 2}`);
+        await new Promise(resolve => setTimeout(resolve, exponentialDelay));
       }
     }
   }
   
   // All retries failed - provide user-friendly error messages
-  console.error('❌ All update attempts failed:', lastError.message);
+  console.error('❌ All update attempts failed:', lastError?.message || 'Unknown error');
   
-  if (lastError.message.includes('duplicate key')) {
-    throw new Error('Order is being processed by another admin. Please try again.');
-  } else if (lastError.message.includes('non-2xx status code')) {
-    throw new Error('Order update service temporarily unavailable. Please try again in a moment.');
+  // Categorize errors for better user experience
+  const errorMessage = lastError?.message || 'Unknown error occurred';
+  
+  if (errorMessage.includes('duplicate key') || errorMessage.includes('being processed')) {
+    throw new Error('Order is being processed by another admin. Please refresh and try again.');
+  } else if (errorMessage.includes('non-2xx status code') || errorMessage.includes('Server error')) {
+    throw new Error('Order service is temporarily busy. Please try again in a moment.');
+  } else if (errorMessage.includes('timeout')) {
+    throw new Error('Request timed out. Please check your connection and try again.');
+  } else if (errorMessage.includes('Network error') || errorMessage.includes('network')) {
+    throw new Error('Network connection issue. Please check your internet and try again.');
+  } else if (errorMessage.includes('Database temporarily unavailable')) {
+    throw new Error('Database service is temporarily unavailable. Please try again in a few moments.');
   } else {
-    throw new Error(`Failed to update order after ${maxRetries} attempts. ${lastError.message}`);
+    throw new Error(`Order update failed: ${errorMessage}`);
   }
 };
 

@@ -10201,15 +10201,24 @@ export type Database = {
         Returns: Json
       }
       upsert_communication_event: {
-        Args: {
-          p_dedupe_key?: string
-          p_event_type: string
-          p_recipient_email: string
-          p_recipient_name: string
-          p_related_order_id: string
-          p_template_key: string
-          p_template_variables: Json
-        }
+        Args:
+          | {
+              p_dedupe_key?: string
+              p_event_type: string
+              p_order_id?: string
+              p_recipient_email: string
+              p_template_key: string
+              p_template_variables?: Json
+            }
+          | {
+              p_dedupe_key?: string
+              p_event_type: string
+              p_recipient_email: string
+              p_recipient_name: string
+              p_related_order_id: string
+              p_template_key: string
+              p_template_variables: Json
+            }
         Returns: string
       }
       upsert_payment_confirmation_event: {

@@ -48,104 +48,35 @@ const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries: nu
         result.error.code === 'AUTH_TOKEN_INVALID' ||
         result.error.code === 'AUTH_TOKEN_MALFORMED'
       )) {
-        throw new Error(`AUTH_ERROR: ${result.error.code}`);
-      }
-      
-      // Check for 500 errors that might be transient (like communication event failures)
-      if (result.error && result.error.status === 500 && attempt < maxRetries) {
-        console.log(`Server error detected on attempt ${attempt}, retrying...`);
-        throw new Error(`SERVER_ERROR: ${result.error.message || 'Internal server error'}`);
+        console.warn(`Auth token issue detected on attempt ${attempt}, refreshing session...`);
+        
+        // Try to refresh the session
+        await supabase.auth.refreshSession();
+        
+        // If this isn't the last attempt, continue to retry
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          continue;
+        }
       }
       
       return result;
     } catch (error: any) {
-      console.log(`Attempt ${attempt} failed:`, error?.message || error);
+      console.warn(`Attempt ${attempt} failed:`, error.message);
       lastError = error;
       
-      // Handle authentication errors
-      if (error.message?.includes('AUTH_ERROR')) {
-        console.log('🔄 Authentication error detected, refreshing session...');
-        
-        // Report authentication errors to production monitoring
-        if (typeof window !== 'undefined') {
-          try {
-            const { productionErrorReporter } = await import('@/utils/productionErrorReporter');
-            await productionErrorReporter.reportError(
-              'auth_system',
-              'AUTH_ERROR',
-              error,
-              { attempt, maxRetries }
-            );
-          } catch (reportError) {
-            console.warn('Failed to report auth error:', reportError);
-          }
-        }
-        
-        try {
-          // Attempt to refresh the session
-          const { error: refreshError } = await supabase.auth.refreshSession();
-          if (refreshError) {
-            console.error('❌ Failed to refresh session:', refreshError);
-            if (attempt === maxRetries) {
-              throw new Error('Authentication failed - please log in again');
-            }
-          } else {
-            console.log('✅ Session refreshed successfully, retrying...');
-          }
-        } catch (refreshError) {
-          console.error('Session refresh error:', refreshError);
-          if (attempt === maxRetries) {
-            throw new Error('Authentication failed - please log in again');
-          }
-        }
-      }
-      // Handle server errors with exponential backoff
-      else if (error.message?.includes('SERVER_ERROR') && attempt < maxRetries) {
-        console.log(`Server error detected, waiting before retry...`);
-        
-        // Report server errors to production monitoring
-        if (typeof window !== 'undefined') {
-          try {
-            const { productionErrorReporter } = await import('@/utils/productionErrorReporter');
-            await productionErrorReporter.reportError(
-              'edge_function',
-              'SERVER_ERROR',
-              error,
-              { attempt, maxRetries }
-            );
-          } catch (reportError) {
-            console.warn('Failed to report server error:', reportError);
-          }
-        }
-        
-        const delay = 1000 * Math.pow(2, attempt - 1);
-        console.log(`Waiting ${delay}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-      // Handle network or other transient errors
-      else if (attempt < maxRetries && (
-        error?.code === 'NETWORK_ERROR' ||
-        error?.message?.includes('non-2xx status code') ||
-        error?.message?.includes('fetch')
-      )) {
-        const delay = 1000 * attempt;
-        console.log(`Transient error detected, waiting ${delay}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-      // For other errors, only retry on first attempt if it might be transient
-      else if (attempt === 1 && error?.status >= 500) {
-        console.log('Server error on first attempt, will retry once...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } else {
-        // Don't retry for other types of errors
+      // Don't retry for certain non-transient errors
+      if (error.message?.includes('not found') || 
+          error.message?.includes('Invalid status') ||
+          error.message?.includes('Missing required fields') ||
+          error.message?.includes('Access denied') ||
+          error.message?.includes('Forbidden')) {
         throw error;
       }
       
-      // Add exponential backoff between attempts for auth errors
-      if (attempt < maxRetries && error.message?.includes('AUTH_ERROR')) {
-        const delay = 1000 * Math.pow(2, attempt - 1);
-        console.log(`Waiting ${delay}ms before auth retry...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+      // Wait before retry with exponential backoff
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
       }
     }
   }
@@ -153,25 +84,13 @@ const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries: nu
   throw lastError;
 };
 
-export const getOrders = async ({
-  page = 1,
-  pageSize = 10,
-  status = 'all',
-  searchQuery = '',
-  startDate,
-  endDate,
-}: GetOrdersParams): Promise<{ orders: OrderWithItems[]; count: number }> => {
+export const getOrders = async (params: GetOrdersParams = {}) => {
   try {
     const result = await retryWithFreshToken(async () => {
       return await supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'list',
-          page,
-          pageSize,
-          status,
-          searchQuery,
-          startDate,
-          endDate
+          ...params
         }
       });
     });
@@ -179,109 +98,91 @@ export const getOrders = async ({
     const { data, error } = result;
 
     if (error) {
-      // Only log errors in development
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error fetching orders via admin function:', error);
-      }
-      throw new Error(error.message || 'Failed to fetch orders');
+      console.error('❌ Supabase function error:', error);
+      throw new Error(`Function invocation failed: ${error.message}`);
     }
 
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to fetch orders');
+    if (!data || !data.success) {
+      console.error('❌ Function returned error:', data);
+      throw new Error(data?.error || 'Unknown error occurred');
     }
 
-    return { orders: data.orders || [], count: data.count || 0 };
-  } catch (error) {
-    // Only log errors in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error fetching orders:', error);
-    }
+    console.log('✅ Orders fetched successfully via Edge Function');
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error fetching orders via admin function:', error);
     
-    // Fallback to direct Supabase query for backward compatibility
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-
-    let query = supabase
-      .from('orders')
-      .select(`*, 
-        order_items (*),
-        order_delivery_schedule (*)
-      `, { count: 'exact' });
-
-    if (status !== 'all') {
-      query = query.eq('status', status);
-    }
-
-    if (searchQuery) {
-      const searchString = `%${searchQuery}%`;
-      query = query.or(
-        `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
-      );
-    }
-
-    const { data: fallbackData, error: fallbackError, count } = await query
-      .order('order_time', { ascending: false })
-      .range(from, to);
-
-    // If query with delivery zones fails, try without them and manually fetch
-    if (fallbackError) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('Query with delivery zones failed, trying fallback:', fallbackError.message);
-      }
+    // Fallback to direct query for development/debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 Falling back to direct query...');
       
-      let fallbackQuery = supabase
+      let query = supabase
         .from('orders')
-        .select(`*, order_items (*), order_delivery_schedule (*)`, { count: 'exact' });
+        .select(`
+          *,
+          order_items (*),
+          delivery_zones (*)
+        `)
+        .order('created_at', { ascending: false });
 
-      if (status !== 'all') {
-        fallbackQuery = fallbackQuery.eq('status', status);
+      // Apply filters
+      if (params.status && params.status !== 'all') {
+        query = query.eq('status', params.status);
       }
 
-      if (searchQuery) {
-        const searchString = `%${searchQuery}%`;
-        fallbackQuery = fallbackQuery.or(
-          `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
-        );
+      if (params.searchQuery) {
+        query = query.or(`order_number.ilike.%${params.searchQuery}%,customer_name.ilike.%${params.searchQuery}%,customer_email.ilike.%${params.searchQuery}%`);
       }
 
-      const { data: noZoneData, error: noZoneError, count: noZoneCount } = await fallbackQuery
-        .order('order_time', { ascending: false })
-        .range(from, to);
-
-      if (noZoneError) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Fallback query also failed:', noZoneError);
-        }
-        throw new Error(noZoneError.message);
+      if (params.startDate) {
+        query = query.gte('created_at', params.startDate);
       }
 
-      // Manually fetch delivery zones for each order
-      const ordersWithZones = await Promise.all(
-        (noZoneData || []).map(async (order: any) => {
-          if (order.delivery_zone_id) {
-            try {
-              const { data: zone } = await supabase
-                .from('delivery_zones')
-                .select('id, name, base_fee, is_active')
-                .eq('id', order.delivery_zone_id)
-                .single();
-              
-              return { ...order, delivery_zones: zone };
-            } catch (zoneError) {
-              if (process.env.NODE_ENV === 'development') {
-                console.warn(`Failed to fetch zone for order ${order.id}:`, zoneError);
-              }
-              return { ...order, delivery_zones: null };
-            }
-          }
-          return { ...order, delivery_zones: null };
-        })
-      );
+      if (params.endDate) {
+        query = query.lte('created_at', params.endDate);
+      }
 
-      return { orders: ordersWithZones as unknown as OrderWithItems[], count: noZoneCount || 0 };
+      // Add pagination
+      const page = params.page || 1;
+      const pageSize = params.pageSize || 20;
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      query = query.range(from, to);
+
+      const { data: fallbackData, error: fallbackError, count } = await query;
+
+      if (fallbackError) {
+        console.error('❌ Fallback query also failed:', fallbackError);
+        throw new Error(fallbackError.message);
+      }
+
+      // Try to get delivery zones for fallback data
+      if (fallbackData && fallbackData.length > 0) {
+        const { data: zonesData } = await supabase
+          .from('delivery_zones')
+          .select('*')
+          .in('id', fallbackData.map(order => order.delivery_zone_id).filter(Boolean));
+
+        const zonesMap = new Map(zonesData?.map(zone => [zone.id, zone]) || []);
+        
+        const ordersWithZones = fallbackData.map(order => ({
+          ...order,
+          delivery_zones: order.delivery_zone_id ? zonesMap.get(order.delivery_zone_id) : null
+        }));
+
+        // Get total count for pagination
+        const { count: noZoneCount } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true });
+
+        return { orders: ordersWithZones as unknown as OrderWithItems[], count: noZoneCount || 0 };
+      }
+
+      return { orders: fallbackData as unknown as OrderWithItems[] || [], count: count || 0 };
     }
 
-    return { orders: fallbackData as unknown as OrderWithItems[] || [], count: count || 0 };
+    throw error;
   }
 };
 
@@ -387,7 +288,7 @@ export const updateOrder = async (
       console.log('✅ Order updated successfully via Edge Function');
       return data.order;
 
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`⚠️ Order update attempt ${attempt + 1} failed:`, error.message);
       lastError = error;
       
@@ -435,7 +336,7 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     if (error || !data.success) {
       throw new Error(data?.error || error?.message || 'Failed to delete order');
     }
-  } catch (error) {
+  } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
       console.error('Error deleting order via admin function:', error);
     }
@@ -471,7 +372,7 @@ export const bulkDeleteOrders = async (orderIds: string[]): Promise<void> => {
     if (error || !data.success) {
       throw new Error(data?.error || error?.message || 'Failed to delete orders');
     }
-  } catch (error) {
+  } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
       console.error('Error bulk deleting orders via admin function:', error);
     }

@@ -90,7 +90,7 @@ export function DeliveryAnalytics({ className }: DeliveryAnalyticsProps) {
     }, {} as Record<string, { orders: number; revenue: number; deliveries: number }>);
 
     // Convert to chart format
-    const chartData = Object.entries(dailyMetrics).map(([date, metrics]) => ({
+    const chartData = Object.entries(dailyMetrics).map(([date, metrics]: [string, { orders: number; revenue: number; deliveries: number }]) => ({
       date: format(new Date(date), 'MMM dd'),
       orders: metrics.orders,
       revenue: metrics.revenue,

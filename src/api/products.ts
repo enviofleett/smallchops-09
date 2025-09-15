@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Product, NewProduct, UpdatedProduct, ProductWithCategory } from '@/types/database';
 
-const PRODUCT_IMAGE_BUCKET = 'product-images';
+const PRODUCT_IMAGE_BUCKET = 'products-images';
 
 /**
  * Uploads an image file using the upload-product-image edge function.

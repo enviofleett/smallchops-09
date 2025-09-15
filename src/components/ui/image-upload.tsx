@@ -310,7 +310,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
             </Button>
           )}
           <div className="mt-2 text-xs text-gray-500 text-center">
-            Image will be automatically resized to 1000×1000px
+            Image will be automatically optimized for web
           </div>
         </div>
       ) : (
@@ -335,10 +335,10 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
             Drop an image here, or click to select
           </p>
           <p className="text-xs text-gray-400">
-            PNG, JPG, WebP up to 10MB
+            PNG, JPG, WebP up to 20MB
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            Images will be automatically resized to 1000×1000px
+            Images will be automatically optimized for web
           </p>
           <input
             ref={fileInputRef}

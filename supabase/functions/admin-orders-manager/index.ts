@@ -523,12 +523,13 @@ serve(async (req) => {
               })
             }
 
-            success: true,
-            message: 'Order status updated successfully',
-            order: result.order
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
+            return new Response(JSON.stringify({
+              success: true,
+              message: 'Order status updated successfully',
+              order: result.order
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
           
         } catch (functionError) {
           console.error('❌ Exception in safe update function:', functionError)

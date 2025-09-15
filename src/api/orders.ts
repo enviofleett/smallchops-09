@@ -228,38 +228,6 @@ export const updateOrder = async (
   const sanitizedUpdates = { ...cleanedUpdates };
   console.log('🔄 Starting order update:', orderId, updates);
   
-  // Validate required parameters
-  if (!orderId || orderId.trim() === '') {
-    throw new Error('Order ID is required');
-  }
-
-  if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
-    throw new Error('Updates are required');
-  }
-
-  // Clean and validate updates - filter out invalid values
-  const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-    // Skip undefined, null, empty string, or 'undefined' string values
-    if (value !== undefined && 
-        value !== null && 
-        value !== '' && 
-        value !== 'undefined' && 
-        value !== 'null') {
-      acc[key] = value;
-    } else {
-      console.warn(`⚠️ Filtering out invalid value for ${key}:`, value);
-    }
-    return acc;
-  }, {} as Record<string, any>);
-
-  // Check if we have any valid updates after cleaning
-  if (Object.keys(cleanedUpdates).length === 0) {
-    throw new Error('No valid updates provided after validation');
-  }
-
-  // CRITICAL: Fix field mapping to prevent database column errors
-  const sanitizedUpdates = { ...cleanedUpdates };
-  
   // Always sanitize phone field to customer_phone for orders table compatibility
   if ('phone' in sanitizedUpdates) {
     console.log('🔧 Mapping phone to customer_phone for orders table compatibility');

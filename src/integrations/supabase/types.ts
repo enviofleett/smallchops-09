@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -8852,7 +8852,7 @@ export type Database = {
               p_target_user_id: string
               p_window_minutes?: number
             }
-        Returns: boolean
+        Returns: Json
       }
       check_production_readiness: {
         Args: Record<PropertyKey, never>

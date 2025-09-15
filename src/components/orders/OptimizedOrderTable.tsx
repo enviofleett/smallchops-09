@@ -225,7 +225,12 @@ const OptimizedOrderRow = React.memo<{
           {order.order_type === 'delivery' && order.delivery_address && (
             <div className="flex items-center gap-1">
               <MapPin className="h-3 w-3" />
-              <span className="truncate max-w-32">{order.delivery_address}</span>
+              <span className="truncate max-w-32">
+                {typeof order.delivery_address === 'string' 
+                  ? order.delivery_address 
+                  : JSON.stringify(order.delivery_address)
+                }
+              </span>
             </div>
           )}
         </div>

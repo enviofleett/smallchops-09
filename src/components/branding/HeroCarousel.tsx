@@ -26,9 +26,10 @@ export const HeroCarousel = ({
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Fetch hero images
-  const { data: heroImages = [] } = useQuery({
+  const { data: heroImages = [], error: queryError, isLoading, isError } = useQuery({
     queryKey: ['hero-images-public'],
     queryFn: async () => {
+      console.log('Fetching hero images...');
       const { data, error } = await supabase
         .from('hero_carousel_images')
         .select('*')
@@ -37,11 +38,29 @@ export const HeroCarousel = ({
       
       if (error) {
         console.error('Error fetching hero images:', error);
-        return [];
+        throw error;
       }
+      
+      console.log('Hero images fetched:', data?.length || 0, 'images');
       return data as HeroImage[];
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 3,
+    refetchOnWindowFocus: false,
   });
+
+  // Log query state for debugging
+  useEffect(() => {
+    if (isError) {
+      console.error('Hero images query error:', queryError);
+    }
+    if (isLoading) {
+      console.log('Loading hero images...');
+    }
+    if (!isLoading && !isError) {
+      console.log('Hero images loaded successfully:', heroImages.length);
+    }
+  }, [isLoading, isError, queryError, heroImages.length]);
 
   // Only show uploaded images - no hardcoded fallbacks
   const imagesToShow = heroImages.length > 0 ? heroImages : [];
@@ -70,6 +89,34 @@ export const HeroCarousel = ({
     setCurrentIndex(0);
     setIsTransitioning(false);
   }, [imagesToShow]);
+
+  // Don't render anything if loading or error occurred
+  if (isLoading) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-gray-100 rounded-2xl`}>
+        <div className="text-center p-6">
+          <div className="text-gray-400 text-sm font-medium">
+            Loading images...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-red-50 rounded-2xl`}>
+        <div className="text-center p-6">
+          <div className="text-red-500 text-sm font-medium">
+            Error loading images
+          </div>
+          <div className="text-red-400 text-xs mt-1">
+            {queryError?.message || 'Unknown error'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Don't render anything if no uploaded images available
   if (imagesToShow.length === 0) {

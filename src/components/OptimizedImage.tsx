@@ -30,15 +30,24 @@ export function OptimizedImage({
   const [hasError, setHasError] = useState(false);
   const [currentSrc, setCurrentSrc] = useState(src);
 
+  // Update currentSrc when src prop changes
+  React.useEffect(() => {
+    setCurrentSrc(src);
+    setHasError(false);
+    setIsLoading(true);
+  }, [src]);
+
   const handleLoad = useCallback(() => {
     setIsLoading(false);
     setHasError(false);
   }, []);
 
   const handleError = useCallback(() => {
+    console.error('Image failed to load:', currentSrc);
     setIsLoading(false);
     setHasError(true);
     if (currentSrc !== fallback) {
+      console.log('Falling back to:', fallback);
       setCurrentSrc(fallback);
     }
   }, [currentSrc, fallback]);
@@ -46,6 +55,17 @@ export function OptimizedImage({
   // Generate optimized URLs
   const optimizedSrc = ImageOptimizer.optimizeImageUrl(currentSrc, width, quality);
   const srcSet = sizes ? ImageOptimizer.generateSrcSet(currentSrc) : undefined;
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('OptimizedImage rendered:', {
+      originalSrc: src,
+      currentSrc,
+      optimizedSrc,
+      hasError,
+      isLoading
+    });
+  }, [src, currentSrc, optimizedSrc, hasError, isLoading]);
 
   return (
     <div className={`relative overflow-hidden ${className}`} style={{ width, height }}>

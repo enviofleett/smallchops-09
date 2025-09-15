@@ -39,13 +39,10 @@ export class ImageOptimizer {
   static optimizeImageUrl(url: string, width?: number, quality: number = 80): string {
     if (!url || url.startsWith('data:')) return url;
     
-    // For Supabase storage URLs, add optimization parameters
+    // For Supabase storage URLs, avoid adding optimization parameters that may not be supported
+    // Just return the original URL to ensure compatibility
     if (url.includes('supabase.co/storage')) {
-      const urlObj = new URL(url);
-      if (width) urlObj.searchParams.set('width', width.toString());
-      urlObj.searchParams.set('quality', quality.toString());
-      urlObj.searchParams.set('format', 'webp');
-      return urlObj.toString();
+      return url;
     }
     
     return url;

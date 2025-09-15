@@ -66,6 +66,21 @@ const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries: nu
       if (error.message?.includes('AUTH_ERROR')) {
         console.log('🔄 Authentication error detected, refreshing session...');
         
+        // Report authentication errors to production monitoring
+        if (typeof window !== 'undefined') {
+          try {
+            const { productionErrorReporter } = await import('@/utils/productionErrorReporter');
+            await productionErrorReporter.reportError(
+              'auth_system',
+              'AUTH_ERROR',
+              error,
+              { attempt, maxRetries }
+            );
+          } catch (reportError) {
+            console.warn('Failed to report auth error:', reportError);
+          }
+        }
+        
         try {
           // Attempt to refresh the session
           const { error: refreshError } = await supabase.auth.refreshSession();
@@ -83,11 +98,28 @@ const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries: nu
             throw new Error('Authentication failed - please log in again');
           }
         }
-      } 
+      }
       // Handle server errors with exponential backoff
       else if (error.message?.includes('SERVER_ERROR') && attempt < maxRetries) {
+        console.log(`Server error detected, waiting before retry...`);
+        
+        // Report server errors to production monitoring
+        if (typeof window !== 'undefined') {
+          try {
+            const { productionErrorReporter } = await import('@/utils/productionErrorReporter');
+            await productionErrorReporter.reportError(
+              'edge_function',
+              'SERVER_ERROR',
+              error,
+              { attempt, maxRetries }
+            );
+          } catch (reportError) {
+            console.warn('Failed to report server error:', reportError);
+          }
+        }
+        
         const delay = 1000 * Math.pow(2, attempt - 1);
-        console.log(`Server error detected, waiting ${delay}ms before retry...`);
+        console.log(`Waiting ${delay}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
       // Handle network or other transient errors

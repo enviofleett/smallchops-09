@@ -70,7 +70,8 @@ serve(async (req) => {
 
   const corsHeaders = getCorsHeaders(origin)
 
-  // ADMIN AUTHENTICATION: Validate JWT and admin role manually since verify_jwt = false
+  // ✅ PRODUCTION-READY AUTHENTICATION
+  // Since verify_jwt = true, Supabase automatically validates JWT and provides user context
   try {
     const authHeader = req.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -85,38 +86,24 @@ serve(async (req) => {
       })
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    // Get authenticated user from context (automatically validated by Supabase)
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     
-    if (authError || !user) {
-      console.log('❌ Invalid JWT token:', authError?.message || 'Auth session missing!')
-      
-      // Provide specific error codes for different auth failure scenarios
-      let errorCode = 'AUTH_TOKEN_INVALID';
-      let errorMessage = 'Unauthorized: Invalid authentication token';
-      
-      if (authError?.message?.includes('expired')) {
-        errorCode = 'AUTH_TOKEN_EXPIRED';
-        errorMessage = 'Authentication token has expired. Please log in again.';
-      } else if (authError?.message?.includes('invalid') || authError?.message?.includes('malformed')) {
-        errorCode = 'AUTH_TOKEN_MALFORMED';
-        errorMessage = 'Authentication token is malformed. Please log in again.';
-      } else if (!user) {
-        errorCode = 'AUTH_SESSION_MISSING';
-        errorMessage = 'Authentication session not found. Please log in again.';
-      }
-      
+    if (userError || !user) {
+      console.log('❌ Authentication failed:', userError?.message || 'No user found')
       return new Response(JSON.stringify({
         success: false,
-        error: errorMessage,
-        code: errorCode
+        error: 'Authentication failed. Please log in again.',
+        code: 'AUTH_FAILED'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
       })
     }
 
-    // Check if user is admin
+    console.log('✅ User authenticated:', user.id)
+
+    // Check if user is admin using service role client for reliable access
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role, is_active')

@@ -1,10 +1,16 @@
 project_id = "oknnklksdiqaifhxaccs"
 
 [functions.admin-orders-manager]
-verify_jwt = false
+verify_jwt = true
 
 [functions.process-checkout]
 verify_jwt = false
+
+[functions.production-error-handler]
+verify_jwt = false
+
+[functions.reports]
+verify_jwt = true
 
 [functions.simplified-product-upload]
 verify_jwt = true

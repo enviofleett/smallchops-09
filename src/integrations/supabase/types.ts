@@ -8960,6 +8960,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_stuck_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       clear_production_data: {
         Args: Record<PropertyKey, never>
         Returns: string

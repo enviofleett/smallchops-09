@@ -604,7 +604,7 @@ serve(async (req) => {
         }
 
         // For other updates, continue with the existing logic
-        console.log('🔄 Using existing update logic for non-status updates')
+        console.log('🔄 Using existing update logic for non-status updates');
 
         // Get the current order to compare status changes
         const { data: currentOrder, error: fetchError } = await supabaseClient

@@ -10038,11 +10038,9 @@ export type Database = {
         Returns: Json
       }
       safe_update_order_status: {
-        Args: {
-          p_admin_notes?: string
-          p_new_status: string
-          p_order_id: string
-        }
+        Args:
+          | { p_admin_id?: string; p_new_status: string; p_order_id: string }
+          | { p_admin_notes?: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
       set_limit: {
@@ -10134,6 +10132,18 @@ export type Database = {
           | { p_change_reason?: string; p_permissions: Json; p_user_id: string }
           | { permissions_data: Json; target_user_id: string }
         Returns: Json
+      }
+      upsert_communication_event: {
+        Args: {
+          p_dedupe_key?: string
+          p_event_type: string
+          p_recipient_email: string
+          p_recipient_name: string
+          p_related_order_id: string
+          p_template_key: string
+          p_template_variables: Json
+        }
+        Returns: string
       }
       upsert_payment_confirmation_event: {
         Args: {

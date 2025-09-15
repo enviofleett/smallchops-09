@@ -175,6 +175,7 @@ serve(async (req) => {
             recipient_email: event.data.customer?.email || null,
             template_key: 'payment_confirmation',
             status: 'queued',
+            dedupe_key: `${processResult[0].order_id}|payment_confirmed|${Date.now()}`,
             variables: {
               customerName: event.data.customer?.first_name || 'Customer',
               orderNumber: processResult[0].order_number,
@@ -182,7 +183,7 @@ serve(async (req) => {
               paymentMethod: event.data.channel || 'Online Payment',
               paidAt: event.data.paid_at
             }
-          });
+          }).select().maybeSingle();
         }
 
       } catch (error) {

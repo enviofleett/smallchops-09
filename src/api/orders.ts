@@ -33,6 +33,45 @@ interface GetOrdersParams {
  * Fetches orders and their associated items from the database with pagination and filtering.
  * Uses admin edge function to bypass RLS for authenticated admin users.
  */
+// Helper function to handle authentication errors and retry with fresh token
+const retryWithFreshToken = async (operation: () => Promise<any>, maxRetries = 1) => {
+  let attempt = 0;
+  
+  while (attempt <= maxRetries) {
+    try {
+      const result = await operation();
+      
+      // Check if the result indicates an auth error
+      if (result.error && (
+        result.error.code === 'AUTH_TOKEN_EXPIRED' ||
+        result.error.code === 'AUTH_SESSION_MISSING' ||
+        result.error.code === 'AUTH_TOKEN_INVALID'
+      )) {
+        throw new Error(`AUTH_ERROR: ${result.error.code}`);
+      }
+      
+      return result;
+    } catch (error: any) {
+      if (attempt < maxRetries && error.message?.includes('AUTH_ERROR')) {
+        console.log('🔄 Authentication error detected, refreshing session...');
+        
+        // Attempt to refresh the session
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.error('❌ Failed to refresh session:', refreshError);
+          throw new Error('Session expired. Please log in again.');
+        }
+        
+        console.log('✅ Session refreshed successfully, retrying...');
+        attempt++;
+        continue;
+      }
+      
+      throw error;
+    }
+  }
+};
+
 export const getOrders = async ({
   page = 1,
   pageSize = 10,
@@ -42,17 +81,21 @@ export const getOrders = async ({
   endDate,
 }: GetOrdersParams): Promise<{ orders: OrderWithItems[]; count: number }> => {
   try {
-    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
-      body: {
-        action: 'list',
-        page,
-        pageSize,
-        status,
-        searchQuery,
-        startDate,
-        endDate
-      }
+    const result = await retryWithFreshToken(async () => {
+      return await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'list',
+          page,
+          pageSize,
+          status,
+          searchQuery,
+          startDate,
+          endDate
+        }
+      });
     });
+    
+    const { data, error } = result;
 
     if (error) {
       // Only log errors in development
@@ -188,16 +231,20 @@ export const updateOrder = async (
         console.log('🎯 Assigning/reassigning rider using secure RPC:', sanitizedUpdates.assigned_rider_id);
       }
       
-      const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
-        body: {
-          action: 'assign_rider',
-          orderId,
-          riderId: sanitizedUpdates.assigned_rider_id
-        }
+      const assignmentResult = await retryWithFreshToken(async () => {
+        return await supabase.functions.invoke('admin-orders-manager', {
+          body: {
+            action: 'assign_rider',
+            orderId,
+            riderId: sanitizedUpdates.assigned_rider_id
+          }
+        });
       });
+      
+      const { data, error: assignmentError } = assignmentResult;
 
-      if (assignmentError || !assignmentResult?.success) {
-        const errorMsg = assignmentResult?.error || assignmentError?.message || 'Failed to assign rider';
+      if (assignmentError || !data?.success) {
+        const errorMsg = data?.error || assignmentError?.message || 'Failed to assign rider';
         if (process.env.NODE_ENV === 'development') {
           console.error('❌ Rider assignment failed:', errorMsg);
         }
@@ -213,32 +260,40 @@ export const updateOrder = async (
       delete otherUpdates.assigned_rider_id;
       
       if (Object.keys(otherUpdates).length > 0) {
-        const { data: updateResult, error: updateError } = await supabase.functions.invoke('admin-orders-manager', {
-          body: {
-            action: 'update',
-            orderId,
-            updates: otherUpdates
-          }
+        const updateResult = await retryWithFreshToken(async () => {
+          return await supabase.functions.invoke('admin-orders-manager', {
+            body: {
+              action: 'update',
+              orderId,
+              updates: otherUpdates
+            }
+          });
         });
+        
+        const { data: updateData, error: updateError } = updateResult;
 
-        if (updateError || !updateResult?.success) {
-          throw new Error(updateResult?.error || updateError?.message || 'Failed to update order');
+        if (updateError || !updateData?.success) {
+          throw new Error(updateData?.error || updateError?.message || 'Failed to update order');
         }
         
-        return updateResult.order;
+        return updateData.order;
       }
       
-      return assignmentResult.order;
+      return data.order;
     }
 
     // For non-rider updates, use the standard update path
-    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
-      body: {
-        action: 'update',
-        orderId,
-        updates: sanitizedUpdates
-      }
+    const result = await retryWithFreshToken(async () => {
+      return await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'update',
+          orderId,
+          updates: sanitizedUpdates
+        }
+      });
     });
+    
+    const { data, error } = result;
 
     if (error) {
       console.error('❌ Error updating order via admin function:', error);
@@ -272,12 +327,16 @@ export const updateOrder = async (
 
 export const deleteOrder = async (orderId: string): Promise<void> => {
   try {
-    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
-      body: {
-        action: 'delete',
-        orderId
-      }
+    const result = await retryWithFreshToken(async () => {
+      return await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'delete',
+          orderId
+        }
+      });
     });
+    
+    const { data, error } = result;
 
     if (error || !data.success) {
       throw new Error(data?.error || error?.message || 'Failed to delete order');
@@ -304,12 +363,16 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
 
 export const bulkDeleteOrders = async (orderIds: string[]): Promise<void> => {
   try {
-    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
-      body: {
-        action: 'bulk_delete',
-        orderIds
-      }
+    const result = await retryWithFreshToken(async () => {
+      return await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'bulk_delete',
+          orderIds
+        }
+      });
     });
+    
+    const { data, error } = result;
 
     if (error || !data.success) {
       throw new Error(data?.error || error?.message || 'Failed to delete orders');

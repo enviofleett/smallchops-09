@@ -1,4 +1,7 @@
 project_id = "oknnklksdiqaifhxaccs"
 
+[functions.admin-orders-manager]
+verify_jwt = false
+
 [functions.simplified-product-upload]
 verify_jwt = true

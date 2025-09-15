@@ -77,7 +77,8 @@ serve(async (req) => {
       console.log('❌ Missing or invalid authorization header')
       return new Response(JSON.stringify({
         success: false,
-        error: 'Unauthorized: Missing authentication token'
+        error: 'Unauthorized: Missing authentication token',
+        code: 'AUTH_TOKEN_MISSING'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
@@ -88,10 +89,27 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
     
     if (authError || !user) {
-      console.log('❌ Invalid JWT token:', authError?.message)
+      console.log('❌ Invalid JWT token:', authError?.message || 'Auth session missing!')
+      
+      // Provide specific error codes for different auth failure scenarios
+      let errorCode = 'AUTH_TOKEN_INVALID';
+      let errorMessage = 'Unauthorized: Invalid authentication token';
+      
+      if (authError?.message?.includes('expired')) {
+        errorCode = 'AUTH_TOKEN_EXPIRED';
+        errorMessage = 'Authentication token has expired. Please log in again.';
+      } else if (authError?.message?.includes('invalid') || authError?.message?.includes('malformed')) {
+        errorCode = 'AUTH_TOKEN_MALFORMED';
+        errorMessage = 'Authentication token is malformed. Please log in again.';
+      } else if (!user) {
+        errorCode = 'AUTH_SESSION_MISSING';
+        errorMessage = 'Authentication session not found. Please log in again.';
+      }
+      
       return new Response(JSON.stringify({
         success: false,
-        error: 'Unauthorized: Invalid authentication token'
+        error: errorMessage,
+        code: errorCode
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401

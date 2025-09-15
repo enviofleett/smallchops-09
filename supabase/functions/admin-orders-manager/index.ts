@@ -596,8 +596,8 @@ serve(async (req) => {
 
           return new Response(JSON.stringify({
             success: true,
-            order: parsedResult.order,
-            message: parsedResult.message
+            order: updatedOrder,
+            message: 'Order updated successfully'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
@@ -612,8 +612,8 @@ serve(async (req) => {
             status: 500
           })
         }
-
-        // For other updates, continue with the existing logic
+      } else {
+        // For other non-status updates, continue with existing logic
         console.log('🔄 Using existing update logic for non-status updates');
 
         // Get the current order to compare status changes

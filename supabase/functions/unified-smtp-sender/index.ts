@@ -51,9 +51,29 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const emailRequest: EmailRequest = await req.json();
     
+    // Handle different request formats - both direct and template-based
+    console.log('📧 Raw email request:', JSON.stringify(emailRequest, null, 2));
+    
+    // Extract email fields from different possible formats
+    const emailTo = emailRequest.to || emailRequest.recipient_email || emailRequest.email;
+    const emailSubject = emailRequest.subject || emailRequest.template_key || 'Order Notification';
+    const emailContent = emailRequest.content || emailRequest.html || emailRequest.text || '';
+    
+    console.log('📧 Extracted fields:', { 
+      to: emailTo, 
+      subject: emailSubject, 
+      hasContent: !!emailContent,
+      templateKey: emailRequest.template_key,
+      hasVariables: !!emailRequest.template_variables
+    });
+    
     // Validate required fields
-    if (!emailRequest.to || !emailRequest.subject) {
-      throw new Error('Missing required fields: to, subject');
+    if (!emailTo) {
+      throw new Error('Missing required field: recipient email (to/recipient_email/email)');
+    }
+    
+    if (!emailSubject && !emailRequest.template_key) {
+      throw new Error('Missing required field: subject or template_key');
     }
 
     if (!emailRequest.html && !emailRequest.text) {

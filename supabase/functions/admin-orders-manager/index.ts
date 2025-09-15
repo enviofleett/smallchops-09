@@ -70,16 +70,29 @@ serve(async (req) => {
 
   const corsHeaders = getCorsHeaders(origin)
 
-  // ✅ PRODUCTION-READY AUTHENTICATION
-  // Extract JWT token and get user ID from it
+  // ✅ FIXED AUTHENTICATION - Proper JWT handling
   try {
     const authHeader = req.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Missing or invalid authorization header')
+    console.log('🔍 Auth header present:', !!authHeader)
+    
+    if (!authHeader) {
+      console.log('❌ No authorization header provided')
       return new Response(JSON.stringify({
         success: false,
-        error: 'Unauthorized: Missing authentication token',
+        error: 'Unauthorized: No authentication token provided',
         code: 'AUTH_TOKEN_MISSING'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401
+      })
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      console.log('❌ Invalid authorization header format')
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Unauthorized: Invalid token format',
+        code: 'AUTH_TOKEN_INVALID_FORMAT'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
@@ -88,25 +101,42 @@ serve(async (req) => {
 
     // Extract JWT token
     const jwt = authHeader.replace('Bearer ', '')
+    console.log('🔍 JWT token extracted, length:', jwt.length)
     
-    // Create user client to verify the JWT token
-    const userClient = createClient(
+    // Use service role client with auth header to verify JWT
+    const authClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: { headers: { authorization: authHeader } }
-      }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
-    // Get user from the JWT token using user client
-    const { data: { user }, error: userError } = await userClient.auth.getUser(jwt)
+    // Get user from the JWT token
+    const { data: { user }, error: userError } = await authClient.auth.getUser(jwt)
     
-    if (userError || !user) {
-      console.log('❌ Authentication failed: Auth session missing!')
+    console.log('🔍 User verification result:', { 
+      hasUser: !!user, 
+      userId: user?.id, 
+      userEmail: user?.email,
+      error: userError?.message 
+    })
+    
+    if (userError) {
+      console.log('❌ JWT verification failed:', userError.message)
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid or expired token. Please log in again.',
+        code: 'AUTH_TOKEN_INVALID'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401
+      })
+    }
+    
+    if (!user) {
+      console.log('❌ No user found in valid JWT')
       return new Response(JSON.stringify({
         success: false,
         error: 'Authentication failed. Please log in again.',
-        code: 'AUTH_FAILED'
+        code: 'AUTH_USER_NOT_FOUND'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401

@@ -204,7 +204,7 @@ export const updateOrder = async (
     throw new Error('Updates are required and must be a valid object');
   }
 
-  // Enhanced cleaning and validation - filter out invalid values
+  // CRITICAL: Enhanced cleaning and validation - filter out invalid values
   const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
     // Skip undefined, null, empty string, or 'undefined'/'null' string values
     if (value !== undefined && 
@@ -215,12 +215,13 @@ export const updateOrder = async (
       
       // Additional field-specific validation
       if (key === 'status') {
-        // Validate status enum values
+        // CRITICAL: Strict status enum validation
         const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'completed', 'returned'];
-        if (!validStatuses.includes(value as string)) {
-          console.warn(`⚠️ Invalid status value: ${value}`);
-          return acc;
+        if (typeof value !== 'string' || !validStatuses.includes(value)) {
+          console.error(`❌ BLOCKED: Invalid status value rejected: ${value} (type: ${typeof value})`);
+          throw new Error(`Invalid status value: ${value}. Valid values are: ${validStatuses.join(', ')}`);
         }
+        console.log(`✅ Status validation passed: ${value}`);
       }
       
       if (key === 'customer_email' && typeof value === 'string') {

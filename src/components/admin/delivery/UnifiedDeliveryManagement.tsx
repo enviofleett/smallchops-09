@@ -30,6 +30,7 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { validateAndSanitizeStatus, isValidStatusTransition } from '@/utils/statusValidation';
 
 // --- Types ---
 interface UnifiedDeliveryManagementProps {
@@ -125,16 +126,34 @@ export function UnifiedDeliveryManagement({
   // --- Status Change Handler ---
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
+      // CRITICAL: Use centralized validation utility
+      const validatedStatus = validateAndSanitizeStatus(newStatus);
+      
       const order = filteredOrders.find(o => o.id === orderId);
-      if (newStatus === 'out_for_delivery' && !order?.assigned_rider_id) {
-        toast.error('Cannot move to "Out for Delivery" without assigning a driver. Please assign a driver first.');
+      if (!order) {
+        toast.error('Order not found. Please refresh and try again.');
         return;
       }
-      await updateOrder(orderId, { status: newStatus as any });
+
+      // Business logic validation using utility
+      const transitionCheck = isValidStatusTransition(
+        order.status, 
+        validatedStatus, 
+        !!order.assigned_rider_id
+      );
+      
+      if (!transitionCheck.isValid) {
+        toast.error(transitionCheck.reason || 'Invalid status transition');
+        return;
+      }
+
+      console.log('✅ Comprehensive validation passed, updating order:', orderId, 'to:', validatedStatus);
+      await updateOrder(orderId, { status: validatedStatus });
       toast.success('Order status updated successfully');
       refetch();
     } catch (error) {
-      toast.error('Failed to update order status');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update order status';
+      toast.error(errorMessage);
       console.error('Status update error:', error);
     }
   };
@@ -475,7 +494,16 @@ export function UnifiedDeliveryManagement({
                     <div className="w-full sm:w-auto flex-1 min-w-0">
                       <Select
                         value={order.status}
-                        onValueChange={(value) => handleStatusChange(order.id, value)}
+                        onValueChange={(value) => {
+                          // CRITICAL: Use centralized validation with better error handling
+                          try {
+                            const validatedStatus = validateAndSanitizeStatus(value);
+                            handleStatusChange(order.id, validatedStatus);
+                          } catch (error) {
+                            console.error('❌ Select component validation failed:', error);
+                            toast.error('Invalid status selection. Please refresh and try again.');
+                          }
+                        }}
                       >
                         <SelectTrigger className="h-8 text-xs">
                           <div className="flex items-center gap-1">

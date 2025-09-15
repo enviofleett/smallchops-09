@@ -183,14 +183,34 @@ serve(async (req) => {
   try {
     let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
     
-    // CRITICAL: Comprehensive phone field sanitization to prevent ALL column errors
+    // CRITICAL: Comprehensive field sanitization to prevent ALL enum/column errors
     if (updates && typeof updates === 'object') {
+      // Phone field mapping
       if ('phone' in updates) {
         console.log('🚨 GLOBAL SANITIZATION: Found phone field in updates, mapping to customer_phone');
         updates.customer_phone = updates.phone;
         delete updates.phone;
-        console.log('✅ GLOBAL SANITIZED: Updates after phone field cleanup:', updates);
       }
+      
+      // CRITICAL: Status field validation at entry point
+      if ('status' in updates) {
+        if (!updates.status || 
+            updates.status === 'undefined' || 
+            updates.status === 'null' || 
+            typeof updates.status !== 'string' ||
+            updates.status.trim() === '') {
+          console.error('❌ ENTRY POINT BLOCKED: Invalid status in request body:', updates.status);
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Invalid status in request: ${updates.status}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+      }
+      
+      console.log('✅ GLOBAL SANITIZATION: Updates after field cleanup:', updates);
     }
 
     switch (action) {
@@ -472,17 +492,36 @@ serve(async (req) => {
         if (updates && updates.status && Object.keys(updates).length === 1) {
           console.log('🔄 Using safe database function for status update:', updates.status)
           
-          // Validate status value is not undefined/null
-          if (!updates.status || updates.status === 'undefined' || updates.status === 'null') {
-            console.error('❌ Invalid status value:', updates.status)
+          // CRITICAL: Comprehensive status validation
+          if (!updates.status || 
+              updates.status === 'undefined' || 
+              updates.status === 'null' || 
+              typeof updates.status !== 'string' ||
+              updates.status.trim() === '') {
+            console.error('❌ BLOCKED: Invalid status value:', updates.status, 'Type:', typeof updates.status)
             return new Response(JSON.stringify({
               success: false,
-              error: 'Invalid status value provided'
+              error: `Invalid status value: ${updates.status}. Status must be a valid non-empty string.`
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400
             })
           }
+
+          // Validate against allowed enum values
+          const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'completed', 'returned'];
+          if (!validStatuses.includes(updates.status)) {
+            console.error('❌ BLOCKED: Status not in allowed enum values:', updates.status)
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Invalid status: ${updates.status}. Valid statuses are: ${validStatuses.join(', ')}`
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            })
+          }
+
+          console.log('✅ Status validation passed in Edge Function:', updates.status)
 
           try {
             // Use enhanced version with better validation

@@ -23,7 +23,7 @@ export const HeroCarousel = ({
   fallbackAlt = "Product showcase"
 }: HeroCarouselProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Fetch hero images
   const { data: heroImages = [] } = useQuery({
@@ -51,31 +51,24 @@ export const HeroCarousel = ({
     if (imagesToShow.length <= 1) return;
 
     const interval = setInterval(() => {
-      // Start fade out
-      setIsVisible(false);
+      setIsTransitioning(true);
       
-      // After fade out completes, change image and fade in
+      // Change image after fade out duration
       setTimeout(() => {
         setCurrentIndex((prevIndex) => 
           (prevIndex + 1) % imagesToShow.length
         );
-        // Small delay before fade in to ensure image change is processed
-        setTimeout(() => {
-          setIsVisible(true);
-        }, 50);
-      }, 600); // Extended fade out duration for smoother transition
+        setIsTransitioning(false);
+      }, 500); // Match CSS transition duration
     }, 20000); // 20 seconds
 
     return () => clearInterval(interval);
   }, [imagesToShow.length]);
 
-  // Reset visibility when component mounts or images change
+  // Reset state when images change
   useEffect(() => {
     setCurrentIndex(0);
-    // Ensure fade in after image list changes
-    setTimeout(() => {
-      setIsVisible(true);
-    }, 100);
+    setIsTransitioning(false);
   }, [imagesToShow]);
 
   // Don't render anything if no uploaded images available
@@ -99,7 +92,7 @@ export const HeroCarousel = ({
         src={currentImage.image_url}
         alt={currentImage.alt_text || 'Uploaded product image'}
         className={`w-full h-full object-cover rounded-2xl transition-opacity duration-500 ease-in-out ${
-          isVisible ? 'opacity-100' : 'opacity-0'
+          isTransitioning ? 'opacity-0' : 'opacity-100'
         }`}
         showLoader={true}
         fit="cover"

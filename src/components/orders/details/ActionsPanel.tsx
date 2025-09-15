@@ -149,7 +149,7 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
             <SelectContent className="bg-background border shadow-lg z-50 max-h-[200px] overflow-y-auto">
               <SelectItem value="unassigned">Unassigned</SelectItem>
               {filteredRiders?.length === 0 && !isLoadingRiders && (
-                <SelectItem value="no-riders" disabled>
+                <SelectItem value="" disabled>
                   {riderSearchTerm ? 'No riders match your search' : 'No active riders available'}
                 </SelectItem>
               )}

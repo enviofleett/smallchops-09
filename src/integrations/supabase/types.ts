@@ -346,6 +346,7 @@ export type Database = {
         Row: {
           action: string
           category: string | null
+          created_at: string | null
           entity_id: string | null
           entity_type: string | null
           event_time: string
@@ -354,6 +355,7 @@ export type Database = {
           message: string | null
           new_values: Json | null
           old_values: Json | null
+          updated_at: string | null
           user_agent: string | null
           user_id: string | null
           user_name: string | null
@@ -361,6 +363,7 @@ export type Database = {
         Insert: {
           action: string
           category?: string | null
+          created_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           event_time?: string
@@ -369,6 +372,7 @@ export type Database = {
           message?: string | null
           new_values?: Json | null
           old_values?: Json | null
+          updated_at?: string | null
           user_agent?: string | null
           user_id?: string | null
           user_name?: string | null
@@ -376,6 +380,7 @@ export type Database = {
         Update: {
           action?: string
           category?: string | null
+          created_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           event_time?: string
@@ -384,6 +389,7 @@ export type Database = {
           message?: string | null
           new_values?: Json | null
           old_values?: Json | null
+          updated_at?: string | null
           user_agent?: string | null
           user_id?: string | null
           user_name?: string | null
@@ -8725,7 +8731,7 @@ export type Database = {
       }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
-        Returns: Json
+        Returns: undefined
       }
       calculate_delivery_metrics: {
         Args: { p_date: string }

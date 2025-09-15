@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { getOrders } from '@/api/orders';
 import { getRoutes } from '@/api/routes';
 import { getDrivers } from '@/api/drivers';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Activity } from 'lucide-react';
 export function SystemStatusChecker() {
   // Test API connections with enhanced error handling
   const {
@@ -79,8 +79,42 @@ export function SystemStatusChecker() {
     }
     return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />OK</Badge>;
   };
-  return <Card className="mb-6">
-      
-      
-    </Card>;
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="w-5 h-5" />
+          System Status
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <span className="text-sm font-medium">Orders API</span>
+            {getStatusBadge(ordersLoading, ordersError, ordersData, 'Orders')}
+          </div>
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <span className="text-sm font-medium">Routes API</span>
+            {getStatusBadge(routesLoading, routesError, routes, 'Routes')}
+          </div>
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <span className="text-sm font-medium">Drivers API</span>
+            {getStatusBadge(driversLoading, driversError, drivers, 'Drivers')}
+          </div>
+        </div>
+        
+        {(ordersError || routesError || driversError) && (
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <div className="flex items-center gap-2 text-destructive">
+              <XCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">System Issues Detected</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Some services are experiencing issues. Contact system administrator if problems persist.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }

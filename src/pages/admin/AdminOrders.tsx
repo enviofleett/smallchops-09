@@ -24,6 +24,8 @@ import { useOverdueOrdersLogic } from '@/hooks/useOverdueOrdersLogic';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
+import { ErrorBoundary } from '@/components/admin/ErrorBoundary';
+import { useProductionLogging } from '@/hooks/useProductionLogging';
 import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
@@ -58,6 +60,7 @@ export default function AdminOrders() {
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { logError, logWarn } = useProductionLogging();
   
   // Thermal printing functionality
   const { 
@@ -81,7 +84,7 @@ export default function AdminOrders() {
         .single();
       
       if (error) {
-        console.warn('Could not fetch business info:', error);
+        logWarn('Could not fetch business info', { error: error.message });
         return null;
       }
       
@@ -124,9 +127,19 @@ export default function AdminOrders() {
       status: statusFilter === 'all' || statusFilter === 'overdue' ? undefined : statusFilter,
       searchQuery: debouncedSearchQuery || undefined
     }),
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 60000, // Refresh every 60 seconds (reduced from 30s for production)
     placeholderData: (previousData) => previousData // Keep previous data while loading new data
   });
+
+  // Log errors when they occur
+  React.useEffect(() => {
+    if (error) {
+      logError('Failed to fetch orders', { 
+        error: error.message, 
+        filters: { statusFilter, searchQuery: debouncedSearchQuery, page: currentPage }
+      });
+    }
+  }, [error, logError, statusFilter, debouncedSearchQuery, currentPage]);
   
   const orders = ordersData?.orders || [];
   const totalCount = ordersData?.count || 0;
@@ -506,7 +519,9 @@ export default function AdminOrders() {
 
       <div className="space-y-6">
         {/* System Status Check */}
-        <SystemStatusChecker />
+        <ErrorBoundary>
+          <SystemStatusChecker />
+        </ErrorBoundary>
         
         {/* Header - Mobile Responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

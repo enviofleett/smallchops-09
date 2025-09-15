@@ -456,7 +456,6 @@ export const updateOrder = async (
       }
       
       return data.order;
-    }
 
     // For non-rider updates, use the standard update path
     const result = await retryWithFreshToken(async () => {

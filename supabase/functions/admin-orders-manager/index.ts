@@ -601,6 +601,16 @@ serve(async (req) => {
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
+        } catch (directUpdateError) {
+          console.error('❌ Exception in direct update:', directUpdateError)
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Failed to update order: ' + directUpdateError.message,
+            code: 'DIRECT_UPDATE_EXCEPTION'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
         }
 
         // For other updates, continue with the existing logic

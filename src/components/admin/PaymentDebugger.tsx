@@ -106,7 +106,7 @@ export const PaymentDebugger: React.FC = () => {
       // Test 1: Check business settings
       try {
         const { data: settings, error } = await supabase
-          .from('business_info')
+          .from('business_settings')
           .select('allow_guest_checkout')
           .single();
         

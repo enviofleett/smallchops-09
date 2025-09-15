@@ -24,7 +24,7 @@ export const checkSystemHealth = async (): Promise<SystemHealthStatus> => {
   // Check database connectivity
   try {
     const { error } = await supabase
-      .from('business_info')
+      .from('business_settings')
       .select('id')
       .limit(1)
       .maybeSingle();

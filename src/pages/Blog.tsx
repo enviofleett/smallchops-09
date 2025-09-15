@@ -76,7 +76,7 @@ const Blog: React.FC = () => {
     queryKey: ['business-settings-blog'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('business_info')
+        .from('business_settings')
         .select('name, tagline, seo_title, seo_description')
         .order('updated_at', { ascending: false })
         .limit(1)

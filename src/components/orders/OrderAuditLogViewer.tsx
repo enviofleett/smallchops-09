@@ -22,7 +22,6 @@ interface AuditLogEntry {
   new_values?: any;
   ip_address?: string;
   user_agent?: string;
-  created_at: string;
   event_time: string;
 }
 
@@ -65,8 +64,8 @@ export const OrderAuditLogViewer: React.FC<OrderAuditLogViewerProps> = ({
     try {
       let query = supabase
         .from('audit_logs')
-        .select('id, action, category, message, user_id, user_name, entity_id, entity_type, old_values, new_values, ip_address, user_agent, created_at, event_time')
-        .order('created_at', { ascending: false })
+        .select('id, action, category, message, user_id, user_name, entity_id, entity_type, old_values, new_values, ip_address, user_agent, event_time')
+        .order('event_time', { ascending: false })
         .limit(50);
 
       if (orderId) {
@@ -174,7 +173,7 @@ export const OrderAuditLogViewer: React.FC<OrderAuditLogViewerProps> = ({
                           </Badge>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Clock className="h-3 w-3" />
-                            {format(new Date(log.created_at), 'MMM d, yyyy h:mm a')}
+                            {format(new Date(log.event_time), 'MMM d, yyyy h:mm a')}
                           </div>
                         </div>
                         

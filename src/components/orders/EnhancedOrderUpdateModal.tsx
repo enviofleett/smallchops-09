@@ -48,7 +48,7 @@ const ALLOWED_UPDATE_FIELDS = {
   
   // Delivery information
   delivery_address: { label: 'Delivery Address', type: 'textarea', critical: false },
-  delivery_instructions: { label: 'Delivery Instructions', type: 'textarea', critical: false },
+  special_instructions: { label: 'Special Instructions', type: 'textarea', critical: false },
   
   // Order details  
   admin_notes: { label: 'Admin Notes', type: 'textarea', critical: false },
@@ -81,9 +81,12 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
   useEffect(() => {
     if (order) {
       // Initialize form with current order data, only for allowed fields
-      const initialData: Partial<OrderWithItems> = {};
+      const initialData: any = {};
       Object.keys(ALLOWED_UPDATE_FIELDS).forEach(field => {
-        initialData[field as keyof OrderWithItems] = order[field as keyof OrderWithItems];
+        const value = order[field as keyof OrderWithItems];
+        if (value !== undefined) {
+          initialData[field] = value;
+        }
       });
       setFormData(initialData);
       setValidationErrors({});
@@ -113,7 +116,7 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
       errors.customer_email = 'Invalid email format';
     }
 
-    if (formData.customer_phone && !/^\\+?[\\d\\s\\-()]+$/.test(formData.customer_phone)) {
+    if (formData.customer_phone && !/^\+?[\d\s()-]+$/.test(formData.customer_phone)) {
       errors.customer_phone = 'Invalid phone number format';
     }
 
@@ -160,12 +163,12 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
     setIsSaving(true);
     try {
       // Filter out unchanged fields to minimize update payload
-      const changedFields: Partial<OrderWithItems> = {};
+      const changedFields: any = {};
       Object.keys(ALLOWED_UPDATE_FIELDS).forEach(field => {
-        const newValue = formData[field as keyof OrderWithItems];
+        const newValue = formData[field as keyof typeof formData];
         const oldValue = order[field as keyof OrderWithItems];
-        if (newValue !== oldValue) {
-          changedFields[field as keyof OrderWithItems] = newValue;
+        if (newValue !== oldValue && newValue !== undefined) {
+          changedFields[field] = newValue;
         }
       });
 
@@ -374,16 +377,16 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
                     <div className="space-y-2">
                       <Label>Delivery Address</Label>
                       <Textarea
-                        value={formData.delivery_address || ''}
+                        value={(formData.delivery_address as string) || ''}
                         onChange={(e) => handleFieldChange('delivery_address', e.target.value)}
                         rows={3}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Delivery Instructions</Label>
+                      <Label>Special Instructions</Label>
                       <Textarea
-                        value={formData.delivery_instructions || ''}
-                        onChange={(e) => handleFieldChange('delivery_instructions', e.target.value)}
+                        value={formData.special_instructions || ''}
+                        onChange={(e) => handleFieldChange('special_instructions', e.target.value)}
                         rows={2}
                         placeholder="Special delivery instructions..."
                       />
@@ -396,15 +399,6 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
 
               {/* Notes */}
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Order Notes</Label>
-                  <Textarea
-                    value={formData.order_notes || ''}
-                    onChange={(e) => handleFieldChange('order_notes', e.target.value)}
-                    placeholder="Customer or order specific notes..."
-                    rows={2}
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label>Admin Notes</Label>
                   <Textarea

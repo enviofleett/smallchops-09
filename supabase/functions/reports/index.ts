@@ -119,37 +119,138 @@ serve(async (req) => {
     
     console.log(`Generating reports from ${start.toISOString()} to ${end.toISOString()}`);
 
-    // ✅ PRODUCTION-OPTIMIZED: Fetch aggregated data efficiently
-    const { data: ordersData, error: ordersError } = await serviceSupabase
-      .from('orders')
-      .select(`
-        id,
-        created_at,
-        total_amount,
-        status,
-        payment_status,
-        order_type,
-        customer_id
-      `)
-      .gte('created_at', start.toISOString())
-      .lte('created_at', end.toISOString())
-      .order('created_at', { ascending: true });
+    // ✅ PRODUCTION-OPTIMIZED: Fetch all required data efficiently
+    const [ordersResult, productsResult, customersResult] = await Promise.all([
+      // Orders with customer data
+      serviceSupabase
+        .from('orders')
+        .select(`
+          id,
+          created_at,
+          total_amount,
+          status,
+          payment_status,
+          order_type,
+          customer_id,
+          customer_name,
+          customer_email
+        `)
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
+        .order('created_at', { ascending: true }),
+      
+      // Products count
+      serviceSupabase
+        .from('products')
+        .select('id', { count: 'exact' }),
+      
+      // Unique customers
+      serviceSupabase
+        .from('orders')
+        .select('customer_id', { count: 'exact' })
+        .not('customer_id', 'is', null)
+    ]);
 
-    if (ordersError) {
-      console.error("Error fetching orders:", ordersError);
-      throw new Error(`Failed to fetch orders data: ${ordersError.message}`);
+    if (ordersResult.error) {
+      console.error("Error fetching orders:", ordersResult.error);
+      throw new Error(`Failed to fetch orders data: ${ordersResult.error.message}`);
     }
 
-    console.log(`✅ Fetched ${ordersData?.length || 0} orders for analysis`);
+    if (productsResult.error) {
+      console.error("Error fetching products:", productsResult.error);
+      throw new Error(`Failed to fetch products data: ${productsResult.error.message}`);
+    }
 
-    // ✅ PRODUCTION-OPTIMIZED: Process data efficiently
-    const reports = generateReports(ordersData || [], groupBy, start, end);
+    if (customersResult.error) {
+      console.error("Error fetching customers:", customersResult.error);
+      throw new Error(`Failed to fetch customers data: ${customersResult.error.message}`);
+    }
 
+    const ordersData = ordersResult.data || [];
+    const productsCount = productsResult.count || 0;
+
+    console.log(`✅ Fetched ${ordersData.length} orders, ${productsCount} products for analysis`);
+
+    // Calculate dashboard stats
+    const paidOrders = ordersData.filter(order => order.payment_status === 'paid');
+    const totalRevenue = paidOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    
+    // Get unique customers from orders data
+    const uniqueCustomerIds = new Set(
+      ordersData
+        .filter(order => order.customer_id)
+        .map(order => order.customer_id)
+    );
+
+    // Top customers by order count
+    const customerOrderCounts = new Map();
+    const customerSpending = new Map();
+    
+    ordersData.forEach(order => {
+      if (order.customer_id && order.customer_name) {
+        // Count orders
+        const currentCount = customerOrderCounts.get(order.customer_id) || 0;
+        customerOrderCounts.set(order.customer_id, currentCount + 1);
+        
+        // Track spending for paid orders
+        if (order.payment_status === 'paid') {
+          const currentSpending = customerSpending.get(order.customer_id) || 0;
+          customerSpending.set(order.customer_id, currentSpending + (order.total_amount || 0));
+        }
+      }
+    });
+
+    // Create top customers arrays
+    const topCustomersByOrders = Array.from(customerOrderCounts.entries())
+      .map(([customerId, orderCount]) => {
+        const customerOrder = ordersData.find(o => o.customer_id === customerId);
+        return {
+          id: customerId,
+          name: customerOrder?.customer_name || 'Unknown',
+          customer_name: customerOrder?.customer_name || 'Unknown',
+          email: customerOrder?.customer_email || '',
+          customer_email: customerOrder?.customer_email || '',
+          totalOrders: orderCount,
+          orders: orderCount,
+          totalSpent: customerSpending.get(customerId) || 0,
+          spending: customerSpending.get(customerId) || 0
+        };
+      })
+      .sort((a, b) => b.totalOrders - a.totalOrders)
+      .slice(0, 10);
+
+    const topCustomersBySpending = [...topCustomersByOrders]
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 10);
+
+    // Generate time-series reports for trends
+    const reports = generateReports(ordersData, groupBy, start, end);
+
+    // Return dashboard-compatible data structure
     return new Response(JSON.stringify({
-      success: true,
-      data: reports,
+      stats: {
+        totalProducts: productsCount,
+        totalOrders: ordersData.length,
+        totalCustomers: uniqueCustomerIds.size,
+        totalRevenue: totalRevenue
+      },
+      revenueTrends: reports,
+      orderTrends: reports,
+      topCustomersByOrders: topCustomersByOrders,
+      topCustomersBySpending: topCustomersBySpending,
+      recentOrders: ordersData
+        .slice(-10)
+        .reverse()
+        .map(order => ({
+          id: order.id,
+          customer_name: order.customer_name,
+          total_amount: order.total_amount,
+          status: order.status,
+          payment_status: order.payment_status,
+          created_at: order.created_at
+        })),
       metadata: {
-        total_orders: ordersData?.length || 0,
+        total_orders: ordersData.length,
         date_range: { startDate, endDate },
         groupBy,
         generated_at: new Date().toISOString()

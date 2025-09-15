@@ -16,6 +16,7 @@ import { OrderAuditLogViewer } from './OrderAuditLogViewer';
 import { OrderWithItems } from '@/api/orders';
 import { OrderStatus, PaymentStatus } from '@/types/orders';
 import { updateOrder } from '@/api/orders';
+import { validateOrderUpdatePayload } from '@/utils/orderValidation';
 import { 
   Save, 
   AlertTriangle, 
@@ -162,32 +163,53 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
 
     setIsSaving(true);
     try {
-      // Filter out unchanged fields to minimize update payload
-      const changedFields: any = {};
+      // Use enhanced validation before sending to backend
+      const rawChangedFields: any = {};
       Object.keys(ALLOWED_UPDATE_FIELDS).forEach(field => {
         const newValue = formData[field as keyof typeof formData];
         const oldValue = order[field as keyof OrderWithItems];
         if (newValue !== oldValue && newValue !== undefined) {
-          changedFields[field] = newValue;
+          rawChangedFields[field] = newValue;
         }
       });
 
-      if (Object.keys(changedFields).length === 0) {
+      // Validate the updates using the comprehensive validation utility
+      const validation = validateOrderUpdatePayload(rawChangedFields, order);
+
+      if (!validation.isValid) {
+        console.error('❌ Validation failed:', validation.errors);
+        setValidationErrors(validation.errors);
         toast({
-          title: "No Changes",
-          description: "No changes were made to the order",
+          title: "Validation Error",
+          description: "Please fix the validation errors before saving.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (Object.keys(validation.cleanedUpdates).length === 0) {
+        toast({
+          title: "No Valid Changes",
+          description: "No valid changes were detected to save.",
         });
         onClose();
         return;
       }
 
+      // Show warnings if any
+      if (validation.warnings.length > 0) {
+        console.warn('⚠️ Update warnings:', validation.warnings);
+      }
+
       // Add admin reason for critical changes
+      const finalUpdates = { ...validation.cleanedUpdates };
       if (confirmationReason.trim()) {
-        changedFields.admin_notes = 
+        finalUpdates.admin_notes = 
           `${order.admin_notes || ''}\n\n[${new Date().toISOString()}] Admin Update: ${confirmationReason}`.trim();
       }
 
-      const updatedOrder = await updateOrder(order.id, changedFields);
+      console.log('📤 Sending validated order update:', finalUpdates);
+      const updatedOrder = await updateOrder(order.id, finalUpdates);
       
       toast({
         title: "Order Updated",
@@ -197,10 +219,23 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
       onOrderUpdated(updatedOrder);
       onClose();
     } catch (error: any) {
-      console.error('Error updating order:', error);
+      console.error('❌ Error updating order:', error);
+      
+      // Enhanced error handling for specific backend errors
+      let errorMessage = "Failed to update order. Please try again.";
+      if (error.message?.includes('No valid fields to update')) {
+        errorMessage = "No valid fields found to update. Please ensure you're modifying allowed fields with valid values.";
+      } else if (error.message?.includes('Invalid status transition')) {
+        errorMessage = "Invalid status transition. Please check the order status workflow.";
+      } else if (error.message?.includes('filtered out for security')) {
+        errorMessage = "Some fields were rejected for security reasons. Please check your input values.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Update Failed",
-        description: error.message || "Failed to update order",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

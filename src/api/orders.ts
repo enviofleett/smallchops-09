@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
+import { validateOrderUpdatePayload } from '@/utils/orderValidation';
 
 // We define a more specific type for an order that includes its line items and delivery zones.
 export type OrderWithItems = Tables<'orders'> & {
@@ -182,17 +183,32 @@ export const updateOrder = async (
       console.log('🔄 Updating order via production-safe method:', orderId, updates);
     }
 
+    // CRITICAL: Enhanced field validation before sending to backend
+    const { isValid, errors, cleanedUpdates, warnings } = validateOrderUpdatePayload(updates, {});
+    
+    if (!isValid) {
+      console.error('❌ Client-side validation failed:', errors);
+      throw new Error(Object.values(errors)[0] || 'Invalid update data');
+    }
+
+    if (warnings.length > 0) {
+      console.warn('⚠️ Update warnings:', warnings);
+    }
+
+    const finalUpdates = cleanedUpdates;
+    console.log('📤 Sending validated updates to backend:', finalUpdates);
+
     // If we're assigning a rider, use the secure RPC-based assignment
-    if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
+    if (finalUpdates.assigned_rider_id && finalUpdates.assigned_rider_id !== null) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('🎯 Assigning/reassigning rider using secure RPC:', sanitizedUpdates.assigned_rider_id);
+        console.log('🎯 Assigning/reassigning rider using secure RPC:', finalUpdates.assigned_rider_id);
       }
       
       const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'assign_rider',
           orderId,
-          riderId: sanitizedUpdates.assigned_rider_id
+          riderId: finalUpdates.assigned_rider_id
         }
       });
 
@@ -209,7 +225,7 @@ export const updateOrder = async (
       }
 
       // If there are other updates besides rider assignment, apply them separately
-      const otherUpdates = { ...sanitizedUpdates };
+      const otherUpdates = { ...finalUpdates };
       delete otherUpdates.assigned_rider_id;
       
       if (Object.keys(otherUpdates).length > 0) {
@@ -236,7 +252,7 @@ export const updateOrder = async (
       body: {
         action: 'update',
         orderId,
-        updates: sanitizedUpdates
+        updates: finalUpdates
       }
     });
 
@@ -252,7 +268,16 @@ export const updateOrder = async (
 
     if (!data?.success) {
       console.error('❌ Order update failed:', data?.error);
-      throw new Error(data?.error || 'Order update failed due to server error');
+      
+      // Enhanced error handling for specific backend responses
+      let errorMessage = data?.error || 'Order update failed due to server error';
+      if (data?.details) {
+        console.error('❌ Update failure details:', data.details);
+        if (data.details.rejected_fields) {
+          errorMessage += ` (Rejected fields: ${data.details.rejected_fields.join(', ')})`;
+        }
+      }
+      throw new Error(errorMessage);
     }
 
     if (process.env.NODE_ENV === 'development') {

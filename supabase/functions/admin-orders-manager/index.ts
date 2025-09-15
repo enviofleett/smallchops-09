@@ -424,28 +424,79 @@ serve(async (req) => {
           'internal_notes', 'updated_at'
         ];
 
-        // Sanitize and validate updates
+        // Enhanced sanitization and validation with comprehensive field cleaning
         const sanitizedUpdates = {};
-        console.log('Raw updates before sanitization:', updates);
+        const rejectedFields = [];
+        console.log('🔍 Raw updates before enhanced sanitization:', updates);
         
         if (updates && typeof updates === 'object') {
           for (const [key, value] of Object.entries(updates)) {
+            // Skip null or undefined values for non-critical fields
+            if ((value === null || value === undefined) && key !== 'assigned_rider_id') {
+              console.warn(`⚠️ Skipping null/undefined field: ${key} with value:`, value);
+              rejectedFields.push(`${key} (null/undefined)`);
+              continue;
+            }
+
             if (key === 'phone') {
               // Map legacy phone field to customer_phone
               console.log('🔧 Mapping phone to customer_phone:', value);
-              sanitizedUpdates.customer_phone = value;
+              if (value && value.trim() !== '') {
+                sanitizedUpdates.customer_phone = value;
+              } else {
+                rejectedFields.push(`${key} -> customer_phone (empty value)`);
+              }
+            } else if (key === 'assigned_rider_id') {
+              // Special handling for rider assignment - allow null to unassign
+              if (value === null || value === '') {
+                console.log('🔧 Allowing null assigned_rider_id to unassign rider');
+                sanitizedUpdates[key] = null;
+              } else if (typeof value === 'string' && value.length > 0) {
+                sanitizedUpdates[key] = value;
+              } else {
+                console.warn(`⚠️ Invalid assigned_rider_id value:`, value);
+                rejectedFields.push(`${key} (invalid format)`);
+              }
             } else if (allowedColumns.includes(key)) {
-              sanitizedUpdates[key] = value;
+              // Standard field validation
+              if (typeof value === 'string' && value.trim() === '') {
+                console.warn(`⚠️ Skipping empty string for field: ${key}`);
+                rejectedFields.push(`${key} (empty string)`);
+              } else {
+                sanitizedUpdates[key] = value;
+              }
             } else {
               console.warn(`⚠️ Blocked unauthorized column update attempt: ${key}`);
+              rejectedFields.push(`${key} (unauthorized)`);
             }
           }
         }
 
-        // Ensure we always set updated_at for tracking
+        // Always set updated_at for audit trail
         sanitizedUpdates.updated_at = new Date().toISOString();
         
-        console.log('Sanitized and whitelisted updates:', sanitizedUpdates);
+        console.log('✅ ENHANCED SANITIZATION: Final updates after cleaning:', sanitizedUpdates);
+        console.log('⚠️ ENHANCED SANITIZATION: Rejected fields:', rejectedFields);
+
+        // CRITICAL FIX: Check if there are any meaningful updates (excluding just updated_at)
+        const meaningfulUpdates = { ...sanitizedUpdates };
+        delete meaningfulUpdates.updated_at;
+        
+        if (Object.keys(meaningfulUpdates).length === 0) {
+          console.error('❌ No valid updates after enhanced cleaning. Rejected fields:', rejectedFields);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'No valid fields to update. All provided fields were filtered out for security or validation reasons.',
+            details: {
+              rejected_fields: rejectedFields,
+              allowed_fields: allowedColumns,
+              message: 'Please ensure you are sending valid, non-empty values for allowed fields only.'
+            }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
 
         const { data, error } = await supabaseClient
           .from('orders')

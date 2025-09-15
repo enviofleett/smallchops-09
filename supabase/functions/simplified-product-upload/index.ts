@@ -1,28 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0'
 
-// Production-ready CORS configuration
-const getCorsHeaders = (origin: string | null): Record<string, string> => {
-  const allowedOrigins = [
-    'https://oknnklksdiqaifhxaccs.supabase.co',
-    'https://lovable.dev',
-    'https://startersmallchops.com',
-    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com',
-    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
-    'https://id-preview--7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.app',
-    'https://project-oknnklksdiqaifhxaccs.lovable.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:8000'
-  ];
-  
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : '*';
-  
-  return {
-    'Access-Control-Allow-Origin': corsOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Max-Age': '86400',
-  };
+// Simple CORS configuration
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 interface ProductImageUploadRequest {
@@ -35,10 +17,7 @@ interface ProductImageUploadRequest {
 }
 
 Deno.serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  
-  console.log('Product image upload request:', req.method, req.url, 'from origin:', origin);
+  console.log('Simplified product image upload request:', req.method, req.url);
 
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -60,7 +39,7 @@ Deno.serve(async (req) => {
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      throw new Error('Authentication required');
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(
@@ -68,27 +47,10 @@ Deno.serve(async (req) => {
     );
 
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      throw new Error('Invalid authentication token');
     }
 
     console.log('User authenticated:', user.id);
-
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      throw new Error('Admin access required');
-    }
-
-    console.log('Admin access confirmed');
-
-    // Smart rate limiting based on user role - REMOVED for production
-    // Allow unlimited uploads for admins in production environment
-    console.log('Admin access confirmed - no rate limiting for production');
 
     if (req.method === 'POST') {
       const body: ProductImageUploadRequest = await req.json();
@@ -99,24 +61,20 @@ Deno.serve(async (req) => {
 
       const { file } = body;
 
-      // Validate file
-      console.log('Validating file:', file.name, file.type, file.size);
+      // Basic validation only
+      console.log('Processing file:', file.name, file.type, `${(file.size / 1024 / 1024).toFixed(2)}MB`);
 
-      // Check file type
-      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+      // Check file type (allow all common image types)
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif', 'image/svg+xml'];
       if (!allowedTypes.includes(file.type)) {
-        throw new Error(`Invalid file type. Allowed types: ${allowedTypes.join(', ')}`);
+        throw new Error(`Unsupported file type: ${file.type}. Please use PNG, JPG, WebP, GIF, or SVG.`);
       }
 
-      // Increase file size limit to 20MB for production
+      // Check file size (20MB limit)
       const maxSize = 20 * 1024 * 1024; // 20MB
       if (file.size > maxSize) {
-        throw new Error('File size exceeds 20MB limit');
-      }
-
-      // Validate file name
-      if (!file.name || file.name.length > 255) {
-        throw new Error('Invalid file name');
+        const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+        throw new Error(`File size (${sizeMB}MB) exceeds 20MB limit. Please compress your image.`);
       }
 
       // Decode base64 file data
@@ -128,7 +86,7 @@ Deno.serve(async (req) => {
       const fileExtension = file.name.split('.').pop() || 'jpg';
       const fileName = `product-${timestamp}-${randomId}.${fileExtension}`;
 
-      console.log('Uploading file to storage:', fileName);
+      console.log('Uploading to products-images bucket:', fileName);
 
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -140,7 +98,7 @@ Deno.serve(async (req) => {
 
       if (uploadError) {
         console.error('Storage upload error:', uploadError);
-        throw new Error(`Failed to upload file: ${uploadError.message}`);
+        throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
       console.log('File uploaded successfully:', uploadData.path);
@@ -152,19 +110,23 @@ Deno.serve(async (req) => {
 
       console.log('Public URL generated:', publicUrl);
 
-      // Log the upload in audit logs
-      await supabase.from('audit_logs').insert({
-        action: 'product_image_upload',
-        category: 'Product Management',
-        message: 'Product image uploaded successfully',
-        user_id: user.id,
-        new_values: {
-          file_name: file.name,
-          file_size: file.size,
-          file_type: file.type,
-          public_url: publicUrl
-        }
-      });
+      // Log the upload (optional - no blocking)
+      try {
+        await supabase.from('audit_logs').insert({
+          action: 'product_image_upload_simplified',
+          category: 'Product Management',
+          message: 'Product image uploaded successfully',
+          user_id: user.id,
+          new_values: {
+            file_name: file.name,
+            file_size: file.size,
+            file_type: file.type,
+            public_url: publicUrl
+          }
+        });
+      } catch (logError) {
+        console.warn('Failed to log upload (non-blocking):', logError);
+      }
 
       console.log('Product image upload completed successfully');
 
@@ -208,11 +170,10 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'An unexpected error occurred'
+        error: error.message || 'Upload failed'
       }),
       {
-        status: error.message?.includes('Unauthorized') || error.message?.includes('Admin access') ? 403 : 
-               error.message?.includes('Rate limit') ? 429 : 400,
+        status: error.message?.includes('Authentication') ? 401 : 400,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json'

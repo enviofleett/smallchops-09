@@ -54,7 +54,7 @@ export const useImageUpload = () => {
           ]);
 
           // Get the appropriate function name based on bucket
-          const functionName = options.bucket === 'hero-images' ? 'upload-hero-image' : 'upload-product-image';
+          const functionName = options.bucket === 'hero-images' ? 'upload-hero-image' : 'simplified-product-upload';
 
           // Call the upload function with timeout
           const uploadResponse = await Promise.race([
@@ -88,13 +88,9 @@ export const useImageUpload = () => {
               throw new Error(errorMessage); // Don't retry these errors
             }
             
-            // Handle rate limiting with better error messages
+            // Handle rate limiting with better error messages - REMOVED for production
             if (errorMessage.includes('rate limit') || errorMessage.includes('Rate limit') || errorMessage.includes('Upload limit')) {
-              // Extract retry_after if available from error response
-              const retryMatch = errorMessage.match(/retry_after['":\s]*(\d+)/i);
-              const retryAfter = retryMatch ? parseInt(retryMatch[1]) : 3600;
-              const waitTime = retryAfter >= 3600 ? `${Math.ceil(retryAfter / 3600)} hour(s)` : `${Math.ceil(retryAfter / 60)} minute(s)`;
-              throw new Error(`Upload limit reached. Please wait ${waitTime} before trying again.`);
+              throw new Error('Upload processing delayed. Please try again in a moment.');
             }
             
             lastError = new Error(errorMessage);

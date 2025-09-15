@@ -611,7 +611,7 @@ serve(async (req) => {
           .from('orders')
           .select('status, customer_email, customer_name, order_number')
           .eq('id', orderId)
-          .single()
+          .single();
 
         if (fetchError) {
           console.error('Error fetching current order:', fetchError)

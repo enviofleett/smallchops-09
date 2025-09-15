@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { Settings, ShieldCheck, Send, RefreshCw, Info, Search } from 'lucide-react';
+import React from 'react';
+import { Settings, ShieldCheck, Send, RefreshCw, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SectionHeading } from './SectionHeading';
@@ -65,19 +64,6 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
   customerEmail,
   orderNumber
 }) => {
-  const [riderSearchTerm, setRiderSearchTerm] = useState('');
-
-  const filteredRiders = useMemo(() => {
-    if (!riders || !riderSearchTerm.trim()) return riders;
-    
-    const searchTerm = riderSearchTerm.toLowerCase().trim();
-    return riders.filter(rider => 
-      rider.name.toLowerCase().includes(searchTerm) ||
-      rider.vehicle_brand?.toLowerCase().includes(searchTerm) ||
-      rider.vehicle_model?.toLowerCase().includes(searchTerm) ||
-      rider.license_plate?.toLowerCase().includes(searchTerm)
-    );
-  }, [riders, riderSearchTerm]);
   return (
     <Card>
       <CardContent className="p-4 sm:p-6 space-y-6">
@@ -119,19 +105,6 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
             {selectedStatus === 'out_for_delivery' ? 'Reassign Dispatch Rider' : 'Assign Dispatch Rider'}
           </label>
           
-          {/* Search Input */}
-          {riders && riders.length > 3 && (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search riders by name, vehicle, or license..."
-                value={riderSearchTerm}
-                onChange={(e) => setRiderSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          )}
-          
           <Select
             value={assignedRider ?? 'unassigned'}
             onValueChange={(value) => onRiderChange(value === 'unassigned' ? null : value)}
@@ -148,12 +121,10 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
             </SelectTrigger>
             <SelectContent className="bg-background border shadow-lg z-50 max-h-[200px] overflow-y-auto">
               <SelectItem value="unassigned">Unassigned</SelectItem>
-              {filteredRiders?.length === 0 && !isLoadingRiders && (
-                <SelectItem value="no-riders" disabled>
-                  {riderSearchTerm ? 'No riders match your search' : 'No active riders available'}
-                </SelectItem>
+              {riders?.length === 0 && !isLoadingRiders && (
+                <SelectItem value="no-riders" disabled>No active riders available</SelectItem>
               )}
-              {filteredRiders?.map((rider) => (
+              {riders?.map((rider) => (
                 <SelectItem key={rider.id} value={rider.id}>
                   <div className="flex flex-col py-1">
                     <span className="font-medium">{rider.name}</span>
@@ -175,11 +146,6 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
           {riders?.length === 0 && !isLoadingRiders && (
             <p className="text-xs text-muted-foreground">
               ⚠️ No active dispatch riders found. Contact admin to add riders.
-            </p>
-          )}
-          {riderSearchTerm && filteredRiders?.length === 0 && riders && riders.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              🔍 No riders match "{riderSearchTerm}". Try different search terms.
             </p>
           )}
           {selectedStatus === 'out_for_delivery' && (

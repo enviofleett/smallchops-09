@@ -470,73 +470,43 @@ serve(async (req) => {
         }
 
         // Trigger status change email if status has changed and customer has email
-        if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
+        if (updates.status && updates.status !== currentOrder.status) {
+          console.log('📧 Status changed, queuing email notification...')
+          
+          // Queue communication event using the enhanced upsert function
           try {
-            console.log(`Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
-            
-            // Create HMAC signature for internal authentication
-            const timestamp = Math.floor(Date.now() / 1000).toString()
-            const message = `${timestamp}:user-journey-automation`
-            const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
-            
-            const encoder = new TextEncoder()
-            const keyData = await crypto.subtle.importKey(
-              'raw',
-              encoder.encode(secret),
-              { name: 'HMAC', hash: 'SHA-256' },
-              false,
-              ['sign']
-            )
-            
-            const signature = await crypto.subtle.sign(
-              'HMAC',
-              keyData,
-              encoder.encode(message)
-            )
-            
-            const signatureHex = Array.from(new Uint8Array(signature))
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('')
-            
-            const { error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
-              body: {
-                journey_type: 'order_status_change',
-                user_data: {
-                  email: currentOrder.customer_email,
-                  name: currentOrder.customer_name
+            const { data: eventId, error: commError } = await supabaseClient
+              .rpc('upsert_communication_event', {
+                p_event_type: 'order_status_update',
+                p_recipient_email: data.customer_email,
+                p_recipient_name: data.customer_name || 'Customer',
+                p_template_key: 'order_status_update',
+                p_template_variables: {
+                  orderNumber: data.order_number,
+                  newStatus: updates.status,
+                  customerName: data.customer_name,
+                  orderDate: data.order_time
                 },
-                order_data: {
-                  order_id: orderId,
-                  order_number: currentOrder.order_number,
-                  status: updates.status
-                },
-                metadata: {
-                  old_status: currentOrder.status,
-                  new_status: updates.status,
-                  updated_at: new Date().toISOString()
-                }
-              },
-              headers: {
-                'x-internal-secret': signatureHex,
-                'x-timestamp': timestamp
-              }
-            })
+                p_related_order_id: orderId,
+                p_dedupe_key: `order_status_${orderId}_${updates.status}_${Date.now()}`
+              })
 
-            if (emailError) {
-              console.error('Failed to trigger status change email:', emailError)
-              // Don't fail the order update if email fails
+            if (commError) {
+              console.error('⚠️ Failed to queue communication event:', commError)
+              // Don't fail the order update if communication fails
             } else {
-              console.log('✅ Status change email triggered successfully')
+              console.log('✅ Communication event queued successfully with ID:', eventId)
             }
-          } catch (emailError) {
-            console.error('Error triggering status change email:', emailError)
-            // Don't fail the order update if email fails
+          } catch (commError) {
+            console.error('⚠️ Error queuing communication event:', commError)
+            // Don't fail the order update if communication fails
           }
         }
 
         return new Response(JSON.stringify({
           success: true,
-          order: data
+          order: data,
+          message: `Order ${data.order_number} updated successfully`
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
@@ -546,7 +516,21 @@ serve(async (req) => {
       case 'delete': {
         console.log('Admin function: Deleting order', orderId)
 
-        const { error } = await supabaseClient
+        // Delete related records to avoid foreign key constraints
+        const deleteOperations = [
+          supabaseClient.from('order_items').delete().eq('order_id', orderId),
+          supabaseClient.from('order_delivery_schedule').delete().eq('order_id', orderId),
+          supabaseClient.from('order_status_changes').delete().eq('order_id', orderId),
+          supabaseClient.from('communication_events').delete().eq('order_id', orderId)
+        ]
+
+        try {
+          await Promise.all(deleteOperations)
+        } catch (relatedError) {
+          console.warn('⚠️ Some related record deletions failed (non-blocking):', relatedError)
+        }
+
+        const { data, error } = await supabaseClient
           .from('orders')
           .delete()
           .eq('id', orderId)
@@ -574,7 +558,31 @@ serve(async (req) => {
       case 'bulk_delete': {
         console.log('Admin function: Bulk deleting orders', orderIds)
 
-        const { error } = await supabaseClient
+        if (!Array.isArray(orderIds) || orderIds.length === 0) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Invalid order IDs provided'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
+        }
+
+        // Delete related records for all orders
+        const deleteOperations = [
+          supabaseClient.from('order_items').delete().in('order_id', orderIds),
+          supabaseClient.from('order_delivery_schedule').delete().in('order_id', orderIds),
+          supabaseClient.from('order_status_changes').delete().in('order_id', orderIds),
+          supabaseClient.from('communication_events').delete().in('order_id', orderIds)
+        ]
+
+        try {
+          await Promise.all(deleteOperations)
+        } catch (relatedError) {
+          console.warn('⚠️ Some related record deletions failed (non-blocking):', relatedError)
+        }
+
+        const { data, error } = await supabaseClient
           .from('orders')
           .delete()
           .in('id', orderIds)
@@ -592,7 +600,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({
           success: true,
-          message: 'Orders deleted successfully'
+          message: `${orderIds.length} orders deleted successfully`
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })

@@ -530,8 +530,7 @@ serve(async (req) => {
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             })
-          
-        } catch (functionError) {
+          } catch (functionError) {
           console.error('❌ Exception in safe update function:', functionError)
           return new Response(JSON.stringify({
             success: false,

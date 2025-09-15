@@ -71,7 +71,7 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(origin)
 
   // ✅ PRODUCTION-READY AUTHENTICATION
-  // Since verify_jwt = true, Supabase automatically validates JWT and provides user context
+  // Extract JWT token and get user ID from it
   try {
     const authHeader = req.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -86,11 +86,23 @@ serve(async (req) => {
       })
     }
 
-    // Get authenticated user from context (automatically validated by Supabase)
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+    // Extract JWT token
+    const jwt = authHeader.replace('Bearer ', '')
+    
+    // Create user client to verify the JWT token
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: { headers: { authorization: authHeader } }
+      }
+    )
+
+    // Get user from the JWT token using user client
+    const { data: { user }, error: userError } = await userClient.auth.getUser(jwt)
     
     if (userError || !user) {
-      console.log('❌ Authentication failed:', userError?.message || 'No user found')
+      console.log('❌ Authentication failed: Auth session missing!')
       return new Response(JSON.stringify({
         success: false,
         error: 'Authentication failed. Please log in again.',
@@ -114,7 +126,8 @@ serve(async (req) => {
       console.log('❌ User is not an active admin:', { 
         userId: user.id, 
         role: profile?.role, 
-        isActive: profile?.is_active 
+        isActive: profile?.is_active,
+        profileError: profileError?.message
       })
       return new Response(JSON.stringify({
         success: false,

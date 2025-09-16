@@ -150,7 +150,6 @@ serve(async (req) => {
 
     // Log to notification delivery log
     const logData = {
-      template_key,
       channel: 'sms' as const,
       recipient: to,
       status: finalStatus as 'sent' | 'failed' | 'pending' | 'delivered',

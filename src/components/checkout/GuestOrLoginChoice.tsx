@@ -64,36 +64,48 @@ export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({
         </Card>
 
         {/* Guest Option - Production Ready */}
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors group border-primary/20" onClick={onContinueAsGuest}>
+        <Card className="cursor-pointer hover:border-primary transition-all duration-300 group border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/15 shadow-lg hover:shadow-xl" onClick={onContinueAsGuest}>
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-full bg-secondary/10 group-hover:bg-secondary/20 transition-colors">
-                <Lock className="h-6 w-6 text-secondary-foreground" />
+              <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors border border-primary/20">
+                <ShoppingBag className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h4 className="font-semibold">Continue as Guest</h4>
-                <p className="text-sm text-muted-foreground">Quick checkout without an account</p>
+                <h4 className="font-semibold text-lg">Continue as Guest</h4>
+                <p className="text-sm text-muted-foreground">Quick & secure checkout - No registration needed</p>
               </div>
             </div>
             
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                Faster checkout process
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-center gap-3">
+                <div className="p-1 rounded-full bg-green-100">
+                  <Clock className="h-3 w-3 text-green-600" />
+                </div>
+                <span className="text-foreground">Express checkout in under 2 minutes</span>
               </li>
-              <li className="flex items-center gap-2">
-                <Lock className="h-4 w-4 text-blue-600" />
-                No account required
+              <li className="flex items-center gap-3">
+                <div className="p-1 rounded-full bg-blue-100">
+                  <Lock className="h-3 w-3 text-blue-600" />
+                </div>
+                <span className="text-foreground">Your data is secure & protected</span>
               </li>
-              <li className="flex items-center gap-2">
-                <ShoppingBag className="h-4 w-4 text-orange-600" />
-                Can create account after order
+              <li className="flex items-center gap-3">
+                <div className="p-1 rounded-full bg-orange-100">
+                  <UserPlus className="h-3 w-3 text-orange-600" />
+                </div>
+                <span className="text-foreground">Create account later (optional)</span>
               </li>
             </ul>
 
-            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-              Continue as Guest - Quick Checkout ✨
-            </Button>
+            <div className="pt-2">
+              <Button className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-300 group-hover:scale-[1.02]">
+                <ShoppingBag className="h-5 w-5 mr-2" />
+                Start Quick Checkout
+              </Button>
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                Secure payment • Free to checkout • No spam
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

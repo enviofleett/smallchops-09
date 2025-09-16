@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, AlertTriangle, XCircle, Play, User, CreditCard, ShoppingCart } from 'lucide-react';
 import { GuestCheckoutStatus } from '@/components/admin/GuestCheckoutStatus';
+import { GuestCheckoutValidator } from '@/components/debug/GuestCheckoutValidator';
 import { validateGuestCheckoutProduction } from '@/utils/guestCheckoutProductionValidator';
 import { useGuestSession } from '@/hooks/useGuestSession';
 import { toast } from '@/hooks/use-toast';
@@ -186,6 +187,9 @@ export default function GuestCheckoutTest() {
       </div>
 
       {/* Production Status Overview */}
+      <GuestCheckoutValidator />
+
+      {/* Legacy Status Component */}
       <GuestCheckoutStatus />
 
       {/* Test Runner */}

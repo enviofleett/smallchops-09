@@ -28,6 +28,10 @@ import { CartProvider } from "@/contexts/CartProvider";
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();
 
+// Import cache manager for production optimization
+import { CacheManager } from "./utils/cacheManager";
+import "./utils/productionOptimizer"; // Auto-initializes production optimizations
+
 // Immediate load critical components
 import NotFound from "./pages/NotFound";
 import PublicHome from "./pages/PublicHome";
@@ -83,12 +87,13 @@ const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/Eme
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000,         // 2 minutes - faster fresh data
-      gcTime: 10 * 60 * 1000,           // 10 minutes cache retention
-      refetchOnWindowFocus: false,       // Prevent unnecessary refetches
+      staleTime: 30 * 1000,                  // 30 seconds - FRESH DATA PRIORITY
+      gcTime: 2 * 60 * 1000,                 // 2 minutes cache retention
+      refetchOnWindowFocus: true,            // Refetch when returning to tab
       refetchIntervalInBackground: false,
       refetchInterval: false,
-      refetchOnMount: false,             // Use cached data when available
+      refetchOnMount: true,                  // Always check for fresh data
+      refetchOnReconnect: true,              // Refetch on network reconnect
       retry: (failureCount, error: any) => {
         // Enhanced retry logic for stability
         const errorStatus = error?.status || error?.response?.status;
@@ -129,6 +134,9 @@ const queryClient = new QueryClient({
   },
 });
 
+// Initialize cache manager for production fresh data
+CacheManager.initialize(queryClient);
+
 // Preload critical routes for better performance
 if (typeof window !== 'undefined') {
   preloadRoute(() => import("./pages/Index"), 'high'); // Homepage - highest priority
@@ -159,9 +167,13 @@ const App = () => {
     suppressWebSocketErrors();
     validatePaystackCSP();
     
+    // PRODUCTION: Clear stale caches on startup
+    CacheManager.smartRefresh().catch(console.error);
+    
     // Payment system status logging
     console.log('✅ Payment System: Backend-only references active');
     console.log('✅ Paystack-only migration completed');
+    console.log('✅ Cache Management: Fresh data priority enabled');
     
     // Enhanced environment validation with detailed feedback
     console.group('🌍 Environment Status');

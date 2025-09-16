@@ -93,7 +93,7 @@ const PublicHome = () => {
   // Preload critical images (reduced for performance)
   useImagePreloader(['/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png']);
 
-  // Fetch products with discounts - Production Ready
+  // Fetch products with discounts - PRODUCTION OPTIMIZED (Fresh Data)
   const {
     data: products = [],
     isLoading: isLoadingProducts,
@@ -102,12 +102,13 @@ const PublicHome = () => {
   } = useQuery({
     queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
-    staleTime: 2 * 60 * 1000,
-    // 2 minutes for better UX
-    gcTime: 10 * 60 * 1000,
-    // 10 minutes cache
+    staleTime: 30 * 1000, // 30 seconds only - fresh data priority
+    gcTime: 2 * 60 * 1000, // 2 minutes cache - reduced for freshness
     retry: 2,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000)
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 3000),
+    refetchOnMount: true, // Always refetch on mount
+    refetchOnWindowFocus: true, // Refetch when user returns
+    refetchOnReconnect: true // Refetch on network reconnect
   });
 
   // Debug logging for production troubleshooting
@@ -123,15 +124,16 @@ const PublicHome = () => {
     }))
   });
 
-  // Fetch categories (PRODUCTION OPTIMIZED)
+  // Fetch categories (PRODUCTION FRESH DATA)
   const {
     data: categories = []
   } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
-    staleTime: 10 * 60 * 1000,
-    // 10 minutes
-    gcTime: 30 * 60 * 1000 // 30 minutes (renamed from cacheTime)
+    staleTime: 60 * 1000, // 1 minute - fresh categories
+    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
   });
 
   // Calculate price range from products for filters

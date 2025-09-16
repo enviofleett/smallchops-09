@@ -147,5 +147,62 @@ export function clearProductsCache() {
   );
   
   keysToDelete.forEach(key => cache.delete(key));
-  console.log(`Cleared ${keysToDelete.length} product cache entries`);
+  console.log(`🧹 Cleared ${keysToDelete.length} product cache entries`);
+}
+
+// Force fresh product data - bypasses cache completely
+export async function getFreshProduct(productId: string): Promise<ProductWithDiscount | null> {
+  const cacheKey = `product-${productId}`;
+  
+  // Force remove from cache
+  cache.delete(cacheKey);
+  
+  console.log(`🔄 Force fetching fresh product: ${productId}`);
+  
+  try {
+    const [productPromise, promotionsPromise] = await Promise.allSettled([
+      supabase
+        .from('products')
+        .select(`
+          *,
+          categories (
+            id,
+            name
+          )
+        `)
+        .eq('id', productId)
+        .eq('status', 'active')
+        .gt('stock_quantity', 0)
+        .single(),
+      getPromotions()
+    ]);
+
+    if (productPromise.status === 'rejected') {
+      console.error('Fresh product fetch failed:', productPromise.reason);
+      return null;
+    }
+
+    const { data: product } = productPromise.value;
+    if (!product) return null;
+
+    const promotions = promotionsPromise.status === 'fulfilled' 
+      ? promotionsPromise.value.filter(p => p.status === 'active')
+      : [];
+
+    const productWithDiscount = calculateProductDiscount(product, promotions);
+    
+    // Cache the fresh data with shorter TTL
+    setCachedData(cacheKey, productWithDiscount, 60000); // 1 minute only
+    
+    return productWithDiscount;
+  } catch (error) {
+    console.error('Error fetching fresh product:', error);
+    return null;
+  }
+}
+
+// Emergency cache clear - removes ALL cached data
+export function emergencyCacheClear() {
+  cache.clear();
+  console.log('🚨 EMERGENCY: All product cache cleared');
 }

@@ -170,11 +170,7 @@ const About = () => {
               <Users className="h-12 w-12 text-primary mr-4" />
               <h2 className="text-3xl font-bold text-foreground">Our Team</h2>
             </div>
-            <p className="text-lg text-muted-foreground mb-8">
-              Founded and led by Gwendolyn Akogun, our company is powered by a dedicated team 
-              of subject matter experts with exceptional culinary skills. Together, we bring 
-              years of experience and passion for creating extraordinary finger food experiences.
-            </p>
+            <p className="text-lg text-muted-foreground mb-8">Founded and led by Gwen, our company is powered by a dedicated team of subject matter experts with exceptional culinary skills. Together, we bring years of experience and passion for creating extraordinary finger food experiences.</p>
             <div className="bg-primary/10 rounded-lg p-8">
               <h3 className="text-xl font-semibold text-foreground mb-4">
                 "Our philosophy is simple: provide amazing food products backed by a unique 

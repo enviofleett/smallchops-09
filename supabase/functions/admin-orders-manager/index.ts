@@ -549,14 +549,14 @@ serve(async (req) => {
                     action: 'all_email_methods_failed',
                     category: 'Email System',
                     message: `All email methods failed for order ${currentOrder.order_number}`,
-                  entity_id: orderId,
-                  new_values: {
-                    order_id: orderId,
-                    old_status: currentOrder.status,
-                    new_status: updates.status,
-                    error: emailError.message
-                  }
-                });
+                    entity_id: orderId,
+                    new_values: {
+                      order_id: orderId,
+                      old_status: currentOrder.status,
+                      new_status: updates.status,
+                      error: emailError.message
+                    }
+                  });
             } else {
               console.log('✅ Status change email triggered successfully');
               if (emailResult?.email_events_created > 0) {

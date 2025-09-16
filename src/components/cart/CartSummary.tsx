@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { SimpleCheckout } from '@/components/checkout/SimpleCheckout';
+import { CheckoutFlow } from '@/components/checkout/CheckoutFlow';
 import { DiscountCodeInput } from '@/components/checkout/DiscountCodeInput';
 import { useCart, Cart, AppliedDiscount } from '@/hooks/useCart';
 import { useMOQValidation } from '@/hooks/useMOQValidation';
@@ -139,8 +139,8 @@ export function CartSummary({ cart }: CartSummaryProps) {
         </CardContent>
       </Card>
 
-      {/* Simple Checkout */}
-      <SimpleCheckout
+      {/* Checkout Flow */}
+      <CheckoutFlow
         isOpen={showCheckout}
         onClose={() => setShowCheckout(false)}
       />

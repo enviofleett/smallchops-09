@@ -109,6 +109,8 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     // Specific handling for ComponentLoadError
     if (error.name === 'ComponentLoadError' || message.includes('failed to load component')) {
       return 'Component Load Error';
+    } else if (message.includes('select.item') || message.includes('radix') || message.includes('ui component')) {
+      return 'UI Component Error';
     } else if (message.includes('network') || message.includes('fetch')) {
       return 'Network Error';
     } else if (message.includes('chunk') || message.includes('loading') || message.includes('timeout')) {
@@ -129,6 +131,8 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     switch (category) {
       case 'Component Load Error':
         return 'Please refresh your page';
+      case 'UI Component Error':
+        return 'A user interface component encountered an issue. Please refresh the page to resolve this.';
       case 'Network Error':
         return 'Please check your internet connection and try again. You may also try refreshing the page.';
       case 'Loading Error':

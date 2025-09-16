@@ -121,7 +121,9 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
             <SelectContent className="bg-background border shadow-lg z-50 max-h-[200px] overflow-y-auto">
               <SelectItem value="unassigned">Unassigned</SelectItem>
               {riders?.length === 0 && !isLoadingRiders && (
-                <SelectItem value="" disabled>No active riders available</SelectItem>
+                <div className="px-2 py-1.5 text-sm text-muted-foreground text-center">
+                  No active riders available
+                </div>
               )}
               {riders?.map((rider) => (
                 <SelectItem key={rider.id} value={rider.id}>

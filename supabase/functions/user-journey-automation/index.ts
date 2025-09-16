@@ -476,11 +476,8 @@ async function handleOrderStatusChangeJourney(
         events.push({ id: statusResult.event_id, type: 'order_status_update' });
       }
     } else {
-        console.error('Failed to create status update event:', statusError);
-        throw statusError;
-      }
-    } else if (statusUpdateEvent) {
-      events.push(statusUpdateEvent);
+        console.error('Failed to create status update event:', statusResult.error);
+        throw statusResult.error;
     }
   } catch (error) {
     console.error(`Error creating status update event for order ${orderData.order_number}:`, error);

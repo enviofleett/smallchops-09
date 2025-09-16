@@ -104,55 +104,103 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
           <label className="text-sm font-medium text-foreground">
             {selectedStatus === 'out_for_delivery' ? 'Reassign Dispatch Rider' : 'Assign Dispatch Rider'}
           </label>
-          <Select
-            value={assignedRider ?? 'unassigned'}
-            onValueChange={(value) => onRiderChange(value === 'unassigned' ? null : value)}
-            disabled={isLoadingRiders || !['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)}
-          >
-            <SelectTrigger className="w-full bg-background">
-              <SelectValue placeholder={
-                isLoadingRiders 
-                  ? "Loading riders..." 
-                  : !['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)
+          
+          {isLoadingRiders ? (
+            <div className="w-full bg-background border rounded-md p-3 flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+              <span className="text-sm text-muted-foreground">Loading dispatch riders...</span>
+            </div>
+          ) : (
+            <Select
+              value={assignedRider ?? 'unassigned'}
+              onValueChange={(value) => onRiderChange(value === 'unassigned' ? null : value)}
+              disabled={!['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)}
+            >
+              <SelectTrigger className="w-full bg-background">
+                <SelectValue placeholder={
+                  !['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)
                     ? "Change status first to assign rider"
-                    : "Select a rider"
-              } />
-            </SelectTrigger>
-            <SelectContent className="bg-background border shadow-lg z-50 max-h-[200px] overflow-y-auto">
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-              {riders?.length === 0 && !isLoadingRiders && (
-                <div className="px-2 py-1.5 text-sm text-muted-foreground text-center">
-                  No active riders available
-                </div>
-              )}
-              {riders?.map((rider) => (
-                <SelectItem key={rider.id} value={rider.id}>
-                  <div className="flex flex-col py-1">
-                    <span className="font-medium">{rider.name}</span>
-                    {(rider.vehicle_brand || rider.vehicle_model || rider.license_plate) && (
-                      <span className="text-xs text-muted-foreground">
-                        {rider.vehicle_brand} {rider.vehicle_model} • {rider.license_plate}
-                      </span>
-                    )}
+                    : riders?.length === 0
+                      ? "No dispatch riders available"
+                      : "Select a rider"
+                } />
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                <SelectItem value="unassigned">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">⚪</span>
+                    <span>Unassigned</span>
                   </div>
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                {riders?.length === 0 && (
+                  <div className="px-2 py-3 text-center">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      <div className="mb-1">🚫 No active dispatch riders</div>
+                      <div className="text-xs">Contact admin to add riders</div>
+                    </div>
+                  </div>
+                )}
+                {riders?.map((rider) => (
+                  <SelectItem key={rider.id} value={rider.id}>
+                    <div className="flex flex-col py-1 w-full">
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-500">🟢</span>
+                        <span className="font-medium">{rider.name}</span>
+                      </div>
+                      {(rider.vehicle_brand || rider.vehicle_model || rider.license_plate) && (
+                        <span className="text-xs text-muted-foreground ml-5">
+                          {[rider.vehicle_brand, rider.vehicle_model].filter(Boolean).join(' ')} 
+                          {rider.license_plate && ` • ${rider.license_plate}`}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
+          {/* Status-based help text */}
           {!['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus) && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              ⚠️ Riders can only be assigned when order is confirmed, preparing, ready, or out for delivery
-            </p>
+            <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
+              <div className="flex items-center gap-1">
+                <span>⚠️</span>
+                <span>Riders can only be assigned when order is confirmed, preparing, ready, or out for delivery</span>
+              </div>
+            </div>
           )}
+          
+          {/* No riders available warning */}
           {riders?.length === 0 && !isLoadingRiders && (
-            <p className="text-xs text-muted-foreground">
-              ⚠️ No active dispatch riders found. Contact admin to add riders.
-            </p>
+            <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+              <div className="flex items-center gap-1 mb-1">
+                <span>🚫</span>
+                <span className="font-medium">No Active Dispatch Riders</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                To add dispatch riders: Go to Admin → Drivers Management
+              </div>
+            </div>
           )}
-          {selectedStatus === 'out_for_delivery' && (
-            <p className="text-xs text-blue-600 dark:text-blue-400">
-              🔄 This will reassign the rider for an order already out for delivery
-            </p>
+          
+          {/* Reassignment notice */}
+          {selectedStatus === 'out_for_delivery' && assignedRider && (
+            <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+              <div className="flex items-center gap-1">
+                <span>🔄</span>
+                <span>This will reassign the rider for an order already out for delivery</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Production safety notice */}
+          {riders && riders.length > 0 && (
+            <div className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-2 rounded">
+              <div className="flex items-center gap-1">
+                <span>✅</span>
+                <span>{riders.length} active dispatch rider{riders.length !== 1 ? 's' : ''} available</span>
+              </div>
+            </div>
           )}
         </div>
 

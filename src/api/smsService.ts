@@ -250,25 +250,46 @@ class SMSService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const { data, error } = await supabase
-      .from('notification_delivery_log')
-      .select('status, sms_cost, created_at')
-      .eq('channel', 'sms')
-      .gte('created_at', startDate.toISOString());
+    try {
+      const { data, error } = await supabase
+        .from('notification_delivery_log')
+        .select('status, sms_cost, created_at')
+        .eq('channel', 'sms')
+        .gte('created_at', startDate.toISOString());
 
-    if (error) throw error;
+      if (error) {
+        console.error('Error fetching SMS stats:', error);
+        return {
+          total_sent: 0,
+          successful: 0,
+          failed: 0,
+          total_cost: 0,
+          success_rate: 0
+        };
+      }
 
-    const stats = {
-      total_sent: data.length,
-      successful: data.filter(log => log.status === 'sent').length,
-      failed: data.filter(log => log.status === 'failed').length,
-      total_cost: data.reduce((sum, log) => sum + (log.sms_cost || 0), 0)
-    };
+      const logs = data || [];
+      const stats = {
+        total_sent: logs.length,
+        successful: logs.filter((log: any) => log.status === 'sent').length,
+        failed: logs.filter((log: any) => log.status === 'failed').length,
+        total_cost: logs.reduce((sum: number, log: any) => sum + (log.sms_cost || 0), 0)
+      };
 
-    return {
-      ...stats,
-      success_rate: stats.total_sent > 0 ? (stats.successful / stats.total_sent) * 100 : 0
-    };
+      return {
+        ...stats,
+        success_rate: stats.total_sent > 0 ? (stats.successful / stats.total_sent) * 100 : 0
+      };
+    } catch (error) {
+      console.error('SMS stats query failed:', error);
+      return {
+        total_sent: 0,
+        successful: 0,
+        failed: 0,
+        total_cost: 0,
+        success_rate: 0
+      };
+    }
   }
 }
 

@@ -1535,6 +1535,8 @@ export type Database = {
           phone_verified: boolean | null
           profile_completion_percentage: number | null
           reactivation_email_sent: string | null
+          sms_marketing_consent: boolean | null
+          sms_notifications_enabled: boolean | null
           updated_at: string
           user_id: string | null
         }
@@ -1555,6 +1557,8 @@ export type Database = {
           phone_verified?: boolean | null
           profile_completion_percentage?: number | null
           reactivation_email_sent?: string | null
+          sms_marketing_consent?: boolean | null
+          sms_notifications_enabled?: boolean | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1575,6 +1579,8 @@ export type Database = {
           phone_verified?: boolean | null
           profile_completion_percentage?: number | null
           reactivation_email_sent?: string | null
+          sms_marketing_consent?: boolean | null
+          sms_notifications_enabled?: boolean | null
           updated_at?: string
           user_id?: string | null
         }
@@ -4516,13 +4522,17 @@ export type Database = {
           created_at: string
           customer_id: string | null
           delivered_at: string | null
+          delivery_report_status: string | null
           error_message: string | null
           failed_at: string | null
           id: string
           order_id: string | null
+          phone_number: string | null
           provider_response: Json | null
           recipient: string
           sent_at: string | null
+          sms_cost: number | null
+          sms_provider_message_id: string | null
           status: string | null
           template_id: string | null
         }
@@ -4531,13 +4541,17 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           delivered_at?: string | null
+          delivery_report_status?: string | null
           error_message?: string | null
           failed_at?: string | null
           id?: string
           order_id?: string | null
+          phone_number?: string | null
           provider_response?: Json | null
           recipient: string
           sent_at?: string | null
+          sms_cost?: number | null
+          sms_provider_message_id?: string | null
           status?: string | null
           template_id?: string | null
         }
@@ -4546,13 +4560,17 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           delivered_at?: string | null
+          delivery_report_status?: string | null
           error_message?: string | null
           failed_at?: string | null
           id?: string
           order_id?: string | null
+          phone_number?: string | null
           provider_response?: Json | null
           recipient?: string
           sent_at?: string | null
+          sms_cost?: number | null
+          sms_provider_message_id?: string | null
           status?: string | null
           template_id?: string | null
         }

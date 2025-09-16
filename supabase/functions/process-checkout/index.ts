@@ -53,6 +53,9 @@ async function validateAndApplyDiscount(supabase: any, discountCode: string, ord
 }
 
 serve(async (req) => {
+  // Generate unique request ID for tracing
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   // Get origin and generate CORS headers per-request
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
@@ -63,27 +66,62 @@ serve(async (req) => {
   }
 
   try {
-    // Enhanced authentication and guest session validation
+    console.log(`🚀 [${requestId}] Processing checkout request from origin:`, origin);
+    
+    // Enhanced authentication and guest session validation with idempotency check
     const authHeader = req.headers.get("Authorization");
     const guestSessionId = req.headers.get("x-guest-session-id");
+    const idempotencyKey = req.headers.get("x-idempotency-key");
     
-    console.log("🔐 Authentication debug:", {
+    console.log(`🔐 [${requestId}] Authentication context:`, {
       hasAuthHeader: !!authHeader,
       hasGuestSession: !!guestSessionId,
-      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'none',
+      hasIdempotencyKey: !!idempotencyKey,
       authHeaderLength: authHeader?.length || 0,
-      guestSessionLength: guestSessionId?.length || 0
+      guestSessionLength: guestSessionId?.length || 0,
+      timestamp: new Date().toISOString()
     });
     
+    // Check for duplicate request using idempotency key
+    if (idempotencyKey) {
+      console.log(`🔑 [${requestId}] Checking for duplicate request with key:`, idempotencyKey);
+      const { data: existingOrder, error: idempotencyError } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_number, total_amount, status")
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle();
+
+      if (idempotencyError && idempotencyError.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error(`❌ [${requestId}] Idempotency check failed:`, idempotencyError);
+      } else if (existingOrder) {
+        console.log(`✅ [${requestId}] Found existing order for idempotency key:`, existingOrder.id);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            order_id: existingOrder.id,
+            order_number: existingOrder.order_number,
+            amount: existingOrder.total_amount,
+            duplicate_request: true,
+            message: "Order already processed"
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     // Allow either authenticated users OR guest sessions
     if (!authHeader && !guestSessionId) {
-      console.log("❌ No authentication method provided - checkout requires either JWT or guest session");
+      console.log(`❌ [${requestId}] No authentication method provided`);
       return new Response(
         JSON.stringify({
           success: false,
           error: "Authentication required for checkout. Please log in or continue as guest.",
           code: "REQUIRES_AUTH",
           details: {
+            request_id: requestId,
             missing_auth: !authHeader,
             missing_guest: !guestSessionId,
             suggestion: "Login or use guest checkout"
@@ -96,22 +134,22 @@ serve(async (req) => {
       );
     }
 
-    // For authenticated users, validate the JWT with enhanced error handling
+    // For authenticated users, validate the JWT with simplified error handling
+    let authenticatedUserId = null;
     if (authHeader) {
       try {
-        // Extract JWT and validate format first
+        // Extract and validate JWT format
         const jwt = authHeader.replace('Bearer ', '');
-        
-        // Basic JWT format validation - must have 3 parts separated by dots
         const jwtParts = jwt.split('.');
+        
         if (jwtParts.length !== 3) {
-          console.log("❌ Invalid JWT format: JWT must have 3 parts (header.payload.signature)");
+          console.log(`❌ [${requestId}] Invalid JWT format`);
           return new Response(
             JSON.stringify({
               success: false,
               error: "Invalid authentication token format",
               code: "INVALID_JWT_FORMAT",
-              details: { reason: "JWT must have 3 parts separated by dots" }
+              details: { request_id: requestId, reason: "JWT must have 3 parts separated by dots" }
             }),
             {
               status: 401,
@@ -120,51 +158,33 @@ serve(async (req) => {
           );
         }
 
-        // Try to decode payload to check for required claims before calling Supabase
-        try {
-          const payload = JSON.parse(atob(jwtParts[1]));
-          if (!payload.sub) {
-            console.log("❌ JWT missing required 'sub' claim");
-            return new Response(
-              JSON.stringify({
-                success: false,
-                error: "Authentication token missing required claims",
-                code: "JWT_MISSING_SUB_CLAIM",
-                details: { reason: "Token does not contain user identification" }
-              }),
-              {
-                status: 401,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              }
-            );
-          }
-          
-          // Check token expiration
-          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-            console.log("❌ JWT token has expired");
-            return new Response(
-              JSON.stringify({
-                success: false,
-                error: "Authentication token has expired",
-                code: "JWT_EXPIRED",
-                details: { reason: "Please refresh your session and try again" }
-              }),
-              {
-                status: 401,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              }
-            );
-          }
-          
-          console.log("✅ JWT format and claims validation passed for user:", payload.sub);
-        } catch (decodeError) {
-          console.log("❌ Failed to decode JWT payload:", decodeError);
+        // Decode and validate essential claims
+        const payload = JSON.parse(atob(jwtParts[1]));
+        if (!payload.sub) {
+          console.log(`❌ [${requestId}] JWT missing 'sub' claim`);
           return new Response(
             JSON.stringify({
               success: false,
-              error: "Malformed authentication token",
-              code: "JWT_DECODE_ERROR",
-              details: { reason: "Token payload cannot be decoded" }
+              error: "Authentication token missing user identification",
+              code: "JWT_MISSING_SUB_CLAIM",
+              details: { request_id: requestId, reason: "Token does not contain valid user ID" }
+            }),
+            {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+        
+        // Simple expiration check
+        if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+          console.log(`❌ [${requestId}] JWT token expired`);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "Authentication token has expired",
+              code: "JWT_EXPIRED",
+              details: { request_id: requestId, reason: "Please log in again" }
             }),
             {
               status: 401,
@@ -173,19 +193,20 @@ serve(async (req) => {
           );
         }
 
-        // Now validate with Supabase (should succeed since we pre-validated)
+        // Single validation with Supabase
         const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
         
         if (authError || !user) {
-          console.log("❌ Supabase JWT validation failed:", authError);
+          console.log(`❌ [${requestId}] Supabase auth validation failed:`, authError?.message);
           return new Response(
             JSON.stringify({
               success: false,
-              error: "Authentication validation failed with auth service",
-              code: "SUPABASE_AUTH_ERROR",
+              error: "Authentication validation failed",
+              code: "AUTH_VALIDATION_FAILED",
               details: { 
-                authError: authError?.message,
-                suggestion: "Please refresh your session and try again"
+                request_id: requestId,
+                reason: authError?.message || "User not found",
+                suggestion: "Please log in again"
               }
             }),
             {
@@ -195,17 +216,20 @@ serve(async (req) => {
           );
         }
         
-        console.log("✅ Full JWT validation successful for user:", user.id);
-      } catch (authValidationError) {
-        console.log("❌ JWT validation caught unexpected error:", authValidationError);
+        authenticatedUserId = user.id;
+        console.log(`✅ [${requestId}] Authentication validated for user:`, user.id);
+        
+      } catch (error) {
+        console.error(`❌ [${requestId}] JWT validation error:`, error.message);
         return new Response(
           JSON.stringify({
             success: false,
-            error: "Authentication validation failed",
-            code: "AUTH_VALIDATION_ERROR",
+            error: "Authentication processing failed",
+            code: "JWT_PROCESSING_ERROR",
             details: { 
-              error: authValidationError.message,
-              suggestion: "Please refresh your session and try again"
+              request_id: requestId,
+              error: error.message,
+              suggestion: "Please log in again"
             }
           }),
           {
@@ -218,33 +242,62 @@ serve(async (req) => {
     
     // For guest sessions, validate the session exists and is valid
     if (guestSessionId && !authHeader) {
-      console.log("🎭 Processing guest checkout with session:", guestSessionId);
-      // For now, we'll allow guest sessions - in production you might want to validate
-      // the guest session ID against a guest_sessions table
+      console.log(`🎭 [${requestId}] Processing guest checkout with session:`, guestSessionId);
+      // Guest session validation could be enhanced here for production
     }
     
-    console.log("🛒 Processing checkout request...");
+    console.log(`🛒 [${requestId}] Processing checkout request...`);
 
-    const requestBody = await req.json();
+    // Parse request body with error handling
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error(`❌ [${requestId}] Failed to parse request body:`, parseError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid request format",
+          code: "INVALID_REQUEST_BODY",
+          details: { 
+            request_id: requestId,
+            reason: "Request body must be valid JSON"
+          }
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
-    console.log("📨 Checkout request received:", {
+    console.log(`📨 [${requestId}] Checkout request received:`, {
       customer_email: requestBody.customer?.email,
       items_count: requestBody.items?.length,
       has_discount: !!requestBody.discount,
       discount_code: requestBody.discount?.code,
       cart_total: requestBody.cart_totals?.final_total,
+      authenticated_user: authenticatedUserId,
+      fulfillment_type: requestBody.fulfillment?.type,
+      idempotency_key: idempotencyKey
     });
 
-    // ✅ Validate request
-    if (!requestBody.customer?.email) throw new Error("Customer email is required");
-    if (!requestBody.items || requestBody.items.length === 0) throw new Error("Order must contain at least one item");
-    if (!requestBody.fulfillment?.type) throw new Error("Fulfillment type is required");
+    // Enhanced request validation with detailed error context
+    if (!requestBody.customer?.email) {
+      throw new Error(`[${requestId}] Customer email is required`);
+    }
+    if (!requestBody.items || requestBody.items.length === 0) {
+      throw new Error(`[${requestId}] Order must contain at least one item`);
+    }
+    if (!requestBody.fulfillment?.type) {
+      throw new Error(`[${requestId}] Fulfillment type is required`);
+    }
 
     const customerEmail = requestBody.customer.email.toLowerCase();
     let customerId;
 
-    // ✅ Look up existing customer
-    console.log("👤 Looking up customer by email:", customerEmail);
+    // ✅ Look up existing customer with atomic operation
+    console.log(`👤 [${requestId}] Looking up customer by email:`, customerEmail);
     const { data: existingCustomer, error: findError } = await supabaseAdmin
       .from("customer_accounts")
       .select("id, name")
@@ -320,23 +373,33 @@ serve(async (req) => {
       delivery_instructions: delivery_instructions
     } : null;
 
-    // ✅ Call database function
-    const { data: orderId, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", {
+    // ✅ Create order atomically with idempotency key
+    const orderCreationParams = {
       p_customer_id: customerId,
       p_fulfillment_type: requestBody.fulfillment.type,
       p_delivery_address: enhanced_delivery_address,
       p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
       p_delivery_zone_id: requestBody.fulfillment.delivery_zone_id || null,
-      p_guest_session_id: null,
+      p_guest_session_id: guestSessionId || null,
       p_items: orderItems,
+      p_idempotency_key: idempotencyKey || null
+    };
+    
+    console.log(`🔄 [${requestId}] Creating order with params:`, {
+      customer_id: customerId,
+      fulfillment_type: requestBody.fulfillment.type,
+      items_count: orderItems.length,
+      has_idempotency: !!idempotencyKey
     });
+    
+    const { data: orderId, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", orderCreationParams);
 
     if (orderError) {
-      console.error("❌ Order creation failed:", orderError);
-      throw new Error(`Order creation failed: ${orderError.message}`);
+      console.error(`❌ [${requestId}] Order creation failed:`, orderError);
+      throw new Error(`Order creation failed: ${orderError.message} [${requestId}]`);
     }
 
-    console.log("✅ Order created successfully:", orderId);
+    console.log(`✅ [${requestId}] Order created successfully:`, orderId);
     
     // ✅ Save delivery schedule atomically if provided
     if (requestBody.delivery_schedule && orderId) {
@@ -677,8 +740,8 @@ serve(async (req) => {
       },
     );
   } catch (error) {
-    console.error("❌ Checkout processing error:", error);
-    console.error("❌ Enhanced error context:", {
+    console.error(`❌ [${requestId}] Checkout processing error:`, error);
+    console.error(`❌ [${requestId}] Enhanced error context:`, {
       errorName: error?.name || 'UnknownError',
       errorMessage: error?.message || 'No error message',
       errorStack: error?.stack || 'No stack trace',
@@ -689,7 +752,8 @@ serve(async (req) => {
       requestUrl: req.url,
       authHeaderPresent: !!req.headers.get("Authorization"),
       guestSessionPresent: !!req.headers.get("x-guest-session-id"),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      request_id: requestId
     });
     
     return new Response(
@@ -698,6 +762,7 @@ serve(async (req) => {
         error: error.message || "Checkout processing failed",
         code: error?.code || 'CHECKOUT_PROCESSING_ERROR',
         details: {
+          request_id: requestId,
           timestamp: new Date().toISOString(),
           error_type: error.constructor.name,
           suggestion: error?.message?.includes('JWT') || error?.message?.includes('auth') 
@@ -706,7 +771,7 @@ serve(async (req) => {
         },
       }),
       {
-        status: 400,
+        status: 500, // Changed from 400 to 500 for server errors
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );

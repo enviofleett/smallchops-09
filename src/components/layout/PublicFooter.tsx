@@ -104,7 +104,7 @@ const PublicFooterContent = () => {
               <img src={logoUrl} alt={`${businessName} Logo`} className="h-8 w-auto" onError={e => {
               e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
             }} />
-              <span className="text-gray-400 text-sm">{settings?.tagline || 'SMALL CHOPS'}</span>
+              <span className="text-gray-400 text-sm"></span>
             </div>
 
             {/* Social Media Icons */}

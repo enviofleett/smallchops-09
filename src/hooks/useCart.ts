@@ -182,7 +182,6 @@ export const useCartInternal = () => {
         discount_amount: Math.round(promotionResult.total_discount * 100) / 100,
         delivery_discount: Math.round(promotionResult.delivery_discount * 100) / 100,
         total_amount: Math.round(total_amount * 100) / 100,
-        applied_promotions: promotionResult.applied_promotions || [],
       },
       itemCount,
       promotion_code: promotionCode

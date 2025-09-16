@@ -65,9 +65,9 @@ export const EmailTemplateManager: React.FC = () => {
   // Load live production data for template variables
   const loadProductionData = async () => {
     try {
-      // Get business settings for production branding
+      // Get business settings for production branding (admin access to business_settings)
       const { data: businessSettings } = await supabase
-        .from('business_info')
+        .from('business_settings')
         .select('name, tagline, website_url, working_hours')
         .limit(1)
         .maybeSingle();

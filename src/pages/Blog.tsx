@@ -76,13 +76,13 @@ const Blog: React.FC = () => {
     queryKey: ['business-settings-blog'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('business_info')
-        .select('name, tagline, seo_title, seo_description')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
+        .rpc('get_public_business_info');
       
       if (error) throw error;
+      
+      // RPC returns an array, take the first item
+      const businessData = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return businessData;
       return data;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -163,11 +163,14 @@ const Blog: React.FC = () => {
     enabled: blogSettings?.blog_enable_featured !== 'false',
   });
 
-  // Derived values for UI
-  const blogTitle = blogSettings?.blog_title || businessSettings?.name + ' Blog' || 'Our Blog';
-  const blogSubtitle = blogSettings?.blog_subtitle || businessSettings?.tagline || 'Stay updated with our latest news and insights';
+  // Derived values for UI - properly handle businessSettings type
+  const businessName = (businessSettings && !Array.isArray(businessSettings)) ? businessSettings.name : null;
+  const businessTagline = (businessSettings && !Array.isArray(businessSettings)) ? businessSettings.tagline : null;
+  
+  const blogTitle = blogSettings?.blog_title || (businessName ? businessName + ' Blog' : 'Our Blog');
+  const blogSubtitle = blogSettings?.blog_subtitle || businessTagline || 'Stay updated with our latest news and insights';
   const blogDescription = blogSettings?.blog_description || 'Discover the latest updates, insights, and stories from our team.';
-  const metaTitle = blogSettings?.blog_meta_title || blogSettings?.blog_title || businessSettings?.seo_title || blogTitle;
+  const metaTitle = blogSettings?.blog_meta_title || blogSettings?.blog_title || blogTitle;
   const metaDescription = blogSettings?.blog_meta_description || blogDescription;
 
   // Filter articles based on search and category

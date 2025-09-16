@@ -59,18 +59,21 @@ export const useBusinessSettings = () => {
       try {
         logger.info('Starting business settings fetch');
         
-        // First, try direct database query for public business info
+        // First, try RPC function for public business info
         const { data, error: dbError } = await supabase
-          .from('business_info')
-          .select('*')
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .rpc('get_public_business_info');
           
-        if (!dbError && data) {
-          logger.info('Business settings fetched successfully via direct query');
+        if (!dbError && data && data.length > 0) {
+          logger.info('Business settings fetched successfully via RPC function');
           measurePerformance();
-          return data as BusinessSettings;
+          // RPC returns an array, take the first item
+          const businessData = Array.isArray(data) ? data[0] : data;
+          return {
+            ...businessData,
+            id: 'public-business-info',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as BusinessSettings;
         }
         
         if (dbError) {
@@ -112,10 +115,16 @@ export const useBusinessSettings = () => {
         }
         
         // If we reach here and have data from the first query, return it despite any error
-        if (data) {
+        if (data && data.length > 0) {
           logger.info('Returning cached data despite edge function failure');
           measurePerformance();
-          return data as BusinessSettings;
+          const businessData = Array.isArray(data) ? data[0] : data;
+          return {
+            ...businessData,
+            id: 'public-business-info',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as BusinessSettings;
         }
         
         // Return null instead of throwing error for graceful degradation
@@ -127,18 +136,20 @@ export const useBusinessSettings = () => {
         logger.error('Critical error in useBusinessSettings', error);
         measurePerformance();
         
-        // One final attempt at direct database query
+        // One final attempt at RPC function
         try {
           const { data, error: finalError } = await supabase
-            .from('business_info')
-            .select('*')
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .rpc('get_public_business_info');
             
-          if (!finalError && data) {
+          if (!finalError && data && data.length > 0) {
             logger.info('Final fallback query successful');
-            return data as BusinessSettings;
+            const businessData = Array.isArray(data) ? data[0] : data;
+            return {
+              ...businessData,
+              id: 'public-business-info',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            } as BusinessSettings;
           }
         } catch (finalAttemptError) {
           logger.error('Final fallback query failed', finalAttemptError);

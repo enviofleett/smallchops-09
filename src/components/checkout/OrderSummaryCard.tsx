@@ -22,8 +22,6 @@ interface OrderSummaryCardProps {
   vatAmount?: number;
   subTotalExVat?: number;
   subTotalInclVat?: number;
-  discountAmount?: number;
-  appliedDiscountCode?: string;
   sticky?: boolean;
   collapsibleOnMobile?: boolean;
   className?: string;
@@ -37,8 +35,6 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
   vatAmount,
   subTotalExVat,
   subTotalInclVat,
-  discountAmount,
-  appliedDiscountCode,
   sticky = false,
   collapsibleOnMobile = false,
   className
@@ -69,25 +65,20 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
       {/* Totals */}
       <div className="space-y-2">
         {/* VAT-aware breakdown */}
+        <div className="flex items-center justify-between text-sm">
+          <span>Sub Total (excl. VAT)</span>
+          <span>₦{(subTotalExVat ?? (subtotal - (vatAmount ?? 0))).toLocaleString()}</span>
+        </div>
 
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>VAT</span>
+          <span>₦{(vatAmount ?? 0).toLocaleString()}</span>
+        </div>
 
         <div className="flex items-center justify-between text-sm font-medium">
           <span>Sub Total (incl. VAT)</span>
           <span>₦{(subTotalInclVat ?? subtotal).toLocaleString()}</span>
         </div>
-        
-        {/* Discount display */}
-        {discountAmount && discountAmount > 0 && (
-          <div className="flex items-center justify-between text-sm text-green-600">
-            <span>
-              Discount Applied
-              {appliedDiscountCode && (
-                <span className="text-xs text-muted-foreground ml-1">({appliedDiscountCode})</span>
-              )}
-            </span>
-            <span>-₦{discountAmount.toLocaleString()}</span>
-          </div>
-        )}
         
         <div className="flex items-center justify-between text-sm">
           <span>Delivery Fee</span>

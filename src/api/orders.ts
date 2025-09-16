@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
-import { validateOrderUpdatePayload } from '@/utils/orderValidation';
 
 // We define a more specific type for an order that includes its line items and delivery zones.
 export type OrderWithItems = Tables<'orders'> & {
@@ -79,7 +78,7 @@ export const getOrders = async ({
     const to = from + pageSize - 1;
 
     let query = supabase
-      .from('orders')
+      .from('orders_view')
       .select(`*, 
         order_items (*),
         order_delivery_schedule (*)
@@ -107,7 +106,7 @@ export const getOrders = async ({
       }
       
       let fallbackQuery = supabase
-        .from('orders')
+        .from('orders_view')
         .select(`*, order_items (*), order_delivery_schedule (*)`, { count: 'exact' });
 
       if (status !== 'all') {
@@ -167,65 +166,33 @@ export const getOrders = async ({
  */
 export const updateOrder = async (
   orderId: string,
-  updates: { status?: OrderStatus; assigned_rider_id?: string | null; phone?: string; customer_phone?: string; [key: string]: any }
+  updates: { status?: OrderStatus; assigned_rider_id?: string | null }
 ): Promise<OrderWithItems> => {
-  // CRITICAL: Fix field mapping to prevent database column errors
-  const sanitizedUpdates = { ...updates };
-  
-  // Always sanitize phone field to customer_phone for orders table compatibility
-  if ('phone' in sanitizedUpdates) {
-    console.log('🔧 Mapping phone to customer_phone for orders table compatibility');
-    sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
-    delete sanitizedUpdates.phone;
-  }
   try {
     if (process.env.NODE_ENV === 'development') {
       console.log('🔄 Updating order via production-safe method:', orderId, updates);
     }
 
-    // CRITICAL: Enhanced field validation before sending to backend
-    const { isValid, errors, cleanedUpdates, warnings } = validateOrderUpdatePayload(updates, {});
-    
-    if (!isValid) {
-      console.error('❌ Client-side validation failed:', errors);
-      throw new Error(Object.values(errors)[0] || 'Invalid update data');
-    }
-
-    if (warnings.length > 0) {
-      console.warn('⚠️ Update warnings:', warnings);
-    }
-
-    const finalUpdates = cleanedUpdates;
-    console.log('📤 Sending validated updates to backend:', finalUpdates);
-
-    // If we're assigning a rider, use the secure RPC-based assignment
-    if (finalUpdates.assigned_rider_id && finalUpdates.assigned_rider_id !== null) {
+    // If we're assigning a rider, use the dedicated function for validation
+    if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('🎯 Assigning/reassigning rider using secure RPC:', finalUpdates.assigned_rider_id);
+        console.log('🎯 Assigning rider using validated function:', updates.assigned_rider_id);
       }
       
       const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'assign_rider',
           orderId,
-          riderId: finalUpdates.assigned_rider_id
+          riderId: updates.assigned_rider_id
         }
       });
 
       if (assignmentError || !assignmentResult?.success) {
-        const errorMsg = assignmentResult?.error || assignmentError?.message || 'Failed to assign rider';
-        if (process.env.NODE_ENV === 'development') {
-          console.error('❌ Rider assignment failed:', errorMsg);
-        }
-        throw new Error(errorMsg);
+        throw new Error(assignmentResult?.error || assignmentError?.message || 'Failed to assign rider');
       }
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Rider assignment successful via secure RPC');
-      }
-
-      // If there are other updates besides rider assignment, apply them separately
-      const otherUpdates = { ...finalUpdates };
+      // If there are other updates besides rider assignment, apply them
+      const otherUpdates = { ...updates };
       delete otherUpdates.assigned_rider_id;
       
       if (Object.keys(otherUpdates).length > 0) {
@@ -252,32 +219,12 @@ export const updateOrder = async (
       body: {
         action: 'update',
         orderId,
-        updates: finalUpdates
+        updates
       }
     });
 
-    if (error) {
-      console.error('❌ Error updating order via admin function:', error);
-      // Provide more specific error messaging
-      const errorMessage = error.message || 'Edge Function returned a non-2xx status code';
-      if (errorMessage.includes('non-2xx status code')) {
-        throw new Error('Order update service is temporarily unavailable. Please try again.');
-      }
-      throw new Error(`Order update failed: ${errorMessage}`);
-    }
-
-    if (!data?.success) {
-      console.error('❌ Order update failed:', data?.error);
-      
-      // Enhanced error handling for specific backend responses
-      let errorMessage = data?.error || 'Order update failed due to server error';
-      if (data?.details) {
-        console.error('❌ Update failure details:', data.details);
-        if (data.details.rejected_fields) {
-          errorMessage += ` (Rejected fields: ${data.details.rejected_fields.join(', ')})`;
-        }
-      }
-      throw new Error(errorMessage);
+    if (error || !data.success) {
+      throw new Error(data?.error || error?.message || 'Failed to update order');
     }
 
     if (process.env.NODE_ENV === 'development') {
@@ -290,8 +237,62 @@ export const updateOrder = async (
       console.error('❌ Error updating order via admin function:', error);
     }
     
-    // NO FALLBACK: For production security, we only allow updates through the hardened edge function
-    throw new Error(`Order update failed: ${error.message}`);
+    // Fallback to direct update with enhanced validation
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Attempting fallback direct update with validation...');
+      }
+      
+      // If assigning rider, validate first
+      if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
+        const { data: riderCheck, error: riderError } = await supabase
+          .from('drivers')
+          .select('id, is_active')
+          .eq('id', updates.assigned_rider_id)
+          .single();
+
+        if (riderError || !riderCheck) {
+          throw new Error(`Invalid rider ID: ${updates.assigned_rider_id}`);
+        }
+
+        if (!riderCheck.is_active) {
+          throw new Error(`Rider ${updates.assigned_rider_id} is not active`);
+        }
+      }
+
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', orderId)
+        .select(`*, 
+          order_items (*),
+          delivery_zones (id, name, base_fee, is_active),
+          order_delivery_schedule (*)
+        `)
+        .maybeSingle();
+
+      if (fallbackError) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ Fallback update also failed:', fallbackError);
+        }
+        throw new Error(fallbackError.message);
+      }
+
+      if (!fallbackData) {
+        throw new Error('Order not found');
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Fallback update successful');
+      }
+      return fallbackData as unknown as OrderWithItems;
+      
+    } catch (fallbackError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('💥 All update methods failed:', fallbackError);
+      }
+      throw fallbackError;
+    }
   }
 };
 
@@ -363,47 +364,22 @@ export const manuallyQueueCommunicationEvent = async (
   order: OrderWithItems,
   status: OrderStatus
 ): Promise<void> => {
-  // Generate robust dedupe key to prevent duplicate manual events
-  const timestamp = Date.now();
-  const uniqueId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36);
-  const dedupeKey = `manual_queue|${order.id}|${status}|${order.customer_email}|${timestamp}_${uniqueId}`;
+  const { error } = await supabase.from('communication_events').insert({
+    order_id: order.id,
+    event_type: 'order_status_update', // Re-using to leverage existing processor
+    payload: {
+      old_status: order.status,
+      new_status: status,
+      customer_name: order.customer_name,
+      customer_phone: order.customer_phone,
+      customer_email: order.customer_email,
+    },
+  });
 
-  try {
-    const { error } = await supabase.from('communication_events').insert({
-      order_id: order.id,
-      event_type: 'order_status_update',
-      recipient_email: order.customer_email,
-      template_key: `order_status_${status}`,
-      template_variables: {
-        customer_name: order.customer_name || 'Customer',
-        order_number: order.order_number,
-        old_status: order.status,
-        new_status: status,
-        customer_phone: order.customer_phone,
-      },
-      status: 'queued',
-      dedupe_key: dedupeKey,
-      priority: 'normal'
-    });
-
-    if (error) {
-      // Handle duplicate key errors gracefully
-      if (error.code === '23505' && error.message.includes('communication_events_dedupe_key_unique')) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Duplicate manual communication event prevented (this is normal)');
-        }
-        return; // Don't throw error for duplicates
-      }
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error queueing manual communication event:', error);
-      }
-      throw new Error(error.message);
-    }
-  } catch (error: any) {
+  if (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('Exception in manual communication event:', error);
+      console.error('Error queueing manual communication event:', error);
     }
-    throw new Error(`Failed to queue communication event: ${error.message}`);
+    throw new Error(error.message);
   }
 };

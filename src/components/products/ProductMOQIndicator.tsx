@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ShoppingCart, Info, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/formatCurrency';
+import { formatCurrency } from '@/lib/discountCalculations';
 
 interface ProductMOQIndicatorProps {
   minimumOrderQuantity: number;
@@ -11,6 +11,8 @@ interface ProductMOQIndicatorProps {
   stockQuantity?: number;
   currentCartQuantity?: number;
   className?: string;
+  showDetailedInfo?: boolean;
+  variant?: 'compact' | 'detailed' | 'inline';
 }
 
 export const ProductMOQIndicator = ({
@@ -18,97 +20,141 @@ export const ProductMOQIndicator = ({
   price,
   stockQuantity,
   currentCartQuantity = 0,
-  className
+  className,
+  showDetailedInfo = false,
+  variant = 'compact'
 }: ProductMOQIndicatorProps) => {
-  // Don't show if MOQ is 1 or less or if required data is missing
-  if (!minimumOrderQuantity || minimumOrderQuantity <= 1 || !price) return null;
+  // Don't show if MOQ is 1 or less
+  if (minimumOrderQuantity <= 1) return null;
 
   const isStockSufficient = !stockQuantity || stockQuantity >= minimumOrderQuantity;
   const isCurrentlyMet = currentCartQuantity >= minimumOrderQuantity;
   const shortfall = Math.max(0, minimumOrderQuantity - currentCartQuantity);
   const minimumCost = minimumOrderQuantity * price;
+  const additionalCostNeeded = shortfall * price;
 
-  // Determine status for styling
-  const getStatusColor = () => {
-    if (!isStockSufficient) return 'destructive';
-    if (isCurrentlyMet) return 'success';
-    return 'warning';
+  const getVariantDisplay = () => {
+    switch (variant) {
+      case 'inline':
+        return (
+          <Badge 
+            variant={isCurrentlyMet ? "default" : "secondary"} 
+            className={cn(
+              "text-xs inline-flex items-center gap-1",
+              isCurrentlyMet ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800",
+              className
+            )}
+          >
+            <ShoppingCart className="h-3 w-3" />
+            MOQ: {minimumOrderQuantity}
+            {currentCartQuantity > 0 && (
+              <span className={cn(
+                "ml-1",
+                isCurrentlyMet ? "text-green-700" : "text-orange-600"
+              )}>
+                ({currentCartQuantity}/{minimumOrderQuantity})
+              </span>
+            )}
+          </Badge>
+        );
+
+      case 'detailed':
+        return (
+          <Alert className={cn(
+            "border-l-4",
+            isStockSufficient 
+              ? isCurrentlyMet 
+                ? "border-green-500 bg-green-50" 
+                : "border-blue-500 bg-blue-50"
+              : "border-red-500 bg-red-50",
+            className
+          )}>
+            <ShoppingCart className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <div className="font-medium text-sm">
+                  Minimum Order: {minimumOrderQuantity} units
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-gray-600">Minimum Cost:</span>
+                    <div className="font-medium">{formatCurrency(minimumCost)}</div>
+                  </div>
+                  
+                  {currentCartQuantity > 0 && (
+                    <div>
+                      <span className="text-gray-600">In Cart:</span>
+                      <div className={cn(
+                        "font-medium",
+                        isCurrentlyMet ? "text-green-600" : "text-orange-600"
+                      )}>
+                        {currentCartQuantity} units
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {!isCurrentlyMet && shortfall > 0 && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <div className="text-xs text-gray-600">
+                      Need {shortfall} more units
+                      {additionalCostNeeded > 0 && (
+                        <span className="ml-1">
+                          (+ {formatCurrency(additionalCostNeeded)})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!isStockSufficient && (
+                  <div className="flex items-center gap-1 text-red-600 text-xs">
+                    <AlertTriangle className="h-3 w-3" />
+                    Insufficient stock for MOQ
+                  </div>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        );
+
+      default: // compact
+        return (
+          <div className={cn("flex items-center gap-2", className)}>
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-xs",
+                isCurrentlyMet 
+                  ? "bg-green-100 text-green-800 border-green-300"
+                  : "bg-blue-100 text-blue-800 border-blue-300"
+              )}
+            >
+              <ShoppingCart className="h-3 w-3 mr-1" />
+              MOQ: {minimumOrderQuantity}
+            </Badge>
+            
+            {currentCartQuantity > 0 && (
+              <span className={cn(
+                "text-xs font-medium",
+                isCurrentlyMet ? "text-green-600" : "text-orange-600"
+              )}>
+                {currentCartQuantity}/{minimumOrderQuantity}
+              </span>
+            )}
+            
+            {showDetailedInfo && (
+              <span className="text-xs text-gray-500">
+                Min: {formatCurrency(minimumCost)}
+              </span>
+            )}
+          </div>
+        );
+    }
   };
 
-  const statusColor = getStatusColor();
-
-  return (
-    <div className={cn(
-      "rounded-md border bg-card p-3 w-[70%]",
-      "border-l-4",
-      {
-        "border-l-green-500 bg-green-50/30 border-green-200": statusColor === 'success',
-        "border-l-amber-500 bg-amber-50/30 border-amber-200": statusColor === 'warning',
-        "border-l-red-500 bg-red-50/30 border-red-200": statusColor === 'destructive'
-      },
-      className
-    )}>
-      {/* Compact Header with Status */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "p-1 rounded",
-            {
-              "bg-green-100 text-green-600": statusColor === 'success',
-              "bg-amber-100 text-amber-600": statusColor === 'warning',
-              "bg-red-100 text-red-600": statusColor === 'destructive'
-            }
-          )}>
-            <ShoppingCart className="h-3 w-3" />
-          </div>
-          <span className="text-xs font-medium text-muted-foreground">
-            Min Order: {minimumOrderQuantity} units
-          </span>
-        </div>
-        
-        <span className="text-xs font-semibold text-foreground">
-          {formatCurrency(minimumCost)}
-        </span>
-      </div>
-
-      {/* Compact Status Bar */}
-      <div className="space-y-1.5">
-        {currentCartQuantity > 0 && (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">In Cart:</span>
-            <span className={cn(
-              "font-medium",
-              {
-                "text-green-600": statusColor === 'success',
-                "text-amber-600": statusColor === 'warning', 
-                "text-red-600": statusColor === 'destructive'
-              }
-            )}>
-              {currentCartQuantity} / {minimumOrderQuantity}
-            </span>
-          </div>
-        )}
-
-        {/* Single Status Message */}
-        {!isStockSufficient ? (
-          <div className="flex items-center gap-1.5 p-1.5 rounded bg-red-100 text-red-700 text-xs">
-            <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-            <span>Insufficient stock</span>
-          </div>
-        ) : !isCurrentlyMet ? (
-          <div className="flex items-center justify-between p-1.5 rounded bg-amber-100 text-amber-700 text-xs">
-            <span>Need {shortfall} more</span>
-            <span className="font-medium">+{formatCurrency(shortfall * price)}</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 p-1.5 rounded bg-green-100 text-green-600 text-xs">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-            <span>Requirement met</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return getVariantDisplay();
 };
 
 interface ProductMOQWarningProps {
@@ -134,42 +180,30 @@ export const ProductMOQWarning = ({
   const additionalCost = shortfall * price;
 
   return (
-    <div className={cn(
-      "rounded-lg border border-amber-200 bg-amber-50/50 p-4 w-full",
-      "border-l-4 border-l-amber-500",
-      className
-    )}>
-      <div className="flex items-start gap-3">
-        <div className="p-1.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
-          <AlertTriangle className="h-4 w-4" />
-        </div>
-        
-        <div className="flex-1 space-y-2">
-          <div className="font-medium text-sm text-amber-800">
+    <Alert variant="destructive" className={cn("bg-orange-50 border-orange-200", className)}>
+      <AlertTriangle className="h-4 w-4" />
+      <AlertDescription className="text-orange-800">
+        <div className="space-y-2">
+          <div className="font-medium text-sm">
             Minimum Order Quantity Not Met
           </div>
-          
-          <div className="text-sm text-amber-700 space-y-1">
-            <p>{productName} requires a minimum order of <span className="font-medium">{minimumOrderQuantity} units</span>.</p>
-            <p>You currently have <span className="font-medium">{currentCartQuantity} units</span> in your cart.</p>
+          <div className="text-xs">
+            {productName} requires a minimum order of {minimumOrderQuantity} units. 
+            You currently have {currentCartQuantity} in your cart.
           </div>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-2 border-t border-amber-200">
-            <span className="text-sm font-medium text-amber-800">
-              Need {shortfall} more units • {formatCurrency(additionalCost)}
-            </span>
-            
-            {onAddToCart && (
-              <button
-                onClick={() => onAddToCart(shortfall)}
-                className="px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-md transition-colors duration-200 w-fit"
-              >
-                Add {shortfall} to cart
-              </button>
-            )}
+          <div className="text-xs">
+            Add {shortfall} more units ({formatCurrency(additionalCost)}) to meet the minimum requirement.
           </div>
+          {onAddToCart && (
+            <button
+              onClick={() => onAddToCart(shortfall)}
+              className="text-xs underline hover:no-underline font-medium mt-1"
+            >
+              Add {shortfall} more to cart
+            </button>
+          )}
         </div>
-      </div>
-    </div>
+      </AlertDescription>
+    </Alert>
   );
 };

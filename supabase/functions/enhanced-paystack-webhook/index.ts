@@ -6,9 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
 };
 
-// Import environment detection
-import { getPaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts'
-
 // Paystack's official webhook IP addresses
 const PAYSTACK_IPS = [
   '52.31.139.75',
@@ -65,16 +62,13 @@ serve(async (req) => {
     const payload = await req.text();
     const signature = req.headers.get('x-paystack-signature');
     
-    // Get environment-aware configuration
-    const paystackConfig = getPaystackConfig(req);
-    logPaystackConfigStatus(paystackConfig);
-    
     // Security validation
     const isValidIP = verifyPaystackIP(req);
     let isValidSignature = false;
     
-    if (signature && paystackConfig.webhookSecret) {
-      isValidSignature = await verifyPaystackSignature(payload, signature, paystackConfig.webhookSecret);
+    const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
+    if (signature && webhookSecret) {
+      isValidSignature = await verifyPaystackSignature(payload, signature, webhookSecret);
     }
     
     // Allow if either IP is valid OR signature is valid

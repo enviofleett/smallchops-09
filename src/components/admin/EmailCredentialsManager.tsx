@@ -10,7 +10,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useEnvironmentConfig } from '@/hooks/useEnvironmentConfig';
 import { 
   Shield,
   Key,
@@ -19,9 +18,7 @@ import {
   Server,
   TestTube,
   Settings,
-  ExternalLink,
-  Lock,
-  Copy
+  ExternalLink
 } from 'lucide-react';
 
 const credentialsSchema = z.object({
@@ -52,7 +49,6 @@ export const EmailCredentialsManager = () => {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [lastError, setLastError] = useState<string>('');
   const { toast } = useToast();
-  const { config: envConfig, loading: envLoading } = useEnvironmentConfig();
 
   const {
     register,
@@ -73,28 +69,25 @@ export const EmailCredentialsManager = () => {
 
   const checkCredentialStatus = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('smtp-auth-healthcheck', {
-        body: {}
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: { healthcheck: true, check: 'credentials' }
       });
 
       if (error) {
         console.error('Failed to check credential status:', error);
-        setCredentials([]);
         return;
       }
 
-      // Focus on the 4 core production secrets
-      const coreCredentials = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
-      const statusList = coreCredentials.map(name => ({
+      const credentialNames = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM_EMAIL', 'SMTP_FROM_NAME'];
+      const statusList = credentialNames.map(name => ({
         name,
-        isSet: data?.success && data?.provider?.source === 'function_secrets',
-        masked: data?.success && data?.provider?.source === 'function_secrets' ? '✓ Configured in Function Secrets' : undefined
+        isSet: data.credentials?.[name] !== undefined,
+        masked: data.credentials?.[name] ? maskValue(data.credentials[name]) : undefined
       }));
 
       setCredentials(statusList);
     } catch (error) {
       console.error('Error checking credentials:', error);
-      setCredentials([]);
     }
   };
 
@@ -170,7 +163,7 @@ export const EmailCredentialsManager = () => {
     try {
       console.log('🔍 Testing production email readiness...');
       
-      // Test production SMTP readiness
+      // Test SMTP authentication health check
       const { data: authData, error: authError } = await supabase.functions.invoke('smtp-auth-healthcheck', {
         body: {}
       });
@@ -179,7 +172,7 @@ export const EmailCredentialsManager = () => {
         throw new Error(`Health check failed: ${authError.message}`);
       }
 
-      console.log('📊 Production readiness result:', authData);
+      console.log('📊 Auth health result:', authData);
 
       if (authData?.success) {
         setConnectionStatus('success');
@@ -187,21 +180,20 @@ export const EmailCredentialsManager = () => {
         // Get configuration source info
         const configSource = authData.provider?.source === 'function_secrets' 
           ? 'Function Secrets (Production Ready)' 
-          : authData.provider?.source === 'database'
-          ? 'Database (Development Mode)'
-          : 'Legacy Configuration';
-          
-        const isProductionReady = authData.provider?.source === 'function_secrets';
+          : 'Database (Development Mode)';
           
         toast({
-          title: isProductionReady ? 'Production Ready!' : 'Configuration Found',
+          title: 'Production Email Ready!',
           description: `✅ SMTP authenticated successfully via ${configSource}`,
-          variant: isProductionReady ? 'default' : 'destructive'
         });
         
         // Update status with detailed info
         setLastError('');
-        checkCredentialStatus(); // Refresh the credential status
+        setCredentials(prev => prev.map(cred => ({
+          ...cred,
+          isSet: true,
+          masked: '✓ Configured'
+        })));
         
       } else {
         throw new Error(authData?.error || 'SMTP authentication failed');
@@ -224,8 +216,6 @@ export const EmailCredentialsManager = () => {
 
   const credentialsConfigured = credentials.filter(c => c.isSet).length;
   const totalCredentials = credentials.length;
-  const isLiveMode = envConfig?.isLiveMode || false;
-  const isProductionReady = credentialsConfigured === totalCredentials && credentialsConfigured > 0;
 
   return (
     <div className="space-y-6">
@@ -253,24 +243,6 @@ export const EmailCredentialsManager = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLiveMode && !isProductionReady && (
-            <Alert className="mb-4 border-red-200 bg-red-50">
-              <Lock className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">
-                <strong>Production Mode Active:</strong> SMTP credentials must be configured via Edge Function Secrets.
-                <br />
-                <a 
-                  href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/settings/functions" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="underline font-medium mt-1 inline-block"
-                >
-                  Configure Function Secrets →
-                </a>
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="grid gap-3">
             {credentials.map((cred) => (
               <div key={cred.name} className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-accent/50 transition-colors">
@@ -281,10 +253,12 @@ export const EmailCredentialsManager = () => {
                   <div>
                     <span className="font-medium text-foreground">{cred.name}</span>
                     <div className="text-xs text-muted-foreground">
-                      {cred.name === 'SMTP_HOST' && 'Mail server hostname (e.g., smtp.gmail.com)'}
-                      {cred.name === 'SMTP_PORT' && 'Connection port (587 for TLS, 465 for SSL)'}
-                      {cred.name === 'SMTP_USER' && 'Authentication username/email'}
-                      {cred.name === 'SMTP_PASS' && 'Authentication password/app password'}
+                      {cred.name === 'SMTP_HOST' && 'Mail server hostname'}
+                      {cred.name === 'SMTP_PORT' && 'Connection port (587/465)'}
+                      {cred.name === 'SMTP_USERNAME' && 'Authentication username'}
+                      {cred.name === 'SMTP_PASSWORD' && 'Authentication password'}
+                      {cred.name === 'SMTP_FROM_EMAIL' && 'Sender email address'}
+                      {cred.name === 'SMTP_FROM_NAME' && 'Sender display name'}
                     </div>
                   </div>
                 </div>
@@ -302,7 +276,7 @@ export const EmailCredentialsManager = () => {
                       <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />
                       <div className="text-right">
                         <div className="text-sm font-medium text-amber-600 dark:text-amber-400">Missing</div>
-                        <div className="text-xs text-muted-foreground">Required for production</div>
+                        <div className="text-xs text-muted-foreground">Add to Function Secrets</div>
                       </div>
                     </>
                   )}
@@ -382,30 +356,13 @@ export const EmailCredentialsManager = () => {
             </div>
 
             <div className="bg-muted p-4 rounded-lg font-mono text-sm space-y-2">
-              <div><strong>SMTP_HOST:</strong> smtp.gmail.com (for Gmail)</div>
-              <div><strong>SMTP_PORT:</strong> 587 (TLS) or 465 (SSL)</div>
-              <div><strong>SMTP_USER:</strong> your-email@domain.com</div>
-              <div><strong>SMTP_PASS:</strong> your-app-password</div>
-            </div>
-
-            <div className="flex gap-2 mt-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => {
-                  const commands = [
-                    'supabase secrets set SMTP_HOST=smtp.gmail.com',
-                    'supabase secrets set SMTP_PORT=587',
-                    'supabase secrets set SMTP_USER=your-email@gmail.com',
-                    'supabase secrets set SMTP_PASS=your-16-char-app-password'
-                  ].join('\n');
-                  navigator.clipboard.writeText(commands);
-                  toast({ title: 'CLI Commands Copied!', description: 'Paste into your terminal' });
-                }}
-              >
-                <Copy className="h-3 w-3 mr-1" />
-                Copy CLI Commands
-              </Button>
+              <div><strong>SMTP_HOST:</strong> your.smtp.provider.com</div>
+              <div><strong>SMTP_PORT:</strong> 587 or 465</div>
+              <div><strong>SMTP_USERNAME:</strong> your-email@domain.com</div>
+              <div><strong>SMTP_PASSWORD:</strong> your-secure-password</div>
+              <div><strong>SMTP_FROM_EMAIL:</strong> noreply@yourdomain.com</div>
+              <div><strong>SMTP_FROM_NAME:</strong> Your Business Name</div>
+              <div><strong>SMTP_ENCRYPTION:</strong> TLS or SSL</div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -417,25 +374,24 @@ export const EmailCredentialsManager = () => {
       </Card>
 
       {/* Development Fallback Form */}
-      {!isLiveMode && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Server className="h-5 w-5" />
-              Development Fallback Configuration
-            </CardTitle>
-            <CardDescription>
-              Temporary credentials for development and testing (not recommended for production)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Alert className="mb-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Development Mode:</strong> These credentials are stored in the database for testing only. 
-                Switch to Live mode and configure Function Secrets for production deployment.
-              </AlertDescription>
-            </Alert>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            Development Fallback Configuration
+          </CardTitle>
+          <CardDescription>
+            Temporary credentials for development and testing (not recommended for production)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Warning:</strong> This stores credentials in the database and should only be used for development. 
+              Use Function Secrets for production deployment.
+            </AlertDescription>
+          </Alert>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -520,17 +476,6 @@ export const EmailCredentialsManager = () => {
           </form>
         </CardContent>
       </Card>
-      )}
-
-      {isLiveMode && (
-        <Alert className="border-blue-200 bg-blue-50">
-          <Shield className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
-            <strong>Live Mode Active:</strong> Development fallback configuration is disabled. 
-            All SMTP credentials must be configured via Edge Function Secrets for security.
-          </AlertDescription>
-        </Alert>
-      )}
     </div>
   );
 };

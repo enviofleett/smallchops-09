@@ -7,14 +7,13 @@ import {
   Tag, 
   User, 
   Truck, 
+  Trophy,
   Calendar,
-  Percent,
   BarChart3, 
   FileSearch, 
   Settings
 } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-import { usePermissionGuard, MENU_PERMISSION_KEYS, type MenuPermissionKey } from '@/hooks/usePermissionGuard';
 import startersLogo from '@/assets/starters-logo.png';
 import {
   Sidebar,
@@ -29,85 +28,67 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-interface MenuItem {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  path: string;
-  permissionKey: MenuPermissionKey;
-}
-
-const coreOperations: MenuItem[] = [
+const coreOperations = [
   {
     icon: LayoutDashboard,
     label: 'Dashboard',
-    path: '/dashboard',
-    permissionKey: MENU_PERMISSION_KEYS.dashboard
+    path: '/dashboard'
   },
   {
     icon: ShoppingCart,
     label: 'Orders',
-    path: '/admin/orders',
-    permissionKey: MENU_PERMISSION_KEYS.orders
+    path: '/admin/orders'
   },
   {
     icon: Tag,
     label: 'Categories',
-    path: '/categories',
-    permissionKey: MENU_PERMISSION_KEYS.categories
+    path: '/categories'
   },
   {
     icon: Package,
     label: 'Products',
-    path: '/admin/products',
-    permissionKey: MENU_PERMISSION_KEYS.products
+    path: '/admin/products'
   }
 ];
 
-const management: MenuItem[] = [
+const management = [
   {
     icon: User,
     label: 'Customers',
-    path: '/customers',
-    permissionKey: MENU_PERMISSION_KEYS.customers
+    path: '/customers'
   },
   {
     icon: Calendar,
     label: 'Catering Bookings',
-    path: '/bookings',
-    permissionKey: MENU_PERMISSION_KEYS.bookings
-  },
-  {
-    icon: Percent,
-    label: 'Discount Codes',
-    path: '/admin/discount-codes',
-    permissionKey: MENU_PERMISSION_KEYS.discountCodes
+    path: '/bookings'
   },
   {
     icon: Truck,
     label: 'Delivery Management',
-    path: '/admin/delivery',
-    permissionKey: MENU_PERMISSION_KEYS.delivery
+    path: '/admin/delivery'
   },
+  {
+    icon: Trophy,
+    label: 'Promotions & Loyalty',
+    path: '/promotions'
+  }
 ];
 
-const administration: MenuItem[] = [
+const administration = [
   {
     icon: BarChart3,
     label: 'Reports',
-    path: '/reports',
-    permissionKey: MENU_PERMISSION_KEYS.reports
+    path: '/reports'
   },
   {
     icon: FileSearch,
     label: 'Audit Logs',
-    path: '/audit-logs',
-    permissionKey: MENU_PERMISSION_KEYS.auditLogs
+    path: '/audit-logs'
   },
   {
     icon: Settings,
     label: 'Settings',
-    path: '/settings',
-    permissionKey: MENU_PERMISSION_KEYS.settings
+    path: '/settings'
   }
 ];
 
@@ -125,54 +106,32 @@ export function AppSidebar() {
     return location.pathname.startsWith(path);
   };
 
-  const PermissionMenuItem = ({ item }: { item: MenuItem }) => {
-    const { hasPermission, isLoading } = usePermissionGuard(item.permissionKey, 'view');
-    
-    // Don't render while loading permissions
-    if (isLoading) return null;
-    if (!hasPermission) return null;
-    
-    return (
-      <SidebarMenuItem key={item.path}>
-        <SidebarMenuButton 
-          asChild 
-          isActive={isActive(item.path)}
-          tooltip={collapsed ? item.label : undefined}
-          className="w-full justify-start"
-        >
-          <NavLink to={item.path} end={item.path === '/dashboard'}>
-            <item.icon className="w-4 h-4 shrink-0" />
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    );
-  };
-
-  const renderMenuGroup = (items: MenuItem[], groupLabel: string) => {
-    // Pre-filter items to avoid rendering empty groups
-    const visibleItems = items.filter(item => {
-      const { hasPermission, isLoading } = usePermissionGuard(item.permissionKey, 'view');
-      return !isLoading && hasPermission;
-    });
-    
-    if (visibleItems.length === 0) return null;
-    
-    return (
-      <SidebarGroup>
-        <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70 uppercase tracking-wider">
-          {groupLabel}
-        </SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            {items.map((item) => (
-              <PermissionMenuItem key={item.path} item={item} />
-            ))}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-    );
-  };
+  const renderMenuGroup = (items: typeof coreOperations, groupLabel: string) => (
+    <SidebarGroup>
+      <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70 uppercase tracking-wider">
+        {groupLabel}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => (
+            <SidebarMenuItem key={item.path}>
+              <SidebarMenuButton 
+                asChild 
+                isActive={isActive(item.path)}
+                tooltip={collapsed ? item.label : undefined}
+                className="w-full justify-start"
+              >
+                <NavLink to={item.path} end={item.path === '/dashboard'}>
+                  <item.icon className="w-4 h-4 shrink-0" />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
 
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">

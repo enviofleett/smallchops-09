@@ -122,53 +122,14 @@ export const ProgressiveLoader = ({
 
   // Show error state
   if (error) {
-    const getErrorInfo = (error: Error) => {
-      const message = error.message || '';
-      
-      // Categorize common production errors
-      if (message.includes('Edge Function returned a non-2xx status code') || message.includes('FunctionsHttpError')) {
-        return {
-          title: 'Service Temporarily Unavailable',
-          description: 'Our data service is currently experiencing issues. Please try again in a few moments.',
-          variant: 'warning' as const
-        };
-      }
-      
-      if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-        return {
-          title: 'Connection Problem',
-          description: 'Please check your internet connection and try again.',
-          variant: 'warning' as const
-        };
-      }
-      
-      if (message.includes('timeout') || message.includes('took too long')) {
-        return {
-          title: 'Request Timed Out',
-          description: 'The request is taking longer than expected. Please try again.',
-          variant: 'warning' as const
-        };
-      }
-      
-      // Default error for unknown cases
-      return {
-        title: 'Unable to Load Data',
-        description: 'Something went wrong while loading this content. Our team has been notified.',
-        variant: 'error' as const
-      };
-    };
-
-    const errorInfo = getErrorInfo(error);
-    const iconColor = errorInfo.variant === 'warning' ? 'text-amber-500' : 'text-destructive';
-
     return (
       <Card className="p-6">
         <div className="text-center space-y-4">
-          <AlertCircle className={`h-12 w-12 ${iconColor} mx-auto`} />
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
           <div>
-            <h3 className="text-lg font-semibold">{errorInfo.title}</h3>
+            <h3 className="text-lg font-semibold">Failed to load content</h3>
             <p className="text-muted-foreground">
-              {errorInfo.description}
+              {error.message || 'Something went wrong while loading this content.'}
             </p>
           </div>
           {retryFn && (

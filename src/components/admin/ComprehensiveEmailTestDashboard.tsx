@@ -99,26 +99,26 @@ export const ComprehensiveEmailTestDashboard = () => {
     updateTestResult('SMTP Config', 'running', 'Testing SMTP configuration...');
     
     try {
-      // Use production-safe edge function health check instead of direct database query
-      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
-        body: { healthcheck: true, check: 'smtp' }
-      });
+      const { data, error } = await supabase
+        .from('communication_settings')
+        .select('*')
+        .eq('use_smtp', true)
+        .maybeSingle();
 
-      if (error) throw error;
-
-      if (!data?.smtpCheck?.configured) {
-        updateTestResult('SMTP Config', 'error', 'SMTP not configured properly');
+      if (error || !data) {
+        updateTestResult('SMTP Config', 'error', 'SMTP not configured in database');
         return false;
       }
 
-      const source = data.smtpCheck.source === 'function_secrets' ? 'Edge Function Secrets (Production)' : 'Database Configuration (Development)';
-      
-      updateTestResult('SMTP Config', 'success', `SMTP configuration ready - Source: ${source}`, {
-        host: data.smtpCheck.host,
-        port: data.smtpCheck.port,
-        encryption: data.smtpCheck.encryption,
-        source: data.smtpCheck.source,
-        production_ready: data.smtpCheck.source === 'function_secrets'
+      if (!data.smtp_host || !data.smtp_user || !data.smtp_pass) {
+        updateTestResult('SMTP Config', 'error', 'SMTP configuration incomplete');
+        return false;
+      }
+
+      updateTestResult('SMTP Config', 'success', 'SMTP configuration found and complete', {
+        host: data.smtp_host,
+        port: data.smtp_port,
+        secure: data.smtp_secure
       });
       return true;
     } catch (error) {

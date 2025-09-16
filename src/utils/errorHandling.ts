@@ -58,14 +58,12 @@ export const handlePaymentError = (error: unknown, onError?: (message: string) =
 };
 
 /**
- * Payment response normalization with safe fallbacks - FIXED for new backend structure
+ * Payment response normalization with safe fallbacks
  */
 export const normalizePaymentResponse = (response: any) => {
   try {
-    console.log('🔧 Normalizing payment response:', response);
-    
-    // Handle both new and legacy response structures
-    const paymentData = response?.payment || response;
+    // Handle nested response structures
+    const paymentData = response?.payment || response?.data || response;
     
     // Priority: payment_url > authorization_url > construct from access_code
     let paymentUrl = paymentData?.payment_url || paymentData?.authorization_url;
@@ -85,10 +83,8 @@ export const normalizePaymentResponse = (response: any) => {
       authorization_url: paymentData?.authorization_url,
       reference: paymentData?.reference,
       access_code: paymentData?.access_code,
-      // Handle both root-level and nested order data
-      order_id: response?.order_id || response?.order?.id,
-      order_number: response?.order_number || response?.order?.order_number,
-      amount: response?.total_amount || response?.amount || response?.order?.total_amount
+      order_id: response?.order_id,
+      order_number: response?.order_number
     };
     
   } catch (error) {

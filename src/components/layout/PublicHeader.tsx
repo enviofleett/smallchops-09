@@ -3,17 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, Menu, X, Heart, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
-import { useFavorites } from '@/hooks/useFavorites';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { useWebsiteMenu } from '@/hooks/useWebsiteMenu';
-import { useHeaderBanners } from '@/hooks/useHeaderBanners';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 import { AuthButton } from '@/components/auth/AuthButton';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { NotificationPreview } from '@/components/notifications/NotificationPreview';
-import { NotificationIntegration } from '@/components/notifications/NotificationIntegration';
-import { HeaderBanner } from '@/components/banners/HeaderBanner';
 
 export const PublicHeader = () => {
   return (
@@ -26,44 +19,21 @@ export const PublicHeader = () => {
 const PublicHeaderContent = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Keep for backward compatibility
-  const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
   const { getItemCount } = useCart();
-  const { getFavoritesCount } = useFavorites();
   const { data: settings, error } = useBusinessSettings();
   const { isAuthenticated, customerAccount, isLoading } = useCustomerAuth();
-  const { data: menuItems } = useWebsiteMenu();
-  const { data: banners } = useHeaderBanners();
   const navigate = useNavigate();
 
   const handleCartClick = () => {
     navigate('/cart');
   };
 
-  const handleDismissBanner = (bannerId: string) => {
-    setDismissedBanners(prev => new Set([...prev, bannerId]));
-  };
-
   // Graceful degradation for logo and business name
   const logoUrl = settings?.logo_url || "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
   const businessName = settings?.name || "Starters";
 
-  // Filter out dismissed banners
-  const activeBanners = banners?.filter(banner => !dismissedBanners.has(banner.id)) || [];
-
   return (
-    <div>
-      {/* Header Banners */}
-      {activeBanners.map((banner) => (
-        <HeaderBanner
-          key={banner.id}
-          banner={banner}
-          onDismiss={() => handleDismissBanner(banner.id)}
-          dismissible={true}
-        />
-      ))}
-      
-      {/* Main Header */}
-      <header className="bg-background border-b border-border sticky top-0 z-50">
+    <header className="bg-background border-b border-border sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
@@ -80,16 +50,36 @@ const PublicHeaderContent = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            {menuItems?.map((item) => (
-              <Link
-                key={item.id}
-                to={item.url || '#'}
-                className="text-foreground hover:text-primary transition-colors"
-                target={item.target}
-              >
-                {item.label}
-              </Link>
-            ))}
+            <Link 
+              to="/" 
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              Home
+            </Link>
+            <Link 
+              to="/products" 
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              Shop
+            </Link>
+            <Link 
+              to="/booking" 
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              Event
+            </Link>
+            <Link 
+              to="/about" 
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              About
+            </Link>
+            <Link 
+              to="/contact" 
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              Contact
+            </Link>
           </nav>
 
           {/* Search Bar - Hidden on mobile, shown in mobile menu */}
@@ -106,29 +96,34 @@ const PublicHeaderContent = () => {
 
           {/* Right Actions - Mobile optimized */}
           <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* Track Order - For authenticated users */}
+            {isAuthenticated && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden md:flex"
+                onClick={() => navigate('/track-order')}
+                title="Track Order"
+              >
+                <MapPin className="h-5 w-5" />
+              </Button>
+            )}
+
             {/* Favorites - Hidden on small mobile */}
             <Button
               variant="ghost"
               size="icon"
-              className="hidden sm:flex relative"
+              className="hidden sm:flex"
               onClick={() => {
                 if (isAuthenticated) {
-                  navigate('/favorites');
+                  navigate('/customer-favorites');
                 } else {
-                  navigate('/auth?redirect=/favorites');
+                  navigate('/auth?redirect=/customer-favorites');
                 }
               }}
             >
               <Heart className="h-5 w-5" />
-              {getFavoritesCount() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {getFavoritesCount()}
-                </span>
-              )}
             </Button>
-
-            {/* Notifications */}
-            <NotificationBell />
 
             {/* Cart */}
             <Button
@@ -176,17 +171,27 @@ const PublicHeaderContent = () => {
 
               {/* Mobile Navigation */}
               <nav className="flex flex-col space-y-1 px-4">
-                {menuItems?.map((item) => (
-                  <Link
-                    key={item.id}
-                    to={item.url || '#'}
-                    className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                    target={item.target}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
+                <Link 
+                  to="/" 
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Home
+                </Link>
+                <Link 
+                  to="/products" 
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Shop
+                </Link>
+                <Link 
+                  to="/booking" 
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Event
+                </Link>
                 {isAuthenticated && (
                   <button 
                     className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
@@ -199,35 +204,37 @@ const PublicHeaderContent = () => {
                   </button>
                 )}
                 <button 
-                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full flex items-center justify-between"
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     if (isAuthenticated) {
-                      navigate('/favorites');
+                      navigate('/customer-favorites');
                     } else {
-                      navigate('/auth?redirect=/favorites');
+                      navigate('/auth?redirect=/customer-favorites');
                     }
                   }}
                 >
-                  <span>Favorites</span>
-                  {getFavoritesCount() > 0 && (
-                    <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {getFavoritesCount()}
-                    </span>
-                  )}
+                  Favorites
                 </button>
+                <Link 
+                  to="/about" 
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  About
+                </Link>
+                <Link 
+                  to="/contact" 
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Contact
+                </Link>
               </nav>
             </div>
           </div>
         )}
       </div>
-      
-      {/* Notification Preview - Global */}
-      <NotificationPreview />
-      
-      {/* Notification Integration - Global Event Listeners */}
-      <NotificationIntegration />
-      </header>
-    </div>
+    </header>
   );
 };

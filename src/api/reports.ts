@@ -73,26 +73,6 @@ export async function fetchReportsData(
     }
   }
   
-  // If all retries failed, return fallback data instead of throwing
-  console.warn('Reports API failed after all retries, returning fallback data');
-  
-  return {
-    stats: { 
-      totalProducts: 0, 
-      totalOrders: 0, 
-      totalCustomers: 0, 
-      totalRevenue: 0 
-    },
-    revenueSeries: [],
-    orderSeries: [],
-    topCustomersByOrders: [],
-    topCustomersBySpending: [],
-    recentOrders: [],
-    dateRange: { 
-      startDate: new Date().toISOString().split('T')[0], 
-      endDate: new Date().toISOString().split('T')[0] 
-    },
-    groupBy: 'week' as const,
-    _fallback: true // Flag to indicate this is fallback data
-  };
+  // If all retries failed, throw the last error
+  throw lastError || new Error("Failed to fetch reports data after all retries");
 }

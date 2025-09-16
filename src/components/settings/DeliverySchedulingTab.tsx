@@ -151,29 +151,21 @@ export const DeliverySchedulingTab = () => {
     try {
       setSaving(true);
       
-      // Get existing business settings to preserve required fields
-      const { data: existingSettings } = await supabase
-        .from('business_settings')
-        .select('*')
-        .single();
-      
-      // Update or insert business settings with required name field
+      // Update or insert business settings
       const { error } = await supabase
         .from('business_settings')
         .upsert({
-          ...existingSettings,
-          name: existingSettings?.name || 'My Business', // Preserve existing name or set default
           delivery_scheduling_config: config as any,
           business_hours: config.business_hours as any,
           updated_at: new Date().toISOString()
-        });
+        } as any);
 
       if (error) throw error;
       
       toast.success('Delivery scheduling configuration saved successfully');
     } catch (error) {
       console.error('Failed to save configuration:', error);
-      toast.error(`Failed to save configuration: ${error.message}`);
+      toast.error('Failed to save configuration');
     } finally {
       setSaving(false);
     }

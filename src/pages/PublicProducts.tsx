@@ -8,7 +8,7 @@ import { toImagesArray } from '@/lib/imageUtils';
 import { Input } from '@/components/ui/input';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { getPublicProducts } from '@/api/publicProducts';
+import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { getCategories } from '@/api/categories';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 import { useCart } from '@/hooks/useCart';
@@ -22,7 +22,6 @@ import { useCustomerFavorites, useFavoritesByProducts } from '@/hooks/useCustome
 import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import ProductsFilters, { FilterState } from '@/components/products/ProductsFilters';
-import { MOQBadge } from '@/components/ui/moq-badge';
 
 const PublicProducts = () => {
   const navigate = useNavigate();
@@ -42,23 +41,20 @@ const PublicProducts = () => {
   
   // Fetch products with discounts - Production Ready
   const { 
-    data: productsResponse, 
+    data: products = [], 
     isLoading: isLoadingProducts, 
     error: productsError,
     refetch: refetchProducts 
   } = useQuery({
-    queryKey: ['public-products', activeCategory === 'all' ? undefined : activeCategory],
-    queryFn: () => getPublicProducts({ category_id: activeCategory === 'all' ? undefined : activeCategory }),
+    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
+    queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: false,
   });
 
-  // Extract products from response
-  const products = productsResponse?.products || [];
-
-  const {
+  const { 
     favorites, 
     addToFavorites, 
     removeFromFavorites 
@@ -93,32 +89,25 @@ const PublicProducts = () => {
     }
   }, [products.length, priceRange, filters.priceRange]);
 
-  // Filter and sort products based on all criteria - Production Ready
+  // Filter products based on all criteria
   const filteredProducts = useMemo(() => {
-    return products
-      .filter(product => {
-        // Search filter
-        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        // Price filter
-        const productPrice = product.discounted_price || product.price;
-        const matchesPrice = productPrice >= filters.priceRange[0] && productPrice <= filters.priceRange[1];
-        
-        // Promotion filter
-        const matchesPromotion = !filters.onlyPromotions || (product.discount_percentage && product.discount_percentage > 0);
-        
-        // Rating filter (you'll need to implement this based on your rating system)
-        const matchesRating = filters.minRating === 0; // For now, assuming all products match
-        
-        return matchesSearch && matchesPrice && matchesPromotion && matchesRating;
-      })
-      .sort((a, b) => {
-        // Sort by price (lowest to highest) - Production Ready
-        const priceA = a.discounted_price || a.price;
-        const priceB = b.discounted_price || b.price;
-        return priceA - priceB;
-      });
+    return products.filter(product => {
+      // Search filter
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Price filter
+      const productPrice = product.discounted_price || product.price;
+      const matchesPrice = productPrice >= filters.priceRange[0] && productPrice <= filters.priceRange[1];
+      
+      // Promotion filter
+      const matchesPromotion = !filters.onlyPromotions || (product.discount_percentage && product.discount_percentage > 0);
+      
+      // Rating filter (you'll need to implement this based on your rating system)
+      const matchesRating = filters.minRating === 0; // For now, assuming all products match
+      
+      return matchesSearch && matchesPrice && matchesPromotion && matchesRating;
+    });
   }, [products, searchTerm, filters]);
 
   // Pagination
@@ -364,16 +353,6 @@ const PublicProducts = () => {
                               />
                             </div>
                           )}
-                          {/* MOQ Badge - Top Right */}
-                          {(product.minimum_order_quantity && product.minimum_order_quantity > 1) && (
-                            <div className="absolute top-1 sm:top-2 right-1 sm:right-2">
-                              <MOQBadge 
-                                minimumQuantity={product.minimum_order_quantity}
-                                showIcon={false}
-                                className="text-xs px-2 py-1 bg-blue-500/90 text-white border-blue-500"
-                              />
-                            </div>
-                          )}
                         </div>
                         <CardContent className="p-2 sm:p-3 lg:p-4">
                           <div className="flex items-start justify-between mb-1 sm:mb-2">
@@ -403,19 +382,9 @@ const PublicProducts = () => {
                               }}
                               className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
                             >
-                              {(product.minimum_order_quantity && product.minimum_order_quantity > 1) 
-                                ? `Add ${product.minimum_order_quantity}+` 
-                                : 'Add'
-                              }
+                              Add
                             </Button>
                           </div>
-                          
-                          {/* Minimum Order Information */}
-                          {(product.minimum_order_quantity && product.minimum_order_quantity > 1) && (
-                            <div className="mt-2 text-xs text-muted-foreground text-center">
-                              Min. order: {product.minimum_order_quantity} units
-                            </div>
-                          )}
                         </CardContent>
                       </Card>
                     ))}

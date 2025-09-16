@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { formatPrice } from "@/lib/formatPrice";
+import { formatCurrency } from "@/lib/discountCalculations";
 
 interface PriceDisplayProps {
   originalPrice: number;
@@ -29,7 +29,7 @@ export function PriceDisplay({
   if (!hasDiscount || !discountedPrice) {
     return (
       <div className={cn("font-semibold text-primary", sizeClasses[size], className)}>
-        {formatPrice(originalPrice)}
+        {formatCurrency(originalPrice)}
       </div>
     );
   }
@@ -38,18 +38,18 @@ export function PriceDisplay({
     <div className={cn("space-y-1", className)}>
       <div className="flex items-center gap-2">
         <span className={cn("font-bold text-primary", sizeClasses[size])}>
-          {formatPrice(discountedPrice)}
+          {formatCurrency(discountedPrice)}
         </span>
         <span className={cn(
           "text-muted-foreground line-through",
           size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'
         )}>
-          {formatPrice(originalPrice)}
+          {formatCurrency(originalPrice)}
         </span>
       </div>
       {showSavings && savings > 0 && (
         <div className="text-xs text-green-600 font-medium">
-          You save {formatPrice(savings)}
+          You save {formatCurrency(savings)}
         </div>
       )}
     </div>

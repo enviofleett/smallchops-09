@@ -1,12 +1,6 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { validateSMTPUser, isValidSMTPConfig, maskSMTPConfig, getProviderSpecificSettings, type SMTPUserValidation } from '../_shared/smtp-config.ts';
-
-// Production mode configuration
-const isProductionMode = Deno.env.get('EMAIL_PRODUCTION_MODE')?.toLowerCase() === 'true' || 
-                        Deno.env.get('DENO_ENV') === 'production';
-
-console.log(`🔒 Email Production Mode: ${isProductionMode ? 'ENABLED' : 'DISABLED'} (EMAIL_PRODUCTION_MODE=${Deno.env.get('EMAIL_PRODUCTION_MODE')}, DENO_ENV=${Deno.env.get('DENO_ENV')})`);
 
 // Configuration constants
 const TIMEOUTS = {
@@ -21,8 +15,6 @@ const RETRY_CONFIG = {
   maxDelayMs: 5000,
   jitterFactor: 0.1
 };
-
-// Import shared SMTP utilities - mask function now in shared module
 
 // Helper function for timeouts
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
@@ -55,135 +47,11 @@ function parseResponse(response: string): SMTPResponse {
   return { code, lines, message };
 }
 
-// Production-ready SMTP user type detection and validation
-interface SMTPUserValidation {
-  isValid: boolean;
-  userType: 'email' | 'api_key' | 'username' | 'unknown';
-  provider?: string;
-  errors: string[];
-  suggestions: string[];
-}
-
-function validateSMTPUser(user: string, host: string): SMTPUserValidation {
-  const errors: string[] = [];
-  const suggestions: string[] = [];
-  let userType: 'email' | 'api_key' | 'username' | 'unknown' = 'unknown';
-  let provider: string | undefined;
-
-  // Detect user type based on format and host
-  if (user.includes('@')) {
-    userType = 'email';
-    const domain = user.split('@')[1]?.toLowerCase();
-    if (domain) {
-      if (domain.includes('gmail')) provider = 'gmail';
-      else if (domain.includes('outlook') || domain.includes('hotmail') || domain.includes('live')) provider = 'outlook';
-      else if (domain.includes('yahoo')) provider = 'yahoo';
-    }
-  } else if (user.toLowerCase().startsWith('apikey') || user.toLowerCase().includes('api') || user.length > 20) {
-    userType = 'api_key';
-  } else if (user.length >= 3 && !user.includes('@')) {
-    userType = 'username';
-  }
-
-  // Host-based provider detection for validation
-  const detectProviderFromHost = (hostname: string): string | undefined => {
-    const h = hostname.toLowerCase();
-    if (h.includes('gmail')) return 'gmail';
-    if (h.includes('outlook') || h.includes('office365') || h.includes('hotmail')) return 'outlook';
-    if (h.includes('sendgrid')) return 'sendgrid';
-    if (h.includes('mailgun')) return 'mailgun';
-    if (h.includes('ses') || h.includes('amazonses')) return 'aws_ses';
-    if (h.includes('postmark')) return 'postmark';
-    if (h.includes('mailersend')) return 'mailersend';
-    if (h.includes('yahoo')) return 'yahoo';
-    return undefined;
-  };
-
-  const hostProvider = detectProviderFromHost(host);
-
-  // Provider-specific validation rules
-  switch (hostProvider) {
-    case 'gmail':
-      if (userType !== 'email') {
-        errors.push('Gmail SMTP requires full email address as SMTP_USER');
-        suggestions.push('Use your complete Gmail address (e.g., user@gmail.com)');
-      } else if (!user.toLowerCase().includes('gmail.com')) {
-        errors.push('Gmail SMTP host requires Gmail email address');
-        suggestions.push('Use your Gmail address ending with @gmail.com');
-      }
-      break;
-
-    case 'outlook':
-      if (userType !== 'email') {
-        errors.push('Outlook/Office365 SMTP requires full email address as SMTP_USER');
-        suggestions.push('Use your complete Outlook/Hotmail/Office365 email address');
-      }
-      break;
-
-    case 'sendgrid':
-      if (userType !== 'api_key' && user.toLowerCase() !== 'apikey') {
-        errors.push('SendGrid SMTP typically uses "apikey" as SMTP_USER');
-        suggestions.push('Set SMTP_USER to "apikey" and use your API key as SMTP_PASS');
-      }
-      break;
-
-    case 'mailgun':
-      if (userType !== 'api_key' && userType !== 'username') {
-        errors.push('Mailgun SMTP requires API username or postmaster email');
-        suggestions.push('Use your Mailgun API username or postmaster@yourdomain.com');
-      }
-      break;
-
-    case 'aws_ses':
-      if (userType !== 'api_key' && userType !== 'username') {
-        errors.push('Amazon SES requires SMTP username (not email address)');
-        suggestions.push('Use your AWS SES SMTP username (20-character string starting with AKIA)');
-      }
-      break;
-
-    case 'postmark':
-      if (userType !== 'api_key') {
-        errors.push('Postmark SMTP uses API tokens, not email addresses');
-        suggestions.push('Use your Postmark SMTP token as SMTP_USER');
-      }
-      break;
-
-    default:
-      // Generic validation for unknown providers
-      if (userType === 'unknown') {
-        errors.push(`SMTP_USER format unclear for provider. Should be email, API key, or username`);
-        suggestions.push('Check your email provider documentation for correct SMTP_USER format');
-      }
-  }
-
-  // Check for obvious placeholder/test values
-  const placeholderPatterns = ['test', 'example', 'placeholder', 'your-email', 'user@domain'];
-  if (placeholderPatterns.some(pattern => user.toLowerCase().includes(pattern))) {
-    errors.push(`SMTP_USER "${user}" appears to be a placeholder value`);
-    suggestions.push('Replace with your actual SMTP username, email address, or API key');
-  }
-
-  // Check minimum length requirements
-  if (user.length < 3) {
-    errors.push('SMTP_USER too short - must be at least 3 characters');
-    suggestions.push('Provide a valid email address, username, or API key');
-  }
-
-  return {
-    isValid: errors.length === 0,
-    userType,
-    provider: hostProvider,
-    errors,
-    suggestions
-  };
-}
-
-// Enhanced SMTP configuration validation supporting multiple user formats
-function isValidSMTPConfig(host: string, port: string, user: string, pass: string): { 
+// Validate SMTP configuration values to detect invalid hashed secrets
+function isValidSMTPConfig(host: string, port: string, username: string, password: string): { 
   isValid: boolean; 
   errors: string[];
   suggestions: string[];
-  userValidation?: SMTPUserValidation;
 } {
   const errors: string[] = [];
   const suggestions: string[] = [];
@@ -201,14 +69,14 @@ function isValidSMTPConfig(host: string, port: string, user: string, pass: strin
     suggestions.push('Set SMTP_PORT to your email provider port (usually 587 or 465)');
   }
   
-  if (hashPattern.test(user)) {
-    errors.push(`SMTP_USER appears to be a hashed value (${user.substring(0,8)}...), needs actual credential`);
-    suggestions.push('Set SMTP_USER to your email address, username, or API key');
+  if (hashPattern.test(username)) {
+    errors.push(`SMTP_USERNAME appears to be a hashed value (${username.substring(0,8)}...), needs actual email/username`);
+    suggestions.push('Set SMTP_USERNAME to your email address or API username');
   }
   
-  if (hashPattern.test(pass)) {
-    errors.push(`SMTP_PASS appears to be a hashed value (${pass.substring(0,8)}...), needs actual password`);
-    suggestions.push('Set SMTP_PASS to your email password or API key');
+  if (hashPattern.test(password)) {
+    errors.push(`SMTP_PASSWORD appears to be a hashed value (${password.substring(0,8)}...), needs actual password`);
+    suggestions.push('Set SMTP_PASSWORD to your email password or API key');
   }
   
   // Validate hostname format
@@ -224,31 +92,27 @@ function isValidSMTPConfig(host: string, port: string, user: string, pass: strin
     suggestions.push('Use port 587 for most providers, or 465 for SSL connections');
   }
   
-  // Validate SMTP user with enhanced logic
-  const userValidation = validateSMTPUser(user, host);
-  if (!userValidation.isValid) {
-    errors.push(...userValidation.errors);
-    suggestions.push(...userValidation.suggestions);
+  // Basic email validation for username
+  if (username && !username.includes('@') && !username.includes('apikey') && username.length < 10) {
+    errors.push(`SMTP_USERNAME "${username}" should typically be an email address or API key`);
+    suggestions.push('Use your full email address for Gmail/Outlook, or "apikey" for SendGrid');
   }
   
-  // Validate password strength
-  if (pass.length < 8 && !pass.toLowerCase().includes('api') && !pass.toLowerCase().includes('key')) {
-    errors.push('SMTP_PASS appears too short for a secure password');
-    suggestions.push('Use a strong password or API key (at least 8 characters)');
+  // Check for obvious placeholder/test values
+  if (username.toLowerCase().includes('test') || username.toLowerCase().includes('example') || username.toLowerCase() === 'starters') {
+    errors.push(`SMTP_USERNAME "${username}" appears to be a placeholder or test value`);
+    suggestions.push('Replace with your actual SMTP username/email address');
   }
   
-  // Check for obvious placeholder/test values in password
-  const passwordPlaceholders = ['test', 'example', 'password', 'secret', '12345'];
-  if (passwordPlaceholders.some(placeholder => pass.toLowerCase().includes(placeholder))) {
-    errors.push('SMTP_PASS appears to be a placeholder or weak password');
-    suggestions.push('Use your actual email password or API key');
+  if (password.toLowerCase().includes('test') || password.toLowerCase().includes('example') || password.length < 8) {
+    errors.push(`SMTP_PASSWORD appears to be a placeholder or test value`);
+    suggestions.push('Use your actual email password or API key (at least 8 characters)');
   }
   
   return {
     isValid: errors.length === 0,
     errors,
-    suggestions,
-    userValidation
+    suggestions
   };
 }
 
@@ -265,53 +129,24 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
 }> {
   console.log('🔍 Loading SMTP configuration...');
   
-// Priority 1: Function Secrets (Production) - Using standardized variable names
+  // Priority 1: Function Secrets (Production)
   const secretHost = Deno.env.get('SMTP_HOST');
   const secretPort = Deno.env.get('SMTP_PORT');
-  const secretUser = Deno.env.get('SMTP_USER');
-  const secretPass = Deno.env.get('SMTP_PASS');
+  const secretUsername = Deno.env.get('SMTP_USERNAME');
+  const secretPassword = Deno.env.get('SMTP_PASSWORD');
+  const secretEncryption = Deno.env.get('SMTP_ENCRYPTION');
+  const secretFromName = Deno.env.get('SMTP_FROM_NAME');
+  const secretFromEmail = Deno.env.get('SMTP_FROM_EMAIL');
 
-  // CRITICAL: In production, REQUIRE complete Function Secrets
-  const isProduction = Deno.env.get('DENO_ENV') === 'production' || 
-                       Deno.env.get('SUPABASE_URL')?.includes('supabase.co') ||
-                       isProductionMode;
-
-  if (isProduction) {
-    const missingSecrets = [];
-    if (!secretHost) missingSecrets.push('SMTP_HOST');
-    if (!secretPort) missingSecrets.push('SMTP_PORT');
-    if (!secretUser) missingSecrets.push('SMTP_USER'); 
-    if (!secretPass) missingSecrets.push('SMTP_PASS');
-
-    if (missingSecrets.length > 0) {
-      const errorMsg = `
-❌ PRODUCTION MODE: Missing required Function Secrets: ${missingSecrets.join(', ')}
-
-SETUP REQUIRED:
-1. Go to Supabase Dashboard → Settings → Edge Functions
-2. Add the missing Function Secrets with your actual SMTP credentials:
-   - SMTP_HOST: Your email provider hostname (e.g., smtp.gmail.com)
-   - SMTP_PORT: Usually 587 or 465  
-   - SMTP_USER: Your email address or API username
-   - SMTP_PASS: Your email password or API key
-
-SECURITY: Never use placeholder, test, or hashed values in production.
-      `.trim();
-      
-      console.error(errorMsg);
-      throw new Error(errorMsg);
-    }
-  }
-
-  if (secretHost && secretUser && secretPass) {
+  if (secretHost && secretUsername && secretPassword) {
     console.log('✅ Using production SMTP configuration from Function Secrets');
     
     // CRITICAL: Validate that secrets contain actual values, not hashes
     const validation = isValidSMTPConfig(
       secretHost, 
       secretPort || '587', 
-      secretUser, 
-      secretPass
+      secretUsername, 
+      secretPassword
     );
     
     if (!validation.isValid) {
@@ -356,75 +191,20 @@ Never use placeholder, test, or hashed values in production.
       }
     }
     
-    // Provider-specific validation for Function Secrets
-    const userValidation = validateSMTPUser(secretUser, secretHost);
-    
-    // Gmail-specific App Password validation
-    if (userValidation.provider === 'gmail' && port === 587) {
-      const cleanPassword = secretPass.replace(/\s+/g, '');
-      if (cleanPassword.length !== 16) {
-        console.warn(`⚠️ Gmail App Password should be 16 characters. Current length: ${cleanPassword.length}. Generate one at https://myaccount.google.com/apppasswords`);
-      }
-    }
-    
-    // SendGrid-specific validation
-    if (userValidation.provider === 'sendgrid' && secretUser.toLowerCase() === 'apikey') {
-      if (!secretPass.startsWith('SG.')) {
-        console.warn('⚠️ SendGrid API key should start with "SG." - verify your API key format');
-      }
-    }
-    
-    // AWS SES validation
-    if (userValidation.provider === 'aws_ses') {
-      if (!secretUser.startsWith('AKIA') || secretUser.length !== 20) {
-        console.warn('⚠️ AWS SES SMTP username should be 20 characters starting with "AKIA"');
-      }
-    }
-
-    // Log user type detection and provider-specific settings
-    console.log(`🔍 Production SMTP Configuration:`, maskSMTPConfig({
-      source: 'function_secrets',
-      host: secretHost,
-      port: port,
-      username: secretUser,
-      userType: userValidation.userType,
-      provider: userValidation.provider,
-      senderEmail: secretUser,
-      senderName: 'System',
-      encryption: 'TLS'
-    }));
-    
-    // Log provider-specific recommendations
-    if (userValidation.provider) {
-      const providerSettings = getProviderSpecificSettings(userValidation.provider, userValidation.userType);
-      console.log(`📧 ${userValidation.provider.toUpperCase()} Settings:`, {
-        recommendedPort: providerSettings.defaultPort,
-        encryption: providerSettings.encryption,
-        authMethod: providerSettings.authMethod,
-        currentPort: port
-      });
-    }
-    
     return {
       host: secretHost.trim(),
       port: port,
-      username: secretUser.trim(),
-      // Normalize password: remove spaces that are sometimes copied from UI (e.g., Gmail App Passwords)
-      password: secretPass.replace(/\s+/g, '').trim(),
-      senderEmail: secretUser.trim(),
-      senderName: 'System',
-      encryption: 'TLS',
+      username: secretUsername.trim(),
+      password: secretPassword.trim(),
+      senderEmail: (secretFromEmail || secretUsername).trim(),
+      senderName: (secretFromName || 'System').trim(),
+      encryption: secretEncryption?.trim() || 'TLS',
       source: 'function_secrets'
     };
   }
 
-  // Database Configuration (Development Fallback Only)  
-  if (isProduction) {
-    throw new Error('PRODUCTION MODE: Database fallback not allowed. Configure Function Secrets for production use.');
-  }
-  
-  console.log('📧 Falling back to database SMTP configuration (development mode)');
-  
+  // Priority 2: Database fallback (Testing/Development)
+  console.log('⚠️ Function Secrets not configured, falling back to database');
   const { data: config } = await supabase
     .from('communication_settings')
     .select('*')
@@ -433,146 +213,69 @@ Never use placeholder, test, or hashed values in production.
     .maybeSingle();
 
   if (!config?.use_smtp) {
-    throw new Error('No SMTP configuration found in Function Secrets or database. For production, configure Function Secrets.');
+    throw new Error('SMTP not configured - neither Function Secrets nor database config available');
   }
 
-  if (!config.smtp_host || !config.smtp_user) {
+  if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
     const missing = [];
     if (!config.smtp_host) missing.push('host');
     if (!config.smtp_user) missing.push('username');
+    if (!config.smtp_pass) missing.push('password');
     throw new Error(`Incomplete database SMTP configuration: missing ${missing.join(', ')}`);
-  }
-
-  console.log('📧 Database config loaded:', maskSMTPConfig({
-    host: config.smtp_host,
-    port: config.smtp_port,
-    user: config.smtp_user,
-    encryption: 'TLS'
-  }));
-
-  const normalizedPassword = (config.smtp_pass || '').toString().replace(/\s+/g, '').trim();
-  const normalizedUsername = config.smtp_user.trim();
-
-  // Provider-specific validation for database config
-  const dbUserValidation = validateSMTPUser(normalizedUsername, config.smtp_host);
-  
-  // Gmail-specific App Password validation for database config
-  if (dbUserValidation.provider === 'gmail' && (config.smtp_port || 587) === 587) {
-    if (normalizedPassword.length !== 16 && normalizedPassword.length > 0) {
-      console.warn('⚠️ Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
-    }
-  }
-  
-  // Log user type detection for debugging
-  console.log(`📧 Database SMTP User Type: ${dbUserValidation.userType} (Provider: ${dbUserValidation.provider || 'unknown'})`);
-  
-  if (!dbUserValidation.isValid) {
-    console.warn('⚠️ Database SMTP user validation warnings:', dbUserValidation.errors);
   }
 
   return {
     host: config.smtp_host.trim(),
     port: config.smtp_port || 587,
-    username: normalizedUsername,
-    password: normalizedPassword,
-    senderEmail: (config.sender_email || normalizedUsername).trim(),
+    username: config.smtp_user.trim(),
+    password: config.smtp_pass.trim(),
+    senderEmail: (config.sender_email || config.smtp_user).trim(),
     senderName: (config.sender_name || 'System').trim(),
     encryption: 'TLS',
     source: 'database'
   };
 }
 
-// Base email layout for non-full_html templates
-const BASE_EMAIL_LAYOUT = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{subject}}</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f8f9fa; }
-    .container { max-width: 600px; margin: 0 auto; background: white; }
-    .header { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 20px; text-align: center; }
-    .content { padding: 30px; }
-    .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #e9ecef; }
-    .brand { font-size: 24px; font-weight: bold; margin: 0; }
-    .unsubscribe { margin-top: 10px; }
-    .unsubscribe a { color: #6c757d; text-decoration: none; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1 class="brand">{{business_name}}</h1>
-    </div>
-    <div class="content">
-      {{content}}
-    </div>
-    <div class="footer">
-      <p>This email was sent by {{business_name}}.</p>
-      <div class="unsubscribe">
-        <a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{website_url}}">Visit Website</a>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-`;
-
-// Template processing with fallback, base layout wrapping, and missing variable tracking
+// Template processing with fallback
 async function processTemplate(
   supabase: any, 
   templateKey: string, 
   variables: Record<string, any> = {},
   businessName: string = 'System'
-): Promise<{ 
-  subject: string; 
-  html: string; 
-  text: string; 
-  templateFound: boolean;
-  missingVariables: string[];
-  templateType?: string;
-}> {
+): Promise<{ subject: string; html: string; text: string; templateFound: boolean }> {
   
   let template = null;
   let templateFound = false;
-  let templateType = 'standard';
 
   if (templateKey) {
     try {
-      // CRITICAL FIX 1: Prioritize enhanced_email_templates from Settings Page
-      const { data: enhancedTemplate } = await supabase
-        .from('enhanced_email_templates')
-        .select('template_type, subject_template, html_template, text_template')
+      // First try the email_templates view (preferred)
+      const { data: viewTemplate } = await supabase
+        .from('email_templates')
+        .select('*')
         .eq('template_key', templateKey)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (enhancedTemplate) {
-        template = {
-          subject: enhancedTemplate.subject_template,
-          html_content: enhancedTemplate.html_template,
-          text_content: enhancedTemplate.text_template,
-          template_type: enhancedTemplate.template_type || 'standard'
-        };
-        templateType = template.template_type;
+      if (viewTemplate) {
+        template = viewTemplate;
         templateFound = true;
-        console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from Email Template Manager`);
       } else {
-        // Fallback to legacy email_templates view (for backwards compatibility)
-        const { data: viewTemplate } = await supabase
-          .from('email_templates')
+        // Fallback to enhanced_email_templates with field mapping
+        const { data: enhancedTemplate } = await supabase
+          .from('enhanced_email_templates')
           .select('*')
           .eq('template_key', templateKey)
           .eq('is_active', true)
           .maybeSingle();
 
-        if (viewTemplate) {
-          template = viewTemplate;
-          templateType = viewTemplate.template_type || 'standard';
+        if (enhancedTemplate) {
+          template = {
+            subject: enhancedTemplate.subject || enhancedTemplate.subject_template,
+            html_content: enhancedTemplate.html_content || enhancedTemplate.html_template,
+            text_content: enhancedTemplate.text_content || enhancedTemplate.text_template
+          };
           templateFound = true;
-          console.warn(`⚠️ Using legacy template (consider migrating to Email Template Manager): ${templateKey}`);
         }
       }
     } catch (error) {
@@ -580,95 +283,33 @@ async function processTemplate(
     }
   }
 
-  // CRITICAL FIX 2: Enhanced Production Mode Template Validation
-  if (isProductionMode) {
-    if (!templateKey) {
-      throw new Error('PRODUCTION_MODE: All emails must specify a valid templateKey. Direct content emails are not allowed in production.');
-    }
-    
-    if (!templateFound) {
-      throw new Error(`PRODUCTION_MODE: Template '${templateKey}' not found in enhanced_email_templates. Only active templates from Email Template Manager are allowed in production.`);
-    }
-    
-    console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from Email Template Manager`);
-  }
-
-  // DEVELOPMENT MODE: Log when fallback templates are used
-  if (!isProductionMode && !templateFound && templateKey) {
-    console.warn(`⚠️ DEVELOPMENT_MODE: Template '${templateKey}' not found in database - using fallback. Add this template to Email Template Manager to ensure it works in production.`);
-  }
-
-  // Template processing - use template if found, fallback only in non-production
-  let subject: string;
-  let html: string;
-  let text: string;
-  
-  if (templateFound && template) {
-    // Use database template
-    subject = template.subject || template.subject_template || `${businessName} - Notification`;
-    html = template.html_content || template.html_template || '';
-    text = template.text_content || template.text_template || '';
-  } else if (!isProductionMode) {
-    // Fallback template (only allowed in development)
-    console.warn(`⚠️ DEVELOPMENT_MODE: Using fallback template for '${templateKey}'`);
-    subject = `${businessName} - Important Notification`;
-    html = `
-      <html>
-        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #f59e0b; margin-bottom: 20px;">${businessName}</h2>
-            <p>Thank you for your business with us.</p>
-            <p>This is an automated notification regarding your recent activity.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-            <p style="font-size: 12px; color: #666;">
-              This email was sent from our automated system. Please do not reply directly.
-            </p>
-          </div>
-        </body>
-      </html>
-    `;
-    text = `${businessName} - Important Notification\n\nThank you for your business with us.\n\nThis is an automated notification regarding your recent activity.\n\nThis email was sent from our automated system. Please do not reply directly.`;
-  } else {
-    // This should never happen in production mode due to earlier checks
-    throw new Error('PRODUCTION_MODE: Template processing failed - no fallback allowed');
-  }
-
-  // Extract all template variables to track missing ones
-  const allContent = [subject, html, text].join(' ');
-  const templateVariables = new Set<string>();
-  const variableRegex = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
-  let match;
-  while ((match = variableRegex.exec(allContent)) !== null) {
-    templateVariables.add(match[1]);
-  }
-
-  // Add base layout variables for non-full_html templates
-  const enhancedVariables = { ...variables };
-  if (templateType !== 'full_html') {
-    enhancedVariables.business_name = enhancedVariables.business_name || businessName;
-    enhancedVariables.website_url = enhancedVariables.website_url || '#';  
-    enhancedVariables.unsubscribe_url = enhancedVariables.unsubscribe_url || '#';
-  }
+  // Branded fallback template
+  let subject = template?.subject || `${businessName} - Important Notification`;
+  let html = template?.html_content || `
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #f59e0b; margin-bottom: 20px;">${businessName}</h2>
+          <p>Thank you for your business with us.</p>
+          <p>This is an automated notification regarding your recent activity.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This email was sent from our automated system. Please do not reply directly.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+  let text = template?.text_content || `${businessName}\n\nThank you for your business with us.\n\nThis is an automated notification regarding your recent activity.\n\nThis email was sent from our automated system.`;
 
   // Variable substitution with safe replacement
-  const missingVariables: string[] = [];
-  if (templateVariables.size > 0) {
+  if (variables && Object.keys(variables).length > 0) {
     [subject, html, text].forEach((content, index) => {
       if (content) {
         let processed = content;
-        
-        // Track which variables are actually used vs provided
-        templateVariables.forEach(varName => {
-          if (!(varName in enhancedVariables) || enhancedVariables[varName] === null || enhancedVariables[varName] === undefined) {
-            if (!missingVariables.includes(varName)) {
-              missingVariables.push(varName);
-            }
-          }
-        });
-        
-        Object.entries(enhancedVariables).forEach(([key, value]) => {
+        Object.entries(variables).forEach(([key, value]) => {
           if (value !== null && value !== undefined) {
-            const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+            const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
             processed = processed.replace(regex, String(value));
           }
         });
@@ -680,26 +321,7 @@ async function processTemplate(
     });
   }
 
-  // Apply base layout wrapping for non-full_html templates
-  if (templateType !== 'full_html' && html && !html.includes('<!DOCTYPE html>')) {
-    const layoutVariables = {
-      ...enhancedVariables,
-      content: html,
-      subject: subject
-    };
-    
-    let wrappedHtml = BASE_EMAIL_LAYOUT;
-    Object.entries(layoutVariables).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
-        wrappedHtml = wrappedHtml.replace(regex, String(value));
-      }
-    });
-    
-    html = wrappedHtml;
-  }
-
-  return { subject, html, text, templateFound, missingVariables, templateType };
+  return { subject, html, text, templateFound };
 }
 
 // Production-ready SMTP client with robust error handling
@@ -877,21 +499,10 @@ class ProductionSMTPClient {
   }
 
   private async authenticate(): Promise<string> {
-    // Enhanced authentication with Gmail 535 error handling
+    // Try AUTH PLAIN first as it's more reliable for many providers
     if (this.authMethods.includes('PLAIN')) {
-      try {
-        await this.authenticatePlain();
-        return 'PLAIN';
-      } catch (error) {
-        // Gmail often rejects AUTH PLAIN with 535 - try LOGIN instead
-        if (error.message.includes('535') && this.authMethods.includes('LOGIN')) {
-          this.log('AUTH PLAIN failed with 535, retrying with AUTH LOGIN...');
-          await this.authenticateLogin();
-          return 'LOGIN';
-        } else {
-          throw error;
-        }
-      }
+      await this.authenticatePlain();
+      return 'PLAIN';
     } else if (this.authMethods.includes('LOGIN') || this.authMethods.length === 0) {
       // Fallback to LOGIN if PLAIN not available
       await this.authenticateLogin();
@@ -1093,27 +704,18 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
   }
   
   if (message.includes('authentication failed') || message.includes('535')) {
-    let suggestion = 'Verify SMTP username and password credentials';
-    
-    // Enhanced guidance for Gmail 535 errors with specific troubleshooting
-    if (message.includes('535')) {
-      suggestion = 'Authentication rejected (535). For Gmail: 1) Enable 2-Step Verification, 2) Generate 16-char App Password at https://myaccount.google.com/apppasswords, 3) Use full Gmail address as SMTP_USERNAME, 4) Remove spaces from App Password, 5) Verify account security alerts, 6) Try allowing less secure app access temporarily';
-    } else if (message.includes('username and password not accepted')) {
-      suggestion = 'Username/password rejected. Check credentials in Function Secrets. For Gmail, use App Password (not regular password)';
-    }
-    
     return {
       category: 'auth',
       isTransient: false,
-      suggestion: suggestion
+      suggestion: 'Verify SMTP username and password credentials'
     };
   }
   
-  if (message.includes('connection') || message.includes('network') || message.includes('econnreset') || message.includes('connection refused')) {
+  if (message.includes('connection') || message.includes('network') || message.includes('econnreset')) {
     return {
       category: 'network',
       isTransient: true,
-      suggestion: 'Check network connectivity and SMTP server availability. For Gmail, verify host is smtp.gmail.com'
+      suggestion: 'Check network connectivity and SMTP server availability'
     };
   }
   
@@ -1121,7 +723,7 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
     return {
       category: 'tls',
       isTransient: false,
-      suggestion: 'TLS/STARTTLS issue. Try port 465 (implicit TLS) if 587 (STARTTLS) fails, or set SMTP_ENCRYPTION to match your provider'
+      suggestion: 'Try alternative port (465 for implicit TLS, 587 for STARTTLS)'
     };
   }
   
@@ -1240,116 +842,8 @@ serve(async (req: Request) => {
 
     requestBody = await req.json();
     
-    // SECURITY FIX: Enhanced health check with actual SMTP authentication test
-    if (requestBody.healthcheck === true || requestBody.check === 'smtp') {
-      console.log('🔍 Health check request detected in POST body');
-      
-      try {
-        const smtpConfig = await getProductionSMTPConfig(supabase);
-        
-        // SECURITY FIX: Test actual SMTP AUTH instead of just config loading
-        console.log('🔐 Testing SMTP authentication...');
-        const client = new ProductionSMTPClient(smtpConfig);
-        await client.connect();
-        await client.close();
-        
-        console.log('✅ SMTP health check passed - authentication verified');
-        
-        return new Response(JSON.stringify({
-          success: true,
-          message: 'SMTP sender health check passed - authentication verified',
-          provider: {
-            host: smtpConfig.host,
-            port: smtpConfig.port,
-            username: smtpConfig.username?.split('@')[0] + '@***',
-            senderEmail: smtpConfig.senderEmail?.split('@')[0] + '@***', 
-            senderName: smtpConfig.senderName,
-            encryption: smtpConfig.encryption,
-            source: smtpConfig.source
-          },
-          timestamp: new Date().toISOString()
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
-      } catch (error) {
-        console.error('❌ SMTP health check failed:', error);
-        return new Response(JSON.stringify({
-          success: false,
-          error: 'SMTP authentication failed',
-          message: error.message.includes('535') ? 
-            'SMTP Authentication Error: Check username/password in Function Secrets. For Gmail, use App Passwords.' : 
-            error.message,
-          timestamp: new Date().toISOString()
-        }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
-      }
-    }
-    
-    // P0 HOTFIX: Validate required "to" field immediately (only for regular emails)
-    if (!requestBody.to || typeof requestBody.to !== 'string' || !requestBody.to.includes('@')) {
-      console.error('❌ Invalid or missing recipient email:', {
-        to: requestBody.to,
-        type: typeof requestBody.to,
-        hasAt: requestBody.to && typeof requestBody.to === 'string' ? requestBody.to.includes('@') : false
-      });
-      
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Invalid or missing recipient email address',
-        reason: 'invalid_recipient',
-        received: {
-          to: requestBody.to,
-          type: typeof requestBody.to
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      });
-    }
-    
     // Handle healthcheck requests without full SMTP validation
     if (requestBody.healthcheck) {
-      // Enhanced healthcheck with credential status
-      if (requestBody.check === 'credentials') {
-        try {
-          const smtpConfig = await getProductionSMTPConfig(supabase);
-          
-          const credentialNames = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM_EMAIL', 'SMTP_FROM_NAME'];
-          const credentials: Record<string, any> = {};
-          
-          // Map our internal config to external credential names
-          credentials.SMTP_HOST = smtpConfig.host;
-          credentials.SMTP_PORT = smtpConfig.port.toString();
-          credentials.SMTP_USERNAME = smtpConfig.username;
-          credentials.SMTP_PASSWORD = smtpConfig.password;
-          credentials.SMTP_FROM_EMAIL = smtpConfig.senderEmail;
-          credentials.SMTP_FROM_NAME = smtpConfig.senderName;
-          
-          return new Response(JSON.stringify({
-            status: 'healthy',
-            service: 'unified-smtp-sender',
-            credentials: credentials,
-            source: smtpConfig.source,
-            timestamp: new Date().toISOString()
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        } catch (error) {
-          return new Response(JSON.stringify({
-            status: 'error',
-            service: 'unified-smtp-sender',
-            error: error.message,
-            timestamp: new Date().toISOString()
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-      }
-      
       return new Response(JSON.stringify({
         status: 'healthy',
         service: 'unified-smtp-sender',
@@ -1437,7 +931,7 @@ serve(async (req: Request) => {
     });
 
     // Process template with fallback and explicit subject handling
-    const { subject: templateSubject, html, text, templateFound, missingVariables, templateType } = await processTemplate(
+    const { subject: templateSubject, html, text, templateFound } = await processTemplate(
       supabase,
       requestBody.templateKey,
       requestBody.variables,
@@ -1506,14 +1000,9 @@ serve(async (req: Request) => {
         attempt_count: attemptCount,
         elapsed_ms: elapsed,
         last_smtp_code: result.client.getLastResponseCode(),
-         templateFound: templateFound,
-         templateType: templateType,
-         fallbackUsed: !templateFound,
-         missingVariables: missingVariables,
-         warnings: [
-           ...(!templateFound ? [`Template ${requestBody.templateKey} not found - using branded fallback`] : []),
-           ...(missingVariables.length > 0 ? [`Missing template variables: ${missingVariables.join(', ')}`] : [])
-         ].filter(Boolean)
+        templateFound: templateFound,
+        fallbackUsed: !templateFound,
+        warnings: !templateFound ? [`Template ${requestBody.templateKey} not found - using branded fallback`] : undefined
       }
     });
 

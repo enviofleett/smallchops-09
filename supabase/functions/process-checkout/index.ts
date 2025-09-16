@@ -2,7 +2,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-import { getCorsHeaders, handleCorsPreflightResponse } from '../_shared/cors.ts';
+// ✅ Updated CORS headers with allowed methods
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
+};
 
 // ✅ Validate environment variables before client creation
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -14,118 +19,24 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Validate and process discount codes with centralized validation
-async function validateAndApplyDiscount(supabase: any, discountCode: string, orderAmount: number, customerEmail: string, isNewCustomer: boolean = false) {
-  console.log(`🎟️ Validating discount code: ${discountCode} for amount: ${orderAmount}`);
-  
-  try {
-    const { data, error } = await supabase.functions.invoke('validate-discount-code', {
-      body: {
-        code: discountCode.trim().toUpperCase(),
-        customer_email: customerEmail,
-        order_amount: orderAmount,
-        is_new_customer: isNewCustomer
-      }
-    });
-
-    if (error) {
-      console.error('❌ Discount validation error:', error);
-      return { valid: false, error: error.message || 'Failed to validate discount code' };
-    }
-
-    if (!data || !data.valid) {
-      console.log('❌ Discount code invalid:', data?.error || 'Unknown error');
-      return { valid: false, error: data?.error || 'Invalid discount code' };
-    }
-
-    console.log('✅ Discount code validated successfully:', data);
-    return {
-      valid: true,
-      discount_amount: data.discount_amount,
-      final_amount: data.final_amount,
-      discount_code_id: data.discount_code_id,
-      discount_type: data.discount_type
-    };
-  } catch (error) {
-    console.error('❌ Discount validation exception:', error);
-    return { valid: false, error: 'Discount validation service error' };
-  }
-}
-
 serve(async (req) => {
-  // Generate unique request ID for tracing
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  // Get origin and generate CORS headers per-request
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return handleCorsPreflightResponse(origin);
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    console.log(`🚀 [${requestId}] Processing checkout request from origin:`, origin);
-    
-    // Enhanced authentication and guest session validation with idempotency check
+    // Extract and validate Authorization header
     const authHeader = req.headers.get("Authorization");
-    const guestSessionId = req.headers.get("x-guest-session-id");
-    const idempotencyKey = req.headers.get("x-idempotency-key");
+    console.log("🔐 Authorization header present:", !!authHeader);
     
-    console.log(`🔐 [${requestId}] Authentication context:`, {
-      hasAuthHeader: !!authHeader,
-      hasGuestSession: !!guestSessionId,
-      hasIdempotencyKey: !!idempotencyKey,
-      authHeaderLength: authHeader?.length || 0,
-      guestSessionLength: guestSessionId?.length || 0,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Check for duplicate request using idempotency key
-    if (idempotencyKey) {
-      console.log(`🔑 [${requestId}] Checking for duplicate request with key:`, idempotencyKey);
-      const { data: existingOrder, error: idempotencyError } = await supabaseAdmin
-        .from("orders")
-        .select("id, order_number, total_amount, status")
-        .eq("idempotency_key", idempotencyKey)
-        .maybeSingle();
-
-      if (idempotencyError && idempotencyError.code !== 'PGRST116') { // PGRST116 is "not found"
-        console.error(`❌ [${requestId}] Idempotency check failed:`, idempotencyError);
-      } else if (existingOrder) {
-        console.log(`✅ [${requestId}] Found existing order for idempotency key:`, existingOrder.id);
-        return new Response(
-          JSON.stringify({
-            success: true,
-            order_id: existingOrder.id,
-            order_number: existingOrder.order_number,
-            amount: existingOrder.total_amount,
-            duplicate_request: true,
-            message: "Order already processed"
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    }
-
-    // Allow either authenticated users OR guest sessions
-    if (!authHeader && !guestSessionId) {
-      console.log(`❌ [${requestId}] No authentication method provided`);
+    if (!authHeader) {
+      console.log("❌ No JWT provided - checkout requires authentication");
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Authentication required for checkout. Please log in or continue as guest.",
-          code: "REQUIRES_AUTH",
-          details: {
-            request_id: requestId,
-            missing_auth: !authHeader,
-            missing_guest: !guestSessionId,
-            suggestion: "Login or use guest checkout"
-          }
+          error: "Authentication required for checkout",
+          code: "REQUIRES_AUTH"
         }),
         {
           status: 401,
@@ -133,171 +44,26 @@ serve(async (req) => {
         }
       );
     }
-
-    // For authenticated users, validate the JWT with simplified error handling
-    let authenticatedUserId = null;
-    if (authHeader) {
-      try {
-        // Extract and validate JWT format
-        const jwt = authHeader.replace('Bearer ', '');
-        const jwtParts = jwt.split('.');
-        
-        if (jwtParts.length !== 3) {
-          console.log(`❌ [${requestId}] Invalid JWT format`);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: "Invalid authentication token format",
-              code: "INVALID_JWT_FORMAT",
-              details: { request_id: requestId, reason: "JWT must have 3 parts separated by dots" }
-            }),
-            {
-              status: 401,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        // Decode and validate essential claims
-        const payload = JSON.parse(atob(jwtParts[1]));
-        if (!payload.sub) {
-          console.log(`❌ [${requestId}] JWT missing 'sub' claim`);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: "Authentication token missing user identification",
-              code: "JWT_MISSING_SUB_CLAIM",
-              details: { request_id: requestId, reason: "Token does not contain valid user ID" }
-            }),
-            {
-              status: 401,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-        
-        // Simple expiration check
-        if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-          console.log(`❌ [${requestId}] JWT token expired`);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: "Authentication token has expired",
-              code: "JWT_EXPIRED",
-              details: { request_id: requestId, reason: "Please log in again" }
-            }),
-            {
-              status: 401,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        // Single validation with Supabase
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
-        
-        if (authError || !user) {
-          console.log(`❌ [${requestId}] Supabase auth validation failed:`, authError?.message);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: "Authentication validation failed",
-              code: "AUTH_VALIDATION_FAILED",
-              details: { 
-                request_id: requestId,
-                reason: authError?.message || "User not found",
-                suggestion: "Please log in again"
-              }
-            }),
-            {
-              status: 401,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-        
-        authenticatedUserId = user.id;
-        console.log(`✅ [${requestId}] Authentication validated for user:`, user.id);
-        
-      } catch (error) {
-        console.error(`❌ [${requestId}] JWT validation error:`, error.message);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: "Authentication processing failed",
-            code: "JWT_PROCESSING_ERROR",
-            details: { 
-              request_id: requestId,
-              error: error.message,
-              suggestion: "Please log in again"
-            }
-          }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    }
     
-    // For guest sessions, validate the session exists and is valid
-    if (guestSessionId && !authHeader) {
-      console.log(`🎭 [${requestId}] Processing guest checkout with session:`, guestSessionId);
-      // Guest session validation could be enhanced here for production
-    }
-    
-    console.log(`🛒 [${requestId}] Processing checkout request...`);
+    console.log("🛒 Processing checkout request...");
 
-    // Parse request body with error handling
-    let requestBody;
-    try {
-      requestBody = await req.json();
-    } catch (parseError) {
-      console.error(`❌ [${requestId}] Failed to parse request body:`, parseError);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Invalid request format",
-          code: "INVALID_REQUEST_BODY",
-          details: { 
-            request_id: requestId,
-            reason: "Request body must be valid JSON"
-          }
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const requestBody = await req.json();
 
-    console.log(`📨 [${requestId}] Checkout request received:`, {
+    console.log("📨 Checkout request received:", {
       customer_email: requestBody.customer?.email,
       items_count: requestBody.items?.length,
-      has_discount: !!requestBody.discount,
-      discount_code: requestBody.discount?.code,
-      cart_total: requestBody.cart_totals?.final_total,
-      authenticated_user: authenticatedUserId,
-      fulfillment_type: requestBody.fulfillment?.type,
-      idempotency_key: idempotencyKey
     });
 
-    // Enhanced request validation with detailed error context
-    if (!requestBody.customer?.email) {
-      throw new Error(`[${requestId}] Customer email is required`);
-    }
-    if (!requestBody.items || requestBody.items.length === 0) {
-      throw new Error(`[${requestId}] Order must contain at least one item`);
-    }
-    if (!requestBody.fulfillment?.type) {
-      throw new Error(`[${requestId}] Fulfillment type is required`);
-    }
+    // ✅ Validate request
+    if (!requestBody.customer?.email) throw new Error("Customer email is required");
+    if (!requestBody.items || requestBody.items.length === 0) throw new Error("Order must contain at least one item");
+    if (!requestBody.fulfillment?.type) throw new Error("Fulfillment type is required");
 
     const customerEmail = requestBody.customer.email.toLowerCase();
     let customerId;
 
-    // ✅ Look up existing customer with atomic operation
-    console.log(`👤 [${requestId}] Looking up customer by email:`, customerEmail);
+    // ✅ Look up existing customer
+    console.log("👤 Looking up customer by email:", customerEmail);
     const { data: existingCustomer, error: findError } = await supabaseAdmin
       .from("customer_accounts")
       .select("id, name")
@@ -373,33 +139,23 @@ serve(async (req) => {
       delivery_instructions: delivery_instructions
     } : null;
 
-    // ✅ Create order atomically with idempotency key
-    const orderCreationParams = {
+    // ✅ Call database function
+    const { data: orderId, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", {
       p_customer_id: customerId,
       p_fulfillment_type: requestBody.fulfillment.type,
       p_delivery_address: enhanced_delivery_address,
       p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
       p_delivery_zone_id: requestBody.fulfillment.delivery_zone_id || null,
-      p_guest_session_id: guestSessionId || null,
+      p_guest_session_id: null,
       p_items: orderItems,
-      p_idempotency_key: idempotencyKey || null
-    };
-    
-    console.log(`🔄 [${requestId}] Creating order with params:`, {
-      customer_id: customerId,
-      fulfillment_type: requestBody.fulfillment.type,
-      items_count: orderItems.length,
-      has_idempotency: !!idempotencyKey
     });
-    
-    const { data: orderId, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", orderCreationParams);
 
     if (orderError) {
-      console.error(`❌ [${requestId}] Order creation failed:`, orderError);
-      throw new Error(`Order creation failed: ${orderError.message} [${requestId}]`);
+      console.error("❌ Order creation failed:", orderError);
+      throw new Error(`Order creation failed: ${orderError.message}`);
     }
 
-    console.log(`✅ [${requestId}] Order created successfully:`, orderId);
+    console.log("✅ Order created successfully:", orderId);
     
     // ✅ Save delivery schedule atomically if provided
     if (requestBody.delivery_schedule && orderId) {
@@ -485,205 +241,31 @@ serve(async (req) => {
       }
     }
 
-    // 🔧 CRITICAL: Apply discount with centralized backend validation
-    let finalAmount = order.total_amount;
-    let discountApplied = 0;
-    let validatedDiscountDetails = null;
-    
-    console.log('💰 Backend amount calculation:', {
-      subtotal: requestBody.cart_totals?.subtotal,
-      discount_amount: requestBody.cart_totals?.discount_amount,
-      delivery_fee: deliveryFee,
-      client_final_total: requestBody.cart_totals?.final_total
-    });
-
-    // ✅ Recalculate on backend to ensure accuracy
-    const backendSubtotal = requestBody.items.reduce(
-      (sum, item) => sum + (item.unit_price * item.quantity), 0
-    );
-
-    let backendDiscountAmount = 0;
-    if (requestBody.discount?.code && requestBody.cart_totals?.discount_code) {
-      console.log('💸 Centralizing discount validation via validate-discount-code function:', {
-        code: requestBody.discount.code,
-        customer_email: customerEmail,
-        order_amount: backendSubtotal,
-        client_discount_amount: requestBody.discount.discount_amount
-      });
-      
-      try {
-        // ✅ Call centralized discount validation function
-        const discountValidation = await validateAndApplyDiscount(
-          supabaseAdmin,
-          requestBody.discount.code,
-          backendSubtotal,
-          customerEmail,
-          !existingCustomer // isNewCustomer
-        );
-        
-        if (discountValidation.valid) {
-          backendDiscountAmount = discountValidation.discount_amount;
-          validatedDiscountDetails = {
-            discount_code_id: discountValidation.discount_code_id,
-            discount_type: discountValidation.discount_type,
-            final_amount: discountValidation.final_amount
-          };
-          console.log('✅ Centralized discount validation successful:', discountValidation);
-        } else {
-          console.warn('⚠️ Centralized discount validation failed:', discountValidation.error);
-          // Don't fail checkout, but log the issue
-          backendDiscountAmount = 0;
-        }
-      } catch (discountError) {
-        console.error('❌ Discount validation service error:', discountError);
-        // Fallback: validate discount directly from database
-        const { data: discount, error: dbError } = await supabaseAdmin
-          .from('discount_codes')
-          .select('*')
-          .eq('code', requestBody.discount.code.toUpperCase())
-          .eq('is_active', true)
-          .single();
-          
-        if (discount && !dbError) {
-          if (discount.type === 'percentage') {
-            backendDiscountAmount = backendSubtotal * (discount.value / 100);
-          } else if (discount.type === 'fixed') {
-            backendDiscountAmount = Math.min(discount.value, backendSubtotal);
-          }
-          console.log('✅ Fallback discount validation successful:', {
-            backend_discount: backendDiscountAmount,
-            discount_type: discount.type
-          });
-        } else {
-          console.warn('⚠️ Both centralized and fallback discount validation failed');
-          backendDiscountAmount = 0;
-        }
-      }
-    }
-
-    const backendTotalAmount = backendSubtotal - backendDiscountAmount;
-    const backendFinalTotal = backendTotalAmount + deliveryFee;
-
-    // ✅ Validate client calculation matches backend (allow small rounding differences)
-    const amountDifference = Math.abs(backendFinalTotal - (requestBody.cart_totals?.final_total || 0));
-    if (amountDifference > 0.01 && requestBody.cart_totals?.final_total) {
-      console.warn('⚠️ Amount mismatch detected - using secure backend calculation:', {
-        client_final: requestBody.cart_totals.final_total,
-        backend_final: backendFinalTotal,
-        difference: amountDifference
-      });
-      
-      // Use backend calculation for security
-      finalAmount = backendFinalTotal;
-      discountApplied = backendDiscountAmount;
-    } else {
-      // Client calculation is accurate, use it
-      finalAmount = requestBody.cart_totals?.final_total || backendFinalTotal;
-      discountApplied = backendDiscountAmount; // Always use backend-validated discount
-    }
-
-    // Update the order with final amounts and track discount usage
-    if (requestBody.discount?.code && discountApplied > 0 && validatedDiscountDetails) {
-      const { error: discountUpdateError } = await supabaseAdmin
-        .from('orders')
-        .update({ 
-          total_amount: finalAmount,
-          discount_amount: discountApplied,
-          discount_code: requestBody.discount.code.toUpperCase(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-      
-      if (discountUpdateError) {
-        console.error('⚠️ Failed to update order with discount:', discountUpdateError);
-      } else {
-        console.log('✅ Order updated with validated amounts. Final amount:', finalAmount);
-        order.total_amount = finalAmount;
-        
-        // ✅ Track discount usage for compliance and analytics
-        try {
-          const { error: usageError } = await supabaseAdmin
-            .from('discount_code_usage')
-            .insert({
-              discount_code_id: validatedDiscountDetails.discount_code_id,
-              order_id: orderId,
-              customer_email: customerEmail,
-              discount_amount: discountApplied,
-              original_amount: backendSubtotal,
-              final_amount: finalAmount,
-              used_at: new Date().toISOString()
-            });
-            
-          if (usageError) {
-            console.error('⚠️ Failed to track discount usage:', usageError);
-          } else {
-            console.log('✅ Discount usage tracked successfully');
-          }
-        } catch (usageTrackingError) {
-          console.error('⚠️ Discount usage tracking error:', usageTrackingError);
-          // Don't fail checkout for tracking errors
-        }
-      }
-    } else if (discountApplied > 0) {
-      // Update order without discount tracking if validation failed
-      const { error: updateError } = await supabaseAdmin
-        .from('orders')
-        .update({ 
-          total_amount: finalAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-        
-      if (!updateError) {
-        order.total_amount = finalAmount;
-      }
-    }
-
-    console.log('✅ Final amount for Paystack:', {
-      amount: finalAmount,
-      kobo: Math.round(finalAmount * 100)
-    });
-
     console.log("💰 Order details:", order);
 
     // ✅ Build payment callback URL
     const callbackUrl = `${SUPABASE_URL}/functions/v1/payment-callback?order_id=${order.id}`;
     console.log("🔗 Payment callback URL:", callbackUrl);
 
-    // ✅ Initialize payment with service role for internal authorization
+    // ✅ Initialize payment with forwarded Authorization header
     console.log("💳 Initializing payment via paystack-secure...");
-    console.log("💰 Payment amount details:", {
-      original_total: order.total_amount,
-      delivery_fee: deliveryFee,
-      discount_applied: discountApplied,
-      final_amount: finalAmount
-    });
-    
-    // Debug environment variables
-    const hasServiceRole = !!SUPABASE_SERVICE_ROLE_KEY
-    const serviceRolePrefix = SUPABASE_SERVICE_ROLE_KEY ? SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : 'none'
-    console.log("🔐 Service role debug:", { hasServiceRole, serviceRolePrefix })
-    
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
       headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "x-internal-caller": "process-checkout"
+        Authorization: authHeader,
       },
       body: {
         action: "initialize",
         email: order.customer_email,
-        amount: finalAmount, // Use final discounted amount
+        amount: order.total_amount,
         metadata: {
           order_id: order.id,
           customer_name: requestBody.customer.name,
           order_number: order.order_number,
           fulfillment_type: requestBody.fulfillment.type,
-          items_subtotal: requestBody.cart_totals?.subtotal || (finalAmount - deliveryFee),
+          items_subtotal: order.total_amount - deliveryFee,
           delivery_fee: deliveryFee,
-          discount_amount: discountApplied,
-          discount_code: requestBody.discount?.code || null,
-          client_total: finalAmount,
-          authoritative_total: finalAmount,
+          client_total: order.total_amount,
+          authoritative_total: order.total_amount,
         },
         callback_url: callbackUrl,
       },
@@ -691,18 +273,7 @@ serve(async (req) => {
 
     if (paymentError) {
       console.error("❌ Payment initialization failed:", paymentError);
-      console.error("❌ Full payment error details:", JSON.stringify(paymentError, null, 2));
-      console.error("❌ Error context:", paymentError.context ? JSON.stringify(paymentError.context, null, 2) : 'no context');
-      
-      // Provide more specific error based on the type
-      let userFriendlyError = 'Payment initialization failed'
-      if (paymentError.message?.includes('401') || paymentError.message?.includes('Unauthorized')) {
-        userFriendlyError = 'Payment system configuration issue - please contact support'
-      } else if (paymentError.message?.includes('503') || paymentError.message?.includes('configuration')) {
-        userFriendlyError = 'Payment service temporarily unavailable - please try again'
-      }
-      
-      throw new Error(`${userFriendlyError}: ${paymentError.message || 'Unknown error'}`);
+      throw new Error(`Payment initialization failed: ${paymentError.message}`);
     }
 
     console.log("🔍 Raw paymentData:", paymentData);
@@ -715,19 +286,14 @@ serve(async (req) => {
     console.log("💳 Payment reference:", paymentReference);
     console.log("🌐 Authorization URL:", authorizationUrl);
 
-    // ✅ Success response - FIXED structure to match frontend validator expectations
+    // ✅ Success response
     return new Response(
       JSON.stringify({
         success: true,
-        // Root level fields required by validator
-        total_amount: finalAmount, // Use final discounted amount
-        order_number: order.order_number,
-        order_id: order.id,
-        // Nested order data for backward compatibility
         order: {
           id: order.id,
           order_number: order.order_number,
-          total_amount: finalAmount,
+          total_amount: order.total_amount,
           status: "pending",
         },
         customer: {
@@ -736,13 +302,8 @@ serve(async (req) => {
         },
         payment: {
           authorization_url: authorizationUrl,
-          payment_url: authorizationUrl, // Add payment_url field for validator
           reference: paymentReference,
         },
-        // Additional fields for comprehensive response
-        amount: finalAmount,
-        delivery_fee: deliveryFee,
-        discount_applied: discountApplied
       }),
       {
         status: 200,
@@ -750,38 +311,18 @@ serve(async (req) => {
       },
     );
   } catch (error) {
-    console.error(`❌ [${requestId}] Checkout processing error:`, error);
-    console.error(`❌ [${requestId}] Enhanced error context:`, {
-      errorName: error?.name || 'UnknownError',
-      errorMessage: error?.message || 'No error message',
-      errorStack: error?.stack || 'No stack trace',
-      errorCause: error?.cause || 'No cause',
-      errorCode: error?.code || 'NO_CODE',
-      requestHeaders: Object.fromEntries(req.headers.entries()),
-      requestMethod: req.method,
-      requestUrl: req.url,
-      authHeaderPresent: !!req.headers.get("Authorization"),
-      guestSessionPresent: !!req.headers.get("x-guest-session-id"),
-      timestamp: new Date().toISOString(),
-      request_id: requestId
-    });
-    
+    console.error("❌ Checkout processing error:", error);
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message || "Checkout processing failed",
-        code: error?.code || 'CHECKOUT_PROCESSING_ERROR',
         details: {
-          request_id: requestId,
           timestamp: new Date().toISOString(),
           error_type: error.constructor.name,
-          suggestion: error?.message?.includes('JWT') || error?.message?.includes('auth') 
-            ? 'Please refresh your session and try again'
-            : 'Please check your order details and try again'
         },
       }),
       {
-        status: 500, // Changed from 400 to 500 for server errors
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );

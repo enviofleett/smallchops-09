@@ -1,182 +1,246 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Production-ready CORS configuration
+const getCorsHeaders = (origin: string | null): Record<string, string> => {
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [
+    'https://oknnklksdiqaifhxaccs.supabase.co',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com'
+  ];
+  
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  
+  return {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
 };
 
-interface EmailMetrics {
-  totalSent: number;
-  totalDelivered: number;
-  totalBounced: number;
-  totalComplained: number;
-  totalSuppressed: number;
-  deliveryRate: number;
-  bounceRate: number;
-  complaintRate: number;
-  healthScore: number;
-  issues: string[];
-  recommendations: string[];
+interface MonitoringReport {
+  totalSent: number
+  totalDelivered: number
+  totalBounced: number
+  totalComplained: number
+  totalSuppressed: number
+  deliveryRate: number
+  bounceRate: number
+  complaintRate: number
+  healthScore: number
+  issues: string[]
+  recommendations: string[]
 }
 
-serve(async (req: Request) => {
-  // Handle CORS preflight requests
+Deno.serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
+  }
+
+  // Authentication check
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Authentication required'
+    }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
   }
 
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    )
 
-    console.log('🔍 Email delivery monitor started');
+    const url = new URL(req.url)
+    const timeframe = url.searchParams.get('timeframe') || '24h'
+    const detailed = url.searchParams.get('detailed') === 'true'
 
-    const { timeframe = '24h' } = await req.json().catch(() => ({}));
+    console.log(`Generating email delivery report for ${timeframe}`)
 
-    // Calculate time window based on timeframe
-    let hoursBack = 24;
-    switch (timeframe) {
-      case '1h': hoursBack = 1; break;
-      case '6h': hoursBack = 6; break;
-      case '24h': hoursBack = 24; break;
-      case '7d': hoursBack = 24 * 7; break;
-      case '30d': hoursBack = 24 * 30; break;
-    }
+    const hours = getHoursFromTimeframe(timeframe)
+    const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
 
-    const timeWindow = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
-
-    // Fetch communication events data
+    // Get communication events
     const { data: events, error: eventsError } = await supabase
       .from('communication_events')
-      .select('status, event_type, error_message, sent_at')
-      .gte('created_at', timeWindow);
+      .select('*')
+      .gte('created_at', cutoffTime)
+      .neq('event_type', 'rate_limit_check')
 
     if (eventsError) {
-      console.error('Error fetching events:', eventsError);
-      throw eventsError;
+      throw new Error(`Failed to fetch events: ${eventsError.message}`)
     }
 
-    // Fetch bounce tracking data
-    const { data: bounces, error: bouncesError } = await supabase
-      .from('email_bounce_tracking')
-      .select('bounce_type, email_address')
-      .gte('created_at', timeWindow);
+    // Get delivery logs
+    const { data: deliveryLogs, error: logsError } = await supabase
+      .from('email_delivery_logs')
+      .select('*')
+      .gte('created_at', cutoffTime)
 
-    if (bouncesError) {
-      console.error('Error fetching bounces:', bouncesError);
+    if (logsError) {
+      throw new Error(`Failed to fetch delivery logs: ${logsError.message}`)
     }
 
-    // Fetch suppression data
-    const { data: suppressions, error: suppressionsError } = await supabase
+    // Get suppression list count
+    const { count: suppressedCount, error: suppressedError } = await supabase
       .from('email_suppression_list')
-      .select('email, suppression_type')
-      .eq('is_active', true);
+      .select('*', { count: 'exact', head: true })
 
-    if (suppressionsError) {
-      console.error('Error fetching suppressions:', suppressionsError);
+    if (suppressedError) {
+      throw new Error(`Failed to fetch suppressed count: ${suppressedError.message}`)
     }
 
-    // Calculate metrics
-    const totalEvents = events?.length || 0;
-    const sentEvents = events?.filter(e => e.status === 'sent') || [];
-    const failedEvents = events?.filter(e => e.status === 'failed') || [];
-    const totalSent = sentEvents.length;
-    const totalFailed = failedEvents.length;
-    
-    const totalBounced = bounces?.length || 0;
-    const hardBounces = bounces?.filter(b => b.bounce_type === 'hard').length || 0;
-    const softBounces = bounces?.filter(b => b.bounce_type === 'soft').length || 0;
-    
-    const totalSuppressed = suppressions?.length || 0;
-    const complaintsCount = suppressions?.filter(s => s.suppression_type === 'complaint').length || 0;
+    const report = generateReport(events || [], deliveryLogs || [], suppressedCount || 0)
 
-    // Calculate rates
-    const deliveryRate = totalSent > 0 ? ((totalSent / (totalSent + totalFailed)) * 100) : 100;
-    const bounceRate = totalSent > 0 ? ((totalBounced / totalSent) * 100) : 0;
-    const complaintRate = totalSent > 0 ? ((complaintsCount / totalSent) * 100) : 0;
-
-    // Calculate health score (0-100)
-    let healthScore = 100;
-    if (bounceRate > 5) healthScore -= (bounceRate - 5) * 5; // Penalize bounce rate > 5%
-    if (complaintRate > 0.5) healthScore -= (complaintRate - 0.5) * 10; // Penalize complaint rate > 0.5%
-    if (deliveryRate < 95) healthScore -= (95 - deliveryRate) * 2; // Penalize delivery rate < 95%
-    healthScore = Math.max(0, Math.min(100, healthScore));
-
-    // Generate issues and recommendations
-    const issues: string[] = [];
-    const recommendations: string[] = [];
-
-    if (bounceRate > 5) {
-      issues.push(`High bounce rate: ${bounceRate.toFixed(2)}%`);
-      recommendations.push('Review email list quality and validation processes');
+    if (detailed) {
+      // Add detailed breakdowns
+      const detailedReport = await generateDetailedReport(supabase, cutoffTime, report)
+      
+      return new Response(JSON.stringify({
+        success: true,
+        timeframe,
+        report: detailedReport
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      })
     }
-
-    if (complaintRate > 0.5) {
-      issues.push(`High complaint rate: ${complaintRate.toFixed(2)}%`);
-      recommendations.push('Review email content and frequency');
-    }
-
-    if (deliveryRate < 95) {
-      issues.push(`Low delivery rate: ${deliveryRate.toFixed(2)}%`);
-      recommendations.push('Check SMTP configuration and authentication');
-    }
-
-    if (hardBounces > 10) {
-      issues.push(`${hardBounces} hard bounces detected`);
-      recommendations.push('Implement automatic suppression for hard bounces');
-    }
-
-    if (totalSuppressed > 50) {
-      issues.push(`${totalSuppressed} emails currently suppressed`);
-      recommendations.push('Review and clean suppression list regularly');
-    }
-
-    const metrics: EmailMetrics = {
-      totalSent,
-      totalDelivered: totalSent, // Assuming sent = delivered for now
-      totalBounced,
-      totalComplained: complaintsCount,
-      totalSuppressed,
-      deliveryRate: Math.round(deliveryRate * 100) / 100,
-      bounceRate: Math.round(bounceRate * 100) / 100,
-      complaintRate: Math.round(complaintRate * 100) / 100,
-      healthScore: Math.round(healthScore),
-      issues,
-      recommendations
-    };
-
-    console.log('📊 Email metrics calculated:', {
-      timeframe,
-      totalEvents,
-      totalSent,
-      healthScore: metrics.healthScore,
-      issuesCount: issues.length
-    });
 
     return new Response(JSON.stringify({
       success: true,
-      report: metrics,
-      metadata: {
-        timeframe,
-        calculatedAt: new Date().toISOString(),
-        windowStart: timeWindow
-      }
+      timeframe,
+      report
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    })
 
   } catch (error) {
-    console.error('Error in email delivery monitor:', error);
+    console.error('Email delivery monitoring error:', error)
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
-      details: 'Error generating email delivery report'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      error: error.message
+    }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    })
   }
-});
+})
+
+function getHoursFromTimeframe(timeframe: string): number {
+  switch (timeframe) {
+    case '1h': return 1
+    case '6h': return 6
+    case '24h': return 24
+    case '7d': return 24 * 7
+    case '30d': return 24 * 30
+    default: return 24
+  }
+}
+
+function generateReport(events: any[], deliveryLogs: any[], suppressedCount: number): MonitoringReport {
+  const totalSent = events.filter(e => e.status === 'sent').length
+  
+  // Count delivery statuses from logs
+  const delivered = deliveryLogs.filter(log => log.event_type === 'delivered').length
+  const bounced = deliveryLogs.filter(log => log.event_type === 'bounced').length
+  const complained = deliveryLogs.filter(log => log.event_type === 'complained').length
+  
+  // Calculate rates
+  const deliveryRate = totalSent > 0 ? (delivered / totalSent) * 100 : 0
+  const bounceRate = totalSent > 0 ? (bounced / totalSent) * 100 : 0
+  const complaintRate = totalSent > 0 ? (complained / totalSent) * 100 : 0
+  
+  // Calculate health score (0-100)
+  let healthScore = 100
+  
+  // Deduct points for high bounce rate
+  if (bounceRate > 5) healthScore -= Math.min(30, bounceRate * 2)
+  
+  // Deduct points for high complaint rate
+  if (complaintRate > 0.5) healthScore -= Math.min(25, complaintRate * 10)
+  
+  // Deduct points for low delivery rate
+  if (deliveryRate < 95) healthScore -= Math.min(20, (95 - deliveryRate))
+  
+  // Generate issues and recommendations
+  const issues: string[] = []
+  const recommendations: string[] = []
+  
+  if (bounceRate > 5) {
+    issues.push(`High bounce rate: ${bounceRate.toFixed(2)}%`)
+    recommendations.push('Review email list quality and remove invalid addresses')
+  }
+  
+  if (complaintRate > 0.5) {
+    issues.push(`High complaint rate: ${complaintRate.toFixed(2)}%`)
+    recommendations.push('Review email content and ensure proper consent')
+  }
+  
+  if (deliveryRate < 90) {
+    issues.push(`Low delivery rate: ${deliveryRate.toFixed(2)}%`)
+    recommendations.push('Check sender reputation and email authentication')
+  }
+  
+  if (suppressedCount > totalSent * 0.1) {
+    issues.push(`High suppression list: ${suppressedCount} addresses`)
+    recommendations.push('Review suppression reasons and improve consent management')
+  }
+
+  return {
+    totalSent,
+    totalDelivered: delivered,
+    totalBounced: bounced,
+    totalComplained: complained,
+    totalSuppressed: suppressedCount,
+    deliveryRate: Math.round(deliveryRate * 100) / 100,
+    bounceRate: Math.round(bounceRate * 100) / 100,
+    complaintRate: Math.round(complaintRate * 100) / 100,
+    healthScore: Math.max(0, Math.round(healthScore)),
+    issues,
+    recommendations
+  }
+}
+
+async function generateDetailedReport(supabase: any, cutoffTime: string, baseReport: MonitoringReport) {
+  // Get template performance
+  const { data: templateStats, error: templateError } = await supabase
+    .from('communication_events')
+    .select('template_id, status, email_type')
+    .gte('created_at', cutoffTime)
+    .neq('event_type', 'rate_limit_check')
+
+  let templatePerformance = {}
+  if (!templateError && templateStats) {
+    templatePerformance = templateStats.reduce((acc: any, event: any) => {
+      if (!event.template_id) return acc
+      
+      if (!acc[event.template_id]) {
+        acc[event.template_id] = { sent: 0, failed: 0, emailType: event.email_type }
+      }
+      
+      if (event.status === 'sent') {
+        acc[event.template_id].sent++
+      } else if (event.status === 'failed') {
+        acc[event.template_id].failed++
+      }
+      
+      return acc
+    }, {})
+  }
+
+  // Get hourly breakdown
+  const { data: hourlyStats, error: hourlyError } = await supabase
+    .rpc('get_hourly_email_stats', { hours_back: 24 })
+
+  return {
+    ...baseReport,
+    templatePerformance,
+    hourlyBreakdown: hourlyError ? [] : hourlyStats,
+    generatedAt: new Date().toISOString()
+  }
+}

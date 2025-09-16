@@ -155,7 +155,7 @@ const PaymentConfigurationFixer = () => {
                 {getStatusIcon(diagnostic.overall_status)}
                 <div>
                   <h3 className="font-semibold">
-                    Overall Status: {diagnostic.overall_status?.toUpperCase() || 'UNKNOWN'}
+                    Overall Status: {diagnostic.overall_status.toUpperCase()}
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {diagnostic.issues_found.length === 0 

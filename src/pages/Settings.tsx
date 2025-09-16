@@ -26,7 +26,6 @@ import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel'
 import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
 import { ErrorTestComponent } from '@/components/error/ErrorTestComponent';
 import { EmailCredentialsManager } from '@/components/admin/EmailCredentialsManager';
-import { SMSManagement } from '@/components/admin/SMSManagement';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -77,12 +76,11 @@ const Settings = () => {
         <TabsContent value="communications" className="space-y-4 md:space-y-6">
           <Tabs defaultValue="branding" className="space-y-4 md:space-y-6">
             <div className="overflow-x-auto pb-2 -mx-4 px-4">
-              <TabsList className="grid w-full min-w-[400px] grid-cols-3 sm:grid-cols-5 h-auto p-1">
+              <TabsList className="grid w-full min-w-[320px] grid-cols-2 sm:grid-cols-4 h-auto p-1">
                 <TabsTrigger value="branding" className="text-xs sm:text-sm px-2 py-2">Branding</TabsTrigger>
                 <TabsTrigger value="content" className="text-xs sm:text-sm px-2 py-2">Content</TabsTrigger>
                 <TabsTrigger value="cooms" className="text-xs sm:text-sm px-2 py-2">Support</TabsTrigger>
-                <TabsTrigger value="email-processing" className="text-xs sm:text-sm px-2 py-2">Email</TabsTrigger>
-                <TabsTrigger value="sms" className="text-xs sm:text-sm px-2 py-2">SMS</TabsTrigger>
+                <TabsTrigger value="email-processing" className="text-xs sm:text-sm px-2 py-2">Queue</TabsTrigger>
               </TabsList>
             </div>
             
@@ -108,20 +106,6 @@ const Settings = () => {
                 </CardHeader>
                 <CardContent>
                   <EmailProcessingTab />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="sms" className="space-y-4 md:space-y-6">
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg md:text-xl">SMS Management</CardTitle>
-                  <CardDescription className="text-sm">
-                    Configure SMS providers and manage text message delivery
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <SMSManagement />
                 </CardContent>
               </Card>
             </TabsContent>

@@ -243,28 +243,6 @@
     @apply min-h-[44px] text-base; /* Prevents zoom on iOS */
   }
 
-  /* Error toast styles */
-  .error-toast {
-    @apply bg-white border border-red-200 text-black shadow-xl ring-1 ring-red-100;
-  }
-
-  .error-toast-mobile {
-    @apply fixed bottom-4 left-4 right-4 mx-auto max-w-md;
-  }
-
-  .error-toast-desktop {
-    @apply fixed bottom-6 right-6 max-w-md;
-  }
-
-  /* Toast animations */
-  .toast-enter {
-    @apply animate-in slide-in-from-bottom-2 fade-in-0 duration-300;
-  }
-
-  .toast-exit {
-    @apply animate-out slide-out-to-bottom-2 fade-out-0 duration-200;
-  }
-
   /* Table responsive */
   .responsive-table {
     @apply overflow-x-auto -mx-4 sm:mx-0;

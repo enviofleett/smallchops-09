@@ -17,24 +17,41 @@ import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
 import { DeliveryScheduler } from "./DeliveryScheduler";
 import { OrderSummaryCard } from "./OrderSummaryCard";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
-import { PaymentSummaryDebug } from "./PaymentSummaryDebug";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
-import { AuthStatusIndicator } from './AuthStatusIndicator';
+import '@/components/payments/payment-styles.css';
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
 import { safeErrorMessage, normalizePaymentResponse } from '@/utils/errorHandling';
 import { validatePaymentFlow, formatDiagnosticResults } from '@/utils/paymentDiagnostics';
 import { cn } from "@/lib/utils";
-import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
-import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
+
 interface DeliveryAddress {
   address_line_1: string;
   address_line_2?: string;
@@ -43,6 +60,7 @@ interface DeliveryAddress {
   postal_code: string;
   landmark?: string;
 }
+
 interface CheckoutData {
   customer_email: string;
   customer_name: string;
@@ -59,151 +77,34 @@ interface CheckoutData {
   };
   special_instructions?: string;
 }
+
 interface EnhancedCheckoutFlowProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// Enhanced validation function with friendly messages
-const validateCheckoutForm = (
-  formData: CheckoutData, 
-  deliveryZone: any, 
-  pickupPoint: any
-): { errors: string[], friendlyMessages: string[] } => {
-  const errors: string[] = [];
-  const friendlyMessages: string[] = [];
-
-  // Basic customer information with helpful guidance
-  if (!formData.customer_email?.trim()) {
-    errors.push("email_required");
-    friendlyMessages.push("We need your email address to send you order updates and receipts");
-  } else if (!/\S+@\S+\.\S+/.test(formData.customer_email)) {
-    errors.push("email_invalid");
-    friendlyMessages.push("Please enter a valid email address (like: yourname@example.com)");
-  }
-
-  if (!formData.customer_name?.trim()) {
-    errors.push("name_required");
-    friendlyMessages.push("Please enter your full name so we know who to deliver to");
-  }
-
-  if (!formData.customer_phone?.trim()) {
-    errors.push("phone_required");
-    friendlyMessages.push("We need your phone number to coordinate delivery or contact you about your order");
-  } else if (formData.customer_phone.trim().length < 10) {
-    errors.push("phone_invalid");
-    friendlyMessages.push("Please enter a complete phone number (at least 10 digits)");
-  }
-
-  // Fulfillment type validation with context
-  if (!formData.fulfillment_type) {
-    errors.push("fulfillment_required");
-    friendlyMessages.push("Please choose whether you'd like delivery to your address or pickup from our location");
-  }
-
-  // CRITICAL: Delivery date and time validation - prevents incomplete orders
-  if (!formData.delivery_date) {
-    errors.push("delivery_date_required");
-    friendlyMessages.push("Please select your preferred delivery date from the calendar");
-  }
-
-  if (!formData.delivery_time_slot?.start_time) {
-    errors.push("delivery_time_required");
-    friendlyMessages.push("Please choose a delivery time slot that works best for you");
-  }
-
-  // Delivery-specific validation with helpful context
-  if (formData.fulfillment_type === 'delivery') {
-    if (!deliveryZone) {
-      errors.push("delivery_zone_required");
-      friendlyMessages.push("Please select your delivery area so we can calculate shipping costs and delivery time");
-    }
-    
-    if (!formData.delivery_address.address_line_1?.trim()) {
-      errors.push("address_required");
-      friendlyMessages.push("Please provide your complete delivery address including street name and number");
-    }
-    
-    if (!formData.delivery_address.city?.trim()) {
-      errors.push("city_required");
-      friendlyMessages.push("Please specify which city you're located in for accurate delivery");
-    }
-  }
-
-  // Pickup-specific validation with guidance
-  if (formData.fulfillment_type === 'pickup') {
-    if (!formData.pickup_point_id || !pickupPoint) {
-      errors.push("pickup_location_required");
-      friendlyMessages.push("Please choose a convenient pickup location from our available spots");
-    }
-  }
-
-  return { errors, friendlyMessages };
-};
-
-// Field validation helpers for real-time feedback
-const getFieldValidationState = (fieldName: string, formData: CheckoutData, deliveryZone: any, pickupPoint: any) => {
-  switch (fieldName) {
-    case 'customer_name':
-      return {
-        isValid: !!formData.customer_name?.trim(),
-        isEmpty: !formData.customer_name?.trim()
-      };
-    case 'customer_email':
-      return {
-        isValid: !!formData.customer_email?.trim() && /\S+@\S+\.\S+/.test(formData.customer_email),
-        isEmpty: !formData.customer_email?.trim(),
-        isInvalid: !!formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email)
-      };
-    case 'customer_phone':
-      return {
-        isValid: !!formData.customer_phone?.trim() && formData.customer_phone.trim().length >= 10,
-        isEmpty: !formData.customer_phone?.trim(),
-        isInvalid: !!formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10
-      };
-    case 'delivery_date':
-      return {
-        isValid: !!formData.delivery_date,
-        isEmpty: !formData.delivery_date
-      };
-    case 'delivery_time':
-      return {
-        isValid: !!formData.delivery_time_slot?.start_time,
-        isEmpty: !formData.delivery_time_slot?.start_time
-      };
-    case 'address':
-      return {
-        isValid: formData.fulfillment_type !== 'delivery' || (!!formData.delivery_address.address_line_1?.trim() && !!deliveryZone),
-        isEmpty: formData.fulfillment_type === 'delivery' && (!formData.delivery_address.address_line_1?.trim() || !deliveryZone)
-      };
-    default:
-      return { isValid: true, isEmpty: false };
-  }
-};
-
 // Error boundary component
-class CheckoutErrorBoundary extends React.Component<{
-  children: React.ReactNode;
-}, {
-  hasError: boolean;
-}> {
+class CheckoutErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
   constructor(props: any) {
     super(props);
-    this.state = {
-      hasError: false
-    };
+    this.state = { hasError: false };
   }
+
   static getDerivedStateFromError() {
-    return {
-      hasError: true
-    };
+    return { hasError: true };
   }
+
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('🚨 Checkout error boundary caught:', error, errorInfo);
   }
+
   render() {
     if (this.state.hasError) {
-      return <Dialog open>
+      return (
+        <Dialog open>
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -219,46 +120,34 @@ class CheckoutErrorBoundary extends React.Component<{
               </Button>
             </div>
           </DialogContent>
-        </Dialog>;
+        </Dialog>
+      );
     }
+
     return this.props.children;
   }
 }
-const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
-  isOpen,
-  onClose
-}) => {
-  const navigate = useNavigate();
-  const {
-    cart,
-    clearCart,
-    getCartTotal
-  } = useCart();
-  const items = cart.items || [];
-  // Initialize guest session for guest checkout support
-  useGuestSessionCleanup();
-  const { guestSession, generateGuestSession } = useGuestSession();
-  const guestSessionId = guestSession?.sessionId;
-  const {
-    user,
-    session,
-    isAuthenticated,
-    isLoading
-  } = useCustomerAuth();
-  const {
-    profile
-  } = useCustomerProfile();
-  const {
-    addresses
-  } = useCustomerAddresses();
 
+const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ isOpen, onClose }) => {
+  const navigate = useNavigate();
+  const { cart, clearCart, getCartTotal } = useCart();
+  const items = cart.items || [];
+  // 🔧 CLEANUP: Initialize guest session cleanup and remove usage
+  useGuestSessionCleanup();
+  // Remove guest session usage since guest mode is discontinued
+  // const { guestSession } = useGuestSession();
+  // const guestSessionId = guestSession?.sessionId;
+  const { user, session, isAuthenticated, isLoading } = useCustomerAuth();
+  const { profile } = useCustomerProfile();
+  const { addresses } = useCustomerAddresses();
+  
   // Initialize checkout step based on authentication status
   const getInitialCheckoutStep = () => {
     if (isAuthenticated) return 'details';
-    return 'auth'; // Will allow both login and guest options
+    return 'auth';
   };
+  
   const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(getInitialCheckoutStep());
-  const prevFulfillmentTypeRef = React.useRef<'delivery' | 'pickup'>('delivery');
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: '',
     customer_name: '',
@@ -274,6 +163,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     payment_method: 'paystack',
     fulfillment_type: 'delivery'
   });
+
   const [paymentData, setPaymentData] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -281,76 +171,29 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   const [deliveryZone, setDeliveryZone] = useState<any>(null);
   const [pickupPoint, setPickupPoint] = useState<any>(null);
   const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
-  const [showMOQModal, setShowMOQModal] = useState(false);
-  const [moqValidationResult, setMoqValidationResult] = useState<any>(null);
-
-  // Initialize MOQ validation
-  const {
-    validateMOQWithPricing,
-    autoAdjustQuantities
-  } = useEnhancedMOQValidation();
 
   // Initialize checkout state recovery
-  const {
-    savePrePaymentState,
-    markPaymentCompleted,
+  const { 
+    savePrePaymentState, 
+    markPaymentCompleted, 
     clearState: clearRecoveryState,
-    hasRecoverableState
+    hasRecoverableState 
   } = useCheckoutStateRecovery();
 
   // Initialize order processing
-  const {
-    markCheckoutInProgress
-  } = useOrderProcessing();
+  const { markCheckoutInProgress } = useOrderProcessing();
+
   const handleClose = () => {
     if (checkoutStep === 'payment' && paymentData) {
       // Don't close during payment process
       toast({
         title: "Payment in Progress",
         description: "Please complete your payment before closing.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
     onClose();
-  };
-
-  // Handle guest checkout choice with enhanced validation
-  const handleContinueAsGuest = async () => {
-    try {
-      // Generate guest session if not already present
-      if (!guestSessionId) {
-        console.log('🎭 Generating new guest session...');
-        await generateGuestSession();
-      }
-      
-      // Validate guest session was created successfully
-      const currentGuestSession = guestSession?.sessionId;
-      if (!currentGuestSession) {
-        throw new Error('Failed to create guest session');
-      }
-      
-      console.log('✅ Guest session validated:', currentGuestSession);
-      setCheckoutStep('details');
-      
-      toast({
-        title: "Guest Checkout",
-        description: "You can proceed without creating an account.",
-      });
-    } catch (error) {
-      console.error('❌ Error generating guest session:', error);
-      toast({
-        title: "Guest Checkout Failed",
-        description: "Failed to start guest checkout. Please try logging in or contact support.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Handle login choice
-  const handleLogin = () => {
-    storeRedirectUrl(`${window.location.pathname}${window.location.search}`);
-    navigate('/auth');
   };
 
   // Listen for payment completion messages from popup window
@@ -358,48 +201,27 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     const handleMessage = (event: MessageEvent) => {
       // Verify origin for security
       if (event.origin !== window.location.origin) return;
+      
       if (event.data.type === 'PAYMENT_SUCCESS') {
         console.log('Payment successful, closing checkout dialog');
         handleClose();
         toast({
           title: "Payment Successful!",
-          description: "Your order has been confirmed."
+          description: "Your order has been confirmed.",
         });
       } else if (event.data.type === 'PAYMENT_FAILED') {
         console.log('Payment failed:', event.data.error);
         toast({
           title: "Payment Failed",
           description: "Please try again or contact support.",
-          variant: "destructive"
+          variant: "destructive",
         });
       }
     };
+
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [handleClose]);
-
-  // Handle fulfillment type changes and provide price feedback
-  useEffect(() => {
-    if (prevFulfillmentTypeRef.current !== formData.fulfillment_type) {
-      const currentFee = formData.fulfillment_type === 'pickup' ? 0 : (deliveryZone?.base_fee || 0);
-      const prevFee = prevFulfillmentTypeRef.current === 'pickup' ? 0 : (deliveryZone?.base_fee || 0);
-      
-      // Only show toast if this isn't the initial render and fees actually changed
-      if (prevFulfillmentTypeRef.current !== 'delivery' && currentFee !== prevFee) {
-        const feeChange = currentFee - prevFee;
-        const isRemoving = feeChange < 0;
-        
-        toast({
-          title: isRemoving ? "Delivery Fee Removed" : "Delivery Fee Added",
-          description: isRemoving 
-            ? `₦${Math.abs(feeChange).toLocaleString()} delivery fee removed for pickup`
-            : `₦${feeChange.toLocaleString()} delivery fee added`,
-        });
-      }
-      
-      prevFulfillmentTypeRef.current = formData.fulfillment_type;
-    }
-  }, [formData.fulfillment_type, deliveryZone?.base_fee]);
 
   // Manage checkout step based on authentication status
   useEffect(() => {
@@ -412,53 +234,17 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     }
   }, [isAuthenticated, isLoading]);
 
-  // Enhanced customer profile loading with error handling - PRODUCTION READY
+  // Auto-fill form data from user profile
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      if (profile) {
-        console.log('✅ Successfully loaded authenticated customer profile:', { 
-          profileId: (profile as any).id,
-          name: (profile as any).name, 
-          email: (profile as any).email,
-          phone: (profile as any).phone,
-          hasCompleteProfile: !!(profile as any).name && !!(profile as any).email 
-        });
-        
-        setFormData(prev => ({
-          ...prev,
-          customer_email: (profile as any).email || user?.email || '',
-          customer_name: (profile as any).name || '',
-          customer_phone: (profile as any).phone || ''
-        }));
-      } else if (user) {
-        // Profile hasn't loaded yet, but we have user data - show fallback
-        console.log('⚠️ Profile not loaded yet, using fallback user data');
-        setFormData(prev => ({
-          ...prev,
-          customer_email: user.email || '',
-          customer_name: prev.customer_name || '', 
-          customer_phone: prev.customer_phone || ''
-        }));
-        
-        // Retry profile loading after a short delay
-        const retryTimeout = setTimeout(() => {
-          console.log('🔄 Retrying profile load...');
-          // The useCustomerProfile hook should handle this automatically
-        }, 2000);
-        
-        return () => clearTimeout(retryTimeout);
-      }
-    } else if (!isAuthenticated && !isLoading) {
-      // Clear form data for unauthenticated users
-      console.log('🧹 Clearing form data for unauthenticated user');
+    if (isAuthenticated && profile) {
       setFormData(prev => ({
         ...prev,
-        customer_email: '',
-        customer_name: '',
-        customer_phone: ''
+        customer_email: (profile as any).email || '',
+        customer_name: (profile as any).name || '',
+        customer_phone: (profile as any).phone || ''
       }));
     }
-  }, [isAuthenticated, profile, user, isLoading]);
+  }, [isAuthenticated, profile]);
 
   // Auto-load default delivery address
   useEffect(() => {
@@ -480,17 +266,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     }
   }, [isAuthenticated, addresses]);
 
-  // Calculate delivery fee based on fulfillment type
-  const deliveryFee = useMemo(() => {
-    if (formData.fulfillment_type === 'pickup') {
-      return 0;
-    }
-    return deliveryZone?.base_fee || 0;
-  }, [formData.fulfillment_type, deliveryZone?.base_fee]);
+  // Calculate delivery fee (simple calculation since no getDeliveryFee from useCart)
+  const deliveryFee = deliveryZone?.base_fee || 0;
+  
+  // Calculate totals
+  const subtotal = getCartTotal();
+  const total = subtotal + deliveryFee;
 
-  // Calculate totals - use cart's calculated values including discounts
-  const subtotal = cart.summary.subtotal; // Pre-discount subtotal
-  const total = cart.summary.total_amount + deliveryFee; // Use discounted amount from cart
   const handleFormChange = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -511,217 +293,62 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       }));
     }
   };
+
   const handlePaymentFailure = useCallback((error: any) => {
     console.error('💳 Payment failure handled:', error);
     setIsSubmitting(false);
+    
     const errorMessage = error?.message || 'Payment processing failed';
     toast({
       title: "Payment Failed",
       description: errorMessage,
-      variant: "destructive"
+      variant: "destructive",
     });
   }, []);
 
   // Remove the processOrder hook usage since it doesn't exist
 
-  // ✅ Payment amount validation function
-  const validatePaymentAmount = (cartSummary: any, deliveryFee: number) => {
-    console.log('🔍 Payment Amount Validation:', {
-      subtotal: cartSummary.subtotal,
-      discount_amount: cartSummary.discount_amount,
-      discounted_subtotal: cartSummary.total_amount,
-      delivery_fee: deliveryFee,
-      final_calculated: cartSummary.total_amount + deliveryFee
-    });
-    
-    return cartSummary.total_amount + deliveryFee;
-  };
-
   const handleFormSubmit = async () => {
-    console.log("🚀 Starting enhanced checkout submission...");
-    setIsSubmitting(true);
-    setLastPaymentError(null);
+    // 🔐 ENFORCE AUTHENTICATION: Block if not authenticated
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to continue with checkout.",
+        variant: "destructive",
+      });
+      navigate('/auth');
+      return;
+    }
+
+    // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
+    if (circuitBreakerActive) {
+      toast({
+        title: "Too Many Attempts",
+        description: "Please wait 5 minutes before trying again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 🔧 DEBOUNCE: Prevent double-clicks during submission
+    if (isSubmitting) {
+      console.log('⏳ Already submitting, ignoring duplicate request');
+      return;
+    }
 
     try {
-      // 🔐 ENHANCED AUTHENTICATION CHECK: Validate authentication state before proceeding
-      console.log("🔐 Validating authentication state:", {
-        isAuthenticated,
-        hasSession: !!session,
-        hasAccessToken: !!session?.access_token,
-        guestSessionId,
-        userEmail: user?.email,
-        authMethod: isAuthenticated ? 'authenticated' : (guestSessionId ? 'guest' : 'none')
-      });
-
-      if (!isAuthenticated && !guestSessionId) {
-        console.error("❌ No valid authentication method found");
-        toast({
-          title: "Authentication Required",
-          description: "Please log in or continue as guest to proceed with checkout.",
-          variant: "destructive"
-        });
-        setCheckoutStep('auth');
-        return;
-      }
-
-      // Validate JWT token structure for authenticated users
-      if (isAuthenticated && session?.access_token) {
-        try {
-          const jwtParts = session.access_token.split('.');
-          if (jwtParts.length !== 3) {
-            throw new Error('Invalid JWT format');
-          }
-          
-          const payload = JSON.parse(atob(jwtParts[1]));
-          if (!payload.sub) {
-            throw new Error('JWT missing sub claim');
-          }
-          
-          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-            throw new Error('JWT token expired');
-          }
-          
-          console.log("✅ JWT validation passed for user:", payload.sub);
-        } catch (jwtError) {
-          console.error("❌ JWT validation failed:", jwtError);
-          toast({
-            title: "Session Invalid",
-            description: "Your session is invalid. Please log in again.",
-            variant: "destructive"
-          });
-          setCheckoutStep('auth');
-          return;
-        }
-      }
-
-      // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
-      if (circuitBreakerActive) {
-        toast({
-          title: "Too Many Attempts",
-          description: "Please wait 5 minutes before trying again.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // 🔧 DEBOUNCE: Prevent double-clicks during submission
-      if (isSubmitting) {
-        console.log('⏳ Already submitting, ignoring duplicate request');
-        return;
-      }
-      
       setIsSubmitting(true);
       setLastPaymentError(null);
 
-      // ✅ CRITICAL: Ensure cart state is fully updated before payment
-      await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure state sync
-      
-      // ✅ Get the latest cart state
-      const latestCart = cart; // This should have the discount applied
-      
-      // ✅ Enhanced authentication validation before checkout
-      console.log('🔐 Validating authentication before checkout...');
-      if (isAuthenticated && session?.access_token) {
-        try {
-          // Basic JWT validation without recursive refresh
-          const tokenParts = session.access_token.split('.');
-          if (tokenParts.length !== 3) {
-            throw new Error('Invalid JWT format');
-          }
-          
-          const payload = JSON.parse(atob(tokenParts[1]));
-          if (!payload.sub) {
-            throw new Error('JWT missing required claims');
-          }
-          
-          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-            throw new Error('JWT token expired');
-          }
-          
-          console.log('✅ JWT token validated successfully');
-        } catch (jwtError) {
-          console.error('❌ JWT validation failed:', jwtError);
-          setFailedAttempts(prev => prev + 1);
-          toast({
-            title: "Session Error", 
-            description: "Your session has expired. Please refresh and log in again.",
-            variant: "destructive"
-          });
-          setIsSubmitting(false);
-          return;
-        }
-      } else if (!guestSessionId) {
-        console.error('❌ No valid authentication method');
-        setFailedAttempts(prev => prev + 1);
-        toast({
-          title: "Authentication Required",
-          description: "Please log in or continue as guest to complete checkout.",
-          variant: "destructive"
-        });
-        setIsSubmitting(false);
-        return;
+      // Validate required fields before processing
+      if (!formData.customer_email?.trim()) {
+        throw new Error('Customer email is required');
       }
-      
-      // ✅ Calculate final amount with proper validation
-      const finalAmount = validatePaymentAmount(latestCart.summary, deliveryFee);
-      
-      console.log('💰 Payment Initialization:', {
-        original_subtotal: latestCart.summary.subtotal,
-        discount_applied: latestCart.summary.discount_amount,
-        discounted_subtotal: latestCart.summary.total_amount,
-        delivery_fee: deliveryFee,
-        final_amount: finalAmount,
-        paystack_amount_kobo: Math.round(finalAmount * 100)
-      });
-      
-      // ✅ Validate that we have the correct discount data
-      if (cart.appliedDiscount && latestCart.summary.discount_amount === 0) {
-        console.warn('⚠️ Discount was applied but cart shows no discount amount');
+      if (!formData.customer_name?.trim()) {
+        throw new Error('Customer name is required');
       }
-
-      // Validate MOQ requirements before processing
-      console.log('🔍 Validating MOQ requirements for cart:', items);
-      const moqValidation = await validateMOQWithPricing(items);
-      if (!moqValidation.isValid && moqValidation.violations.length > 0) {
-        console.log('❌ MOQ validation failed:', moqValidation.violations);
-
-        // Try to auto-adjust quantities
-        const adjustmentResult = await autoAdjustQuantities(items);
-        if (adjustmentResult.adjustmentsMade.length > 0) {
-          // Show adjustment modal
-          setMoqValidationResult(adjustmentResult);
-          setShowMOQModal(true);
-          setIsSubmitting(false);
-          return;
-        } else {
-          // Cannot auto-adjust, show error
-          throw new Error(`MOQ requirements not met: ${moqValidation.violations[0].productName} requires minimum ${moqValidation.violations[0].minimumRequired} items`);
-        }
-      }
-
-      // Enhanced validation with friendly, explanatory messages
-      const validation = validateCheckoutForm(formData, deliveryZone, pickupPoint);
-      if (validation.errors.length > 0) {
-        // Show friendly validation message with helpful guidance
-        const errorCount = validation.errors.length;
-        const title = errorCount === 1 
-          ? "Let's complete your checkout information" 
-          : `Just ${errorCount} more details needed`;
-        
-        // Show the most helpful message with context
-        const primaryMessage = validation.friendlyMessages[0];
-        const description = errorCount === 1 
-          ? primaryMessage
-          : `${primaryMessage}${errorCount > 1 ? ` (${errorCount - 1} more field${errorCount > 2 ? 's' : ''} also needed)` : ''}`;
-
-        toast({
-          title,
-          description,
-          variant: "destructive",
-          duration: 6000, // Longer duration for better readability
-        });
-        setIsSubmitting(false);
-        return;
+      if (!formData.fulfillment_type) {
+        throw new Error('Fulfillment type is required');
       }
 
       // Enhanced data sanitization and validation - Structure payload for backend
@@ -729,8 +356,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         customer: {
           name: formData.customer_name.trim(),
           email: formData.customer_email.trim().toLowerCase(),
-          phone: formData.customer_phone?.trim() || undefined,
-          guest_session_id: guestSessionId || undefined // Include guest session for guest users
+          phone: formData.customer_phone?.trim() || undefined
         },
         items: items.map(item => ({
           product_id: item.product_id,
@@ -754,213 +380,53 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         } : null,
         payment: {
           method: formData.payment_method || 'paystack'
-        },
-        // 🔧 CRITICAL: Include discount information for backend
-        discount: cart.appliedDiscount ? {
-          code: cart.appliedDiscount.code,
-          discount_code_id: cart.appliedDiscount.discount_code_id,
-          discount_amount: cart.appliedDiscount.discount_amount,
-          final_amount: cart.appliedDiscount.final_amount
-        } : null,
-        // Include cart totals for validation
-        cart_totals: {
-          subtotal: latestCart.summary.subtotal,
-          discount_amount: latestCart.summary.discount_amount,
-          total_amount: latestCart.summary.total_amount,
-          delivery_fee: deliveryFee,
-          final_total: finalAmount // Use validated final amount
         }
       };
-      
-      console.log('📦 Sending to backend:', sanitizedData);
 
-  // Enhanced authentication validation before checkout
-  console.log('🔐 Session debugging:', {
-    hasSession: !!session,
-    hasAccessToken: !!session?.access_token,
-    hasUser: !!user,
-    isAuthenticated,
-    isLoading,
-    userEmail: user?.email,
-    sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'none'
-  });
+      console.log('📦 Submitting checkout data:', sanitizedData);
 
-  // CRITICAL: Ensure proper authentication before checkout
-  if (!session?.access_token && !guestSessionId) {
-    console.error('❌ Authentication validation failed:', {
-      noSession: !session,
-      noAccessToken: !session?.access_token,
-      noGuestSession: !guestSessionId,
-      isAuthenticated,
-      checkoutStep
-    });
-    
-    throw new Error('Authentication required for checkout. Please log in or continue as guest.');
-  }
+      // Call Supabase edge function with authentication
+      const { data, error } = await supabase.functions.invoke('process-checkout', {
+        body: sanitizedData,
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
 
-  // Simplified session validation with single refresh attempt
-  let validatedSession = session;
-  
-  if (session?.access_token) {
-    try {
-      // Basic JWT format and claims validation
-      const jwtParts = session.access_token.split('.');
-      if (jwtParts.length !== 3) {
-        throw new Error('Invalid JWT format');
-      }
-
-      const payload = JSON.parse(atob(jwtParts[1]));
-      if (!payload.sub) {
-        throw new Error('JWT missing user identifier');
-      }
-
-      // Check expiration and refresh if needed (single attempt)
-      if (payload.exp && payload.exp <= Math.floor(Date.now() / 1000) + 60) { // 1 minute buffer
-        console.log('🔄 JWT token expired or expiring soon, refreshing once...');
-        
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshData.session) {
-          throw new Error('Session refresh failed');
-        }
-        
-        validatedSession = refreshData.session;
-        console.log('✅ Session refreshed successfully');
-      }
-
-      console.log('✅ JWT validation completed');
-      
-    } catch (jwtError) {
-      console.error('❌ JWT validation failed:', jwtError);
-      
-      // Single recovery attempt
-      if (session) {
-        try {
-          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          if (refreshData.session) {
-            validatedSession = refreshData.session;
-            console.log('✅ JWT validation recovered via refresh');
-          } else {
-            throw new Error('Final refresh failed');
-          }
-        } catch (recoveryError) {
-          // Redirect to auth step instead of throwing
-          setCheckoutStep('auth');
-          toast({
-            title: "Session Issue",
-            description: "Please log in again to complete your order.",
-            variant: "destructive"
-          });
-          setIsSubmitting(false);
-          return;
-        }
-      }
-    }
-  }
-
-  // Generate idempotency key for race condition prevention
-  const idempotencyKey = `checkout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  // Call Supabase edge function with validated authentication and idempotency
-  const invokeOptions: any = { 
-    body: sanitizedData,
-    headers: {
-      'x-idempotency-key': idempotencyKey
-    }
-  };
-  
-  // Add authentication headers
-  if (validatedSession?.access_token) {
-    invokeOptions.headers.Authorization = `Bearer ${validatedSession.access_token}`;
-    console.log('✅ Using authenticated checkout with validated token');
-  } else if (guestSessionId) {
-    invokeOptions.headers['x-guest-session-id'] = guestSessionId;
-    console.log('✅ Using guest checkout with session ID');
-  } else {
-    throw new Error('No valid authentication method available');
-  }
-
-  console.log('🚀 Invoking process-checkout with idempotency key:', idempotencyKey);
-  const { data, error } = await supabase.functions.invoke('process-checkout', invokeOptions);
-
+      // 🚨 CRITICAL: Stop flow immediately on order creation failure
       if (error || !data?.success) {
-        console.error('❌ Checkout failed:', error || data);
-        const errorMessage = error?.message || data?.error || 'Checkout processing failed';
-        const errorCode = data?.code || 'CHECKOUT_FAILED';
+        console.error('❌ Order creation failed - stopping checkout flow:', error || data);
         
-        // Handle duplicate requests gracefully
-        if (data?.duplicate_request) {
-          console.log('✅ Duplicate request detected, order already processed');
-          toast({
-            title: "Order Already Processed",
-            description: "This order has already been created. Check your orders page.",
-            variant: "default"
-          });
-          navigate('/orders');
-          return;
-        }
-        
-        // Handle authentication errors with simple recovery
-        const authErrorCodes = ['REQUIRES_AUTH', 'INVALID_JWT_FORMAT', 'JWT_MISSING_SUB_CLAIM', 
-                               'JWT_EXPIRED', 'AUTH_VALIDATION_FAILED', 'JWT_PROCESSING_ERROR'];
-        
-        if (authErrorCodes.includes(errorCode)) {
-          console.log('🔐 Authentication error detected:', errorCode);
-          
-          // Redirect to auth step for all auth errors
-          setCheckoutStep('auth');
-          
-          const authMessage = errorCode === 'JWT_EXPIRED' ? 
-            "Your session has expired. Please log in again." :
-            data?.details?.suggestion || "Please log in or continue as guest to proceed.";
-          
-          toast({
-            title: "Authentication Required",
-            description: authMessage,
-            variant: "destructive"
-          });
-          
-          return; // Don't throw error, just redirect
-        }
+        const errorMessage = error?.message || data?.error || 'Order creation failed';
+        const errorCode = data?.code || 'ORDER_CREATION_FAILED';
         
         throw new Error(`${errorMessage} [${errorCode}]`);
       }
+
       console.log('🔄 Raw server response:', data);
 
-      // Validate payment response only on success
-      const validationResult = validatePaymentInitializationData(data);
-      
-      if (!validationResult.isValid) {
-        console.error('❌ Payment validation failed:', validationResult);
-        const userFriendlyError = generateUserFriendlyErrorMessage(validationResult, data);
-        throw new Error(userFriendlyError);
-      }
-      
-      console.log('✅ Payment validation passed');
-      
       // Try to parse response, prioritizing backend-returned amounts
       let parsedData;
       try {
         parsedData = normalizePaymentResponse(data);
         console.log('✅ Parsed server response successfully:', parsedData);
       } catch (error) {
-        console.warn('⚠️ Could not parse payment_url from response, using validated data:', error);
-        // Use validated data from successful validation
+        console.warn('⚠️ Could not parse payment_url from response, proceeding to secure payment handler:', error);
+        // Fall back to minimal order data without payment_url
         parsedData = {
-          order_id: data?.order_id || data?.order?.id,
-          order_number: data?.order_number || data?.order?.order_number,
-          amount: data?.total_amount || data?.amount,
-          payment_url: data?.payment?.authorization_url || data?.payment?.payment_url,
-          reference: data?.payment?.reference,
+          order_id: data?.order_id,
+          order_number: data?.order_number,
+          amount: data?.amount || total, // Prioritize backend amount
           customer_email: sanitizedData.customer.email,
           success: true
         };
       }
 
       // 🔧 CRITICAL: Use backend-returned amount if available
-      const authoritativeAmount = data?.amount || parsedData?.amount || finalAmount;
+      const authoritativeAmount = data?.amount || parsedData?.amount || total;
+      
       console.log('💰 Amount prioritization:', {
         client_calculated: total,
-        validated_final_amount: finalAmount,
         backend_returned: data?.amount,
         authoritative_amount: authoritativeAmount,
         items_subtotal: data?.items_subtotal,
@@ -971,27 +437,27 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       if (data?.payment?.authorization_url || data?.authorization_url) {
         const paymentUrl = data.payment?.authorization_url || data.authorization_url;
         console.log('🔗 Redirecting to payment URL:', paymentUrl);
-
+        
         // Save state before redirecting  
         savePrePaymentState(sanitizedData, checkoutStep, deliveryFee, 'direct_redirect');
-
+        
         // Close dialog immediately and redirect to payment
         onClose();
-        // Don't clear cart before payment - only clear after successful payment
-        window.location.replace(paymentUrl);
+        clearCart();
+        window.location.href = paymentUrl;
         return;
       }
 
       // Note: Delivery schedule is now saved atomically in the backend during order creation
-
+      
       // Close dialog and redirect directly to payment callback page with processing state
       onClose();
-      // Don't clear cart before payment - only clear after successful payment
-
+      clearCart();
+      
       // Store payment reference for callback page
       sessionStorage.setItem('paystack_payment_reference', data?.reference || parsedData?.reference || '');
       sessionStorage.setItem('payment_order_id', parsedData?.order_id || data?.order?.id || '');
-
+      
       // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({
         orderId: parsedData?.order_id || data?.order?.id,
@@ -1001,36 +467,36 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         successUrl: `${window.location.origin}/payment-callback`,
         cancelUrl: window.location.href
       });
-
+      
       // Navigate to callback page immediately to show clean processing state
       navigate('/payment-callback?status=processing');
       setIsSubmitting(false);
+      
       logPaymentAttempt(sanitizedData, 'success');
+      
     } catch (error: any) {
       console.error('🚨 Checkout submission error:', error);
       setIsSubmitting(false);
-
-      // 🔧 CIRCUIT BREAKER: Track failures but don't prevent legitimate retries
+      
+      // 🔧 CIRCUIT BREAKER: Increment failure count and activate if needed
       const newFailedAttempts = failedAttempts + 1;
       setFailedAttempts(newFailedAttempts);
       
       if (newFailedAttempts >= 3) {
-        console.warn('⚠️ Multiple checkout failures detected, entering recovery mode');
         setCircuitBreakerActive(true);
-        
-        // Reset circuit breaker after 3 minutes for legitimate retry
+        // Reset circuit breaker after 5 minutes
         setTimeout(() => {
           setCircuitBreakerActive(false);
           setFailedAttempts(0);
-          console.log('✅ Circuit breaker reset, checkout available again');
-        }, 3 * 60 * 1000);
+        }, 5 * 60 * 1000);
       }
-
+      
       // Enhanced error handling with safe message extraction
       const errorMessage = safeErrorMessage(error);
-
+      
       // Map specific errors to user-friendly messages
       let userFriendlyMessage: string;
+      
       if (errorMessage.includes('ORDER_CREATION_FAILED') || errorMessage.includes('INVALID_ORDER_DATA')) {
         userFriendlyMessage = 'Order creation failed. Please check your details and try again.';
       } else if (errorMessage.includes('CUSTOMER_ERROR')) {
@@ -1040,38 +506,47 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       } else if (errorMessage.includes('Payment URL not available')) {
         userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
       } else {
-        // Don't validate error responses - just use fallback message
-        userFriendlyMessage = 'Payment processing failed. Please try again or contact support if the issue persists.';
+        // Generate user-friendly error with safe fallback
+        const validationResult = validatePaymentInitializationData({
+          success: false,
+          error: errorMessage
+        });
+        userFriendlyMessage = generateUserFriendlyErrorMessage(validationResult);
       }
+      
       setLastPaymentError(userFriendlyMessage);
       logPaymentAttempt(null, 'failure');
+      
       toast({
         title: "Checkout Error",
         description: userFriendlyMessage,
-        variant: "destructive"
+        variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
+
   const handlePaymentSuccess = useCallback((reference: string) => {
     console.log('🎉 Payment success callback triggered with reference:', reference);
-
+    
     // Save states and mark checkout progress when we get valid reference
     if (reference && reference.startsWith('txn_')) {
       savePrePaymentState(formData, checkoutStep, deliveryFee, reference);
       markCheckoutInProgress(reference);
     }
+    
     markPaymentCompleted();
     clearCart();
     clearRecoveryState();
     onClose();
+    
     toast({
       title: "Payment Successful!",
-      description: "Your order has been confirmed. Check your email for details."
+      description: "Your order has been confirmed. Check your email for details.",
     });
+    
     navigate('/orders');
   }, [formData, checkoutStep, deliveryFee, savePrePaymentState, markCheckoutInProgress, markPaymentCompleted, clearCart, clearRecoveryState, onClose, navigate]);
+
 
   // Validation
   const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -1087,12 +562,18 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   useEffect(() => {
     const loadTermsSettings = async () => {
       try {
-        const {
-          data: requireTermsData
-        } = await supabase.from('content_management').select('content').eq('key', 'legal_require_terms_acceptance').single();
-        const {
-          data: termsContentData
-        } = await supabase.from('content_management').select('content, is_published').eq('key', 'legal_terms').single();
+        const { data: requireTermsData } = await supabase
+          .from('content_management')
+          .select('content')
+          .eq('key', 'legal_require_terms_acceptance')
+          .single();
+
+        const { data: termsContentData } = await supabase
+          .from('content_management')
+          .select('content, is_published')
+          .eq('key', 'legal_terms')
+          .single();
+
         if (requireTermsData?.content === 'true' && termsContentData?.is_published) {
           setTermsRequired(true);
           setTermsContent(termsContentData.content || '');
@@ -1101,306 +582,174 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         console.log('Terms settings not configured or error loading:', error);
       }
     };
+
     loadTermsSettings();
   }, []);
+
   const canProceedToDetails = useMemo(() => {
     if (checkoutStep !== 'details') return false;
-    const baseValidation = formData.customer_name.trim() && isValidEmail(formData.customer_email) && isValidPhone(formData.customer_phone) && formData.delivery_date && formData.delivery_time_slot; // Required for both delivery and pickup
+    
+    const baseValidation = 
+      formData.customer_name.trim() &&
+      isValidEmail(formData.customer_email) &&
+      isValidPhone(formData.customer_phone) &&
+      formData.delivery_date && 
+      formData.delivery_time_slot; // Required for both delivery and pickup
 
     // Terms validation - only required if admin enabled it
     const termsValidation = !termsRequired || termsAccepted;
+
     if (formData.fulfillment_type === 'delivery') {
       // Make city and postal code optional, delivery schedule mandatory
-      const deliveryValidation = baseValidation && formData.delivery_address.address_line_1.trim() && deliveryZone;
+      const deliveryValidation = baseValidation &&
+        formData.delivery_address.address_line_1.trim() &&
+        formData.delivery_address.state.trim() &&
+        deliveryZone;
+      
       return deliveryValidation && termsValidation;
     } else {
       // For pickup, require pickup point selection
       return baseValidation && pickupPoint && termsValidation;
     }
   }, [formData, deliveryZone, pickupPoint, checkoutStep, termsRequired, termsAccepted]);
+
   const renderAuthStep = () => (
     <div className="space-y-6">
-      {/* Authentication Status Indicator */}
-      <AuthStatusIndicator showDetails={true} className="mb-4" />
+      <div className="text-center space-y-2">
+        <h3 className="text-lg font-semibold">Complete Your Order</h3>
+        <p className="text-muted-foreground">
+          {items.length} item{items.length > 1 ? 's' : ''} • ₦{total.toLocaleString()}
+        </p>
+      </div>
       
-      <GuestOrLoginChoice 
-        onContinueAsGuest={handleContinueAsGuest} 
-        onLogin={handleLogin} 
-        totalAmount={total} 
+      <GuestOrLoginChoice
+        onContinueAsGuest={() => setCheckoutStep('details')}
+         onLogin={() => {
+           storeRedirectUrl('/cart');
+           onClose();
+           navigate('/auth');
+         }}
+        totalAmount={total}
       />
     </div>
   );
-  const renderDetailsStep = () => <div className="space-y-6">
+
+  const renderDetailsStep = () => (
+    <div className="space-y-6">
       <div className="space-y-4">
-        {!isAuthenticated && <div className="flex items-center justify-between md:hidden mb-4">
-            <Button variant="ghost" size="sm" onClick={() => setCheckoutStep('auth')} className="flex items-center gap-2">
+        {!isAuthenticated && (
+          <div className="flex items-center justify-between md:hidden mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCheckoutStep('auth')}
+              className="flex items-center gap-2"
+            >
               <ChevronLeft className="w-4 h-4" />
               Back
             </Button>
-          </div>}
+          </div>
+        )}
 
         {/* Customer Information */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              Customer Information
-              {isAuthenticated && (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                  Verified Account
-                </span>
-              )}
-            </CardTitle>
-            {isAuthenticated && (
-              <CardDescription className="text-sm text-muted-foreground">
-                Your account information is automatically loaded and secured.
-              </CardDescription>
-            )}
+            <CardTitle className="text-base">Customer Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <Label htmlFor="customer_name" className="flex items-center gap-2">
-                Full Name <span className="text-destructive">*</span>
-                {isAuthenticated && formData.customer_name && (
-                  <span className="text-xs text-green-600">✓ Verified</span>
-                )}
-              </Label>
-              <Input 
-                id="customer_name" 
-                value={formData.customer_name} 
-                onChange={e => handleFormChange('customer_name', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your name..." : "Enter your full name"} 
-                required 
-                className={cn(
-                  "h-10",
-                  isAuthenticated && formData.customer_name && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_name && "animate-pulse",
-                  // Validation styling
-                  !isAuthenticated && !formData.customer_name?.trim() && "border-destructive/50",
-                  !isAuthenticated && formData.customer_name?.trim() && "border-green-500"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_name}
-                disabled={isAuthenticated && !!formData.customer_name}
-              />
-              {isAuthenticated && !formData.customer_name && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Loading your profile information...
-                </p>
-              )}
-              {!isAuthenticated && !formData.customer_name?.trim() && (
-                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                  <span>📝</span> Please enter your full name so we know who to deliver to
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="customer_email" className="flex items-center gap-2">
-                Email <span className="text-destructive">*</span>
-                {isAuthenticated && formData.customer_email && (
-                  <span className="text-xs text-green-600">✓ Verified</span>
-                )}
-              </Label>
-              <Input 
-                id="customer_email" 
-                type="email" 
-                value={formData.customer_email} 
-                onChange={e => handleFormChange('customer_email', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your email..." : "Enter your email"} 
-                required 
-                className={cn(
-                  "h-10",
-                  isAuthenticated && formData.customer_email && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_email && "animate-pulse",
-                  // Validation styling
-                  !isAuthenticated && !formData.customer_email?.trim() && "border-destructive/50",
-                  !isAuthenticated && formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email) && "border-destructive/50",
-                  !isAuthenticated && formData.customer_email?.trim() && /\S+@\S+\.\S+/.test(formData.customer_email) && "border-green-500"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_email}
-                disabled={isAuthenticated && !!formData.customer_email}
-              />
-              {isAuthenticated && !formData.customer_email && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Loading your email address...
-                </p>
-              )}
-              {!isAuthenticated && !formData.customer_email?.trim() && (
-                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                  <span>📧</span> We need your email address to send you order updates and receipts
-                </p>
-              )}
-              {!isAuthenticated && formData.customer_email?.trim() && !/\S+@\S+\.\S+/.test(formData.customer_email) && (
-                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                  <span>⚠️</span> Please enter a valid email address (like: yourname@example.com)
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="customer_phone" className="flex items-center gap-2">
-                Phone Number <span className="text-destructive">*</span>
-                {isAuthenticated && formData.customer_phone && (
-                  <span className="text-xs text-green-600">✓ Verified</span>
-                )}
-              </Label>
-              <Input 
-                id="customer_phone" 
-                type="tel" 
-                value={formData.customer_phone} 
-                onChange={e => handleFormChange('customer_phone', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
+              <Label htmlFor="customer_name">Full Name *</Label>
+              <Input
+                id="customer_name"
+                value={formData.customer_name}
+                onChange={(e) => handleFormChange('customer_name', e.target.value)}
+                placeholder="Enter your full name"
                 required
-                className={cn(
-                  "h-10",
-                  isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_phone && "animate-pulse",
-                  // Validation styling
-                  !isAuthenticated && !formData.customer_phone?.trim() && "border-destructive/50",
-                  !isAuthenticated && formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10 && "border-destructive/50",
-                  !isAuthenticated && formData.customer_phone?.trim() && formData.customer_phone.trim().length >= 10 && "border-green-500"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_phone}
-                disabled={isAuthenticated && !!formData.customer_phone}
+                className="h-10"
               />
-              {isAuthenticated && !formData.customer_phone && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  You can add a phone number to your profile for better service.
-                </p>
-              )}
-              {!isAuthenticated && !formData.customer_phone?.trim() && (
-                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                  <span>📱</span> We need your phone number to coordinate delivery or contact you about your order
-                </p>
-              )}
-              {!isAuthenticated && formData.customer_phone?.trim() && formData.customer_phone.trim().length < 10 && (
-                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                  <span>⚠️</span> Please enter a complete phone number (at least 10 digits)
-                </p>
-              )}
+            </div>
+            <div>
+              <Label htmlFor="customer_email">Email *</Label>
+              <Input
+                id="customer_email"
+                type="email"
+                value={formData.customer_email}
+                onChange={(e) => handleFormChange('customer_email', e.target.value)}
+                placeholder="Enter your email"
+                required
+                className="h-10"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer_phone">Phone Number</Label>
+              <Input
+                id="customer_phone"
+                type="tel"
+                value={formData.customer_phone}
+                onChange={(e) => handleFormChange('customer_phone', e.target.value)}
+                placeholder="Enter your phone number"
+                className="h-10"
+              />
             </div>
           </CardContent>
         </Card>
 
         {/* Order Scheduling - Required for both delivery and pickup */}
-        {/* Delivery Schedule - Enhanced with validation indicators */}
-        <Card className={cn(
-          "transition-colors duration-200",
-          !formData.delivery_date || !formData.delivery_time_slot?.start_time ? "border-amber-200 bg-amber-50/30" : "border-green-200 bg-green-50/30"
-        )}>
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              When do you need your order? <span className="text-destructive">*</span>
-              {formData.delivery_date && formData.delivery_time_slot?.start_time ? (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Scheduled</span>
-              ) : (
-                <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full">⚠ Required</span>
-              )}
+              When do you need your order? *
             </CardTitle>
-            <CardDescription className={cn(
-              "text-sm transition-colors duration-200",
-              !formData.delivery_date || !formData.delivery_time_slot?.start_time ? "text-amber-600" : "text-muted-foreground"
-            )}>
-              {!formData.delivery_date ? 
-                "Please select your preferred date and time for delivery" :
-                !formData.delivery_time_slot?.start_time ? 
-                "Please choose a time slot for your selected date" :
-                `Scheduled for ${formData.delivery_date} at ${formData.delivery_time_slot.start_time}`
-              }
+            <CardDescription>
+              Select your preferred date and time for {formData.fulfillment_type === 'delivery' ? 'delivery' : 'pickup'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DeliveryScheduler onScheduleChange={(date, timeSlot) => {
-            handleFormChange('delivery_date', date);
-            handleFormChange('delivery_time_slot', timeSlot);
-          }} selectedDate={formData.delivery_date} selectedTimeSlot={formData.delivery_time_slot} showHeader={false} />
-            
+            <DeliveryScheduler
+              onScheduleChange={(date, timeSlot) => {
+                handleFormChange('delivery_date', date);
+                handleFormChange('delivery_time_slot', timeSlot);
+              }}
+              selectedDate={formData.delivery_date}
+              selectedTimeSlot={formData.delivery_time_slot}
+              showHeader={false}
+            />
           </CardContent>
         </Card>
 
-        {/* Fulfillment Type - Centered and Production Ready */}
+        {/* Fulfillment Type */}
         <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base text-center">How would you like to receive your order?</CardTitle>
-            <CardDescription className="text-center text-sm">
-              Choose delivery for convenience or pickup to save on fees
-            </CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Fulfillment Method</CardTitle>
           </CardHeader>
           <CardContent>
-            <RadioGroup 
-              value={formData.fulfillment_type} 
-              onValueChange={value => handleFormChange('fulfillment_type', value)} 
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            <RadioGroup
+              value={formData.fulfillment_type}
+              onValueChange={(value) => handleFormChange('fulfillment_type', value)}
+              className="space-y-3"
             >
-              <div className="relative">
-                <RadioGroupItem value="delivery" id="delivery" className="peer sr-only" />
-                <Label 
-                  htmlFor="delivery" 
-                  className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
-                    "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
-                  )}
-                >
-                  <Truck className="w-8 h-8 mb-3 text-primary" />
-                  <span className="font-medium text-base">Delivery</span>
-                  <span className="text-sm text-muted-foreground text-center mt-1">
-                    We'll deliver to your address
-                  </span>
-                  {deliveryFee > 0 && (
-                    <span className="text-xs text-primary mt-2 font-medium">
-                      Fee: ₦{deliveryFee.toLocaleString()}
-                    </span>
-                  )}
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="delivery" id="delivery" />
+                <Label htmlFor="delivery" className="flex items-center gap-2 cursor-pointer">
+                  <Truck className="w-4 h-4" />
+                  Delivery
                 </Label>
               </div>
-              
-              <div className="relative">
-                <RadioGroupItem value="pickup" id="pickup" className="peer sr-only" />
-                <Label 
-                  htmlFor="pickup" 
-                  className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
-                    "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
-                  )}
-                >
-                  <MapPin className="w-8 h-8 mb-3 text-primary" />
-                  <span className="font-medium text-base">Pickup</span>
-                  <span className="text-sm text-muted-foreground text-center mt-1">
-                    Collect from our location
-                  </span>
-                  <span className="text-xs text-green-600 mt-2 font-medium">
-                    No delivery fee
-                  </span>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="pickup" id="pickup" />
+                <Label htmlFor="pickup" className="flex items-center gap-2 cursor-pointer">
+                  <MapPin className="w-4 h-4" />
+                  Pickup
                 </Label>
               </div>
             </RadioGroup>
           </CardContent>
         </Card>
 
-        {/* Delivery Zone Selection - Moved before delivery address */}
-        {formData.fulfillment_type === 'delivery' && <Card className="mb-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Truck className="w-4 h-4" />
-                Delivery Zone <span className="text-destructive">*</span>
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Select your delivery zone to calculate delivery fees
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DeliveryZoneDropdown selectedZoneId={deliveryZone?.id} onZoneSelect={(zoneId, fee) => {
-            const zone = {
-              id: zoneId,
-              base_fee: fee
-            };
-            setDeliveryZone(zone);
-          }} orderSubtotal={subtotal} />
-            </CardContent>
-          </Card>}
-
         {/* Delivery Address */}
-        {formData.fulfillment_type === 'delivery' && <Card>
+        {formData.fulfillment_type === 'delivery' && (
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
@@ -1409,46 +758,83 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label htmlFor="address_line_1">Street Address <span className="text-destructive">*</span></Label>
-                <Input 
-                  id="address_line_1" 
-                  value={formData.delivery_address.address_line_1} 
-                  onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} 
-                  placeholder="Enter street address" 
-                  required 
-                  className={cn(
-                    "h-10",
-                    !formData.delivery_address.address_line_1?.trim() && "border-destructive/50",
-                    formData.delivery_address.address_line_1?.trim() && "border-green-500"
-                  )}
+                <Label htmlFor="address_line_1">Street Address *</Label>
+                <Input
+                  id="address_line_1"
+                  value={formData.delivery_address.address_line_1}
+                  onChange={(e) => handleFormChange('delivery_address.address_line_1', e.target.value)}
+                  placeholder="Enter street address"
+                  required
+                  className="h-10"
                 />
-                {!formData.delivery_address.address_line_1?.trim() && (
-                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                    <span>🏠</span> Please provide your complete delivery address including street name and number
-                  </p>
-                )}
               </div>
               <div>
                 <Label htmlFor="address_line_2">Apartment, suite, etc. (optional)</Label>
-                <Input id="address_line_2" value={formData.delivery_address.address_line_2} onChange={e => handleFormChange('delivery_address.address_line_2', e.target.value)} placeholder="Apartment, suite, etc." className="h-10" />
+                <Input
+                  id="address_line_2"
+                  value={formData.delivery_address.address_line_2}
+                  onChange={(e) => handleFormChange('delivery_address.address_line_2', e.target.value)}
+                  placeholder="Apartment, suite, etc."
+                  className="h-10"
+                />
               </div>
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <Label htmlFor="city">City</Label>
-                  <Input id="city" value={formData.delivery_address.city} onChange={e => handleFormChange('delivery_address.city', e.target.value)} placeholder="City" className="h-10" />
+                  <Input
+                    id="city"
+                    value={formData.delivery_address.city}
+                    onChange={(e) => handleFormChange('delivery_address.city', e.target.value)}
+                    placeholder="City"
+                    className="h-10"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="state">State *</Label>
+                  <Input
+                    id="state"
+                    value={formData.delivery_address.state}
+                    onChange={(e) => handleFormChange('delivery_address.state', e.target.value)}
+                    placeholder="State"
+                    required
+                    className="h-10"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="postal_code">Postal Code</Label>
+                  <Input
+                    id="postal_code"
+                    value={formData.delivery_address.postal_code}
+                    onChange={(e) => handleFormChange('delivery_address.postal_code', e.target.value)}
+                    placeholder="Postal code"
+                    className="h-10"
+                  />
                 </div>
               </div>
               <div>
                 <Label htmlFor="landmark">Landmark (optional)</Label>
-                <Input id="landmark" value={formData.delivery_address.landmark} onChange={e => handleFormChange('delivery_address.landmark', e.target.value)} placeholder="Nearby landmark" className="h-10" />
+                <Input
+                  id="landmark"
+                  value={formData.delivery_address.landmark}
+                  onChange={(e) => handleFormChange('delivery_address.landmark', e.target.value)}
+                  placeholder="Nearby landmark"
+                  className="h-10"
+                />
               </div>
               <div>
                 <Label htmlFor="delivery_instructions">Delivery Instructions (optional)</Label>
                 <div className="relative">
-                  <Input id="delivery_instructions" value={formData.special_instructions || ''} onChange={e => {
-                const value = e.target.value.slice(0, 160); // Limit to 160 characters
-                handleFormChange('special_instructions', value);
-              }} placeholder="Gate code, building entrance, floor, special handling notes..." maxLength={160} className="h-10" />
+                  <Input
+                    id="delivery_instructions"
+                    value={formData.special_instructions || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.slice(0, 160); // Limit to 160 characters
+                      handleFormChange('special_instructions', value);
+                    }}
+                    placeholder="Gate code, building entrance, floor, special handling notes..."
+                    maxLength={160}
+                    className="h-10"
+                  />
                   <div className="flex justify-between mt-1">
                     <span className="text-xs text-muted-foreground">
                       Help our drivers find you and deliver your order smoothly
@@ -1459,46 +845,44 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   </div>
                 </div>
               </div>
+              
+              <DeliveryZoneDropdown
+                selectedZoneId={deliveryZone?.id}
+                onZoneSelect={(zoneId, fee) => {
+                  const zone = { id: zoneId, base_fee: fee };
+                  setDeliveryZone(zone);
+                }}
+                orderSubtotal={subtotal}
+              />
             </CardContent>
-          </Card>}
+          </Card>
+        )}
 
-          {/* Pickup Point Selection - Centered */}
+        {/* Pickup Point Selection */}
         {formData.fulfillment_type === 'pickup' && (
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base text-center flex items-center justify-center gap-2">
-                <MapPin className="w-5 h-5 text-primary" />
-                Select Pickup Location <span className="text-destructive">*</span>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Pickup Location
               </CardTitle>
-              <CardDescription className="text-center text-sm">
-                Choose a convenient location to collect your order
-              </CardDescription>
             </CardHeader>
             <CardContent>
-              <PickupPointSelector 
-                selectedPointId={pickupPoint?.id} 
-                onSelect={point => {
+              <PickupPointSelector
+                selectedPointId={pickupPoint?.id}
+                onSelect={(point) => {
                   setPickupPoint(point);
                   handleFormChange('pickup_point_id', point?.id);
-                }} 
+                }}
               />
-              {pickupPoint && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-800 font-medium">
-                    ✅ Selected: {pickupPoint.name}
-                  </p>
-                  <p className="text-xs text-green-700 mt-1">
-                    {pickupPoint.address}
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
         )}
 
       </div>
 
-      {lastPaymentError && <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+      {lastPaymentError && (
+        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
             <div>
@@ -1506,9 +890,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               <p className="text-sm text-destructive/80">{lastPaymentError}</p>
             </div>
           </div>
-        </div>}
-    </div>;
-  const renderPaymentStep = () => <div className="space-y-6">
+        </div>
+      )}
+    </div>
+  );
+
+  const renderPaymentStep = () => (
+    <div className="space-y-6">
       <div className="text-center space-y-2">
         <h3 className="text-lg font-semibold">Complete Payment</h3>
         <p className="text-muted-foreground">
@@ -1516,178 +904,215 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         </p>
       </div>
 
-      {paymentData && <PaystackPaymentHandler orderId={paymentData.orderId} amount={paymentData.amount} email={paymentData.email} orderNumber={paymentData.orderNumber} successUrl={paymentData.successUrl} cancelUrl={paymentData.cancelUrl} onSuccess={handlePaymentSuccess} onError={error => handlePaymentFailure({
-      message: error
-    })} onClose={() => setCheckoutStep('details')} />}
-    </div>;
-  return <>
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
-          {/* Mobile Header */}
-          <div className="flex md:hidden items-center justify-between p-3 border-b bg-background flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-                <X className="h-4 w-4" />
-              </Button>
-              <h2 className="text-base font-semibold">
-                {checkoutStep === 'auth' && 'Complete Order'}
-                {checkoutStep === 'details' && 'Checkout'}
-                {checkoutStep === 'payment' && 'Payment'}
-              </h2>
+      {paymentData && (
+        <PaystackPaymentHandler
+          orderId={paymentData.orderId}
+          amount={paymentData.amount}
+          email={paymentData.email}
+          orderNumber={paymentData.orderNumber}
+          successUrl={paymentData.successUrl}
+          cancelUrl={paymentData.cancelUrl}
+          onSuccess={handlePaymentSuccess}
+          onError={(error) => handlePaymentFailure({ message: error })}
+          onClose={() => setCheckoutStep('details')}
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
+        {/* Mobile Header */}
+        <div className="flex md:hidden items-center justify-between p-3 border-b bg-background flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <h2 className="text-base font-semibold">
+              {checkoutStep === 'auth' && 'Complete Order'}
+              {checkoutStep === 'details' && 'Checkout'}
+              {checkoutStep === 'payment' && 'Payment'}
+            </h2>
+          </div>
+        </div>
+
+        {/* Mobile Order Summary */}
+        <div className="md:hidden flex-shrink-0">
+          <OrderSummaryCard
+            items={items}
+            subtotal={subtotal}
+            deliveryFee={deliveryFee}
+            total={total}
+            collapsibleOnMobile={true}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
+          {/* Desktop Left Panel - Order Details */}
+          <div className="hidden lg:block lg:col-span-1 bg-muted/30 border-r overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClose}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <h2 className="text-lg font-semibold">Order Details</h2>
+              </div>
+              
+              <OrderSummaryCard
+                items={items}
+                subtotal={subtotal}
+                deliveryFee={deliveryFee}
+                total={total}
+                collapsibleOnMobile={false}
+                className="shadow-none border-0 bg-transparent"
+              />
             </div>
           </div>
 
-          {/* Mobile Order Summary */}
-          <div className="md:hidden flex-shrink-0">
-            <OrderSummaryCard 
-              items={items} 
-              subtotal={subtotal} 
-              deliveryFee={deliveryFee} 
-              total={total} 
-              discountAmount={cart.summary.discount_amount}
-              appliedDiscountCode={cart.appliedDiscount?.code}
-              collapsibleOnMobile={true} 
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
-            {/* Desktop Left Panel - Order Details */}
-            <div className="hidden lg:block lg:col-span-1 bg-muted/30 border-r overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <h2 className="text-lg font-semibold">Order Details</h2>
+          {/* Main Content Panel */}
+          <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
+            {/* Desktop Header */}
+            <div className="hidden md:block flex-shrink-0">
+              <DialogHeader className="px-6 py-4 border-b">
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-xl">
+                    {checkoutStep === 'auth' && 'Complete Your Order'}
+                    {checkoutStep === 'details' && 'Delivery Details'}
+                    {checkoutStep === 'payment' && 'Payment'}
+                  </DialogTitle>
+                  <DialogClose asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </DialogClose>
                 </div>
-                
-                <OrderSummaryCard 
-                  items={items} 
-                  subtotal={subtotal} 
-                  deliveryFee={deliveryFee} 
-                  total={total} 
-                  discountAmount={cart.summary.discount_amount}
-                  appliedDiscountCode={cart.appliedDiscount?.code}
-                  collapsibleOnMobile={false} 
-                  className="shadow-none border-0 bg-transparent" 
-                />
-              </div>
-            </div>
-
-            {/* Main Content Panel */}
-            <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
-              {/* Desktop Header */}
-              <div className="hidden md:block flex-shrink-0">
-                <DialogHeader className="px-6 py-4 border-b">
-                  <div className="flex items-center justify-between">
-                    <DialogTitle className="text-xl">
-                      {checkoutStep === 'auth' && 'Complete Your Order'}
-                      {checkoutStep === 'details' && 'Delivery Details'}
-                      {checkoutStep === 'payment' && 'Payment'}
-                    </DialogTitle>
-                    <DialogClose asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </DialogClose>
-                  </div>
-                </DialogHeader>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-6">
-                {isLoading ? <div className="flex items-center justify-center py-12">
-                    <div className="space-y-4 text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                      <p className="text-muted-foreground">Checking account...</p>
-                    </div>
-                  </div> : <>
-                    {checkoutStep === 'auth' && renderAuthStep()}
-                    {checkoutStep === 'details' && renderDetailsStep()}
-                    {checkoutStep === 'payment' && renderPaymentStep()}
-                  </>}
-              </div>
-
-              {/* Sticky Bottom Action */}
-              {checkoutStep === 'details' && <div className="flex-shrink-0 p-3 md:p-6 border-t bg-background/80 backdrop-blur-sm">
-                  {/* Terms and Conditions */}
-                  {termsRequired && <div className="mb-3 flex items-start gap-2">
-                      <input type="checkbox" id="terms-checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
-                      <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
-                        I agree to the{' '}
-                        <button type="button" onClick={() => setShowTermsDialog(true)} className="text-primary hover:underline font-medium">
-                          Terms and Conditions
-                        </button>
-                      </Label>
-                    </div>}
-
-                  <Button 
-                    onClick={handleFormSubmit} 
-                    disabled={!canProceedToDetails || isSubmitting || (!isAuthenticated && !guestSession)} 
-                    className="w-full h-11 md:h-14 text-sm md:text-lg font-medium" 
-                    size="lg"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (!isAuthenticated && !guestSession) ? (
-                      "Please choose checkout method"
-                    ) : (
-                      `Proceed to Payment • ₦${total.toLocaleString()}`
-                    )}
-                  </Button>
-                  
-                  {lastPaymentError && <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                      <p className="text-sm text-destructive">{lastPaymentError}</p>
-                    </div>}
-                </div>}
-            </div>
-          </div>
-
-          {/* Terms and Conditions Dialog */}
-          <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
-            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Terms and Conditions
-                </DialogTitle>
               </DialogHeader>
-              <div className="prose prose-sm max-w-none">
-                {termsContent ? <SafeHtml className="prose prose-sm max-w-none">
-                    {termsContent}
-                  </SafeHtml> : <p>Terms and conditions content is being loaded...</p>}
-              </div>
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setShowTermsDialog(false)}>
-                  Close
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-6">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="space-y-4 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-muted-foreground">Checking account...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {checkoutStep === 'auth' && renderAuthStep()}
+                  {checkoutStep === 'details' && renderDetailsStep()}
+                  {checkoutStep === 'payment' && renderPaymentStep()}
+                </>
+              )}
+            </div>
+
+            {/* Sticky Bottom Action */}
+            {checkoutStep === 'details' && (
+              <div className="flex-shrink-0 p-3 md:p-6 border-t bg-background/80 backdrop-blur-sm">
+                {/* Terms and Conditions */}
+                {termsRequired && (
+                  <div className="mb-3 flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="terms-checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-1 h-4 w-4 accent-primary"
+                    />
+                    <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => setShowTermsDialog(true)}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Terms and Conditions
+                      </button>
+                    </Label>
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleFormSubmit}
+                  disabled={!canProceedToDetails || isSubmitting || !isAuthenticated}
+                  className="w-full h-11 md:h-14 text-sm md:text-lg font-medium"
+                  size="lg"
+                >
+                  {isSubmitting ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : !isAuthenticated ? (
+                    "Please log in to continue"
+                  ) : (
+                    `Proceed to Payment • ₦${total.toLocaleString()}`
+                  )}
                 </Button>
-                <Button onClick={() => {
-                setTermsAccepted(true);
-                setShowTermsDialog(false);
-              }}>
-                  I Agree
-                </Button>
+                
+                {lastPaymentError && (
+                  <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                    <p className="text-sm text-destructive">{lastPaymentError}</p>
+                  </div>
+                )}
               </div>
-            </DialogContent>
-          </Dialog>
-        </DialogContent>
-      </Dialog>
-      
-      {/* MOQ Adjustment Modal */}
-      <MOQAdjustmentModal isOpen={showMOQModal} onClose={() => setShowMOQModal(false)} onConfirm={async () => {
-      setShowMOQModal(false);
-      toast({
-        title: "Cart Updated",
-        description: "Quantities have been adjusted to meet minimum order requirements. Proceeding to payment."
-      });
-      // Retry checkout after adjustment
-      await handleFormSubmit();
-    }} onCancel={() => setShowMOQModal(false)} adjustments={moqValidationResult?.adjustmentsMade || []} pricingImpact={moqValidationResult?.pricingImpact} />
-    </>
-  });
+            )}
+          </div>
+        </div>
+
+        {/* Terms and Conditions Dialog */}
+        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Terms and Conditions
+              </DialogTitle>
+            </DialogHeader>
+            <div className="prose prose-sm max-w-none">
+              {termsContent ? (
+                <SafeHtml className="prose prose-sm max-w-none">
+                  {termsContent}
+                </SafeHtml>
+              ) : (
+                <p>Terms and conditions content is being loaded...</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowTermsDialog(false)}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setTermsAccepted(true);
+                  setShowTermsDialog(false);
+                }}
+              >
+                I Agree
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </DialogContent>
+    </Dialog>
+  );
+});
+
 EnhancedCheckoutFlowComponent.displayName = 'EnhancedCheckoutFlowComponent';
-export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = props => <CheckoutErrorBoundary>
+
+export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = (props) => (
+  <CheckoutErrorBoundary>
     <EnhancedCheckoutFlowComponent {...props} />
-  </CheckoutErrorBoundary>;
+  </CheckoutErrorBoundary>
+);

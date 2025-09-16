@@ -1,1 +1,0 @@
-DELETE FROM website_menu WHERE id = '1a25fbff-5950-4587-9d85-71e6c57c38d6';

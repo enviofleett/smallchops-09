@@ -119,12 +119,11 @@ export const useSecurePayment = () => {
         email: customerEmail.substring(0, 3) + '***'
       });
 
-      console.log('🔄 Using process-checkout for consistent payment processing');
+      console.log('🔄 Using secure payment processor for authenticated fallback');
 
-      // Use consistent payment processor that handles both new orders and existing orders
-      const { data, error } = await supabase.functions.invoke('process-checkout', {
+      // For fallback payments, use the secure-payment-processor with existing order
+      const { data, error } = await supabase.functions.invoke('secure-payment-processor', {
         body: {
-          action: 'existing_order_payment',
           order_id: orderId,
           customer_email: customerEmail,
         }

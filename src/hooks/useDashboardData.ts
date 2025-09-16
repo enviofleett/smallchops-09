@@ -46,7 +46,6 @@ export const useDashboardData = () => {
     try {
       setIsLoading(true);
       setError(null);
-      setRetryCount(prev => prev + 1);
       
       console.log('Dashboard: Starting data fetch...', { retryCount, skipCache });
       

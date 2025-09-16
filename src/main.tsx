@@ -8,8 +8,6 @@ import { productionMonitoring } from "./utils/productionMonitoring";
 import { initializeConsoleCleanup, suppressWebSocketErrors } from "./utils/consoleCleanup";
 import { initializeSecureStorage } from "./utils/secureStorage";
 import { initializeSecurityMonitoring } from "./utils/securityHeaders";
-// Import global error handler for ComponentLoadError
-import "./utils/componentErrorHandler";
 
 // Initialize performance monitoring
 initWebVitals();
@@ -52,14 +50,6 @@ function safeCacheCleanup() {
 
 // Execute safe cleanup
 safeCacheCleanup();
-
-// CRITICAL: Initialize Paystack health check configuration
-try {
-  localStorage.setItem('payment_system_mode', 'backend-only');
-  console.log('✅ Payment system configured for backend-only mode');
-} catch (error) {
-  console.warn('⚠️ Failed to set payment system mode:', error);
-}
 
 // Disable existing service workers to prevent stale asset caching that can break dynamic imports
 if ('serviceWorker' in navigator) {

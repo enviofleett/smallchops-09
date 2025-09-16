@@ -29,10 +29,10 @@ serve(async (req) => {
 
     console.log('Processing admin order notification for order:', order_number);
 
-    // Get business settings for admin email and company info
+    // Get business settings for admin email
     const { data: businessSettings } = await supabaseAdmin
       .from('business_settings')
-      .select('admin_notification_email, email, name, site_url')
+      .select('admin_notification_email, email, name')
       .limit(1)
       .single();
 
@@ -52,29 +52,44 @@ serve(async (req) => {
       );
     }
 
-    // Prepare template variables for admin_new_order template
-    const templateVariables = {
-      order_number: order_number,
-      customer_name: customer_name,
-      customer_email: customer_email,
-      customer_phone: order_items?.[0]?.customer_phone || 'N/A', // Get from order if available
-      total_amount: total_amount?.toLocaleString() || '0',
-      order_date: new Date().toLocaleDateString(),
-      order_items_list: order_items.length > 0 ? 
-        order_items.map(item => 
-          `• ${item.product_name} - Qty: ${item.quantity} - ₦${item.unit_price?.toLocaleString()}`
-        ).join('\n') : 'No items',
-      admin_dashboard_link: `${businessSettings?.site_url || 'https://yourdomain.com'}/admin/orders/${order_id}`,
-      business_name: businessSettings?.name || 'Starters'
-    };
-
-    // Send admin notification using the template from Email Template Manager
-    const { data: emailResult, error: emailError } = await supabaseAdmin.functions.invoke('unified-smtp-sender', {
+    // Send admin notification using enhanced-smtp-sender
+    const { data: emailResult, error: emailError } = await supabaseAdmin.functions.invoke('enhanced-smtp-sender', {
       body: {
         to: adminEmail,
-        templateKey: 'admin_new_order',
-        variables: templateVariables,
-        emailType: 'transactional',
+        subject: `New Order Received: ${order_number}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2d3748;">New Order Notification</h2>
+            <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3>Order Details</h3>
+              <p><strong>Order Number:</strong> ${order_number}</p>
+              <p><strong>Customer:</strong> ${customer_name}</p>
+              <p><strong>Email:</strong> ${customer_email}</p>
+              <p><strong>Total Amount:</strong> ₦${total_amount?.toLocaleString() || 'N/A'}</p>
+              <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            ${order_items.length > 0 ? `
+              <div style="margin: 20px 0;">
+                <h3>Order Items</h3>
+                <ul>
+                  ${order_items.map(item => `
+                    <li>${item.product_name} - Qty: ${item.quantity} - ₦${item.unit_price?.toLocaleString()}</li>
+                  `).join('')}
+                </ul>
+              </div>
+            ` : ''}
+            
+            <div style="margin-top: 30px; padding: 20px; background: #e2e8f0; border-radius: 8px;">
+              <p style="margin: 0;">
+                <a href="https://yourdomain.com/admin/orders/${order_id}" 
+                   style="background: #3182ce; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  View Order in Admin
+                </a>
+              </p>
+            </div>
+          </div>
+        `,
         priority: 'high'
       }
     });

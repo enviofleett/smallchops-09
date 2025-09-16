@@ -1,19 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CalendarIcon, Clock, AlertTriangle, Info } from 'lucide-react';
-import { DeliveryTimeSlot } from '@/utils/deliveryScheduling';
-import { isAfter, addDays, addMonths, isBefore, startOfDay, endOfDay, differenceInDays, isWeekend, addMinutes } from 'date-fns';
+import { CalendarIcon, Clock, AlertTriangle } from 'lucide-react';
+import { deliverySchedulingService, DeliverySlot, DeliveryTimeSlot } from '@/utils/deliveryScheduling';
+import { isAfter, addDays } from 'date-fns';
+import { useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
 import { HorizontalDatePicker } from './HorizontalDatePicker';
-import { DropdownDatePicker } from './DropdownDatePicker';
-import { useQuery } from '@tanstack/react-query';
-
 interface DeliverySchedulerProps {
   selectedDate?: string;
   selectedTimeSlot?: {
@@ -28,8 +26,7 @@ interface DeliverySchedulerProps {
   showHeader?: boolean;
   variant?: 'calendar' | 'horizontal';
 }
-
-export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
+export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   selectedDate,
   selectedTimeSlot,
   onScheduleChange,
@@ -37,114 +34,15 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
   showHeader = true,
   variant = 'calendar'
 }) => {
+  console.log('🚀 DeliveryScheduler component initializing');
+  const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
   const [selectedDateSlots, setSelectedDateSlots] = useState<DeliveryTimeSlot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(selectedDate ? parseISO(selectedDate) : undefined);
-  const [deliveryConfig, setDeliveryConfig] = useState<any>(null);
-
-  // Production-ready query that fetches config and slots
-  const {
-    data: apiResponse,
-    isLoading: loading,
-    error: queryError,
-    refetch
-  } = useQuery({
-    queryKey: ['delivery-availability', new Date().toISOString().split('T')[0]],
-    queryFn: async () => {
-      const { deliveryBookingAPI } = await import('@/api/deliveryBookingApi');
-      const now = new Date();
-      const maxDate = addDays(now, 60); // 60 days from backend config
-      
-      const response = await deliveryBookingAPI.getAvailableSlots({
-        start_date: deliveryBookingAPI.formatDateForAPI(now),
-        end_date: deliveryBookingAPI.formatDateForAPI(maxDate)
-      });
-      
-      console.log('✅ Delivery API response:', {
-        slots: response.slots.length,
-        config: response.config,
-        businessDays: response.business_days
-      });
-      
-      return response;
-    },
-    staleTime: 10 * 60 * 1000, // 10 minutes cache
-    refetchInterval: false,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: 'always',
-    retry: 2
-  });
-
-  const availableSlots = apiResponse?.slots || [];
-  const config = apiResponse?.config;
-  const error = queryError?.message || null;
-
-  // Update delivery config when API response changes
   useEffect(() => {
-    if (config) {
-      setDeliveryConfig(config);
-    }
-  }, [config]);
-
-  // Fixed useMemo dependency array to prevent infinite re-renders
-  const dateValidation = useMemo(() => {
-    const now = new Date();
-    const leadTimeMinutes = deliveryConfig?.lead_time_minutes || 60;
-    const maxAdvanceDays = deliveryConfig?.max_advance_days || 60;
-    
-    const minDate = startOfDay(now);
-    const maxDate = addDays(startOfDay(now), maxAdvanceDays);
-    
-    return {
-      minDate,
-      maxDate,
-      leadTimeMinutes,
-      maxAdvanceDays,
-      isDateInRange: (date: Date) => {
-        const dayStart = startOfDay(date);
-        return !isBefore(dayStart, minDate) && !isAfter(dayStart, maxDate);
-      },
-      isDateBlocked: (date: Date) => {
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const slot = availableSlots.find(s => s.date === dateStr);
-        return slot?.is_holiday || false;
-      },
-      getMinimumBookingTime: () => {
-        return addMinutes(now, leadTimeMinutes);
-      },
-      getDateDisabledReason: (date: Date) => {
-        const dayStart = startOfDay(date);
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const slot = availableSlots.find(s => s.date === dateStr);
-        
-        if (isBefore(dayStart, minDate)) {
-          return 'Past dates not available';
-        }
-        if (isAfter(dayStart, maxDate)) {
-          return `Booking available up to ${maxAdvanceDays} days in advance`;
-        }
-        if (slot?.is_holiday) {
-          return `Delivery not available - ${slot.holiday_name || 'Holiday'}`;
-        }
-        if (slot && !slot.is_business_day) {
-          return 'Delivery not available on this date';
-        }
-        return null;
-      }
-    };
-  }, [deliveryConfig?.lead_time_minutes, deliveryConfig?.max_advance_days, availableSlots]);
-
-  // Enhanced date disabled function
-  const isDateDisabled = useCallback((date: Date) => {
-    if (!dateValidation.isDateInRange(date)) return true;
-    if (dateValidation.isDateBlocked(date)) return true;
-    if (isBefore(startOfDay(date), startOfDay(new Date()))) return true;
-    
-    // Check if date has available slots
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const slot = availableSlots.find(s => s.date === dateStr);
-    return !slot?.is_business_day;
-  }, [dateValidation, availableSlots]);
-
+    loadAvailableSlots();
+  }, []);
   useEffect(() => {
     if (calendarDate) {
       const dateStr = format(calendarDate, 'yyyy-MM-dd');
@@ -154,8 +52,32 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
       setSelectedDateSlots([]);
     }
   }, [calendarDate, availableSlots]);
-
-  // Legacy date modifier functions for existing slot data
+  const loadAvailableSlots = useCallback(async () => {
+    try {
+      console.log('📋 Loading delivery slots...');
+      setLoading(true);
+      setError(null);
+      const endDate = addDays(new Date(), 30);
+      console.log('🕐 Getting slots from service...');
+      const slots = await deliverySchedulingService.getAvailableDeliverySlots(new Date(), endDate);
+      console.log('✅ Delivery slots loaded:', slots.length);
+      setAvailableSlots(slots);
+      if (slots.length === 0) {
+        setError('No delivery slots available. Please contact support.');
+      }
+    } catch (err) {
+      console.error('❌ Failed to load delivery slots:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load available delivery slots';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  const isDateDisabled = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const slot = availableSlots.find(s => s.date === dateStr);
+    return !slot?.is_business_day || slot.is_holiday;
+  };
   const getDateModifiers = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const slot = availableSlots.find(s => s.date === dateStr);
@@ -163,7 +85,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
     if (!slot?.is_business_day) return 'closed';
     return undefined;
   };
-
   const handleDateSelect = (date: Date | undefined) => {
     setCalendarDate(date);
     if (date && selectedTimeSlot) {
@@ -179,7 +100,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
       onScheduleChange(dateStr, selectedTimeSlot);
     }
   };
-
   const handleTimeSlotSelect = (timeSlot: DeliveryTimeSlot) => {
     if (!timeSlot.available || !calendarDate) return;
     const dateStr = format(calendarDate, 'yyyy-MM-dd');
@@ -189,44 +109,24 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
     };
     onScheduleChange(dateStr, newTimeSlot);
   };
-
   const selectedSlot = availableSlots.find(slot => calendarDate && slot.date === format(calendarDate, 'yyyy-MM-dd'));
-
   if (loading) {
-    return (
-      <DeliverySchedulingErrorBoundary>
+    return <DeliverySchedulingErrorBoundary>
         <Card className={className}>
-          {showHeader && (
-            <CardHeader>
+          {showHeader && <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CalendarIcon className="h-5 w-5" />
                 Choose Delivery Date & Time
               </CardTitle>
-            </CardHeader>
-          )}
-          <CardContent className="space-y-6">
-            {/* Fast-loading skeleton */}
-            <div className="space-y-4">
-              <div className="h-4 bg-muted animate-pulse rounded w-1/3"></div>
-              <div className="h-3 bg-muted animate-pulse rounded w-2/3"></div>
-            </div>
-            <div className="w-full h-64 bg-muted animate-pulse rounded-lg"></div>
-            <div className="space-y-2">
-              <div className="h-4 bg-muted animate-pulse rounded w-1/4"></div>
-              <div className="grid grid-cols-3 gap-2">
-                {Array.from({
-                  length: 6
-                }).map((_, i) => (
-                  <div key={i} className="h-12 bg-muted animate-pulse rounded"></div>
-                ))}
-              </div>
+            </CardHeader>}
+          <CardContent>
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           </CardContent>
         </Card>
-      </DeliverySchedulingErrorBoundary>
-    );
+      </DeliverySchedulingErrorBoundary>;
   }
-
   if (variant === 'horizontal') {
     return (
       <DeliverySchedulingErrorBoundary>
@@ -236,28 +136,19 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 {error}
-                <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
+                <Button variant="outline" size="sm" onClick={loadAvailableSlots} className="ml-2">
                   Retry
                 </Button>
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Date Picker - Responsive */}
-          <div className="block sm:hidden">
-            <DropdownDatePicker 
-              selectedDate={selectedDate} 
-              availableSlots={availableSlots} 
-              onDateSelect={handleHorizontalDateSelect} 
-            />
-          </div>
-          <div className="hidden sm:block">
-            <HorizontalDatePicker 
-              selectedDate={selectedDate} 
-              availableSlots={availableSlots} 
-              onDateSelect={handleHorizontalDateSelect} 
-            />
-          </div>
+          {/* Horizontal Date Picker */}
+          <HorizontalDatePicker
+            selectedDate={selectedDate}
+            availableSlots={availableSlots}
+            onDateSelect={handleHorizontalDateSelect}
+          />
 
           {/* Time Slots Section */}
           {calendarDate && selectedDateSlots.length > 0 && (
@@ -268,13 +159,15 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {selectedDateSlots.map((timeSlot, index) => {
-                  const isSelected = selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time;
+                  const isSelected = selectedTimeSlot?.start_time === timeSlot.start_time && 
+                                   selectedTimeSlot?.end_time === timeSlot.end_time;
+                  
                   return (
-                    <Button 
-                      key={index} 
-                      variant={isSelected ? "default" : "outline"} 
-                      disabled={!timeSlot.available} 
-                      onClick={() => handleTimeSlotSelect(timeSlot)} 
+                    <Button
+                      key={index}
+                      variant={isSelected ? "default" : "outline"}
+                      disabled={!timeSlot.available}
+                      onClick={() => handleTimeSlotSelect(timeSlot)}
                       className={cn(
                         "h-14 px-3 flex items-center justify-center",
                         "border-2 transition-all duration-200 hover:scale-105 active:scale-95",
@@ -307,168 +200,112 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
     );
   }
 
-  return (
-    <DeliverySchedulingErrorBoundary>
+  return <DeliverySchedulingErrorBoundary>
       <Card className={`border-primary/20 ${className}`}>
-        {showHeader && (
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5" />
-              Choose Delivery Date & Time
-            </CardTitle>
-          </CardHeader>
-        )}
+        {showHeader}
         <CardContent className="space-y-6">
-          {error && (
-            <Alert variant="destructive">
+        {error && <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {error}
+              <Button variant="outline" size="sm" onClick={loadAvailableSlots} className="ml-2">
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>}
+
+        
+
+        {/* Calendar Section */}
+        <div className="space-y-4">
+          <h3 className="font-medium">Select Delivery Date</h3>
+          <div className="w-full overflow-hidden">
+            <Calendar mode="single" selected={calendarDate} onSelect={handleDateSelect} disabled={date => isDateDisabled(date) || isAfter(date, addDays(new Date(), 30))} className="w-full mx-auto rounded-md border pointer-events-auto scale-90 sm:scale-100 origin-top" classNames={{
+              months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+              month: "space-y-4",
+              caption: "flex justify-center pt-1 relative items-center text-sm sm:text-base",
+              caption_label: "text-sm sm:text-base font-medium",
+              nav: "space-x-1 flex items-center",
+              nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-accent hover:text-accent-foreground border rounded-md",
+              nav_button_previous: "absolute left-1",
+              nav_button_next: "absolute right-1",
+              table: "w-full border-collapse space-y-1",
+              head_row: "flex",
+              head_cell: "text-muted-foreground rounded-md w-8 sm:w-9 font-normal text-xs sm:text-sm",
+              row: "flex w-full mt-2",
+              cell: "text-center text-xs sm:text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+              day: "h-8 w-8 sm:h-9 sm:w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors text-xs sm:text-sm touch-manipulation",
+              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+              day_today: "bg-accent text-accent-foreground",
+              day_outside: "text-muted-foreground opacity-50",
+              day_disabled: "text-muted-foreground opacity-50",
+              day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+              day_hidden: "invisible"
+            }} modifiers={{
+              holiday: date => getDateModifiers(date) === 'holiday',
+              closed: date => getDateModifiers(date) === 'closed'
+            }} modifiersStyles={{
+              holiday: {
+                backgroundColor: 'hsl(var(--destructive))',
+                color: 'hsl(var(--destructive-foreground))'
+              },
+              closed: {
+                backgroundColor: 'hsl(var(--muted))',
+                color: 'hsl(var(--muted-foreground))'
+              }
+            }} />
+          </div>
+
+          {selectedSlot?.is_holiday && <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                {error}
-                <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
-                  Retry
-                </Button>
+                {selectedSlot.holiday_name} - No delivery available on this date
               </AlertDescription>
-            </Alert>
-          )}
+            </Alert>}
+        </div>
 
-          {/* Date Picker - Mobile Optimized */}
-          <div className="space-y-4">
-            
-            {/* Always use dropdown for better UX */}
-            <DropdownDatePicker 
-              selectedDate={selectedDate} 
-              availableSlots={availableSlots} 
-              onDateSelect={handleHorizontalDateSelect} 
-            />
-          </div>
-          
-          {/* Booking Information - Production Ready */}
-          <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-            <div className="space-y-2">
-              <p className="text-sm text-primary font-medium">
-                📅 <strong>Booking Window:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                ⏰ <strong>Delivery Hours:</strong> Mon-Sat: 8:00AM - 7:00PM | Sunday: 10:00AM - 5:00PM
-              </p>
-              <p className="text-xs text-muted-foreground">
-                🕐 <strong>Lead Time:</strong> Minimum {dateValidation.leadTimeMinutes} minutes from booking
-              </p>
+        {/* Time Slots Section */}
+        {calendarDate && selectedDateSlots.length > 0 && <div className="space-y-4">
+            <h3 className="font-medium text-sm sm:text-base flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Select Delivery Time for {format(calendarDate, 'EEEE, MMMM d')}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+              {selectedDateSlots.map((timeSlot, index) => <Button key={index} variant={selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time ? "default" : "outline"} disabled={!timeSlot.available} onClick={() => handleTimeSlotSelect(timeSlot)} className={cn("h-auto min-h-[64px] p-3 sm:p-4 flex flex-col items-center justify-center gap-1 text-center touch-manipulation", "hover:scale-105 transition-all duration-200 active:scale-95", !timeSlot.available && "opacity-50 cursor-not-allowed", "sm:min-h-[72px] rounded-lg border-2")}>
+                  <span className="font-medium text-sm sm:text-base">
+                    {timeSlot.start_time} - {timeSlot.end_time}
+                  </span>
+                  {!timeSlot.available && timeSlot.reason && <span className="text-xs text-red-500 text-center leading-tight">
+                      {timeSlot.reason}
+                    </span>}
+                  {timeSlot.available && <span className="text-xs text-green-600">Available</span>}
+                </Button>)}
             </div>
-          </div>
+          </div>}
 
-          {/* Date Selection Feedback */}
-          {calendarDate && (
-            <div className="text-sm text-muted-foreground bg-green-50 border border-green-200 rounded-lg p-3">
-              ✅ Selected: <strong>{format(calendarDate, 'EEEE, MMMM d, yyyy')}</strong>
-              {differenceInDays(calendarDate, new Date()) > 7 && (
-                <div className="mt-1 text-blue-600">
-                  ℹ️ Advanced booking - {differenceInDays(calendarDate, new Date())} days from today
-                </div>
-              )}
+        {calendarDate && selectedDateSlots.length === 0 && !selectedSlot?.is_holiday && <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              No delivery slots available for the selected date.
+            </AlertDescription>
+          </Alert>}
+
+        {/* Summary */}
+        {selectedDate && selectedTimeSlot && <div className="pt-4 border-t">
+            <h4 className="font-medium mb-2">Delivery Schedule Summary</h4>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <Badge variant="secondary" className="whitespace-nowrap">
+                {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
+              </Badge>
+              <Badge variant="secondary" className="whitespace-nowrap">
+                {selectedTimeSlot.start_time} - {selectedTimeSlot.end_time}
+              </Badge>
             </div>
-          )}
-
-          {/* Time Slots Section - Enhanced Mobile Layout */}
-          {calendarDate && selectedDateSlots.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="font-medium text-base flex items-center gap-2 text-foreground">
-                <Clock className="w-4 h-4 text-primary" />
-                Select Delivery Time for {format(calendarDate, 'EEEE, MMMM d')}
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {selectedDateSlots.map((timeSlot, index) => (
-                  <Button 
-                    key={index} 
-                    variant={selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time ? "default" : "outline"} 
-                    disabled={!timeSlot.available} 
-                    onClick={() => handleTimeSlotSelect(timeSlot)} 
-                    className={cn(
-                      "h-auto min-h-[72px] p-4 flex flex-col items-center justify-center gap-2 text-center",
-                      "transition-all duration-200 touch-manipulation rounded-xl border-2",
-                      "hover:scale-[1.02] active:scale-[0.98] focus:scale-[1.02]",
-                      "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                      !timeSlot.available && "opacity-50 cursor-not-allowed hover:scale-100",
-                      timeSlot.available && "hover:shadow-md",
-                      selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time && "ring-2 ring-primary ring-offset-2 shadow-lg"
-                    )}
-                  >
-                    <span className="font-semibold text-sm leading-tight">
-                      {timeSlot.start_time} - {timeSlot.end_time}
-                    </span>
-                    {!timeSlot.available && timeSlot.reason && (
-                      <span className="text-xs text-destructive text-center leading-tight max-w-full">
-                        booking closed
-                      </span>
-                    )}
-                    {timeSlot.available && (
-                      <span className="text-xs text-muted-foreground font-medium">Available</span>
-                    )}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* No Slots Available Alert */}
-          {calendarDate && selectedDateSlots.length === 0 && !selectedSlot?.is_holiday && (
-            <Alert className="border-orange-200 bg-orange-50">
-              <AlertTriangle className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800">
-                No delivery slots available for the selected date. Please choose a different date or contact support for assistance.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Holiday Alert */}
-          {selectedSlot?.is_holiday && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Selected date is a holiday. Delivery is not available on this date.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Delivery Summary - Enhanced with Booking Timeline */}
-          {selectedDate && selectedTimeSlot && (
-            <div className="pt-6 border-t border-border/50">
-              <h4 className="font-semibold mb-4 text-foreground flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4 text-primary" />
-                Delivery Schedule Summary
-              </h4>
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                  <Badge variant="secondary" className="px-3 py-1.5 text-sm font-medium whitespace-nowrap bg-primary/10 text-primary border-primary/20">
-                    📅 {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
-                  </Badge>
-                  <Badge variant="secondary" className="px-3 py-1.5 text-sm font-medium whitespace-nowrap bg-green-100 text-green-800 border-green-200">
-                    🕒 {selectedTimeSlot.start_time} - {selectedTimeSlot.end_time}
-                  </Badge>
-                  {differenceInDays(parseISO(selectedDate), new Date()) > 30 && (
-                    <Badge variant="outline" className="px-3 py-1.5 text-sm font-medium whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200">
-                      🚀 Advanced Booking
-                    </Badge>
-                  )}
-                </div>
-
-
-              </div>
-            </div>
-          )}
-
-          {/* Advanced Booking Notice */}
-          {selectedDate && differenceInDays(parseISO(selectedDate), new Date()) > 90 && (
-            <Alert className="border-blue-200 bg-blue-50">
-              <Info className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <strong>Long-term booking:</strong> You're booking {differenceInDays(parseISO(selectedDate), new Date())} days in advance. 
-                We'll send you a confirmation reminder 1 week before your delivery date.
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
+            <p className="text-sm text-muted-foreground mt-2">
+              Please ensure someone is available to receive the delivery during this time window.
+            </p>
+          </div>}
+      </CardContent>
       </Card>
-    </DeliverySchedulingErrorBoundary>
-  );
-});
+    </DeliverySchedulingErrorBoundary>;
+};

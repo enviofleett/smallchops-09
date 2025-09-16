@@ -44,21 +44,6 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
       };
     }
 
-    // ENHANCED: Check for duplicate-related errors and treat as success
-    const errorMessage = verifyError?.message || '';
-    const isDuplicateError = errorMessage.includes('duplicate key') || 
-                           errorMessage.includes('already processed') ||
-                           errorMessage.includes('already exists') ||
-                           errorMessage.includes('unique constraint');
-
-    if (isDuplicateError && verifyData?.data?.duplicate_handled) {
-      console.log('✅ Payment already processed (duplicate handled as success)');
-      return {
-        success: true,
-        data: verifyData.data
-      };
-    }
-
     console.log('⚠️ verify-payment failed, falling back to paystack-secure:', verifyError?.message);
     
     // Fallback to paystack-secure

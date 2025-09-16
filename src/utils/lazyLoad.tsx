@@ -23,8 +23,8 @@ export function withLazyLoading<T extends ComponentType<any>>(
   importFunc: () => Promise<{ default: T }>,
   fallback: ComponentType = LoadingSpinner,
   useFastLoader = false,
-  timeout = 10000, // 10 seconds timeout
-  maxRetries = 2 // Reduced retries to fail faster
+  timeout = 15000, // Reduced timeout for better UX
+  maxRetries = 3
 ) {
   const LazyComponent = lazy(() => {
     let retryCount = 0;
@@ -61,13 +61,6 @@ export function withLazyLoading<T extends ComponentType<any>>(
         // Final failure - provide better error context
         const finalError = new Error(`Failed to load component after ${maxRetries + 1} attempts. Last error: ${error.message}`);
         finalError.name = 'ComponentLoadError';
-        finalError.stack = error.stack; // Preserve original stack trace
-        console.error('🚨 ComponentLoadError - Final failure details:', {
-          attempts: maxRetries + 1,
-          lastError: error.message,
-          timestamp: new Date().toISOString(),
-          url: window.location.href
-        });
         throw finalError;
       }
     };

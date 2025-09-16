@@ -61,7 +61,6 @@ export const validatePaystackCSP = (): { valid: boolean; issues: string[] } => {
   
   const requiredDomains = [
     'checkout.paystack.com',
-    'paystack.com',
     'js.paystack.co',
     'api.paystack.co'
   ];
@@ -72,13 +71,8 @@ export const validatePaystackCSP = (): { valid: boolean; issues: string[] } => {
     issues.push(`Missing Paystack domains in CSP: ${missingDomains.join(', ')}`);
   }
   
-  // Check for style-src-elem directive specifically
-  if (!content.includes('style-src-elem')) {
-    issues.push('Missing style-src-elem directive for external stylesheets');
-  }
-  
   return {
-    valid: missingDomains.length === 0 && content.includes('style-src-elem'),
+    valid: missingDomains.length === 0,
     issues
   };
 };

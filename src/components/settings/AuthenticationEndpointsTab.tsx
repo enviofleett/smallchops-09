@@ -8,7 +8,7 @@ import { Copy, CheckCircle, AlertCircle, Send, Code, Eye, EyeOff } from 'lucide-
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EndpointTest {
@@ -137,7 +137,7 @@ const { data, error } = await supabase.auth.signInWithOAuth({
       title: 'Business Settings',
       method: 'GET',
       path: '/rest/v1/business_settings',
-      description: 'Get public business configuration for branding'
+      description: 'Get business configuration for branding'
     }
   ];
 

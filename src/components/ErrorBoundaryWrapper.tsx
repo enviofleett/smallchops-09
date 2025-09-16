@@ -1,9 +1,8 @@
 import React, { Component, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
-import { logger } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -60,17 +59,16 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       url: window.location.href
     };
 
-    // Use production-safe logger
-    logger.error('Error Boundary caught error', error, this.props.context);
+    console.group(`🚨 Error Boundary: ${this.props.context || 'Unknown Context'}`);
+    console.error('Error Details:', errorDetails);
+    console.groupEnd();
 
     this.setState({ errorInfo });
     this.props.onError?.(error, errorInfo);
 
     // Log to external service in production
     if (import.meta.env.PROD) {
-      this.logErrorToService(errorDetails).catch((logError) => {
-        logger.error('Failed to log error to service', logError);
-      });
+      this.logErrorToService(errorDetails).catch(console.error);
     }
   }
 
@@ -105,11 +103,7 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
 
   private getErrorCategory = (error: Error): string => {
     const message = error.message.toLowerCase();
-    
-    // Specific handling for ComponentLoadError
-    if (error.name === 'ComponentLoadError' || message.includes('failed to load component')) {
-      return 'Component Load Error';
-    } else if (message.includes('network') || message.includes('fetch')) {
+    if (message.includes('network') || message.includes('fetch')) {
       return 'Network Error';
     } else if (message.includes('chunk') || message.includes('loading') || message.includes('timeout')) {
       return 'Loading Error';
@@ -127,8 +121,6 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     const message = error.message.toLowerCase();
     
     switch (category) {
-      case 'Component Load Error':
-        return 'Please refresh your page';
       case 'Network Error':
         return 'Please check your internet connection and try again. You may also try refreshing the page.';
       case 'Loading Error':
@@ -158,46 +150,20 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       const suggestion = this.state.error ? this.getErrorSuggestion(this.state.error) : 'Please try again.';
       const canRetry = this.state.retryCount < this.maxRetries;
 
-      // Show simplified UI for ComponentLoadError
-      if (errorCategory === 'Component Load Error') {
-        return (
-          <div className="min-h-[200px] flex items-center justify-center p-4 sm:p-6">
-            <Card className="w-full max-w-md shadow-sm border-border/50 bg-card">
-              <CardContent className="p-4 sm:p-6">
-                <div className="text-center space-y-3">
-                  <AlertTriangle className="h-6 w-6 text-destructive mx-auto" />
-                  <p className="text-foreground text-sm">
-                    Component failed to load. Please refresh the page.
-                  </p>
-                  <Button 
-                    onClick={this.handleRefresh}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh Page
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      }
-
       return (
         <div className="min-h-[400px] flex items-center justify-center p-4 sm:p-6">
-          <Card className="w-full max-w-lg shadow-sm border-border/50 bg-card">
+          <Card className="w-full max-w-lg shadow-lg border-border/50">
             <CardContent className="p-4 sm:p-6 space-y-6">
               <div className="text-center space-y-4">
                 <div className="flex items-center justify-center space-x-3 mb-4">
                   <AlertTriangle className="h-8 w-8 text-destructive" />
-                  <h3 className="text-xl font-semibold text-foreground">
+                  <h3 className="text-xl font-semibold">
                     {errorCategory}
                   </h3>
                 </div>
                 
-                <Alert className="mb-4 border-destructive/50 bg-destructive/5">
-                  <AlertDescription className="text-left text-foreground">
+                <Alert className="mb-4">
+                  <AlertDescription className="text-left">
                     {suggestion}
                   </AlertDescription>
                 </Alert>
@@ -264,24 +230,18 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
 
                 {this.props.showErrorDetails && this.state.error && (
                   <details className="mt-4 text-left">
-                    <summary className="text-sm font-medium cursor-pointer mb-2 text-muted-foreground flex items-center gap-1">
-                      <Bug className="h-3 w-3" />
+                    <summary className="text-sm font-medium cursor-pointer mb-2">
                       Technical Details
                     </summary>
-                    <div className="text-xs bg-muted/50 p-3 rounded border overflow-auto max-h-40 text-left space-y-2">
-                      <div>
-                        <strong className="text-foreground">Error:</strong>
-                        <span className="text-muted-foreground ml-1">{this.state.error.message}</span>
-                      </div>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-40 text-left">
+                      {this.state.error.message}
                       {this.state.error.stack && (
-                        <div>
-                          <strong className="text-foreground">Stack:</strong>
-                          <pre className="text-xs mt-1 bg-background p-2 rounded overflow-auto max-h-32 text-muted-foreground">
-                            {this.state.error.stack}
-                          </pre>
-                        </div>
+                        <>
+                          {'\n\nStack Trace:\n'}
+                          {this.state.error.stack}
+                        </>
                       )}
-                    </div>
+                    </pre>
                   </details>
                 )}
               </div>

@@ -57,92 +57,96 @@ export const useBusinessSettings = () => {
       const measurePerformance = measure.start('useBusinessSettings');
       
       try {
-        logger.info('Starting business settings fetch using secure function');
+        logger.info('Starting business settings fetch');
         
-        // Use the new secure public function
-        const { data, error } = await supabase.rpc('get_public_business_info');
-        
-        if (error) {
-          logger.warn('Public business info function failed', error);
-          throw new Error(`Failed to fetch business settings: ${error.message}`);
-        }
-        
-        if (!data) {
-          logger.warn('No business settings data returned from secure function');
+        // First, always try direct database query with public access
+        const { data, error: dbError } = await supabase
+          .from('business_settings')
+          .select('*')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+          
+        if (!dbError && data) {
+          logger.info('Business settings fetched successfully via direct query');
           measurePerformance();
-          return null;
+          return data as BusinessSettings;
         }
+        
+        if (dbError) {
+          logger.warn('Direct database query failed', dbError);
+        }
+        
+        // Fallback: Try with authentication for admin users
+        const { data: session } = await supabase.auth.getSession();
+        
+        if (session?.session?.access_token) {
+          logger.info('Attempting authenticated edge function call');
+          
+          const { data: result, error } = await invokeWithRetry('business-settings', {
+            method: 'GET',
+            headers: {
+              'authorization': `Bearer ${session.session.access_token}`,
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA',
+              'content-type': 'application/json'
+            }
+          }, {
+            maxRetries: 2,
+            retryCondition: (error) => {
+              // Only retry on network errors, not auth errors
+              return (error?.message?.includes('Failed to send a request') ||
+                     error?.message?.includes('Network') ||
+                     error?.status >= 500) && error?.status !== 401 && error?.status !== 403;
+            }
+          });
 
-        // Transform the function result to match BusinessSettings interface
-        const businessInfo = data as Record<string, any>;
-        const businessSettings: BusinessSettings = {
-          id: 'public-view',
-          name: businessInfo.name || 'Starters Small Chops',
-          tagline: businessInfo.tagline || 'Delicious Nigerian Small Chops',
-          logo_url: businessInfo.logo_url,
-          logo_dark_url: businessInfo.logo_dark_url,
-          favicon_url: businessInfo.favicon_url,
-          primary_color: businessInfo.primary_color || '#3b82f6',
-          secondary_color: businessInfo.secondary_color || '#1e40af',
-          accent_color: businessInfo.accent_color || '#f59e0b',
-          website_url: businessInfo.website_url,
-          facebook_url: businessInfo.social_links?.facebook,
-          instagram_url: businessInfo.social_links?.instagram,
-          twitter_url: businessInfo.social_links?.twitter,
-          linkedin_url: businessInfo.social_links?.linkedin,
-          youtube_url: businessInfo.social_links?.youtube,
-          tiktok_url: businessInfo.social_links?.tiktok,
-          seo_title: businessInfo.seo?.title || 'Starters Small Chops',
-          seo_description: businessInfo.seo?.description || 'Premium Nigerian small chops and catering services',
-          seo_keywords: businessInfo.seo?.keywords || 'small chops, catering, Nigerian food',
-          working_hours: businessInfo.working_hours || 'Mon-Sat: 9AM-9PM',
-          business_hours: businessInfo.business_hours || {},
-          whatsapp_support_number: '', // Not included in public view for security
-          allow_guest_checkout: true, // Default value
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-
-        logger.info('Business settings fetched successfully via secure function');
+          if (!error && result?.data) {
+            logger.info('Business settings fetched successfully via edge function');
+            measurePerformance();
+            return result.data as BusinessSettings;
+          }
+          
+          if (error) {
+            logger.warn('Edge function call failed', { status: error.status, message: error.message });
+          }
+        }
+        
+        // If we reach here and have data from the first query, return it despite any error
+        if (data) {
+          logger.info('Returning cached data despite edge function failure');
+          measurePerformance();
+          return data as BusinessSettings;
+        }
+        
+        // Return null instead of throwing error for graceful degradation
+        logger.warn('No business settings found, returning null for graceful degradation');
         measurePerformance();
-        return businessSettings;
+        return null;
         
       } catch (error) {
-        logger.error('Error in useBusinessSettings', error);
+        logger.error('Critical error in useBusinessSettings', error);
         measurePerformance();
         
-        // Return graceful fallback data to prevent app crashes
-        logger.warn('Returning fallback business settings due to error');
+        // One final attempt at direct database query
+        try {
+          const { data, error: finalError } = await supabase
+            .from('business_settings')
+            .select('*')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+            
+          if (!finalError && data) {
+            logger.info('Final fallback query successful');
+            return data as BusinessSettings;
+          }
+        } catch (finalAttemptError) {
+          logger.error('Final fallback query failed', finalAttemptError);
+        }
         
-        const fallbackSettings: BusinessSettings = {
-          id: 'fallback',
-          name: 'Starters Small Chops',
-          tagline: 'Delicious Nigerian Small Chops',
-          logo_url: '',
-          logo_dark_url: '',
-          favicon_url: '',
-          primary_color: '#3b82f6',
-          secondary_color: '#1e40af',
-          accent_color: '#f59e0b',
-          website_url: '',
-          facebook_url: '',
-          instagram_url: '',
-          twitter_url: '',
-          linkedin_url: '',
-          youtube_url: '',
-          tiktok_url: '',
-          seo_title: 'Starters Small Chops',
-          seo_description: 'Premium Nigerian small chops and catering services',
-          seo_keywords: 'small chops, catering, Nigerian food',
-          working_hours: 'Mon-Sat: 9AM-9PM',
-          business_hours: {},
-          whatsapp_support_number: '',
-          allow_guest_checkout: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        return fallbackSettings;
+        // Graceful degradation - return null instead of throwing
+        logger.warn('All attempts failed, returning null for graceful degradation');
+        return null;
       }
     },
     refetchOnWindowFocus: false,

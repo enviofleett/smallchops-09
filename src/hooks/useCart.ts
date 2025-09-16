@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo, useCallback, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { useCartTracking } from '@/hooks/useCartTracking';
+import { calculateAdvancedOrderDiscount, CartPromotion } from '@/lib/discountCalculations';
 import { calculateCartVATSummary } from '@/lib/vatCalculations';
+import { validatePromotionCode } from '@/api/productsWithDiscounts';
+import { usePromotions } from './usePromotions';
 import { useGuestSession } from './useGuestSession';
 import { useCustomerAuth } from './useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
-import { CartContext } from '@/contexts/CartContext';
 
 export interface CartItem {
   id: string;
@@ -30,7 +32,7 @@ export interface OrderSummary {
   discount_amount: number;
   delivery_discount: number;
   total_amount: number;
-  
+  applied_promotions: CartPromotion[];
 }
 
 const CART_STORAGE_KEY = 'restaurant_cart';
@@ -41,28 +43,15 @@ const FREE_DELIVERY_THRESHOLD = 30;
 // Optimize cart operations for production
 const isProduction = !window.location.hostname.includes('localhost');
 
-export interface AppliedDiscount {
-  code: string;
-  discount_code_id: string; // UUID from validation - required for tracking
-  discount_amount: number;
-  final_amount: number;
-  valid?: boolean;
-  code_details: {
-    name: string;
-    description?: string;
-    type?: string;
-    value?: number;
-  };
-}
-
 export interface Cart {
   items: CartItem[];
   summary: OrderSummary;
   itemCount: number;
-  appliedDiscount?: AppliedDiscount;
+  promotion_code?: string;
 }
 
-export const useCartInternal = () => {
+export const useCart = () => {
+  const { data: promotions = [] } = usePromotions();
   const { guestSession, generateGuestSession } = useGuestSession();
   const { customerAccount } = useCustomerAuth();
   const { toast } = useToast();
@@ -77,9 +66,9 @@ export const useCartInternal = () => {
       discount_amount: 0,
       delivery_discount: 0,
       total_amount: 0,
+      applied_promotions: []
     },
-    itemCount: 0,
-    appliedDiscount: undefined
+    itemCount: 0
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -106,16 +95,8 @@ export const useCartInternal = () => {
       if (savedCart) {
         const parsedCart = JSON.parse(savedCart);
         
-        // Validate the parsed cart structure and ensure discount integrity
+        // Validate the parsed cart structure
         if (parsedCart && typeof parsedCart === 'object' && Array.isArray(parsedCart.items)) {
-          // Ensure appliedDiscount is properly structured if it exists
-          if (parsedCart.appliedDiscount && !parsedCart.appliedDiscount.code) {
-            console.warn('🛒 useCart - Invalid discount structure, removing...');
-            parsedCart.appliedDiscount = undefined;
-            parsedCart.summary.discount_amount = 0;
-            parsedCart.summary.total_amount = parsedCart.summary.subtotal + parsedCart.summary.delivery_fee;
-          }
-          
           setCart(parsedCart);
           console.log('🛒 useCart - Cart restored from localStorage');
         } else {
@@ -133,26 +114,26 @@ export const useCartInternal = () => {
     setIsInitialized(true);
   }, []); // Remove isInitialized dependency to prevent loops
 
-  // Save cart to localStorage with optimized debouncing
+  // Save cart to localStorage with debouncing for production stability
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized) return; // Don't save during initialization
     
     const timeoutId = setTimeout(() => {
       try {
+        console.log('🛒 useCart - Saving cart to localStorage:', cart);
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
       } catch (error) {
         console.error('🛒 useCart - Error saving cart:', error);
       }
-    }, 50); // Reduced debounce for faster persistence
+    }, 100); // Debounce saves for performance
 
     return () => clearTimeout(timeoutId);
   }, [cart, isInitialized]);
 
-  // Memoized cart calculations for performance
-  const calculateCartSummary = useCallback((
+  const calculateCartSummary = (
     items: CartItem[], 
-    deliveryFee = 0,
-    appliedDiscount?: AppliedDiscount
+    deliveryFee = 0, 
+    promotionCode?: string
   ): Cart => {
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -169,25 +150,42 @@ export const useCartInternal = () => {
       deliveryFee
     );
 
-    const discount_amount = appliedDiscount?.discount_amount || 0;
-    const total_amount = Math.max(0, subtotal + deliveryFee - discount_amount);
+    // Calculate promotions using advanced discount calculation (after VAT calculation)
+    const promotionResult = calculateAdvancedOrderDiscount(
+      items.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        price: item.price,
+        quantity: item.quantity,
+        category_id: item.customizations?.category_id
+      })),
+      subtotal,
+      deliveryFee,
+      promotions,
+      promotionCode
+    );
+
+    const finalDeliveryFee = deliveryFee - promotionResult.delivery_discount;
+    const total_amount = subtotal + finalDeliveryFee - promotionResult.total_discount;
 
     return {
-      items: items,
+      items: items, // Use original items, don't replace with promotion result items
       summary: {
         subtotal: Math.round(subtotal * 100) / 100,
         subtotal_cost: Math.round(vatSummary.subtotal_cost * 100) / 100,
         total_vat: Math.round(vatSummary.total_vat * 100) / 100,
-        tax_amount: 0,
+        tax_amount: 0, // Deprecated - VAT replaces this
         delivery_fee: Math.round(deliveryFee * 100) / 100,
-        discount_amount: Math.round(discount_amount * 100) / 100,
-        delivery_discount: 0,
-        total_amount: Math.round(total_amount * 100) / 100
+        discount_amount: Math.round(promotionResult.total_discount * 100) / 100,
+        delivery_discount: Math.round(promotionResult.delivery_discount * 100) / 100,
+        total_amount: Math.round(total_amount * 100) / 100,
+        applied_promotions: promotionResult.applied_promotions
       },
       itemCount,
-      appliedDiscount
+      promotion_code: promotionCode
     };
-  }, []);
+  };
 
   const addItem = (product: {
     id: string;
@@ -267,7 +265,7 @@ export const useCartInternal = () => {
       }
       
       console.log('🛒 Updated items:', updatedItems);
-      const newCart = calculateCartSummary(updatedItems, 0, cart.appliedDiscount); // No delivery fee in cart
+      const newCart = calculateCartSummary(updatedItems, 0, cart.promotion_code); // No delivery fee in cart
       console.log('🛒 New cart calculated:', newCart);
       setCart(newCart);
       console.log('🛒 Cart state updated successfully');
@@ -276,35 +274,28 @@ export const useCartInternal = () => {
     }
   };
 
-  const removeItem = useCallback((cartItemId: string) => {
-    // Optimistic update: immediately filter out the item
+  const removeItem = (cartItemId: string) => {
     const updatedItems = cart.items.filter(item => item.id !== cartItemId);
-    
-    // Immediate calculation and state update
-    const newCart = calculateCartSummary(updatedItems, 0, cart.appliedDiscount);
-    setCart(newCart);
-  }, [cart.items, calculateCartSummary]);
+    setCart(calculateCartSummary(updatedItems, 0, cart.promotion_code)); // No delivery fee in cart
+  };
 
-  const updateQuantity = useCallback((cartItemId: string, quantity: number) => {
+  const updateQuantity = (cartItemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeItem(cartItemId);
       return;
     }
 
-    // Optimistic update: immediately update the quantity
     const updatedItems = cart.items.map(item => {
       if (item.id === cartItemId) {
         const moq = item.minimum_order_quantity || 1;
+        // Ensure quantity meets MOQ
         const validQuantity = Math.max(quantity, moq);
         return { ...item, quantity: validQuantity };
       }
       return item;
     });
-    
-    // Immediate calculation and state update
-    const newCart = calculateCartSummary(updatedItems, 0, cart.appliedDiscount);
-    setCart(newCart);
-  }, [cart.items, calculateCartSummary, removeItem]);
+    setCart(calculateCartSummary(updatedItems, 0, cart.promotion_code)); // No delivery fee in cart
+  };
 
   const clearCart = () => {
     console.log('🛒 Clearing cart and all related data...');
@@ -319,10 +310,9 @@ export const useCartInternal = () => {
         discount_amount: 0,
         delivery_discount: 0,
         total_amount: 0,
-        
+        applied_promotions: []
       },
-      itemCount: 0,
-      appliedDiscount: undefined
+      itemCount: 0
     });
     localStorage.removeItem(CART_STORAGE_KEY);
     localStorage.removeItem('guest_session');
@@ -331,54 +321,27 @@ export const useCartInternal = () => {
   };
 
   const updateDeliveryFee = (deliveryFee: number) => {
-    setCart(calculateCartSummary(cart.items, deliveryFee, cart.appliedDiscount));
+    setCart(calculateCartSummary(cart.items, deliveryFee, cart.promotion_code));
   };
 
-  const applyDiscount = useCallback((discount: AppliedDiscount) => {
-    console.log('🎫 Applying discount to cart:', discount);
-    const newCart = calculateCartSummary(cart.items, cart.summary.delivery_fee, discount);
-    console.log('🧮 Cart recalculated after discount:', newCart.summary);
-    setCart(newCart);
-  }, [cart.items, cart.summary.delivery_fee, calculateCartSummary]);
-
-  const removeDiscount = useCallback(() => {
-    console.log('🎫 Removing discount from cart');
-    const newCart = calculateCartSummary(cart.items, cart.summary.delivery_fee, undefined);
-    console.log('🧮 Cart recalculated after discount removal:', newCart.summary);
-    setCart(newCart);
-  }, [cart.items, cart.summary.delivery_fee, calculateCartSummary]);
-
-  // ✅ Force recalculation of cart summary
-  const recalculateCartSummary = useCallback(() => {
-    const subtotal = cart.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
-    let discount_amount = 0;
-    if (cart.appliedDiscount) {
-      if (cart.appliedDiscount.discount_amount) {
-        discount_amount = cart.appliedDiscount.discount_amount;
+  const applyPromotionCode = async (code: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const validation = await validatePromotionCode(code, cart.summary.subtotal);
+      
+      if (validation.valid) {
+        setCart(calculateCartSummary(cart.items, 0, code)); // No delivery fee in cart
+        return { success: true, message: 'Promotion code applied successfully!' };
+      } else {
+        return { success: false, message: validation.error || 'Invalid promotion code' };
       }
+    } catch (error) {
+      return { success: false, message: 'Failed to validate promotion code' };
     }
-    
-    const total_amount = Math.max(0, subtotal - discount_amount);
-    
-    console.log('🧮 Cart Summary Recalculated:', {
-      subtotal,
-      discount_amount,
-      total_amount,
-      applied_discount: cart.appliedDiscount
-    });
-    
-    const newCart = calculateCartSummary(cart.items, cart.summary.delivery_fee, cart.appliedDiscount);
-    setCart(newCart);
-  }, [cart.items, cart.appliedDiscount, cart.summary.delivery_fee, calculateCartSummary]);
+  };
 
-  // ✅ Trigger recalculation when discount changes
-  useEffect(() => {
-    if (cart.appliedDiscount) {
-      recalculateCartSummary();
-    }
-  }, [cart.appliedDiscount]);
-
+  const removePromotionCode = () => {
+    setCart(calculateCartSummary(cart.items, 0)); // No delivery fee in cart
+  };
 
   const getCartTotal = () => cart.summary.total_amount;
   const getItemCount = () => cart.itemCount;
@@ -391,20 +354,10 @@ export const useCartInternal = () => {
     updateQuantity,
     clearCart,
     updateDeliveryFee,
-    applyDiscount,
-    removeDiscount,
-    recalculateCartSummary,
+    applyPromotionCode,
+    removePromotionCode,
     getCartTotal,
     getItemCount,
     isEmpty
   };
-};
-
-// Context consumer hook to ensure a single cart instance app-wide
-export const useCart = () => {
-  const ctx = useContext(CartContext);
-  if (!ctx) {
-    throw new Error('useCart must be used within CartProvider');
-  }
-  return ctx;
 };

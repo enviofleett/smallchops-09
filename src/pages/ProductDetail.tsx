@@ -19,9 +19,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ResponsiveGrid } from '@/components/layout/ResponsiveGrid';
-import { ResponsiveCard } from '@/components/layout/ResponsiveCard';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
@@ -29,43 +26,43 @@ import { ProductRatingsSummary } from '@/components/reviews/ProductRatingsSummar
 import { ReviewCard } from '@/components/reviews/ReviewCard';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
-import { getProducts } from '@/api/products';
-import { getPublicProducts } from '@/api/publicProducts';
-import { useProductRatings } from '@/hooks/useProductRatings';
-import { RatingSummaryComponent } from '@/components/product/RatingSummary';
-import { ReviewsList } from '@/components/product/ReviewsList';
-import { ReviewForm } from '@/components/product/ReviewForm';
-import { useProductFavorite } from '@/hooks/useProductFavorite';
+import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
+import { useProductReviews, useProductRatingSummary, useVoteOnReview } from '@/hooks/useProductReviews';
 import { WhatsAppSupportWidget } from '@/components/ui/WhatsAppSupportWidget';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { StarRating } from '@/components/ui/star-rating';
 import { FavoriteButton } from '@/components/ui/favorite-button';
 import { DiscountBadge } from '@/components/ui/discount-badge';
-import { formatCurrency } from '@/lib/formatCurrency';
+import { ProductWithDiscount, formatCurrency } from '@/lib/discountCalculations';
 import { sanitizeHtml } from '@/utils/htmlSanitizer';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
-import { ProductMOQIndicator } from '@/components/products/ProductMOQIndicator';
 
 // Remove the mock Review interface since we're using the real one from API
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addItem, cart } = useCart();
+  const { addItem } = useCart();
   const { toast } = useToast();
 
-  const [product, setProduct] = useState<any | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+  const [product, setProduct] = useState<ProductWithDiscount | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<ProductWithDiscount[]>([]);
   const [quantity, setQuantity] = useState(1);
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<{ rating?: number; sortBy: string }>({ sortBy: 'newest' });
 
-  const productRatings = useProductRatings(id || '');
-  
-  // Initialize favorites for this product
-  const { isFavorite, isLoading: favoriteLoading, toggleFavorite } = useProductFavorite(id || '');
+  // Fetch reviews and rating summary
+  const { data: reviewsData } = useProductReviews(id || '', { 
+    page: 1, 
+    limit: 10, 
+    rating: reviewFilter.rating,
+    sortBy: reviewFilter.sortBy as any
+  });
+  const { data: ratingSummary } = useProductRatingSummary(id || '');
+  const voteOnReviewMutation = useVoteOnReview();
 
   useEffect(() => {
     console.log('ProductDetail component mounted, ID from params:', id);
@@ -125,23 +122,16 @@ const ProductDetail = () => {
       console.log('Fetching product with ID:', id);
       
       // Fetch individual product with discounts
-      const products = await getProducts();
-      const productData = products?.find(p => p.id === id);
+      const productData = await getProductWithDiscounts(id!);
       console.log('Product data received:', productData);
       
       if (productData) {
         setProduct(productData);
         
-        // Set initial quantity to MOQ if MOQ > 1
-        const moq = productData.minimum_order_quantity || 1;
-        if (moq > 1) {
-          setQuantity(moq);
-        }
-        
         // Fetch related products from same category - show up to 4 products
-        const relatedResponse = await getPublicProducts({ category_id: productData.category_id });
-        const related = (relatedResponse?.products || [])
-          .filter((p: any) => p.id !== id)
+        const allProducts = await getProductsWithDiscounts(productData.category_id);
+        const related = allProducts
+          .filter((p: ProductWithDiscount) => p.id !== id)
           .slice(0, 4);
         setRelatedProducts(related);
         console.log('Related products:', related);
@@ -163,24 +153,8 @@ const ProductDetail = () => {
     }
   };
 
-  // Get current cart quantity for this product
-  const getCurrentCartQuantity = () => {
-    if (!product) return 0;
-    const cartItem = cart.items.find(item => item.product_id === product.id);
-    return cartItem?.quantity || 0;
-  };
-
-  // Get minimum quantity (considering MOQ)
-  const getMinimumQuantity = () => {
-    if (!product) return 1;
-    return product.minimum_order_quantity || 1;
-  };
-
   const handleAddToCart = () => {
     if (!product) return;
-    
-    const moq = product.minimum_order_quantity || 1;
-    const actualQuantity = Math.max(quantity, moq);
     
     addItem({
       id: product.id,
@@ -190,16 +164,11 @@ const ProductDetail = () => {
       discount_amount: product.discount_amount,
       vat_rate: 7.5, // Default VAT rate
       image_url: product.image_url,
-      minimum_order_quantity: moq,
-    }, actualQuantity);
-    
-    const addedQuantityText = actualQuantity > quantity ? 
-      `${actualQuantity} ${product.name} added to cart (adjusted to meet minimum order quantity)` :
-      `${actualQuantity} ${product.name} added to cart`;
+    }, quantity);
     
     toast({
       title: "Added to Cart",
-      description: addedQuantityText,
+      description: `${quantity} ${product.name} added to cart`,
     });
   };
 
@@ -230,8 +199,14 @@ const ProductDetail = () => {
   };
 
   const handleReviewVote = (reviewId: string, voteType: 'helpful' | 'not_helpful') => {
-    // Placeholder for review voting functionality
-    console.log('Review vote:', reviewId, voteType);
+    voteOnReviewMutation.mutate({ reviewId, voteType }, {
+      onSuccess: () => {
+        toast({ title: "Thank you for your feedback!" });
+      },
+      onError: () => {
+        toast({ title: "Failed to record vote", variant: "destructive" });
+      }
+    });
   };
 
   const getPromotionBadge = () => {
@@ -311,12 +286,12 @@ const ProductDetail = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
         {/* Product Main Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 mb-6 sm:mb-8 lg:mb-12">
+        <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 mb-8 sm:mb-12">
           {/* Product Image - Mobile optimized */}
           <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-full max-w-md mx-auto lg:max-w-none">
+            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-full sm:w-4/5 mx-auto">
               <img
                 src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=480&h=480&fit=crop'}
                 alt={product.name}
@@ -326,32 +301,32 @@ const ProductDetail = () => {
           </div>
 
           {/* Product Details */}
-          <div className="space-y-4 sm:space-y-5 lg:space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 leading-tight">{product.name}</h1>
-              <div className="flex items-center gap-3 sm:gap-4 mb-4 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2">{product.name}</h1>
+              <div className="flex items-center gap-4 mb-4">
                 <StarRating 
-                  rating={productRatings?.ratingSummary?.average_rating || 0} 
+                  rating={ratingSummary?.average_rating || 0} 
                   size="md"
                 />
-                <span className="text-xs sm:text-sm text-muted-foreground">
-                  ({productRatings?.ratingSummary?.total_reviews || 0} review{productRatings?.ratingSummary?.total_reviews !== 1 ? 's' : ''})
+                <span className="text-sm text-muted-foreground">
+                  ({ratingSummary?.total_reviews || 0} review{ratingSummary?.total_reviews !== 1 ? 's' : ''})
                 </span>
               </div>
             </div>
 
             {/* Promotion Banner */}
             {product.active_promotion && (
-              <div className="bg-gradient-to-r from-destructive to-orange-500 text-destructive-foreground px-3 sm:px-4 py-2 sm:py-3 rounded-lg">
-                <div className="flex items-center justify-between flex-col sm:flex-row gap-2 sm:gap-0">
-                  <div className="text-center sm:text-left">
-                    <span className="font-bold text-base sm:text-lg">🔥 {getPromotionBadge()}</span>
-                    <p className="text-xs sm:text-sm mt-1 opacity-90">Limited time offer - don't miss out!</p>
+              <div className="bg-gradient-to-r from-destructive to-orange-500 text-destructive-foreground px-4 py-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-lg">🔥 {getPromotionBadge()}</span>
+                    <p className="text-sm mt-1 opacity-90">Limited time offer - don't miss out!</p>
                   </div>
                   {getPromotionTimeLeft() && (
-                    <div className="text-center sm:text-right">
-                      <div className="flex items-center gap-1 text-xs sm:text-sm justify-center sm:justify-end">
-                        <Timer className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-sm">
+                        <Timer className="h-4 w-4" />
                         {getPromotionTimeLeft()}
                       </div>
                     </div>
@@ -373,79 +348,60 @@ const ProductDetail = () => {
 
             {/* Description */}
             <div>
-              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description || '') }} />
+              <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description || '') }} />
             </div>
 
             {/* Features */}
             {product.features && product.features.length > 0 && (
               <div>
-                <h3 className="font-semibold text-sm sm:text-base mb-2">What's included:</h3>
-                <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-muted-foreground pl-2">
+                <h3 className="font-semibold mb-2">What's included:</h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                   {product.features.map((feature, index) => (
-                    <li key={index} className="leading-relaxed">{feature}</li>
+                    <li key={index}>{feature}</li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {/* MOQ Requirements */}
-            {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
-              <ProductMOQIndicator
-                minimumOrderQuantity={product.minimum_order_quantity}
-                price={product.discounted_price || product.price}
-                stockQuantity={product.stock_quantity}
-                currentCartQuantity={getCurrentCartQuantity()}
-              />
-            )}
-
             {/* Quantity and Add to Cart */}
-            <div className="space-y-3 sm:space-y-4">
-              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                <span className="text-xs sm:text-sm font-medium">Quantity:</span>
-                {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
-                  <span className="text-xs text-muted-foreground">
-                    (Min: {product.minimum_order_quantity})
-                  </span>
-                )}
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium">Quantity:</span>
                 <div className="flex items-center border rounded-lg">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setQuantity(Math.max(getMinimumQuantity(), quantity - 1))}
-                    disabled={quantity <= getMinimumQuantity()}
-                    className="h-8 w-8 p-0"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1}
                   >
-                    <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Minus className="h-4 w-4" />
                   </Button>
-                  <span className="px-3 sm:px-4 py-2 min-w-[50px] sm:min-w-[60px] text-center text-sm">{quantity}</span>
+                  <span className="px-4 py-2 min-w-[60px] text-center">{quantity}</span>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setQuantity(quantity + 1)}
-                    className="h-8 w-8 p-0"
                   >
-                    <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   onClick={handleAddToCart}
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white order-2 sm:order-1"
                   size="lg"
                 >
-                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <ShoppingCart className="h-5 w-5 mr-2" />
                   Add to Cart
                 </Button>
-                <div className="flex justify-center">
-                  <FavoriteButton
-                    isFavorite={isFavorite}
-                    isLoading={favoriteLoading}
-                    onToggle={toggleFavorite}
-                    size="lg"
-                  />
-                </div>
+                <FavoriteButton
+                  isFavorite={isFavorite}
+                  onToggle={() => setIsFavorite(!isFavorite)}
+                  size="lg"
+                  className="order-1 sm:order-2 self-center sm:self-auto"
+                />
               </div>
 
               {/* Support Information */}
@@ -456,13 +412,13 @@ const ProductDetail = () => {
 
             {/* Social Sharing */}
             <div className="space-y-3">
-              <h3 className="font-semibold text-sm sm:text-base">Share this product:</h3>
-              <div className="grid grid-cols-2 sm:flex gap-2">
+              <h3 className="font-semibold">Share this product:</h3>
+              <div className="flex gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('telegram')}
-                  className="text-blue-500 border-blue-500 hover:bg-blue-50 text-xs sm:text-sm"
+                  className="text-blue-500 border-blue-500 hover:bg-blue-50"
                 >
                   Telegram
                 </Button>
@@ -470,7 +426,7 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('twitter')}
-                  className="text-blue-400 border-blue-400 hover:bg-blue-50 text-xs sm:text-sm"
+                  className="text-blue-400 border-blue-400 hover:bg-blue-50"
                 >
                   Twitter
                 </Button>
@@ -478,7 +434,7 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('whatsapp')}
-                  className="text-green-500 border-green-500 hover:bg-green-50 text-xs sm:text-sm"
+                  className="text-green-500 border-green-500 hover:bg-green-50"
                 >
                   WhatsApp
                 </Button>
@@ -486,10 +442,9 @@ const ProductDetail = () => {
                   variant="outline" 
                   size="sm"
                   onClick={() => handleShare('other')}
-                  className="text-xs sm:text-sm"
                 >
-                  <Share className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                  Copy Link
+                  <Share className="h-4 w-4 mr-1" />
+                  Other
                 </Button>
               </div>
             </div>
@@ -497,65 +452,84 @@ const ProductDetail = () => {
         </div>
 
         {/* Reviews Section */}
-        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
+        <div className="space-y-6 mb-8">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl sm:text-2xl font-bold">Customer Reviews</h3>
+            <h3 className="text-2xl font-bold">Customer Reviews</h3>
           </div>
 
           {/* Rating Summary */}
-          <ResponsiveCard>
-            {productRatings.ratingSummary ? (
-              <RatingSummaryComponent summary={productRatings.ratingSummary} />
-            ) : (
-              <div className="text-center py-6 sm:py-8">
-                <p className="text-muted-foreground text-sm sm:text-base">No ratings yet</p>
-              </div>
-            )}
-          </ResponsiveCard>
+          <Card>
+            <CardContent className="p-6">
+              <ProductRatingsSummary summary={ratingSummary} />
+            </CardContent>
+          </Card>
 
-          {/* Review Form */}
-          <ResponsiveCard title="Write a Review">
-            <ReviewForm
-              onSubmit={() => {}}
-              isSubmitting={false}
-            />
-          </ResponsiveCard>
+          {/* Review Filters */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={!reviewFilter.rating ? "default" : "outline"}
+              size="sm"
+              onClick={() => setReviewFilter({ ...reviewFilter, rating: undefined })}
+            >
+              All Reviews
+            </Button>
+            {[5, 4, 3, 2, 1].map((rating) => (
+              <Button
+                key={rating}
+                variant={reviewFilter.rating === rating ? "default" : "outline"}
+                size="sm"
+                onClick={() => setReviewFilter({ ...reviewFilter, rating })}
+              >
+                {rating} ⭐
+              </Button>
+            ))}
+          </div>
 
           {/* Reviews List */}
-          <ResponsiveCard title="All Reviews">
-            <ReviewsList
-              reviews={productRatings.reviews || []}
-              onToggleHelpfulness={() => {}}
-              isUpdatingHelpfulness={false}
-            />
-          </ResponsiveCard>
+          <div className="space-y-4">
+            {reviewsData && reviewsData.reviews.length > 0 ? (
+              reviewsData.reviews.map((review) => (
+                <ReviewCard
+                  key={review.id}
+                  review={review}
+                  onVoteUpdate={() => {}}
+                />
+              ))
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-medium">No reviews yet</h4>
+                    <p className="text-muted-foreground">Be the first to review this product!</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div>
-            <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">You might also like</h3>
-            <ResponsiveGrid columns={2} gap="sm" minItemWidth="200px" autoFit={true}>
+            <h3 className="text-2xl font-bold mb-6">You might also like</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               {relatedProducts.map((relatedProduct) => (
-                <div 
+                <Card 
                   key={relatedProduct.id} 
-                  className="cursor-pointer group"
+                  className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                   onClick={() => navigate(`/product/${relatedProduct.id}`)}
                 >
-                  <ResponsiveCard 
-                    className="overflow-hidden hover:shadow-lg transition-shadow h-full"
-                    interactive
-                  >
-                    <div className="aspect-square overflow-hidden mb-3">
-                      <img
-                        src={relatedProduct.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
-                        alt={relatedProduct.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <h4 className="font-semibold text-sm sm:text-base line-clamp-2 leading-snug">{relatedProduct.name}</h4>
-                      <div className="flex flex-col gap-2">
+                  <div className="aspect-square overflow-hidden">
+                    <img
+                      src={relatedProduct.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
+                      alt={relatedProduct.name}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform"
+                    />
+                  </div>
+                  <CardContent className="p-4">
+                    <h4 className="font-semibold mb-2">{relatedProduct.name}</h4>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
                         <PriceDisplay
                           originalPrice={relatedProduct.price}
                           discountedPrice={relatedProduct.discounted_price}
@@ -566,36 +540,32 @@ const ProductDetail = () => {
                           <DiscountBadge 
                             discountPercentage={relatedProduct.discount_percentage || 0}
                             size="sm"
+                            className="mt-1"
                           />
                         )}
-                        <Button 
-                          size="sm" 
-                          className="w-full mt-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addItem({
-                              id: relatedProduct.id,
-                              name: relatedProduct.name,
-                              price: relatedProduct.discounted_price || relatedProduct.price,
-                              original_price: relatedProduct.price,
-                              discount_amount: relatedProduct.discount_amount,
-                              vat_rate: 7.5,
-                              image_url: relatedProduct.image_url,
-                            });
-                            toast({
-                              title: "Added to Cart",
-                              description: `${relatedProduct.name} added successfully`,
-                            });
-                          }}
-                        >
-                          Add to Cart
-                        </Button>
                       </div>
+                      <Button 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addItem({
+                            id: relatedProduct.id,
+                            name: relatedProduct.name,
+                            price: relatedProduct.discounted_price || relatedProduct.price,
+                            original_price: relatedProduct.price,
+                            discount_amount: relatedProduct.discount_amount,
+                            vat_rate: 7.5,
+                            image_url: relatedProduct.image_url,
+                          });
+                        }}
+                      >
+                        Add to Cart
+                      </Button>
                     </div>
-                  </ResponsiveCard>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
-            </ResponsiveGrid>
+            </div>
           </div>
         )}
       </div>

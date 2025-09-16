@@ -222,6 +222,7 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Orders</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Total Spent</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
+                <th className="text-left py-4 px-6 font-medium text-gray-600">Email Status</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Last Activity</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
               </tr>
@@ -285,6 +286,21 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
                      <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(customer.status)}`}>
                        {customer.status}
                      </span>
+                   </td>
+                   <td className="py-4 px-6">
+                     <div className="flex items-center gap-2">
+                       <EmailStatusBadge 
+                         status={customer.emailStatus || 'none'}
+                         sentAt={customer.emailSentAt}
+                         lastAttempt={customer.emailLastAttempt}
+                       />
+                       <EmailActions
+                         customerEmail={customer.email}
+                         customerName={customer.name}
+                         emailStatus={customer.emailStatus || 'none'}
+                         onEmailResent={onEmailResent}
+                       />
+                     </div>
                    </td>
                     <td className="py-4 px-6 text-gray-600">
                       {customer.totalOrders > 0 

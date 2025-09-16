@@ -126,31 +126,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const loadUserData = async (authUser: SupabaseUser) => {
     try {
-      // Try to find existing profile with retry for newly created users
-      let profile = null;
-      let retries = 0;
-      const maxRetries = 3;
-      
-      while (!profile && retries < maxRetries) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authUser.id)
-          .maybeSingle();
-        
-        profile = data;
-        
-        if (!profile && retries < maxRetries - 1) {
-          // Wait a bit before retrying for newly created users
-          await new Promise(resolve => setTimeout(resolve, 500));
-          retries++;
-        } else {
-          break;
-        }
-      }
+      // First check if user is admin (has profile)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
 
       if (profile) {
-        // Admin user found
+        // Admin user
         setUser({
           id: profile.id,
           name: profile.name || '',
@@ -178,31 +162,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // Check if this user was created by admin and should have a profile
-      const isCreatedByAdmin = authUser.user_metadata?.created_by_admin || 
-                               authUser.user_metadata?.role === 'admin' ||
-                               authUser.user_metadata?.user_type === 'admin';
-      
       // New user - determine type based on metadata or email
       const isAdminEmail = authUser.email === 'store@startersmallchops.com' || 
                           authUser.email?.includes('admin') || 
-                          isCreatedByAdmin;
+                          authUser.user_metadata?.role;
       
-      if (isAdminEmail || isCreatedByAdmin) {
-        // Create admin profile for users who should be admins
-        const { data: newProfile, error: profileError } = await supabase
+      if (isAdminEmail) {
+        // Create admin profile
+        const { data: newProfile } = await supabase
           .from('profiles')
           .insert({
             id: authUser.id,
             name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Admin',
             email: authUser.email,
-            role: authUser.user_metadata?.role || 'admin',
-            is_active: true
+            role: 'admin'
           })
           .select()
           .single();
 
-        if (newProfile && !profileError) {
+        if (newProfile) {
           setUser({
             id: newProfile.id,
             name: newProfile.name,
@@ -211,8 +189,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             email: authUser.email || '',
           });
           setUserType('admin');
-        } else {
-          console.error('Failed to create admin profile:', profileError);
         }
       } else {
         // Create customer account with enhanced Google profile data
@@ -274,56 +250,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) {
         console.error('Login error:', error);
-        
-        // Provide more helpful error messages for common issues
-        let errorMessage = error.message;
-        if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Please verify your email address before logging in. Check your inbox for a verification email.';
-        }
-        
         toast({
           title: "Login failed",
-          description: errorMessage,
+          description: error.message,
           variant: "destructive",
         });
-        return { success: false, error: errorMessage };
+        return { success: false, error: error.message };
       }
 
       if (data.user) {
-        // Load user data to determine correct redirect with retry logic
+        // Load user data to determine correct redirect
         await loadUserData(data.user);
         
-        // Enhanced admin check with retry for newly created users
-        let profile = null;
-        let retries = 0;
-        const maxRetries = 3;
+        // Check if user is admin by checking profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
         
-        while (!profile && retries < maxRetries) {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', data.user.id)
-            .maybeSingle();
-          
-          profile = profileData;
-          
-          if (!profile && retries < maxRetries - 1) {
-            // Wait a bit before retrying for newly created admin users
-            await new Promise(resolve => setTimeout(resolve, 300));
-            retries++;
-          } else {
-            break;
-          }
-        }
-        
-        // Check metadata if no profile found (for newly created admin users)
-        const isAdminFromMetadata = data.user.user_metadata?.role === 'admin' ||
-                                   data.user.user_metadata?.created_by_admin ||
-                                   data.user.user_metadata?.user_type === 'admin';
-        
-        const redirectPath = (profile || isAdminFromMetadata) ? '/dashboard' : '/';
+        const redirectPath = profile ? '/dashboard' : '/';
         return { success: true, redirect: redirectPath };
       }
 

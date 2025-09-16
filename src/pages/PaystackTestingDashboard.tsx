@@ -4,8 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaystackEnvChecker from '@/components/admin/PaystackEnvChecker';
 import PaystackIntegrationTestSuite from '@/components/admin/PaystackIntegrationTestSuite';
 import ManualE2ETestGuide from '@/components/admin/ManualE2ETestGuide';
-import { ProductionReadinessCheck } from '@/components/admin/ProductionReadinessCheck';
-import { TestTube, CreditCard, User, Settings, Rocket } from 'lucide-react';
+import { TestTube, CreditCard, User, Settings } from 'lucide-react';
 
 const PaystackTestingDashboard = () => {
   return (
@@ -20,12 +19,8 @@ const PaystackTestingDashboard = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="production-ready" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="production-ready" className="flex items-center gap-2">
-            <Rocket className="h-4 w-4" />
-            Production Ready
-          </TabsTrigger>
+      <Tabs defaultValue="environment" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="environment" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Environment
@@ -43,10 +38,6 @@ const PaystackTestingDashboard = () => {
             Overview
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="production-ready" className="space-y-6">
-          <ProductionReadinessCheck />
-        </TabsContent>
 
         <TabsContent value="environment" className="space-y-6">
           <PaystackEnvChecker />

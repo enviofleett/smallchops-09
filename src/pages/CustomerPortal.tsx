@@ -6,9 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Star, TrendingUp, User, LogOut, Loader2, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
-
+import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
-// ProductCatalog component removed with promotions
+import { ProductCatalog } from '@/components/products/ProductCatalog';
 import { CustomerReviewsTab } from '@/components/customer/CustomerReviewsTab';
 import { PaymentDebugger } from '@/components/admin/PaymentDebugger';
 
@@ -153,9 +153,7 @@ export default function CustomerPortal() {
 
         <div className="container mx-auto px-4 py-8">
           {/* Show only the public product catalog */}
-            <div className="text-center py-8 text-muted-foreground">
-              Product catalog is not available at this time.
-            </div>
+          <ProductCatalog />
         </div>
       </div>
     );
@@ -361,9 +359,7 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="menu" className="space-y-6">
-            <div className="text-center py-8 text-muted-foreground">
-              Product catalog is not available at this time.
-            </div>
+            <ProductCatalog />
           </TabsContent>
 
           <TabsContent value="favorites" className="space-y-6">
@@ -391,9 +387,7 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="loyalty">
-            <div className="text-center py-8 text-muted-foreground">
-              Loyalty program is not available at this time.
-            </div>
+            <LoyaltyDashboard customerEmail={user?.email || ''} />
           </TabsContent>
         </Tabs>
       </div>

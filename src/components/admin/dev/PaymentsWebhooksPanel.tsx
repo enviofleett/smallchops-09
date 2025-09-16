@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { ExternalLink, RefreshCw, ShieldCheck, ShieldX, Copy, LinkIcon, Activity, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface HealthStatus {

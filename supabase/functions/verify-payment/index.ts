@@ -6,7 +6,7 @@ function getCorsHeaders(origin?: string): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, x-guest-session-id',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
     'Access-Control-Allow-Credentials': 'false',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
@@ -187,47 +187,36 @@ serve(async (req) => {
         });
       }
 
-      console.log('✅ Payment verified and processed successfully:', {
+      console.log('✅ Payment verified and processed:', {
         reference,
         orderId: result.order_id,
         orderNumber: result.order_number,
         status: result.status,
-        payment_status: result.payment_status,
-        amount: amountNaira,
-        customer_email: paystackData.data.customer?.email
+        payment_status: result.payment_status
       });
 
-      // ENHANCED: Use idempotent email confirmation
+      // Trigger email confirmation
       try {
-        console.log('📧 Creating payment confirmation event via RPC...');
-        const { data: emailResult, error: emailError } = await supabase
-          .rpc('upsert_payment_confirmation_event', {
-            p_reference: reference,
-            p_recipient_email: paystackData.data.customer?.email || 'unknown@example.com',
-            p_order_id: result.order_id,
-            p_template_variables: {
-              customerName: paystackData.data.customer?.first_name || 'Customer',
-              orderNumber: result.order_number,
-              amount: amountNaira.toFixed(2),
-              paymentMethod: paystackData.data.channel || 'Online Payment',
-              paidAt: paystackData.data.paid_at
-            }
-          });
-
-        if (emailError) {
-          console.warn('⚠️  Email confirmation RPC failed (non-blocking):', emailError);
-        } else if (emailResult?.existing) {
-          console.log('📧 Email confirmation already exists (idempotent success)');
-        } else {
-          console.log('📧 Email confirmation created successfully');
-        }
+        await supabase.from('communication_events').insert({
+          order_id: result.order_id,
+          event_type: 'payment_verified',
+          recipient_email: paystackData.data.customer?.email,
+          template_key: 'payment_confirmation',
+          status: 'queued',
+          variables: {
+            customerName: paystackData.data.customer?.first_name || 'Customer',
+            orderNumber: result.order_number,
+            amount: amountNaira.toFixed(2),
+            paymentMethod: paystackData.data.channel || 'Online Payment',
+            paidAt: paystackData.data.paid_at
+          }
+        });
       } catch (emailError) {
-        console.warn('⚠️  Email notification error (non-blocking):', emailError);
+        console.warn('⚠️  Email notification failed:', emailError);
         // Don't fail the payment verification for email issues
       }
 
-      // ENHANCED: Normalized success response with idempotency handling
-      const successResponse = {
+      return new Response(JSON.stringify({
         success: true,
         status: 'success',
         amount: amountNaira,
@@ -236,25 +225,16 @@ serve(async (req) => {
         customer: paystackData.data.customer,
         channel: paystackData.data.channel,
         paid_at: paystackData.data.paid_at,
-        // Enhanced data wrapper for consistency
+        // Add data wrapper for compatibility
         data: {
           order_id: result.order_id,
           order_number: result.order_number,
           amount: amountNaira,
           status: 'success',
           customer: paystackData.data.customer,
-          reference: reference,
-          verified_at: new Date().toISOString()
+          reference: reference
         }
-      };
-
-      console.log('✅ Returning success response:', { 
-        reference, 
-        order_id: result.order_id,
-        amount: amountNaira 
-      });
-
-      return new Response(JSON.stringify(successResponse), {
+      }), {
         status: 200,
         headers: corsHeaders
       });
@@ -262,45 +242,7 @@ serve(async (req) => {
     } catch (error) {
       console.error('❌ Critical verification error:', error);
       
-      // ENHANCED: Check if this is a duplicate payment scenario
-      const errorMessage = error.message || '';
-      const isDuplicatePayment = errorMessage.includes('duplicate key') || 
-                                errorMessage.includes('already exists') ||
-                                errorMessage.includes('unique constraint');
-      
-      if (isDuplicatePayment) {
-        console.log('🔄 Detected duplicate payment scenario - treating as success');
-        
-        // Return success for duplicate payments (idempotent behavior)
-        const duplicateSuccessResponse = {
-          success: true,
-          status: 'success',
-          amount: amountNaira,
-          order_id: result?.order_id,
-          order_number: result?.order_number,
-          customer: paystackData.data.customer,
-          channel: paystackData.data.channel,
-          paid_at: paystackData.data.paid_at,
-          data: {
-            order_id: result?.order_id,
-            order_number: result?.order_number,
-            amount: amountNaira,
-            status: 'success',
-            customer: paystackData.data.customer,
-            reference: reference,
-            duplicate_handled: true,
-            verified_at: new Date().toISOString()
-          }
-        };
-
-        return new Response(JSON.stringify(duplicateSuccessResponse), {
-          status: 200,
-          headers: corsHeaders
-        });
-      }
-      
       // Log critical error
-      try {
         await supabase.from('audit_logs').insert({
           action: 'payment_verification_critical_error',
           category: 'Payment Critical',
@@ -309,13 +251,9 @@ serve(async (req) => {
             reference,
             amount_naira: amountNaira,
             error: error.message,
-            paystack_data: paystackData.data,
-            is_duplicate: isDuplicatePayment
+            paystack_data: paystackData.data
           }
         });
-      } catch (logError) {
-        console.error('Failed to log critical error:', logError);
-      }
 
       return new Response(JSON.stringify({
         success: false,

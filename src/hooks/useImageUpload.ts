@@ -83,18 +83,10 @@ export const useImageUpload = () => {
             // Check for specific error types that shouldn't be retried
             if (errorMessage.includes('Unauthorized') || 
                 errorMessage.includes('Admin access') ||
+                errorMessage.includes('Rate limit') ||
                 errorMessage.includes('Invalid file type') ||
                 errorMessage.includes('File size exceeds')) {
               throw new Error(errorMessage); // Don't retry these errors
-            }
-            
-            // Handle rate limiting with better error messages
-            if (errorMessage.includes('rate limit') || errorMessage.includes('Rate limit') || errorMessage.includes('Upload limit')) {
-              // Extract retry_after if available from error response
-              const retryMatch = errorMessage.match(/retry_after['":\s]*(\d+)/i);
-              const retryAfter = retryMatch ? parseInt(retryMatch[1]) : 3600;
-              const waitTime = retryAfter >= 3600 ? `${Math.ceil(retryAfter / 3600)} hour(s)` : `${Math.ceil(retryAfter / 60)} minute(s)`;
-              throw new Error(`Upload limit reached. Please wait ${waitTime} before trying again.`);
             }
             
             lastError = new Error(errorMessage);
@@ -132,9 +124,7 @@ export const useImageUpload = () => {
           // Check if this is a non-retryable error
           if (lastError.message.includes('Unauthorized') || 
               lastError.message.includes('Admin access') ||
-              lastError.message.includes('rate limit') || 
               lastError.message.includes('Rate limit') ||
-              lastError.message.includes('Upload limit') ||
               lastError.message.includes('Invalid file type') ||
               lastError.message.includes('File size exceeds') ||
               lastError.message.includes('Invalid file format')) {

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { OptimizedImage } from '@/components/OptimizedImage';
 
 interface HeroImage {
   id: string;
@@ -46,7 +45,7 @@ export const HeroCarousel = ({
   // Only show uploaded images - no hardcoded fallbacks
   const imagesToShow = heroImages.length > 0 ? heroImages : [];
 
-  // Auto-rotate images every 20 seconds with smooth fade effect
+  // Auto-rotate images every 20 seconds with fade effect
   useEffect(() => {
     if (imagesToShow.length <= 1) return;
 
@@ -59,11 +58,8 @@ export const HeroCarousel = ({
         setCurrentIndex((prevIndex) => 
           (prevIndex + 1) % imagesToShow.length
         );
-        // Small delay before fade in to ensure image change is processed
-        setTimeout(() => {
-          setIsVisible(true);
-        }, 50);
-      }, 600); // Extended fade out duration for smoother transition
+        setIsVisible(true);
+      }, 500); // 500ms fade out duration
     }, 20000); // 20 seconds
 
     return () => clearInterval(interval);
@@ -71,11 +67,8 @@ export const HeroCarousel = ({
 
   // Reset visibility when component mounts or images change
   useEffect(() => {
+    setIsVisible(true);
     setCurrentIndex(0);
-    // Ensure fade in after image list changes
-    setTimeout(() => {
-      setIsVisible(true);
-    }, 100);
   }, [imagesToShow]);
 
   // Don't render anything if no uploaded images available
@@ -95,15 +88,19 @@ export const HeroCarousel = ({
 
   return (
     <div className={className}>
-      <OptimizedImage
-        src={currentImage.image_url}
-        alt={currentImage.alt_text || 'Uploaded product image'}
+      <img 
+        src={currentImage.image_url} 
+        alt={currentImage.alt_text || 'Uploaded product image'} 
         className={`w-full h-full object-cover rounded-2xl transition-opacity duration-500 ease-in-out ${
           isVisible ? 'opacity-100' : 'opacity-0'
         }`}
-        showLoader={true}
-        fit="cover"
-        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+        loading="eager"
+        onError={(e) => {
+          console.error('Failed to load hero image:', currentImage.image_url);
+          // Don't fallback to any hardcoded image
+          const target = e.target as HTMLImageElement;
+          target.style.display = 'none';
+        }}
       />
     </div>
   );

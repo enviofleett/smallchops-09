@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-
+import { PromotionalBadge } from '@/components/ui/promotional-badge';
 import { FavoriteButton } from '@/components/ui/favorite-button';
 import { BulkDeleteDialog } from './BulkDeleteDialog';
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
@@ -144,12 +144,16 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
                   ) : (
                     <ImageIcon className="h-6 w-6 text-gray-400" />
                   )}
-                  {/* Promotional badges removed */}
+                  {product.is_promotional && (
+                    <div className="absolute -top-1 -right-1">
+                      <PromotionalBadge className="text-xs px-1 py-0.5" />
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="font-medium text-gray-800 truncate">{product.name}</p>
-                    {/* Promotional badges removed */}
+                    {product.is_promotional && <PromotionalBadge className="text-xs" />}
                   </div>
                   <p className="text-sm text-gray-600">{product.categories?.name || 'N/A'}</p>
                 </div>
@@ -340,12 +344,16 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
                             ) : null}
                             {!product.image_url && <ImageIcon className="h-6 w-6 text-gray-400" />}
                             <ImageIcon className="h-6 w-6 text-gray-400 hidden" />
-                            {/* Promotional badges removed */}
+                            {product.is_promotional && (
+                              <div className="absolute -top-1 -right-1">
+                                <PromotionalBadge className="text-xs px-1 py-0.5" />
+                              </div>
+                            )}
                           </div>
                          <div className="flex-1 min-w-0">
                            <div className="flex items-center gap-2 mb-1">
                              <p className="font-medium text-gray-800 truncate">{product.name}</p>
-                             {/* Promotional badges removed */}
+                             {product.is_promotional && <PromotionalBadge className="text-xs" />}
                            </div>
                            <div className="flex items-center gap-3 text-xs text-gray-500">
                              {product.preparation_time && (

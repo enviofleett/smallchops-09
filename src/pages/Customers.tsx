@@ -1,19 +1,19 @@
 
 import React, { useState } from 'react';
-import { Search, Filter, Plus, Edit, UserPlus, Users, BarChart3 } from 'lucide-react';
+import { Search, Filter, Plus, Edit, UserPlus, Shield, Users, BarChart3 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { CustomerAnalytics } from '@/components/customers/CustomerAnalytics';
 import { CustomerFilters } from '@/components/customers/CustomerFilters';
 import { CustomerTable } from '@/components/customers/CustomerTable';
 import { CustomerTypeFilter, CustomerTypeFilter as CustomerTypeFilterType } from '@/components/customers/CustomerTypeFilter';
 import { CustomerRateLimitWarning } from '@/components/customers/CustomerRateLimitWarning';
-
-
+import { CustomerSecurityDashboard } from '@/components/customers/CustomerSecurityDashboard';
+import { BulkEmailActions } from '@/components/customers/BulkEmailActions';
 import { getCustomerAnalytics } from '@/api/customers';
 import { DateRange, Customer, CustomerDb } from '@/types/customers';
 import { CustomerDialog } from '@/components/customers/CustomerDialog';
 import { Button } from '@/components/ui/button';
-
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useCustomerRateLimit } from '@/hooks/useCustomerRateLimit';
 
 const Customers = () => {
@@ -26,7 +26,7 @@ const Customers = () => {
   const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerTypeFilterType>('all');
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [currentEditCustomer, setCurrentEditCustomer] = useState<CustomerDb | null>(null);
-  
+  const [securitySectionOpen, setSecuritySectionOpen] = useState(false);
 
   // Rate limiting for customer operations
   const rateLimitStatus = useCustomerRateLimit('create', 50);
@@ -34,20 +34,10 @@ const Customers = () => {
   const { data: analytics, isLoading, error, refetch } = useQuery({
     queryKey: ['customer-analytics', dateRange],
     queryFn: () => getCustomerAnalytics(dateRange),
-    retry: 3, // Retry failed requests up to 3 times
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: false // Prevent unnecessary refetches
   });
 
-  // Production-ready data validation and fallbacks
-  const allCustomers = Array.isArray(analytics?.allCustomers) ? analytics.allCustomers : [];
-  const repeatCustomers = Array.isArray(analytics?.repeatCustomers) ? analytics.repeatCustomers : [];
-  const hasValidAnalytics = analytics && typeof analytics.metrics === 'object';
-
-  // Log errors for production monitoring
-  if (error) {
-    console.error('Customer analytics error:', error);
-  }
+  // Get all customers (now includes customers without orders)
+  const allCustomers = analytics?.allCustomers || [];
 
   const filteredCustomers = allCustomers.filter((customer) => {
     // Search term filter
@@ -143,119 +133,48 @@ const Customers = () => {
         />
       )}
 
-      {/* Repeat Business Analysis - Production Ready with Paid Orders Only */}
+      {/* Repeat Business Analysis */}
       {analytics && analytics.repeatCustomers.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">Repeat Business Champions</h3>
-              <p className="text-sm text-gray-500 mt-1">Based on paid orders only • Updated in real-time</p>
-            </div>
-            <div className="flex items-center space-x-2 text-xs text-gray-500">
-              <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Paid Only</span>
-            </div>
-          </div>
-          
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Repeat Business Champions</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {analytics.repeatCustomers.slice(0, 3).map((customer, index) => {
-              // Production-ready validation and safety checks
-              const safeCustomer = {
-                id: customer.id || `repeat-${index}`,
-                name: customer.name || 'Unknown Customer',
-                totalOrders: Math.max(0, customer.totalOrders || 0),
-                totalSpent: Math.max(0, customer.totalSpent || 0),
-                isGuest: Boolean(customer.isGuest)
-              };
-
-              // Calculate average order value safely
-              const avgOrderValue = safeCustomer.totalOrders > 0 
-                ? Math.round(safeCustomer.totalSpent / safeCustomer.totalOrders)
-                : 0;
-
-              return (
-                <div key={safeCustomer.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-gray-800 truncate" title={safeCustomer.name}>
-                        {safeCustomer.name.length > 20 
-                          ? `${safeCustomer.name.substring(0, 20)}...` 
-                          : safeCustomer.name
-                        }
+            {analytics.repeatCustomers.slice(0, 3).map((customer, index) => (
+              <div key={customer.id} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-gray-800">{customer.name}</span>
+                    {customer.isGuest && (
+                      <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                        Guest
                       </span>
-                      {safeCustomer.isGuest && (
-                        <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
-                          Guest
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                      #{index + 1}
-                    </span>
+                    )}
                   </div>
-                  
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span>Orders:</span>
-                      <span className="font-semibold">{safeCustomer.totalOrders}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Total Paid:</span>
-                      <span className="font-semibold text-green-600">₦{safeCustomer.totalSpent.toLocaleString()}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 pt-1 border-t">
-                      <div className="flex items-center justify-between">
-                        <span>Avg per order:</span>
-                        <span>₦{avgOrderValue.toLocaleString()}</span>
-                      </div>
-                    </div>
+                  <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                    #{index + 1}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <div>{customer.totalOrders} orders</div>
+                  <div>₦{customer.totalSpent.toLocaleString()} total</div>
+                  <div className="text-xs text-gray-500">
+                    Avg: ₦{Math.round(customer.totalSpent / customer.totalOrders).toLocaleString()} per order
                   </div>
                 </div>
-              );
-            })}
-          </div>
-          
-          {/* Production footer with data integrity info */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>
-                Showing top {Math.min(3, analytics.repeatCustomers.length)} of {analytics.repeatCustomers.length} repeat customers
-              </span>
-              <span>
-                Last updated: {new Date().toLocaleTimeString()}
-              </span>
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* No repeat customers state - Production ready */}
-      {analytics && analytics.repeatCustomers.length === 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
-              <Users className="h-full w-full" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No Repeat Customers Yet</h3>
-            <p className="text-gray-600 max-w-md mx-auto">
-              Once customers make multiple paid orders, they'll appear here as your repeat business champions.
-            </p>
-            <div className="mt-4 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 max-w-md mx-auto">
-              <strong>Note:</strong> Only customers with paid orders are counted for accurate business metrics.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Customer Type Filter - Production Ready */}
-      {hasValidAnalytics && (
+      {/* Customer Type Filter */}
+      {analytics && (
         <CustomerTypeFilter
           currentFilter={customerTypeFilter}
           onFilterChange={setCustomerTypeFilter}
-          isLoading={isLoading}
           counts={{
-            all: allCustomers.length,
-            authenticated: Math.max(0, analytics.metrics.authenticatedCustomers || 0),
-            guest: Math.max(0, analytics.metrics.guestCustomers || 0)
+            all: analytics.allCustomers.length,
+            authenticated: analytics.metrics.authenticatedCustomers,
+            guest: analytics.metrics.guestCustomers
           }}
         />
       )}
@@ -276,6 +195,7 @@ const Customers = () => {
                 className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+            <BulkEmailActions onEmailsRequeued={refetchAnalytics} />
             <Button 
               variant="outline"
               className="flex items-center space-x-2"
@@ -297,6 +217,21 @@ const Customers = () => {
         />
       </div>
 
+      {/* Collapsible Security Section */}
+      <Collapsible open={securitySectionOpen} onOpenChange={setSecuritySectionOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Security & Audit Dashboard
+            </div>
+            <Filter className={`h-4 w-4 transition-transform ${securitySectionOpen ? 'rotate-180' : ''}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-6 mt-6">
+          <CustomerSecurityDashboard />
+        </CollapsibleContent>
+      </Collapsible>
       
       <CustomerDialog
         open={customerDialogOpen}

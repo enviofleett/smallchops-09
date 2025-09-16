@@ -12,7 +12,7 @@ export const CustomerStats = () => {
     queryFn: async () => {
       // Get customer data from orders
       const { data: orders, error } = await supabase
-        .from('orders')
+        .from('orders_view')
         .select('customer_email, created_at')
         .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
       

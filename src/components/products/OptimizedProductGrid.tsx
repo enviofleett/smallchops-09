@@ -9,7 +9,6 @@ import { useOptimizedProducts } from '@/hooks/useOptimizedProducts';
 import { useNetworkResilience } from '@/hooks/useNetworkResilience';
 import { useDebounce } from '@/hooks/useDebounce';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
-import productPlaceholder from '@/assets/product-placeholder.jpg';
 
 interface OptimizedProductGridProps {
   categoryId?: string;
@@ -119,8 +118,7 @@ const OptimizedProductGrid: React.FC<OptimizedProductGridProps> = ({
                 <SelectContent>
                   <SelectItem value="20">20 items</SelectItem>
                   <SelectItem value="40">40 items</SelectItem>
-                  <SelectItem value="100">100 items</SelectItem>
-                  <SelectItem value="200">All items</SelectItem>
+                  <SelectItem value="50">50 items</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -133,15 +131,18 @@ const OptimizedProductGrid: React.FC<OptimizedProductGridProps> = ({
         {memoizedProducts.map((product) => (
           <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
             <div className="aspect-square bg-muted">
-              <img
-                src={product.image_url || productPlaceholder}
-                alt={product.name}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.src = productPlaceholder;
-                }}
-              />
+              {product.image_url ? (
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  No Image
+                </div>
+              )}
             </div>
             <CardContent className="p-4">
               <h3 className="font-semibold line-clamp-2 mb-2">{product.name}</h3>

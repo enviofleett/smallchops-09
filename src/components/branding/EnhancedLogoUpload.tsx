@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useApiWithRetry } from '@/hooks/useApiWithRetry';
 import { toast } from 'sonner';
-import ErrorBoundaryWrapper from '@/components/ErrorBoundaryWrapper';
+import EnhancedErrorBoundary from '@/components/ui/enhanced-error-boundary';
 
 interface ValidationResult {
   isValid: boolean;
@@ -265,7 +265,7 @@ export const EnhancedLogoUpload = ({
   }
 
   return (
-    <ErrorBoundaryWrapper context="Logo Upload Component">
+    <EnhancedErrorBoundary context="Logo Upload Component">
       <div className="space-y-4">
         <Card
           {...getRootProps()}
@@ -322,6 +322,6 @@ export const EnhancedLogoUpload = ({
         <p>• Will be automatically validated for security and quality</p>
         </div>
       </div>
-    </ErrorBoundaryWrapper>
+    </EnhancedErrorBoundary>
   );
 };

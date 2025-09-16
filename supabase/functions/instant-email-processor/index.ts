@@ -1,4 +1,4 @@
-// Real-time Email Processing Engine - PRODUCTION READY
+// Real-time Email Processing Engine
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from '../_shared/cors.ts'
 
@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('=== Instant Email Processor Started (Production Ready) ===')
+    console.log('=== Instant Email Processor Started ===')
 
     // Get high priority queued emails for immediate processing
     const { data: highPriorityEmails, error: fetchError } = await supabase
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
       .eq('priority', 'high')
       .lt('retry_count', 3)
       .order('created_at', { ascending: true })
-      .limit(20)
+      .limit(20) // Process 20 high priority emails at once
 
     if (fetchError) {
       console.error('Error fetching high priority emails:', fetchError)
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
         .in('priority', ['normal', 'low'])
         .lt('retry_count', 3)
         .order('created_at', { ascending: true })
-        .limit(10)
+        .limit(10) // Process fewer normal priority emails
 
       if (normalError) {
         console.error('Error fetching normal priority emails:', normalError)
@@ -109,7 +109,6 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
         .from('communication_events')
         .update({ 
           status: 'processing',
-          processing_started_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', email.id)
@@ -122,6 +121,7 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
         suppressionCheck = data === true;
       } catch (suppressionError) {
         console.warn(`⚠️ Suppression check failed for ${email.recipient_email}, allowing email:`, suppressionError.message);
+        // Continue processing if suppression check fails
       }
 
       if (suppressionCheck === true) {
@@ -132,7 +132,6 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
           .update({ 
             status: 'failed',
             error_message: 'Email address is suppressed',
-            processed_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
           .eq('id', email.id)
@@ -147,34 +146,18 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
       try {
         // Normalize template key for backwards compatibility
         let normalizedTemplateKey = email.template_key;
-        const legacyMappings: Record<string, string> = {
-          'order_confirmed': 'order_confirmation',
-          'order_preparing': 'order_processing', 
-          'order_cancelled': 'order_cancellation',
-          'pickup_ready': 'order_ready'
-        };
-        
-        if (legacyMappings[email.template_key]) {
-          normalizedTemplateKey = legacyMappings[email.template_key];
-          console.log(`🔄 Normalized template key: ${email.template_key} → ${normalizedTemplateKey}`);
+        if (email.template_key === 'order_confirmed') {
+          normalizedTemplateKey = 'order_confirmation';
         }
 
-        // Merge template_variables and variables for complete data
-        const mergedVariables = {
-          ...(email.template_variables || {}),
-          ...(email.variables || {})
-        };
-
-        console.log(`📧 Sending with template: ${normalizedTemplateKey} (original: ${email.template_key})`);
-        
         emailResult = await supabase.functions.invoke('unified-smtp-sender', {
           body: {
             to: email.recipient_email,
-            subject: mergedVariables.subject || 'Notification from Starters Small Chops',
-            htmlContent: mergedVariables.html_content,
-            textContent: mergedVariables.text_content,
+            subject: email.variables?.subject || 'Notification from Starters Small Chops',
+            htmlContent: email.variables?.html_content,
+            textContent: email.variables?.text_content,
             templateKey: normalizedTemplateKey,
-            variables: mergedVariables
+            variables: email.variables
           }
         })
       } catch (sendError) {
@@ -191,17 +174,14 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
             errorMessage.toLowerCase().includes('rejected') || 
             errorMessage.toLowerCase().includes('invalid')) {
           
-          // FIXED: Use correct schema for email_suppression_list
           await supabase
             .from('email_suppression_list')
             .upsert({
-              email_address: email.recipient_email.toLowerCase(),
-              reason: 'smtp_rejection',
-              event_data: JSON.stringify({
-                error: errorMessage,
-                email_id: email.id,
-                timestamp: new Date().toISOString()
-              })
+              email: email.recipient_email.toLowerCase(),
+              suppression_type: 'bounce',
+              reason: errorMessage,
+              is_active: true,
+              created_at: new Date().toISOString()
             })
           
           console.log(`📝 Added ${email.recipient_email} to suppression list`)
@@ -222,7 +202,6 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
               retry_count: newRetryCount,
               scheduled_at: scheduledAt,
               error_message: errorMessage,
-              processed_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
             .eq('id', email.id)
@@ -235,7 +214,6 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
               status: 'failed',
               retry_count: newRetryCount,
               error_message: errorMessage,
-              processed_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
             .eq('id', email.id)
@@ -247,15 +225,13 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
       } else {
         console.log(`✅ Successfully sent email ${email.id}`)
 
-        // FIXED: Use external_id instead of provider_message_id
         await supabase
           .from('communication_events')
           .update({
             status: 'sent',
             sent_at: new Date().toISOString(),
-            processed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            external_id: emailResult.data?.messageId
+            provider_message_id: emailResult.data?.messageId
           })
           .eq('id', email.id)
         
@@ -271,7 +247,6 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
           status: 'failed',
           error_message: error.message,
           retry_count: (email.retry_count || 0) + 1,
-          processed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', email.id)

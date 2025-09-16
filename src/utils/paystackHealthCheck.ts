@@ -23,13 +23,7 @@ export const performPaystackHealthCheck = (): HealthCheckResult => {
   };
 
   // Check if we're in secure backend-only mode (expected state)
-  let hasBackendReferences = false;
-  try {
-    hasBackendReferences = localStorage.getItem('payment_system_mode') === 'backend-only';
-  } catch (error) {
-    // Handle localStorage access issues gracefully
-    console.warn('Unable to access localStorage for payment system mode check:', error);
-  }
+  const hasBackendReferences = localStorage.getItem('payment_system_mode') === 'backend-only';
   
   if (!hasBackendReferences) {
     result.issues.push('App not in secure backend-only references mode');

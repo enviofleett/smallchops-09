@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Settings, Building2, MessageCircle } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 export const PublicFooter = () => {
@@ -22,10 +22,7 @@ const PublicFooterContent = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {/* Address */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
-              <MapPin className="w-5 h-5" />
-              Address
-            </h3>
+            <h3 className="text-lg font-bold mb-4 text-white">Address</h3>
             <div className="space-y-2 text-gray-300">
               <div className="font-medium">Headquarters:</div>
               <div>2B Close Off 11 Crescent Kado Estate, Abuja</div>
@@ -36,52 +33,31 @@ const PublicFooterContent = () => {
 
           {/* Services */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Services
-            </h3>
+            <h3 className="text-lg font-bold mb-4 text-white">Services</h3>
             <div className="space-y-2">
               <Link to="/" className="block text-gray-300 hover:text-white transition-colors">Catering services</Link>
+              
+              <Link to="/blog" className="block text-gray-300 hover:text-white transition-colors">Blog</Link>
             </div>
           </div>
 
           {/* Company */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
-              Company
-            </h3>
+            <h3 className="text-lg font-bold mb-4 text-white">Company</h3>
             <div className="space-y-2">
               <Link to="/about" className="block text-gray-300 hover:text-white transition-colors">About us</Link>
-              
+              <Link to="/blog" className="block text-gray-300 hover:text-white transition-colors">Blog</Link>
               
             </div>
           </div>
 
           {/* Contact Us */}
           <div>
-            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
-              <Phone className="w-5 h-5" />
-              Contact Us
-            </h3>
+            <h3 className="text-lg font-bold mb-4 text-white">Contact Us</h3>
             <div className="space-y-2 text-gray-300">
-              <div className="flex items-center gap-2">
-                <a 
-                  href="https://wa.me/2348073011100" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-green-500 hover:text-green-400 transition-colors"
-                  aria-label="Contact us on WhatsApp"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                </a>
-                <span>+234 807 3011 100</span>
-              </div>
+              <div>+234 807 3011 100</div>
               
-              <div className="flex items-center gap-2">
-                <Mail className="w-7 h-7" />
-                <span>support@startersmallchops.com</span>
-              </div>
+              <div>support@startersmallchops.com</div>
             </div>
           </div>
         </div>
@@ -89,11 +65,12 @@ const PublicFooterContent = () => {
         {/* Bottom Section */}
         <div className="border-t border-gray-800 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-            {/* Logo */}
-            <div className="flex items-center">
+            {/* Logo and Tagline */}
+            <div className="flex items-center space-x-3">
               <img src={logoUrl} alt={`${businessName} Logo`} className="h-8 w-auto" onError={e => {
               e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
             }} />
+              <span className="text-gray-400 text-sm">{settings?.tagline || 'SMALL CHOPS'}</span>
             </div>
 
             {/* Social Media Icons */}

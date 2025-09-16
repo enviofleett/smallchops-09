@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, CheckCircle, Clock, Mail, Zap, X, Trash2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Mail, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface EmailStats {
@@ -93,96 +93,6 @@ export const RealTimeEmailProcessor: React.FC = () => {
         title: 'Enhanced Processing Failed',
         description: error.message,
         variant: 'destructive',
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const clearQueuedEmails = async () => {
-    try {
-      setIsProcessing(true);
-      const { data, error } = await supabase.functions.invoke('clear-email-queue', {
-        body: {
-          action: 'clear_queue',
-          statuses: ['queued']
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Queued Emails Cleared",
-        description: `Successfully cleared ${data?.cleared_count || 0} queued emails`,
-      });
-      
-      await fetchEmailStats();
-    } catch (error) {
-      console.error('Failed to clear queued emails:', error);
-      toast({
-        title: "Clear Failed",
-        description: error instanceof Error ? error.message : 'Failed to clear queued emails',
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const clearFailedEmails = async () => {
-    try {
-      setIsProcessing(true);
-      const { data, error } = await supabase.functions.invoke('clear-email-queue', {
-        body: {
-          action: 'clear_queue',
-          statuses: ['failed']
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Failed Emails Cleared",
-        description: `Successfully cleared ${data?.cleared_count || 0} failed emails`,
-      });
-      
-      await fetchEmailStats();
-    } catch (error) {
-      console.error('Failed to clear failed emails:', error);
-      toast({
-        title: "Clear Failed",
-        description: error instanceof Error ? error.message : 'Failed to clear failed emails',
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const retryFailedEmails = async () => {
-    try {
-      setIsProcessing(true);
-      const { data, error } = await supabase.functions.invoke('clear-email-queue', {
-        body: {
-          action: 'retry_failed',
-          statuses: ['failed']
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Failed Emails Reset for Retry",
-        description: `Successfully reset ${data?.retry_count || 0} failed emails back to queue`,
-      });
-      
-      await fetchEmailStats();
-    } catch (error) {
-      console.error('Failed to retry failed emails:', error);
-      toast({
-        title: "Retry Failed",
-        description: error instanceof Error ? error.message : 'Failed to retry failed emails',
-        variant: "destructive"
       });
     } finally {
       setIsProcessing(false);
@@ -284,39 +194,6 @@ export const RealTimeEmailProcessor: React.FC = () => {
           >
             <Mail className="h-4 w-4 mr-2" />
             Enhanced Processing
-          </Button>
-        </div>
-
-        {/* Queue Management Controls */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t">
-          <Button 
-            onClick={clearQueuedEmails}
-            disabled={isProcessing || emailStats.queued === 0}
-            variant="destructive"
-            className="flex-1"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear Queued ({emailStats.queued})
-          </Button>
-          
-          <Button 
-            onClick={clearFailedEmails}
-            disabled={isProcessing || emailStats.failed === 0}
-            variant="destructive"
-            className="flex-1"
-          >
-            <X className="h-4 w-4 mr-2" />
-            Clear Failed ({emailStats.failed})
-          </Button>
-          
-          <Button 
-            onClick={retryFailedEmails}
-            disabled={isProcessing || emailStats.failed === 0}
-            variant="outline"
-            className="flex-1"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry Failed
           </Button>
         </div>
 

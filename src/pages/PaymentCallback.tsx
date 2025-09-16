@@ -176,38 +176,16 @@ export default function PaymentCallback() {
           return; // Success - exit retry loop
         }
 
-        // ENHANCED: Handle verification failure with duplicate detection
-        const errorMessage = verificationResult.message?.toLowerCase() || '';
-        const isDuplicateError = errorMessage.includes('duplicate') || 
-                               errorMessage.includes('already processed') ||
-                               errorMessage.includes('already exists');
-
-        // Treat duplicate payments as success (idempotent behavior)
-        if (isDuplicateError) {
-          console.log('✅ Duplicate payment detected - treating as success');
-          const duplicateResult = {
-            success: true,
-            data: {
-              status: 'success',
-              order_id: verificationResult.data?.order_id,
-              order_number: verificationResult.data?.order_number,
-              amount: verificationResult.data?.amount,
-              duplicate_handled: true
-            }
-          };
-          await handleVerificationSuccess(duplicateResult, paymentReference);
-          return;
-        }
-
+        // Handle verification failure
         const errorData = {
           error: verificationResult.message,
           code: 'VERIFICATION_FAILED'
         };
 
         // Check if error is retryable
-        const isRetryableError = errorMessage.includes('temporarily unavailable') ||
-                               errorMessage.includes('timeout') ||
-                               errorMessage.includes('network');
+        const isRetryableError = verificationResult.message?.toLowerCase().includes('temporarily unavailable') ||
+                               verificationResult.message?.toLowerCase().includes('timeout') ||
+                               verificationResult.message?.toLowerCase().includes('network');
 
         if (isRetryableError) {
           throw new Error(`Service temporarily unavailable: ${verificationResult.message}`);
@@ -255,18 +233,12 @@ export default function PaymentCallback() {
     console.log('💰 Amount received from verification:', payload?.amount);
     
     setStatus('success');
-    // ENHANCED: Better messaging for duplicate scenarios
-    const isDuplicate = payload?.duplicate_handled;
-    const message = isDuplicate 
-      ? 'Payment already confirmed! Your order is being processed.'
-      : 'Payment verified successfully! Your order has been confirmed.';
-
     setResult({
       success: true,
       order_id: payload?.order_id,
       order_number: payload?.order_number,
       amount: payload?.amount || payload?.total_amount,
-      message
+      message: 'Payment verified successfully! Your order has been confirmed.'
     });
 
     // Log success

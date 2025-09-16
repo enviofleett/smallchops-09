@@ -3,46 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductionHealthDashboard } from '@/components/production/ProductionHealthDashboard';
 import { WebSocketStatusMonitor } from '@/components/production/WebSocketStatusMonitor';
 import { useProductionReady } from '@/hooks/useProductionReady';
-import { ProductionEmailHealthChecker } from '@/utils/production-email-health';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, CheckCircle, AlertTriangle, XCircle, Mail } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { RefreshCw, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 
 const ProductionOverview = () => {
   const { status, isLoading, refresh } = useProductionReady();
-  const { toast } = useToast();
-  const [isTestingEmail, setIsTestingEmail] = useState(false);
-
-  const testProductionEmail = async () => {
-    setIsTestingEmail(true);
-    try {
-      const result = await ProductionEmailHealthChecker.testSMTPConnection();
-      
-      if (result.success) {
-        toast({
-          title: "✅ SMTP Connection Healthy",
-          description: result.message,
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: "❌ SMTP Connection Failed",
-          description: result.message,
-          variant: "destructive"
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "❌ Email Test Failed",
-        description: error.message || "Failed to test email system",
-        variant: "destructive"
-      });
-    } finally {
-      setIsTestingEmail(false);
-    }
-  };
 
   const getReadinessIcon = () => {
     if (isLoading) return <RefreshCw className="w-5 h-5 animate-spin" />;
@@ -62,20 +28,10 @@ const ProductionOverview = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Production Overview</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={refresh} disabled={isLoading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh All
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={testProductionEmail} 
-            disabled={isTestingEmail}
-          >
-            <Mail className={`w-4 h-4 mr-2 ${isTestingEmail ? 'animate-spin' : ''}`} />
-            Test Email System
-          </Button>
-        </div>
+        <Button variant="outline" onClick={refresh} disabled={isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh All
+        </Button>
       </div>
 
       {/* Production Readiness Summary */}

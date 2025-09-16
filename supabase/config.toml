@@ -1,1 +1,96 @@
 project_id = "oknnklksdiqaifhxaccs"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+port = 54322
+site_url = "https://preview--smallchops-09.lovable.app"
+additional_redirect_urls = ["https://preview--smallchops-09.lovable.app", "http://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+enable_email_confirmations = true
+enable_email_autoconfirm = false
+enable_phone_confirmations = false
+enable_phone_autoconfirm = false
+
+# SECURE EMAIL SYSTEM - Production Ready
+[functions.email-service-core]
+verify_jwt = true
+
+[functions.unified-smtp-sender]
+verify_jwt = false
+
+[functions.unified-email-queue-processor]
+verify_jwt = false
+
+[functions.instant-email-processor]
+verify_jwt = false
+
+# SECURE AUTHENTICATION
+[functions.secure-customer-auth]
+verify_jwt = false
+
+[functions.customer-otp-verification]
+verify_jwt = false
+
+[functions.auth-profile]
+verify_jwt = true
+
+# SECURE PAYMENT PROCESSING
+[functions.paystack-secure]
+verify_jwt = true
+
+[functions.secure-payment-processor]
+verify_jwt = true
+
+[functions.payment-callback]
+verify_jwt = false
+
+[functions.paystack-webhook-secure]
+verify_jwt = false
+
+[functions.payment-health-check]
+verify_jwt = true
+
+[functions.paystack-health]
+verify_jwt = true
+
+# ADMIN FUNCTIONS (require authentication)
+[functions.admin-orders-manager]
+verify_jwt = true
+
+[functions.reports]
+verify_jwt = true
+
+[functions.shipping-fees-report]
+verify_jwt = true
+
+# PUBLIC UTILITIES
+[functions.unsubscribe-email]
+verify_jwt = false
+
+[functions.get-turnstile-key]
+verify_jwt = false
+
+[functions.public-api]
+verify_jwt = false
+
+# HEALTH & MONITORING
+[functions.security-monitor]
+verify_jwt = false
+
+[functions.delivery-schedule-health]
+verify_jwt = false
+
+# AUTOMATED PROCESSORS (service-to-service)
+[functions.backfill-missing-schedules]
+verify_jwt = true
+
+[functions.recover-order-schedule]
+verify_jwt = true

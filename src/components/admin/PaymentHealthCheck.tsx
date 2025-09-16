@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, AlertTriangle, XCircle, RefreshCw, Activity, Clock, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 interface HealthMetrics {

@@ -70,7 +70,9 @@ serve(async (req) => {
     console.log("🔐 Authentication debug:", {
       hasAuthHeader: !!authHeader,
       hasGuestSession: !!guestSessionId,
-      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'none'
+      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'none',
+      authHeaderLength: authHeader?.length || 0,
+      guestSessionLength: guestSessionId?.length || 0
     });
     
     // Allow either authenticated users OR guest sessions
@@ -676,13 +678,31 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("❌ Checkout processing error:", error);
+    console.error("❌ Enhanced error context:", {
+      errorName: error?.name || 'UnknownError',
+      errorMessage: error?.message || 'No error message',
+      errorStack: error?.stack || 'No stack trace',
+      errorCause: error?.cause || 'No cause',
+      errorCode: error?.code || 'NO_CODE',
+      requestHeaders: Object.fromEntries(req.headers.entries()),
+      requestMethod: req.method,
+      requestUrl: req.url,
+      authHeaderPresent: !!req.headers.get("Authorization"),
+      guestSessionPresent: !!req.headers.get("x-guest-session-id"),
+      timestamp: new Date().toISOString()
+    });
+    
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message || "Checkout processing failed",
+        code: error?.code || 'CHECKOUT_PROCESSING_ERROR',
         details: {
           timestamp: new Date().toISOString(),
           error_type: error.constructor.name,
+          suggestion: error?.message?.includes('JWT') || error?.message?.includes('auth') 
+            ? 'Please refresh your session and try again'
+            : 'Please check your order details and try again'
         },
       }),
       {

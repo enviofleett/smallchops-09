@@ -538,33 +538,78 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   };
 
   const handleFormSubmit = async () => {
-    // 🔐 AUTHENTICATION CHECK: Allow both authenticated users and guests with session
-    if (!isAuthenticated && !guestSessionId) {
-      toast({
-        title: "Session Required",
-        description: "Please log in or continue as guest to checkout.",
-        variant: "destructive"
-      });
-      setCheckoutStep('auth');
-      return;
-    }
+    console.log("🚀 Starting enhanced checkout submission...");
+    setIsSubmitting(true);
+    setLastPaymentError(null);
 
-    // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
-    if (circuitBreakerActive) {
-      toast({
-        title: "Too Many Attempts",
-        description: "Please wait 5 minutes before trying again.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // 🔧 DEBOUNCE: Prevent double-clicks during submission
-    if (isSubmitting) {
-      console.log('⏳ Already submitting, ignoring duplicate request');
-      return;
-    }
     try {
+      // 🔐 ENHANCED AUTHENTICATION CHECK: Validate authentication state before proceeding
+      console.log("🔐 Validating authentication state:", {
+        isAuthenticated,
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        guestSessionId,
+        userEmail: user?.email,
+        authMethod: isAuthenticated ? 'authenticated' : (guestSessionId ? 'guest' : 'none')
+      });
+
+      if (!isAuthenticated && !guestSessionId) {
+        console.error("❌ No valid authentication method found");
+        toast({
+          title: "Authentication Required",
+          description: "Please log in or continue as guest to proceed with checkout.",
+          variant: "destructive"
+        });
+        setCheckoutStep('auth');
+        return;
+      }
+
+      // Validate JWT token structure for authenticated users
+      if (isAuthenticated && session?.access_token) {
+        try {
+          const jwtParts = session.access_token.split('.');
+          if (jwtParts.length !== 3) {
+            throw new Error('Invalid JWT format');
+          }
+          
+          const payload = JSON.parse(atob(jwtParts[1]));
+          if (!payload.sub) {
+            throw new Error('JWT missing sub claim');
+          }
+          
+          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+            throw new Error('JWT token expired');
+          }
+          
+          console.log("✅ JWT validation passed for user:", payload.sub);
+        } catch (jwtError) {
+          console.error("❌ JWT validation failed:", jwtError);
+          toast({
+            title: "Session Invalid",
+            description: "Your session is invalid. Please log in again.",
+            variant: "destructive"
+          });
+          setCheckoutStep('auth');
+          return;
+        }
+      }
+
+      // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
+      if (circuitBreakerActive) {
+        toast({
+          title: "Too Many Attempts",
+          description: "Please wait 5 minutes before trying again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // 🔧 DEBOUNCE: Prevent double-clicks during submission
+      if (isSubmitting) {
+        console.log('⏳ Already submitting, ignoring duplicate request');
+        return;
+      }
+      
       setIsSubmitting(true);
       setLastPaymentError(null);
 
@@ -1015,6 +1060,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         description: userFriendlyMessage,
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   const handlePaymentSuccess = useCallback((reference: string) => {
@@ -1648,8 +1695,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       // Retry checkout after adjustment
       await handleFormSubmit();
     }} onCancel={() => setShowMOQModal(false)} adjustments={moqValidationResult?.adjustmentsMade || []} pricingImpact={moqValidationResult?.pricingImpact} />
-    </>;
-});
+    </>
+  });
 EnhancedCheckoutFlowComponent.displayName = 'EnhancedCheckoutFlowComponent';
 export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = props => <CheckoutErrorBoundary>
     <EnhancedCheckoutFlowComponent {...props} />

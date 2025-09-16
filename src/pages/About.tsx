@@ -11,9 +11,7 @@ const About = () => {
       <section className="relative py-20 bg-gradient-to-r from-primary/10 to-primary/5">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
-              About Starters Management Ltd
-            </h1>
+            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">About Starters</h1>
             <p className="text-xl text-muted-foreground leading-relaxed">
               Revolutionizing the finger food business in Nigeria and West Africa with quality, 
               innovation, and exceptional customer service since 2005.

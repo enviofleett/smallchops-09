@@ -1264,46 +1264,44 @@ function AdminOrderCard({
         {order.payment_status === 'paid' && (
           <div className="mt-4 border-t pt-4">
             {/* Customer Delivery/Pickup Schedule Requirements */}
-            <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4 border border-primary/20">
-              <div className="flex items-center gap-2 mb-4">
-                {order.order_type === 'delivery' ? (
-                  <Truck className="w-5 h-5 text-primary" />
-                ) : (
-                  <Package className="w-5 h-5 text-primary" />
-                )}
-                <h4 className="font-semibold text-base">
-                  {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
-                </h4>
-              </div>
-              
-              {deliverySchedule ? (
-                <div className="space-y-3">
-                  {/* Production-Ready Schedule Display using DeliveryScheduleDisplay component */}
-                  <DeliveryScheduleDisplay 
-                    schedule={deliverySchedule}
-                    orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
-                    orderStatus={order.status}
-                    className="mb-0" 
-                  />
-                  
-                  {/* Schedule Request Info */}
-                  <div className="text-xs text-muted-foreground border-t pt-3">
-                    Scheduled on {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'MMM d, yyyy \'at\' h:mm a')}
-                  </div>
-                </div>
+            <div className="flex items-center gap-2 mb-4">
+              {order.order_type === 'delivery' ? (
+                <Truck className="w-5 h-5 text-primary" />
               ) : (
-                <div className="text-center py-4">
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 dark:bg-amber-950 dark:border-amber-800">
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Schedule will be confirmed after payment is verified.
-                    </p>
-                  </div>
-                </div>
+                <Package className="w-5 h-5 text-primary" />
               )}
+              <h4 className="font-semibold text-base">
+                {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
+              </h4>
             </div>
+            
+            {deliverySchedule ? (
+              <div className="space-y-3">
+                {/* Production-Ready Schedule Display using DeliveryScheduleDisplay component */}
+                <DeliveryScheduleDisplay 
+                  schedule={deliverySchedule}
+                  orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
+                  orderStatus={order.status}
+                  className="mb-0" 
+                />
+                
+                {/* Schedule Request Info */}
+                <div className="text-xs text-muted-foreground border-t pt-3">
+                  Scheduled on {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 dark:bg-amber-950 dark:border-amber-800">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Schedule will be confirmed after payment is verified.
+                  </p>
+                </div>
+              </div>
+            )}
             
             {/* Special Instructions Fallback */}
             {!order.delivery_schedule?.special_instructions && order.special_instructions && (

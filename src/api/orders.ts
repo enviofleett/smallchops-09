@@ -162,25 +162,32 @@ export const updateOrder = async (
   orderId: string,
   updates: { status?: OrderStatus; assigned_rider_id?: string | null; customer_phone?: string; [key: string]: any }
 ): Promise<OrderWithItems> => {
-  const sanitizedUpdates = { ...updates };
+  // Clean up updates object by removing null, undefined, and empty values
+  const sanitizedUpdates: Record<string, any> = {};
+  
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') {
+      sanitizedUpdates[key] = value;
+    }
+  });
   
   // Phone field mapping no longer needed - phone column removed from database
   try {
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔄 Updating order via production-safe method:', orderId, updates);
+      console.log('🔄 Updating order via production-safe method:', orderId, sanitizedUpdates);
     }
 
     // If we're assigning a rider, use the secure RPC-based assignment
-    if (sanitizedUpdates.assigned_rider_id && sanitizedUpdates.assigned_rider_id !== null) {
+    if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('🎯 Assigning/reassigning rider using secure RPC:', sanitizedUpdates.assigned_rider_id);
+        console.log('🎯 Assigning/reassigning rider using secure RPC:', updates.assigned_rider_id);
       }
       
       const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'assign_rider',
           orderId,
-          riderId: sanitizedUpdates.assigned_rider_id
+          riderId: updates.assigned_rider_id
         }
       });
 
@@ -219,7 +226,7 @@ export const updateOrder = async (
       return assignmentResult.order;
     }
 
-    // For non-rider updates, use the standard update path
+    // For non-rider updates, use the standard update path with cleaned data
     const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
       body: {
         action: 'update',

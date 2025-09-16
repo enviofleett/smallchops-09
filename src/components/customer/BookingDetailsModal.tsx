@@ -11,6 +11,7 @@ interface CateringBooking {
   email: string;
   phone_number: string;
   event_date: string;
+  event_type?: string;
   number_of_guests: number;
   additional_details?: string;
   status: string;
@@ -133,6 +134,16 @@ export const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                   <div>
                     <p className="text-sm text-muted-foreground">Event Date</p>
                     <p className="font-medium">{formatDate(booking.event_date)}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Event Type</p>
+                    <p className="font-medium capitalize">
+                      {booking.event_type ? booking.event_type.replace('_', ' ') : 'Not specified'}
+                    </p>
                   </div>
                 </div>
                 

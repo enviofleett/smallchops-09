@@ -20,6 +20,7 @@ interface CateringBooking {
   email: string;
   phone_number: string;
   event_date: string;
+  event_type?: string;
   number_of_guests: number;
   additional_details?: string;
   status: string;
@@ -262,6 +263,7 @@ const BookingManagement = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Customer</TableHead>
+                <TableHead>Event Type</TableHead>
                 <TableHead>Event Date</TableHead>
                 <TableHead>Guests</TableHead>
                 <TableHead>Status</TableHead>
@@ -285,6 +287,11 @@ const BookingManagement = () => {
                         {booking.phone_number}
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {booking.event_type ? booking.event_type.replace('_', ' ') : 'Not specified'}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -346,6 +353,10 @@ const BookingManagement = () => {
             <div className="space-y-6">
               {/* Booking Details */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                <div>
+                  <Label className="text-sm font-medium">Event Type</Label>
+                  <p className="capitalize">{selectedBooking.event_type ? selectedBooking.event_type.replace('_', ' ') : 'Not specified'}</p>
+                </div>
                 <div>
                   <Label className="text-sm font-medium">Event Date</Label>
                   <p>{format(new Date(selectedBooking.event_date), 'MMMM dd, yyyy')}</p>

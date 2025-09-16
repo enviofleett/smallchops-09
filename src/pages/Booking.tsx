@@ -18,7 +18,8 @@ const Booking = () => {
     email: '',
     phoneNumber: '',
     numberOfGuests: '',
-    additionalDetails: ''
+    additionalDetails: '',
+    eventType: ''
   });
   const [eventDate, setEventDate] = useState<Date>();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,7 +32,7 @@ const Booking = () => {
   };
   const handleSubmitBooking = async () => {
     // Validation
-    if (!formData.fullName || !formData.email || !formData.phoneNumber || !eventDate || !formData.numberOfGuests) {
+    if (!formData.fullName || !formData.email || !formData.phoneNumber || !eventDate || !formData.numberOfGuests || !formData.eventType) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -48,6 +49,7 @@ const Booking = () => {
         email: formData.email,
         phone_number: formData.phoneNumber,
         event_date: format(eventDate, 'yyyy-MM-dd'),
+        event_type: formData.eventType,
         number_of_guests: parseInt(formData.numberOfGuests),
         additional_details: formData.additionalDetails || null
       });
@@ -61,7 +63,8 @@ const Booking = () => {
         email: '',
         phoneNumber: '',
         numberOfGuests: '',
-        additionalDetails: ''
+        additionalDetails: '',
+        eventType: ''
       });
       setEventDate(undefined);
     } catch (error) {
@@ -132,6 +135,39 @@ Fill out the form below and we will get back to you with the perfect smallchops 
                     Email Address <span className="text-red-500">*</span>
                   </label>
                   <Input type="email" value={formData.email} onChange={e => handleInputChange('email', e.target.value)} placeholder="Enter your email" />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Event Type <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    value={formData.eventType} 
+                    onChange={e => handleInputChange('eventType', e.target.value)}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
+                    required
+                  >
+                    <option value="">Select event type</option>
+                    <option value="wedding">Wedding</option>
+                    <option value="office_event">Office Event</option>
+                    <option value="funeral">Funeral</option>
+                    <option value="birthday">Birthday Party</option>
+                    <option value="corporate_meeting">Corporate Meeting</option>
+                    <option value="baby_shower">Baby Shower</option>
+                    <option value="graduation">Graduation Party</option>
+                    <option value="anniversary">Anniversary</option>
+                    <option value="housewarming">Housewarming</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <Input type="tel" value={formData.phoneNumber} onChange={e => handleInputChange('phoneNumber', e.target.value)} placeholder="Enter your phone number" />
                 </div>
               </div>
 

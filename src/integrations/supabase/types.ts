@@ -8968,6 +8968,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      check_secure_api_rate_limit: {
+        Args: {
+          p_endpoint: string
+          p_identifier: string
+          p_max_requests?: number
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       check_upload_rate_limit: {
         Args: { p_user_id: string }
         Returns: boolean
@@ -10134,6 +10143,14 @@ export type Database = {
         Args:
           | { p_admin_id?: string; p_new_status: string; p_order_id: string }
           | { p_admin_notes?: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
+      secure_payment_verification: {
+        Args: {
+          p_expected_amount: number
+          p_order_id: string
+          p_payment_reference: string
+        }
         Returns: Json
       }
       secure_verify_payment: {

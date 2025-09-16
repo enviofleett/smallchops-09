@@ -1,10 +1,12 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, FileText, Truck, Package, CheckCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Calendar, Clock, MapPin, FileText, Truck, Package, CheckCircle, AlertTriangle, Info, XCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { OrderStatus } from '@/types/orders';
+import { useEnhancedDeliverySchedule, ScheduleWarning } from '@/hooks/useEnhancedDeliverySchedule';
 
 interface DeliveryScheduleDisplayProps {
   schedule: DeliverySchedule;
@@ -19,6 +21,7 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
   orderStatus = 'pending',
   className = "" 
 }) => {
+  const { validation, loading } = useEnhancedDeliverySchedule(schedule);
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
     try {
@@ -112,6 +115,24 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
   const statusConfig = getStatusConfig(orderStatus);
   const StatusIcon = statusConfig.icon;
 
+  const getWarningIcon = (warning: ScheduleWarning) => {
+    switch (warning.severity) {
+      case 'error': return XCircle;
+      case 'warning': return AlertTriangle;
+      case 'info': return Info;
+      default: return Info;
+    }
+  };
+
+  const getWarningColor = (warning: ScheduleWarning) => {
+    switch (warning.severity) {
+      case 'error': return 'destructive';
+      case 'warning': return 'warning';
+      case 'info': return 'secondary';
+      default: return 'secondary';
+    }
+  };
+
   return (
     <Card className={`border-blue-200 bg-blue-50/50 ${className}`}>
       <CardHeader className="pb-3">
@@ -199,6 +220,92 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
             <p className="text-sm text-gray-600 bg-white/70 p-2 rounded border">
               {schedule.special_instructions}
             </p>
+          </div>
+        )}
+
+        {/* Business Context & Validation */}
+        {validation && (
+          <div className="space-y-2">
+            {/* Business Day Indicator */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {validation.businessContext.isHoliday && (
+                <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50">
+                  <CalendarIcon className="w-3 h-3 mr-1" />
+                  Holiday: {validation.businessContext.holidayName}
+                </Badge>
+              )}
+              
+              {validation.businessContext.isBusinessDay ? (
+                <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Business Day
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50">
+                  <XCircle className="w-3 h-3 mr-1" />
+                  Non-Business Day
+                </Badge>
+              )}
+
+              {validation.businessContext.slotAvailability && (
+                <Badge 
+                  variant="outline" 
+                  className={`${
+                    validation.businessContext.slotAvailability.available
+                      ? 'border-green-500 text-green-700 bg-green-50'
+                      : 'border-red-500 text-red-700 bg-red-50'
+                  }`}
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  {validation.businessContext.slotAvailability.available ? 'Available' : 'Unavailable'}
+                  {validation.businessContext.slotAvailability.capacity && validation.businessContext.slotAvailability.bookedCount && (
+                    <span className="ml-1">
+                      ({validation.businessContext.slotAvailability.bookedCount}/{validation.businessContext.slotAvailability.capacity})
+                    </span>
+                  )}
+                </Badge>
+              )}
+            </div>
+
+            {/* Warnings and Alerts */}
+            {validation.warnings.length > 0 && (
+              <div className="space-y-2">
+                {validation.warnings.map((warning, index) => {
+                  const WarningIcon = getWarningIcon(warning);
+                  return (
+                    <Alert key={index} variant={getWarningColor(warning) as any} className="py-2">
+                      <WarningIcon className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        <div className="font-medium">{warning.message}</div>
+                        {warning.recommendation && (
+                          <div className="text-xs mt-1 opacity-80">
+                            Recommendation: {warning.recommendation}
+                          </div>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Overall Schedule Status */}
+            {!validation.isValid && (
+              <Alert variant="destructive" className="py-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  <div className="font-medium">Schedule requires attention</div>
+                  <div className="text-xs mt-1">This delivery schedule has validation issues that need to be resolved.</div>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+            Validating schedule...
           </div>
         )}
 

@@ -187,10 +187,17 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     }
   });
   const handleUpdate = () => {
-    updateMutation.mutate({
-      status: selectedStatus,
-      assigned_rider_id: assignedRider
-    });
+    // Only include assigned_rider_id if it has a valid value
+    const updates: { status: OrderStatus; assigned_rider_id?: string } = {
+      status: selectedStatus
+    };
+    
+    // Only add rider assignment if there's actually a rider to assign
+    if (assignedRider && assignedRider.trim() !== '') {
+      updates.assigned_rider_id = assignedRider;
+    }
+    
+    updateMutation.mutate(updates);
   };
   const handleManualSend = () => {
     if (manualStatus) {

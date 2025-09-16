@@ -273,6 +273,18 @@ serve(async (req) => {
       case 'assign_rider': {
         console.log('🎯 Admin function: Assigning rider', riderId, 'to order', orderId)
         
+        // CRITICAL: Validate rider ID before proceeding
+        if (!riderId || riderId === 'null' || riderId === '' || riderId === undefined) {
+          console.error('❌ CRITICAL: Invalid rider ID provided:', riderId)
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Invalid rider ID: Rider ID cannot be null, undefined, or empty'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
+        }
+        
         // Get order status to determine which RPC to use
         const { data: orderCheck, error: orderCheckError } = await supabaseClient
           .from('orders')

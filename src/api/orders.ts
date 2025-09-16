@@ -178,7 +178,8 @@ export const updateOrder = async (
     }
 
     // If we're assigning a rider, use the secure RPC-based assignment
-    if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
+    // Only trigger rider assignment if assigned_rider_id is explicitly provided and valid
+    if ('assigned_rider_id' in updates && updates.assigned_rider_id && updates.assigned_rider_id.trim() !== '') {
       if (process.env.NODE_ENV === 'development') {
         console.log('🎯 Assigning/reassigning rider using secure RPC:', updates.assigned_rider_id);
       }

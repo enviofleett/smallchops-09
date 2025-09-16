@@ -97,8 +97,9 @@ const Booking = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-foreground mb-6">
-              Hosting an Event? We've Got You Covered.
+            <h1 className="text-2xl md:text-4xl font-bold text-foreground mb-6 text-center">
+              Planning an event?<br />
+              We've got you covered.
             </h1>
             <div className="text-lg text-muted-foreground space-y-6 max-w-3xl mx-auto leading-relaxed">
               <p className="text-center">From weddings to birthdays, corporate meetings to intimate gatherings- we bring the taste that makes your event unforgettable. 

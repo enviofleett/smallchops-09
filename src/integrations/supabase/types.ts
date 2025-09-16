@@ -5161,6 +5161,9 @@ export type Database = {
           pickup_time: string | null
           preferred_delivery_time: string | null
           processing_lock: boolean | null
+          processing_officer_id: string | null
+          processing_officer_name: string | null
+          processing_started_at: string | null
           reference_updated_at: string | null
           special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"]
@@ -5209,6 +5212,9 @@ export type Database = {
           pickup_time?: string | null
           preferred_delivery_time?: string | null
           processing_lock?: boolean | null
+          processing_officer_id?: string | null
+          processing_officer_name?: string | null
+          processing_started_at?: string | null
           reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -5257,6 +5263,9 @@ export type Database = {
           pickup_time?: string | null
           preferred_delivery_time?: string | null
           processing_lock?: boolean | null
+          processing_officer_id?: string | null
+          processing_officer_name?: string | null
+          processing_started_at?: string | null
           reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -8803,6 +8812,10 @@ export type Database = {
         Returns: Json
       }
       admin_safe_update_order_status_enhanced: {
+        Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
+      admin_safe_update_order_status_with_officer_tracking: {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }

@@ -19,17 +19,34 @@ interface DriverDialogProps {
 export const DriverDialog = ({ driver, open, onOpenChange, onSave }: DriverDialogProps) => {
   const form = useForm<NewDriver>({
     defaultValues: {
-      name: driver?.name || '',
-      phone: driver?.phone || '',
-      email: driver?.email || '',
-      license_number: driver?.license_number || '',
-      vehicle_type: driver?.vehicle_type || 'car',
-      vehicle_brand: driver?.vehicle_brand || '',
-      vehicle_model: driver?.vehicle_model || '',
-      license_plate: driver?.license_plate || '',
-      is_active: driver?.is_active ?? true,
+      name: '',
+      phone: '',
+      email: '',
+      license_number: '',
+      vehicle_type: 'car',
+      vehicle_brand: '',
+      vehicle_model: '',
+      license_plate: '',
+      is_active: true,
     },
   });
+
+  // Reset form when driver prop changes or dialog opens/closes
+  React.useEffect(() => {
+    if (open) {
+      form.reset({
+        name: driver?.name || '',
+        phone: driver?.phone || '',
+        email: driver?.email || '',
+        license_number: driver?.license_number || '',
+        vehicle_type: driver?.vehicle_type || 'car',
+        vehicle_brand: driver?.vehicle_brand || '',
+        vehicle_model: driver?.vehicle_model || '',
+        license_plate: driver?.license_plate || '',
+        is_active: driver?.is_active ?? true,
+      });
+    }
+  }, [driver, open, form]);
 
   const handleSubmit = async (data: NewDriver) => {
     await onSave(data);

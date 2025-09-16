@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { getDrivers, createDriver, updateDriver, deleteDriver, type Driver, type NewDriver } from '@/api/drivers';
 
@@ -7,7 +7,7 @@ export const useDriverManagement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDrivers = async () => {
+  const fetchDrivers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -20,7 +20,7 @@ export const useDriverManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const addDriver = async (driverData: NewDriver): Promise<Driver | null> => {
     try {
@@ -72,7 +72,7 @@ export const useDriverManagement = () => {
 
   useEffect(() => {
     fetchDrivers();
-  }, []);
+  }, [fetchDrivers]);
 
   return {
     drivers,

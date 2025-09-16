@@ -164,7 +164,7 @@ export default function AdminDelivery() {
     setSelectedOrders(prev => prev.filter(order => 
       filteredOrdersByWindow.some(filtered => filtered.id === order.id)
     ));
-  }, [deliveryWindowFilter, filteredOrdersByWindow]);
+  }, [deliveryWindowFilter]);
 
   // FINAL METRICS
   const finalDeliveryMetrics = useMemo(() => ({

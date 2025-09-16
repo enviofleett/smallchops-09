@@ -148,7 +148,7 @@ serve(async (req) => {
           .from('orders')
           .select(`*, 
             order_items (*),
-            order_delivery_schedule (*),
+            order_delivery_schedule!fk_order_delivery_schedule_order_id (*),
             delivery_zones (id, name, base_fee, is_active)
           `, { count: 'exact' })
         // Sort by delivery date (today's orders first for confirmed status)
@@ -320,7 +320,7 @@ serve(async (req) => {
             .from('orders')
             .select(`*, 
               order_items (*),
-              order_delivery_schedule (*),
+              order_delivery_schedule!fk_order_delivery_schedule_order_id (*),
               delivery_zones (id, name, base_fee, is_active)
             `)
             .eq('id', orderId)
@@ -363,7 +363,7 @@ serve(async (req) => {
             .from('orders')
             .select(`*, 
               order_items (*),
-              order_delivery_schedule (*),
+              order_delivery_schedule!fk_order_delivery_schedule_order_id (*),
               delivery_zones (id, name, base_fee, is_active)
             `)
             .eq('id', orderId)
@@ -484,7 +484,7 @@ serve(async (req) => {
           .select(`*, 
             order_items (*),
             delivery_zones (id, name, base_fee, is_active),
-            order_delivery_schedule (*)
+            order_delivery_schedule!fk_order_delivery_schedule_order_id (*)
           `)
           .single()
 

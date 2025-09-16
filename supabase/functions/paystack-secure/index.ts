@@ -38,7 +38,14 @@ serve(async (req) => {
     
     // Get and validate JWT token
     const authHeader = req.headers.get('Authorization')
+    console.log('🔍 Auth debugging:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'none',
+      internalCaller: req.headers.get('x-internal-caller')
+    })
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('❌ Missing or invalid Authorization header')
       return new Response(JSON.stringify({
         success: false,
         error: 'Authorization required',
@@ -72,6 +79,15 @@ serve(async (req) => {
     // Determine if this is an internal service call (service role token)
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const isInternal = jwt === serviceRoleKey
+    
+    console.log('🔍 Internal call detection:', {
+      jwtLength: jwt.length,
+      serviceRoleKeyLength: serviceRoleKey.length,
+      jwtPrefix: jwt.substring(0, 20) + '...',
+      serviceRolePrefix: serviceRoleKey.substring(0, 20) + '...',
+      isInternal,
+      internalCallerHeader: req.headers.get('x-internal-caller')
+    })
 
     // Verify user authentication unless internal
     let user: any = null
@@ -99,16 +115,24 @@ serve(async (req) => {
     // Get environment-specific Paystack configuration
     let paystackConfig;
     try {
+      console.log('🔧 Getting Paystack configuration...')
       paystackConfig = getPaystackConfig(req);
+      console.log('🔧 Paystack config obtained, validating...')
       const validation = validatePaystackConfig(paystackConfig);
       
       if (!validation.isValid) {
         console.error('❌ Paystack configuration invalid:', validation.errors);
+        
+        // Log available environment variables for debugging
+        const paystackEnvs = Object.keys(Deno.env.toObject()).filter(key => key.includes('PAYSTACK'))
+        console.error('❌ Available Paystack env vars:', paystackEnvs)
+        
         return new Response(JSON.stringify({
           success: false,
-          error: 'Payment service configuration error',
+          error: 'Payment service configuration error - missing Paystack keys',
           code: 'PAYSTACK_CONFIG_INVALID',
-          details: validation.errors.join(', ')
+          details: validation.errors.join(', '),
+          availableEnvs: paystackEnvs
         }), {
           status: 503,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -116,14 +140,22 @@ serve(async (req) => {
       }
       
       logPaystackConfigStatus(paystackConfig);
+      console.log('✅ Paystack configuration valid')
       
     } catch (configError) {
       console.error('❌ Environment config failed:', configError);
+      console.error('❌ Config error stack:', configError.stack)
+      
+      // Log available environment variables for debugging
+      const paystackEnvs = Object.keys(Deno.env.toObject()).filter(key => key.includes('PAYSTACK'))
+      console.error('❌ Available Paystack env vars:', paystackEnvs)
+      
       return new Response(JSON.stringify({
         success: false,
-        error: 'Payment service configuration error',
+        error: 'Payment service configuration error - failed to load config',
         code: 'CONFIG_ERROR',
-        details: configError.message
+        details: configError.message,
+        availableEnvs: paystackEnvs
       }), {
         status: 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

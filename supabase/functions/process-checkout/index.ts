@@ -355,6 +355,11 @@ serve(async (req) => {
       final_amount: finalAmount
     });
     
+    // Debug environment variables
+    const hasServiceRole = !!SUPABASE_SERVICE_ROLE_KEY
+    const serviceRolePrefix = SUPABASE_SERVICE_ROLE_KEY ? SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : 'none'
+    console.log("🔐 Service role debug:", { hasServiceRole, serviceRolePrefix })
+    
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
       headers: {
         Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
@@ -382,7 +387,18 @@ serve(async (req) => {
 
     if (paymentError) {
       console.error("❌ Payment initialization failed:", paymentError);
-      throw new Error(`Payment initialization failed: ${paymentError.message}`);
+      console.error("❌ Full payment error details:", JSON.stringify(paymentError, null, 2));
+      console.error("❌ Error context:", paymentError.context ? JSON.stringify(paymentError.context, null, 2) : 'no context');
+      
+      // Provide more specific error based on the type
+      let userFriendlyError = 'Payment initialization failed'
+      if (paymentError.message?.includes('401') || paymentError.message?.includes('Unauthorized')) {
+        userFriendlyError = 'Payment system configuration issue - please contact support'
+      } else if (paymentError.message?.includes('503') || paymentError.message?.includes('configuration')) {
+        userFriendlyError = 'Payment service temporarily unavailable - please try again'
+      }
+      
+      throw new Error(`${userFriendlyError}: ${paymentError.message || 'Unknown error'}`);
     }
 
     console.log("🔍 Raw paymentData:", paymentData);

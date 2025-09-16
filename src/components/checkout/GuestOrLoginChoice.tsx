@@ -63,8 +63,8 @@ export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({
           </CardContent>
         </Card>
 
-        {/* Guest Option */}
-        <Card className="cursor-pointer hover:border-secondary transition-colors group" onClick={onContinueAsGuest}>
+        {/* Guest Option - Production Ready */}
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors group border-primary/20" onClick={onContinueAsGuest}>
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-full bg-secondary/10 group-hover:bg-secondary/20 transition-colors">
@@ -91,8 +91,8 @@ export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({
               </li>
             </ul>
 
-            <Button variant="outline" className="w-full">
-              Continue as Guest
+            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              Continue as Guest - Quick Checkout ✨
             </Button>
           </CardContent>
         </Card>

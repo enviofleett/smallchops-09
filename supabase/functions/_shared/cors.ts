@@ -22,6 +22,7 @@ const BASE_ALLOWED_ORIGINS = [
   'https://www.startersmallchops.com', 
   'https://startersmallchops.lovableproject.com',
   'https://startersmallchops.lovable.app',
+  'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:8080',

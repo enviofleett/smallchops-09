@@ -444,30 +444,32 @@ serve(async (req) => {
         if (updates && typeof updates === 'object') {
           for (const [key, value] of Object.entries(updates)) {
             if (key === 'status') {
-              // CRITICAL: Validate status enum value
-              if (value === null || value === 'null' || value === '' || value === undefined) {
-                console.error('❌ CRITICAL: Null or invalid status value detected:', value);
+              // CRITICAL: Validate status enum value - enhanced validation
+              if (value === null || value === 'null' || value === '' || value === undefined || typeof value !== 'string') {
+                console.error('❌ CRITICAL: Null or invalid status value detected:', value, 'type:', typeof value);
                 return new Response(JSON.stringify({
                   success: false,
-                  error: 'Status cannot be null, undefined, or empty'
+                  error: 'Status cannot be null, undefined, empty, or non-string value'
                 }), {
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                   status: 400
                 });
               }
               
-              if (!validStatuses.includes(value)) {
-                console.error('❌ CRITICAL: Invalid status enum value:', value);
+              // Trim and validate the status value
+              const trimmedStatus = value.trim();
+              if (!trimmedStatus || !validStatuses.includes(trimmedStatus)) {
+                console.error('❌ CRITICAL: Invalid status enum value:', value, 'trimmed:', trimmedStatus);
                 return new Response(JSON.stringify({
                   success: false,
-                  error: `Invalid status value: ${value}. Valid values are: ${validStatuses.join(', ')}`
+                  error: `Invalid status value: "${value}". Valid values are: ${validStatuses.join(', ')}`
                 }), {
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                   status: 400
                 });
               }
               
-              sanitizedUpdates[key] = value;
+              sanitizedUpdates[key] = trimmedStatus;
             } else if (key === 'assigned_rider_id') {
               // CRITICAL: Validate rider_id - allow null for unassignment
               if (value === 'null' || value === '') {

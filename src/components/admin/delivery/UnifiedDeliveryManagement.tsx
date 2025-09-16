@@ -14,6 +14,7 @@ import { DeliveryAssignmentDialog } from './DeliveryAssignmentDialog';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
 import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
+import { isValidOrderStatus } from '@/utils/orderValidation';
 import {
   Package,
   Clock,
@@ -129,23 +130,53 @@ export function UnifiedDeliveryManagement({
   // --- Status Change Handler ---
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
+      // CRITICAL: Validate status before proceeding using utility
+      if (!isValidOrderStatus(newStatus)) {
+        toast.error('Invalid status selected. Please refresh the page and try again.');
+        console.error('❌ Invalid status provided:', newStatus);
+        return;
+      }
+
       const order = filteredOrders.find(o => o.id === orderId);
-      if (newStatus === 'out_for_delivery' && !order?.assigned_rider_id) {
+      if (!order) {
+        toast.error('Order not found. Please refresh the page.');
+        return;
+      }
+
+      // Check driver assignment requirement
+      if (newStatus === 'out_for_delivery' && !order.assigned_rider_id) {
         toast.error('Cannot move to "Out for Delivery" without assigning a driver. Please assign a driver first.');
         return;
       }
+
+      // Log the status change attempt
+      console.log(`🔄 Updating order ${orderId} status from "${order.status}" to "${newStatus}"`);
 
       // ENHANCED: Centralized error handling with loading state
       await updateOrder(orderId, { status: newStatus as any });
       toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
       refetch();
     } catch (error: any) {
-      // ENHANCED: Detailed error messaging
-      const errorMessage = error?.message?.includes('edge function') 
-        ? 'Service temporarily unavailable. Please try again.'
-        : 'Failed to update order status';
+      // ENHANCED: Detailed error messaging with specific error parsing
+      let errorMessage = 'Failed to update order status';
+      
+      if (error?.message?.includes('edge function') || error?.message?.includes('non-2xx status')) {
+        errorMessage = 'Service temporarily unavailable. Please try again.';
+      } else if (error?.message?.includes('invalid input value for enum')) {
+        errorMessage = 'Invalid status value. Please refresh the page and try again.';
+      } else if (error?.message?.includes('authentication')) {
+        errorMessage = 'Session expired. Please refresh the page and log in again.';
+      } else if (error?.message) {
+        errorMessage = `Update failed: ${error.message}`;
+      }
+      
       toast.error(errorMessage);
-      console.error('❌ Status update error:', error);
+      console.error('❌ Status update error:', {
+        orderId,
+        attemptedStatus: newStatus,
+        error: error?.message || error,
+        fullError: error
+      });
     }
   };
 

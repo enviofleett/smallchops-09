@@ -237,7 +237,28 @@ export const updateOrder = async (
     });
 
     if (error || !data.success) {
-      throw new Error(data?.error || error?.message || 'Failed to update order');
+      // Enhanced error parsing for better user feedback
+      let errorMessage = 'Failed to update order';
+      
+      if (data?.error) {
+        if (typeof data.error === 'string') {
+          errorMessage = data.error;
+        } else if (data.error.message) {
+          errorMessage = data.error.message;
+        }
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      // Log detailed error for debugging
+      console.error('❌ Order update failed:', {
+        orderId,
+        updates: sanitizedUpdates,
+        error: data?.error || error,
+        success: data?.success
+      });
+      
+      throw new Error(errorMessage);
     }
 
     if (process.env.NODE_ENV === 'development') {

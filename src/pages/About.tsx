@@ -3,10 +3,8 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, Target, Award, Globe } from 'lucide-react';
-
 const About = () => {
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       <PublicHeader />
       
       {/* Hero Banner Section */}
@@ -25,11 +23,7 @@ const About = () => {
         
         {/* Banner Image */}
         <div className="absolute inset-0 -z-10">
-          <img
-            src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png"
-            alt="Golden fried finger food balls garnished with microgreens"
-            className="w-full h-full object-cover opacity-10"
-          />
+          <img src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png" alt="Golden fried finger food balls garnished with microgreens" className="w-full h-full object-cover opacity-10" />
         </div>
       </section>
 
@@ -41,9 +35,7 @@ const About = () => {
               <div>
                 <h2 className="text-3xl font-bold text-foreground mb-6">How It All Began</h2>
                 <div className="space-y-4 text-muted-foreground leading-relaxed">
-                  <p>
-                    It was a sunny October day in 2005 when STARTERS first came to life in the buzzing city of Abuja. Our founder, Gwendolyn Akogun, had one big dream: to shake up the small chops scene with fresh ideas, bold flavors, and a sprinkle of love.
-                  </p>
+                  <p>It was a sunny October day in 2005 when STARTERS first came to life in the buzzing city of Abuja. Our founder, Gwen, had one big dream: to shake up the small chops scene with fresh ideas, bold flavors, and a sprinkle of love.</p>
                   <p>
                     With a knack for business, a deep passion for food, and a heart full of compassion, Gwen wanted to create more than just another finger food brand — she wanted an experience. One that delivers quality in every bite and leaves every customer with a smile (and maybe a craving for seconds!).
                   </p>
@@ -62,11 +54,7 @@ const About = () => {
                 </div>
               </div>
               <div className="order-2 md:order-1">
-                <img
-                  src="/lovable-uploads/b0faf90f-366c-461d-9966-d8fb3cd9fd20.png"
-                  alt="Golden fried finger food balls on white plate with microgreens"
-                  className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto"
-                />
+                <img src="/lovable-uploads/b0faf90f-366c-461d-9966-d8fb3cd9fd20.png" alt="Golden fried finger food balls on white plate with microgreens" className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto" />
               </div>
             </div>
           </div>
@@ -130,11 +118,7 @@ const About = () => {
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div className="order-1 md:order-1">
-                <img
-                  src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png"
-                  alt="Golden fried finger food balls beautifully plated with garnish"
-                  className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto"
-                />
+                <img src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png" alt="Golden fried finger food balls beautifully plated with garnish" className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto" />
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-foreground mb-6">What We Offer</h2>
@@ -196,15 +180,13 @@ const About = () => {
                 "Our philosophy is simple: provide amazing food products backed by a unique 
                 customer experience characterized by reliability, honesty, and integrity."
               </h3>
-              <p className="text-muted-foreground">- Gwendolyn Akogun, Founder</p>
+              <p className="text-muted-foreground">- Gwen, Founder</p>
             </div>
           </div>
         </div>
       </section>
 
       <PublicFooter />
-    </div>
-  );
+    </div>;
 };
-
 export default About;

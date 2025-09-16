@@ -2,12 +2,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// ✅ Updated CORS headers with allowed methods
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS"
-};
+import { getCorsHeaders, handleCorsPreflightResponse } from '../_shared/cors.ts';
+
+const corsHeaders = getCorsHeaders();
 
 // ✅ Validate environment variables before client creation
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -22,7 +19,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCorsPreflightResponse(req.headers.get('origin'));
   }
 
   try {

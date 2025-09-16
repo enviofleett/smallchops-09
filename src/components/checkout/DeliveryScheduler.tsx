@@ -85,7 +85,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
     }
   }, [config]);
 
-  // Production-ready date validation using API config - fixed dependencies
+  // Fixed useMemo dependency array to prevent infinite re-renders
   const dateValidation = useMemo(() => {
     const now = new Date();
     const leadTimeMinutes = deliveryConfig?.lead_time_minutes || 60;
@@ -131,7 +131,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
         return null;
       }
     };
-  }, [deliveryConfig?.lead_time_minutes, deliveryConfig?.max_advance_days]);
+  }, [deliveryConfig?.lead_time_minutes, deliveryConfig?.max_advance_days, availableSlots]);
 
   // Enhanced date disabled function
   const isDateDisabled = useCallback((date: Date) => {

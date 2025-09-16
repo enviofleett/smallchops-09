@@ -52,7 +52,7 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
   const baseHeaders = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 
-      'authorization, x-client-info, apikey, content-type, x-requested-with',
+      'authorization, x-client-info, apikey, content-type, x-requested-with, x-guest-session-id',
     'Access-Control-Max-Age': '3600',
     'Access-Control-Allow-Credentials': 'false'
   };

@@ -73,6 +73,7 @@ const PaystackTest = withLazyLoading(() => import("./pages/PaystackTest"), undef
 const PaystackTestingDashboard = withLazyLoading(() => import("./pages/PaystackTestingDashboard"), undefined, false, 12000);
 const ProductionAudit = withLazyLoading(() => import("./pages/ProductionAudit"), undefined, false, 12000);
 const GuestCheckoutTest = withLazyLoading(() => import("./pages/GuestCheckoutTest"), undefined, false, 12000);
+const CheckoutAudit = withLazyLoading(() => import("./pages/CheckoutAudit"), undefined, false, 12000);
 const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"), undefined, true, 8000);
 const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"), undefined, true, 8000);
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"), undefined, true, 8000);
@@ -221,7 +222,8 @@ const App = () => {
               <Route path="/contact" element={<Contact />} />
               <Route path="/paystack-test" element={<PaystackTest />} />
                <Route path="/paystack-testing" element={<PaystackTestingDashboard />} />
-               <Route path="/guest-checkout-test" element={<GuestCheckoutTest />} />
+            <Route path="/guest-checkout-test" element={<GuestCheckoutTest />} />
+            <Route path="/checkout-audit" element={<CheckoutAudit />} />
               <Route path="/emergency-fix" element={<EmergencyPaymentFix />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />

@@ -19,7 +19,7 @@ export function Toaster() {
             <div className="grid gap-1">
               {title && <ToastTitle className="text-foreground group-[.destructive]:text-destructive-foreground group-[.destructive]:font-semibold">{title}</ToastTitle>}
               {description && (
-                <ToastDescription className="text-muted-foreground group-[.destructive]:text-destructive-foreground group-[.destructive]:opacity-90">
+                <ToastDescription className="text-muted-foreground group-[.destructive]:text-destructive-foreground group-[.destructive]:opacity-90 break-words">
                   {description}
                 </ToastDescription>
               )}

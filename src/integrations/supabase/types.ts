@@ -8790,6 +8790,10 @@ export type Database = {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
+      admin_update_order_status_secure: {
+        Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
       assess_production_readiness: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -9800,6 +9804,7 @@ export type Database = {
               p_entity_id?: string
               p_entity_type?: string
             }
+          | { p_action_type: string; p_details?: Json; p_order_id: string }
         Returns: string
       }
       log_admin_management_action: {

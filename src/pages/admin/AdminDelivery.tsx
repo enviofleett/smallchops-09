@@ -17,7 +17,7 @@ import { ShippingFeesReport } from '@/components/admin/delivery/ShippingFeesRepo
 import { DriverDialog } from '@/components/delivery/DriverDialog';
 import { AdminDriversTab } from '@/components/admin/delivery/AdminDriversTab';
 import { DeliveryZonesManager } from '@/components/delivery/DeliveryZonesManager';
-import { UnifiedDeliveryManagement } from '@/components/admin/delivery/UnifiedDeliveryManagement';
+import { SafeUnifiedDeliveryManagement } from '@/components/admin/delivery/SafeUnifiedDeliveryManagement';
 import { DriverPerformanceDashboard } from '@/components/admin/delivery/DriverPerformanceDashboard';
 import { usePaidOrders } from '@/hooks/usePaidOrders';
 import { useOrderFilters } from '@/hooks/useOrderFilters';

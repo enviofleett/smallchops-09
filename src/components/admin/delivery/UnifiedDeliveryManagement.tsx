@@ -13,6 +13,7 @@ import { OrderReceiptModal } from '@/components/customer/OrderReceiptModal';
 import { DeliveryAssignmentDialog } from './DeliveryAssignmentDialog';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
+import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
 import {
   Package,
   Clock,
@@ -61,6 +62,9 @@ export function UnifiedDeliveryManagement({
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const { drivers } = useDriverManagement();
+  
+  // Use production-hardened status update hook
+  const { updateStatus, isUpdating } = useProductionStatusUpdate();
 
   // --- Debounced Search Query ---
   useEffect(() => {

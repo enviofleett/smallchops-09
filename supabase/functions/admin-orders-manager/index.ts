@@ -163,13 +163,17 @@ serve(async (req) => {
           query = query.order('order_time', { ascending: false })
         }
 
-        // Filter based on status - for 'confirmed', only show paid orders
+        // CRITICAL FIX: Properly handle undefined status to prevent enum violations
         if (status === 'confirmed') {
           query = query.eq('status', status).eq('payment_status', 'paid')
-        } else if (status === 'all') {
-          // Don't filter by status
+        } else if (status === 'all' || status === undefined || status === null) {
+          // Don't filter by status for 'all', undefined, or null
+          console.log('🔍 No status filter applied (status:', status, ')')
+        } else if (typeof status === 'string' && status.trim() !== '') {
+          // Only apply status filter for valid non-empty strings
+          query = query.eq('status', status.trim())
         } else {
-          query = query.eq('status', status)
+          console.warn('⚠️ Invalid status value received:', status, 'Skipping status filter')
         }
 
         if (searchQuery) {
@@ -199,11 +203,13 @@ serve(async (req) => {
               .from('orders')
               .select('*', { count: 'exact' })
               
-            // Apply same filters
+            // Apply same filters with safe enum handling
             if (status === 'confirmed') {
               fallbackQuery = fallbackQuery.eq('status', status).eq('payment_status', 'paid')
-            } else if (status !== 'all') {
-              fallbackQuery = fallbackQuery.eq('status', status)
+            } else if (status === 'all' || status === undefined || status === null) {
+              // Don't filter by status for 'all', undefined, or null
+            } else if (typeof status === 'string' && status.trim() !== '') {
+              fallbackQuery = fallbackQuery.eq('status', status.trim())
             }
 
             if (searchQuery) {

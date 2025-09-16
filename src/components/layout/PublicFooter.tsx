@@ -82,6 +82,16 @@ const PublicFooterContent = () => {
                 <Mail className="w-4 h-4" />
                 support@startersmallchops.com
               </a>
+              
+              <a 
+                href="https://www.instagram.com/startersmallchops/" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 hover:text-white transition-colors"
+              >
+                <Instagram className="w-4 h-4" />
+                @startersmallchops
+              </a>
             </div>
           </div>
         </div>

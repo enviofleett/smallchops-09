@@ -53,6 +53,14 @@ function safeCacheCleanup() {
 // Execute safe cleanup
 safeCacheCleanup();
 
+// CRITICAL: Initialize Paystack health check configuration
+try {
+  localStorage.setItem('payment_system_mode', 'backend-only');
+  console.log('✅ Payment system configured for backend-only mode');
+} catch (error) {
+  console.warn('⚠️ Failed to set payment system mode:', error);
+}
+
 // Disable existing service workers to prevent stale asset caching that can break dynamic imports
 if ('serviceWorker' in navigator) {
   // Unregister any existing service workers immediately

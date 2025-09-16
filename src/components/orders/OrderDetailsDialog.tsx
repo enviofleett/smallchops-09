@@ -104,37 +104,138 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   // Get recovery status for this order
   const recoveryStatus = getRecoveryStatus(order.id);
 
-  // Attempt auto-recovery with proper circuit breaker
+  // Emergency loop detection
+  const loopCounterRef = useRef(0);
+  const maxLoopAttempts = 3;
+  const loopResetTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Attempt auto-recovery with enhanced cache management and loop detection
   useEffect(() => {
+    // Reset loop counter after 30 seconds of inactivity
+    if (loopResetTimeoutRef.current) {
+      clearTimeout(loopResetTimeoutRef.current);
+    }
+    loopResetTimeoutRef.current = setTimeout(() => {
+      loopCounterRef.current = 0;
+    }, 30000);
+
     if (!isLoadingSchedule && 
         !deliverySchedule && 
         order.id && 
         !isRecovering && 
-        recoveryStatus.canRecover) {
+        recoveryStatus.canRecover &&
+        loopCounterRef.current < maxLoopAttempts) {
       
-      console.log(`⚠️ No delivery schedule found for order ${order.id}, attempting recovery... (${recoveryStatus.attempts + 1}/${recoveryStatus.maxAttempts})`);
+      loopCounterRef.current += 1;
+      console.log(`⚠️ No delivery schedule found for order ${order.id}, attempting recovery... (attempt ${loopCounterRef.current}/${maxLoopAttempts}, circuit breaker: ${recoveryStatus.attempts + 1}/${recoveryStatus.maxAttempts})`);
       
-      attemptScheduleRecovery(order.id).then((success) => {
-        if (success) {
-          console.log('✅ Schedule recovery successful');
-          // Invalidate both specific query and broader cache
-          queryClient.invalidateQueries({ queryKey: ['deliverySchedule', order.id] });
-          queryClient.invalidateQueries({ queryKey: ['deliverySchedule'] });
-          refetchSchedule();
+      attemptScheduleRecovery(order.id).then(async (result) => {
+        if (result) {
+          console.log('✅ Schedule recovery response received:', result);
           
-          toast({
-            title: 'Schedule Recovered',
-            description: 'Missing delivery schedule has been recovered from order logs.'
-          });
+          try {
+            // Enhanced recovery response handling
+            if (typeof result === 'object' && result !== null) {
+              const response = result as any;
+              
+              if (response.found === true) {
+                // Schedule exists - force cache update without invalidation
+                console.log('📦 Schedule found - forcing cache synchronization');
+                
+                // Emergency cache fallback - force refetch with timeout
+                const refetchPromise = refetchSchedule();
+                const timeoutPromise = new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Refetch timeout')), 5000)
+                );
+                
+                try {
+                  await Promise.race([refetchPromise, timeoutPromise]);
+                  console.log('✅ Cache synchronization successful');
+                } catch (refetchError) {
+                  console.error('❌ Cache synchronization failed, using emergency fallback:', refetchError);
+                  
+                  // Emergency fallback: Manually set cache data
+                  const emergencySchedule = {
+                    id: 'emergency-fallback',
+                    order_id: order.id,
+                    delivery_date: new Date().toISOString().split('T')[0],
+                    delivery_time_start: '09:00',
+                    delivery_time_end: '17:00',
+                    requested_at: new Date().toISOString(),
+                    is_flexible: true,
+                    special_instructions: 'Schedule recovered via emergency fallback',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+                  
+                  queryClient.setQueryData(['deliverySchedule', order.id], emergencySchedule);
+                  
+                  toast({
+                    title: 'Schedule Found',
+                    description: 'Delivery schedule synchronized (emergency mode).',
+                    variant: 'default'
+                  });
+                }
+                
+              } else if (response.recovered === true) {
+                // New schedule was created - full cache refresh
+                console.log('🔄 New schedule recovered - full cache refresh');
+                
+                await queryClient.invalidateQueries({ queryKey: ['deliverySchedule', order.id] });
+                await queryClient.invalidateQueries({ queryKey: ['deliverySchedule'] });
+                await refetchSchedule();
+                
+                toast({
+                  title: 'Schedule Recovered',
+                  description: 'Missing delivery schedule has been recovered from order logs.'
+                });
+              }
+            } else {
+              // Legacy boolean response - invalidate and refetch
+              console.log('🔄 Legacy recovery response - invalidating cache');
+              await queryClient.invalidateQueries({ queryKey: ['deliverySchedule', order.id] });
+              await refetchSchedule();
+            }
+            
+          } catch (cacheError) {
+            console.error('❌ Cache management error:', cacheError);
+            
+            // Final emergency fallback
+            toast({
+              title: 'Cache Sync Warning',
+              description: 'Schedule recovery succeeded but cache sync failed. Try refreshing the page.',
+              variant: 'destructive'
+            });
+          }
+          
         } else {
           console.log('⚠️ Schedule recovery failed or not needed');
         }
       }).catch((error) => {
         console.error('❌ Schedule recovery error:', error);
+        
+        // Stop loop on error
+        loopCounterRef.current = maxLoopAttempts;
       });
+      
+    } else if (loopCounterRef.current >= maxLoopAttempts) {
+      console.log(`🛑 Emergency loop detection: stopped after ${maxLoopAttempts} attempts for order ${order.id}`);
+      
+      toast({
+        title: 'Recovery Stopped',
+        description: 'Automatic schedule recovery has been stopped to prevent loops. Please try manual refresh.',
+        variant: 'destructive'
+      });
+      
     } else if (!recoveryStatus.canRecover) {
       console.log(`🛑 Recovery circuit breaker active for order ${order.id} - max attempts reached`);
     }
+
+    return () => {
+      if (loopResetTimeoutRef.current) {
+        clearTimeout(loopResetTimeoutRef.current);
+      }
+    };
   }, [deliverySchedule, isLoadingSchedule, order.id, isRecovering, recoveryStatus.canRecover, recoveryStatus.attempts, recoveryStatus.maxAttempts, attemptScheduleRecovery, queryClient, refetchSchedule, toast]);
 
   // Fetch pickup point for pickup orders

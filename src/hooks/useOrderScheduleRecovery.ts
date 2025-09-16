@@ -58,21 +58,21 @@ export const useOrderScheduleRecovery = () => {
     }
   };
   
-  const attemptScheduleRecovery = async (orderId: string): Promise<boolean> => {
+  const attemptScheduleRecovery = async (orderId: string): Promise<any> => {
     // Check emergency circuit breaker first
     if (!emergencyCircuitBreaker.recordAttempt(orderId)) {
       console.warn(`🛑 Emergency circuit breaker blocked recovery for order ${orderId}`);
-      return false;
+      return null;
     }
 
     if (!canAttemptRecovery(orderId)) {
       console.warn(`🛑 Recovery circuit breaker active for order ${orderId}`);
-      return false;
+      return null;
     }
 
     if (isRecovering) {
       console.warn('🔄 Recovery already in progress, skipping duplicate attempt');
-      return false;
+      return null;
     }
 
     setIsRecovering(true);
@@ -91,18 +91,45 @@ export const useOrderScheduleRecovery = () => {
       }
 
       if (data?.success) {
-        console.log('✅ Schedule recovery successful:', data.message);
+        console.log('✅ Schedule recovery response:', {
+          success: data.success,
+          found: data.found,
+          recovered: data.recovered,
+          message: data.message
+        });
 
-        // Clear successful recovery from attempts map
-        recoveryAttemptsRef.current.delete(orderId);
-        return true;
+        // Clear successful recovery from attempts map only if actually recovered
+        if (data.recovered === true || (data.found !== true && data.success === true)) {
+          recoveryAttemptsRef.current.delete(orderId);
+        }
+        
+        // Return the full response object for enhanced handling
+        return {
+          success: true,
+          found: data.found === true,
+          recovered: data.recovered === true,
+          message: data.message,
+          data: data.data
+        };
       } else {
         console.warn('⚠️ Schedule recovery returned false:', data);
-        return false;
+        return {
+          success: false,
+          found: false,
+          recovered: false,
+          message: data?.message || 'Recovery failed',
+          error: data?.error
+        };
       }
     } catch (error) {
       console.error('❌ Schedule recovery error:', error);
-      return false;
+      return {
+        success: false,
+        found: false,
+        recovered: false,
+        message: 'Recovery failed with error',
+        error: error.message
+      };
     } finally {
       setIsRecovering(false);
     }

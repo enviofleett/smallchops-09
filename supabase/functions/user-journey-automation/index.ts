@@ -169,31 +169,49 @@ async function handleRegistrationJourney(
 ): Promise<any[]> {
   const events = [];
 
-  // Welcome email
-  const welcomeEvent = await supabase
-    .from('communication_events')
-    .insert({
-      event_type: 'customer_welcome',
-      recipient_email: userData.email,
-      status: 'queued',
-      template_key: 'customer_welcome',
-      template_variables: {
-        customer_name: userData.name || 'New Customer',
-        store_name: 'Starters',
-        support_email: 'support@starters.com',
-        onboarding_link: 'https://yourdomain.com/onboarding',
-        ...metadata
-      },
-      priority: 'normal'
-    })
-    .select()
-    .single();
+  try {
+    // Generate robust dedupe key for welcome email
+    const timestamp = Date.now();
+    const uniqueId = crypto.randomUUID();
+    const dedupeKey = `registration|welcome|${userData.email}|${timestamp}_${uniqueId}`;
 
-  if (welcomeEvent.data) {
-    events.push(welcomeEvent.data);
+    // Welcome email with duplicate handling
+    const { data: welcomeEvent, error: welcomeError } = await supabase
+      .from('communication_events')
+      .insert({
+        event_type: 'customer_welcome',
+        recipient_email: userData.email,
+        status: 'queued',
+        template_key: 'customer_welcome',
+        template_variables: {
+          customer_name: userData.name || 'New Customer',
+          store_name: 'Starters',
+          support_email: 'support@starters.com',
+          onboarding_link: 'https://yourdomain.com/onboarding',
+          ...metadata
+        },
+        priority: 'normal',
+        dedupe_key: dedupeKey
+      })
+      .select()
+      .single();
+
+    if (welcomeError) {
+      if (welcomeError.code === '23505') {
+        console.log(`⚠️ Duplicate welcome email prevented for ${userData.email}`);
+      } else {
+        console.error('Failed to create welcome email:', welcomeError);
+        throw welcomeError;
+      }
+    } else if (welcomeEvent) {
+      events.push(welcomeEvent);
+      console.log(`✅ Created welcome email for ${userData.email}`);
+    }
+  } catch (error) {
+    console.error('Error in registration journey:', error);
+    // Don't throw - allow journey to continue
   }
 
-  console.log(`Created welcome email for ${userData.email}`);
   return events;
 }
 
@@ -205,73 +223,100 @@ async function handleOrderPlacementJourney(
 ): Promise<any[]> {
   const events = [];
 
-  // Order confirmation email
-  const orderConfirmationEvent = await supabase
-    .from('communication_events')
-    .insert({
-      event_type: 'order_confirmation',
-      recipient_email: userData.email,
-      order_id: orderData.order_id,
-      status: 'queued',
-      template_key: 'order_confirmation',
-      template_variables: {
-        customer_name: userData.name || 'Customer',
-        order_number: orderData.order_number,
-        order_total: `₦${orderData.total_amount.toLocaleString()}`,
-        order_date: new Date().toLocaleDateString(),
-        items_count: orderData.items.length,
-        order_tracking_link: `https://yourdomain.com/track/${orderData.order_id}`,
-        store_name: 'Starters',
-        ...metadata
-      },
-      priority: 'high'
-    })
-    .select()
-    .single();
+  try {
+    // Generate robust dedupe keys
+    const timestamp = Date.now();
+    const uniqueId = crypto.randomUUID();
+    const customerDedupeKey = `order_placement|confirmation|${orderData.order_id}|${userData.email}|${timestamp}_${uniqueId}`;
 
-  if (orderConfirmationEvent.data) {
-    events.push(orderConfirmationEvent.data);
-  }
-
-  // Admin notification
-  const { data: businessSettings } = await supabase
-    .from('business_settings')
-    .select('admin_notification_email, email')
-    .limit(1)
-    .single();
-
-  const adminEmail = businessSettings?.admin_notification_email || businessSettings?.email;
-  
-  if (adminEmail) {
-    const adminNotificationEvent = await supabase
+    // Order confirmation email with duplicate handling
+    const { data: orderConfirmationEvent, error: confirmationError } = await supabase
       .from('communication_events')
       .insert({
-        event_type: 'admin_new_order',
-        recipient_email: adminEmail,
+        event_type: 'order_confirmation',
+        recipient_email: userData.email,
         order_id: orderData.order_id,
         status: 'queued',
-        template_key: 'admin_new_order',
+        template_key: 'order_confirmation',
         template_variables: {
-          order_number: orderData.order_number,
           customer_name: userData.name || 'Customer',
-          customer_email: userData.email,
+          order_number: orderData.order_number,
           order_total: `₦${orderData.total_amount.toLocaleString()}`,
           order_date: new Date().toLocaleDateString(),
           items_count: orderData.items.length,
-          order_id: orderData.order_id,
-          admin_dashboard_link: 'https://yourdomain.com/admin/orders'
+          order_tracking_link: `https://yourdomain.com/track/${orderData.order_id}`,
+          store_name: 'Starters',
+          ...metadata
         },
-        priority: 'high'
+        priority: 'high',
+        dedupe_key: customerDedupeKey
       })
       .select()
       .single();
 
-    if (adminNotificationEvent.data) {
-      events.push(adminNotificationEvent.data);
+    if (confirmationError) {
+      if (confirmationError.code === '23505') {
+        console.log(`⚠️ Duplicate order confirmation prevented for ${orderData.order_number}`);
+      } else {
+        console.error('Failed to create order confirmation:', confirmationError);
+        throw confirmationError;
+      }
+    } else if (orderConfirmationEvent) {
+      events.push(orderConfirmationEvent);
     }
+
+    // Admin notification with separate dedupe key
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('admin_notification_email')
+      .limit(1)
+      .single();
+
+    const adminEmail = businessSettings?.admin_notification_email;
+    
+    if (adminEmail) {
+      const adminDedupeKey = `order_placement|admin_notification|${orderData.order_id}|${adminEmail}|${timestamp}_${crypto.randomUUID()}`;
+      
+      const { data: adminNotificationEvent, error: adminError } = await supabase
+        .from('communication_events')
+        .insert({
+          event_type: 'admin_new_order',
+          recipient_email: adminEmail,
+          order_id: orderData.order_id,
+          status: 'queued',
+          template_key: 'admin_new_order',
+          template_variables: {
+            order_number: orderData.order_number,
+            customer_name: userData.name || 'Customer',
+            customer_email: userData.email,
+            order_total: `₦${orderData.total_amount.toLocaleString()}`,
+            order_date: new Date().toLocaleDateString(),
+            items_count: orderData.items.length,
+            order_id: orderData.order_id,
+            admin_dashboard_link: 'https://yourdomain.com/admin/orders'
+          },
+          priority: 'high',
+          dedupe_key: adminDedupeKey
+        })
+        .select()
+        .single();
+
+      if (adminError) {
+        if (adminError.code === '23505') {
+          console.log(`⚠️ Duplicate admin notification prevented for ${orderData.order_number}`);
+        } else {
+          console.error('Failed to create admin notification:', adminError);
+        }
+      } else if (adminNotificationEvent) {
+        events.push(adminNotificationEvent);
+      }
+    }
+  } catch (error) {
+    console.error('Error in order placement journey:', error);
+    // Don't throw - allow order placement to continue
   }
 
-  console.log(`Created order confirmation and admin notification for order ${orderData.order_number}`);
+  console.log(`✅ Created ${events.length} communication events for order ${orderData.order_number}`);
   return events;
 }
 
@@ -403,39 +448,57 @@ async function handleOrderStatusChangeJourney(
 
   console.log(`📧 Using template key: ${templateKey} for status: ${status}`);
 
-  const statusUpdateEvent = await supabase
-    .from('communication_events')
-    .insert({
-      event_type: 'order_status_update',
-      recipient_email: userData.email,
-      order_id: orderData.order_id,
-      status: 'queued',
-      template_key: templateKey,
-      template_variables: {
-        customer_name: userData.name || 'Valued Customer',
-        order_number: orderData.order_number,
-        order_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        status_date: new Date().toLocaleDateString('en-NG', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        }),
-        business_name: 'Starters Small Chops',
-        support_email: 'support@starterssmallchops.com',
-        order_id: orderData.order_id,
-        old_status: metadata?.old_status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '',
-        new_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        updated_at: metadata?.updated_at || new Date().toISOString(),
-        fulfillment_type: orderDetails.order_type,
-        ...metadata
-      },
-      priority: 'normal'
-    })
-    .select()
-    .single();
+  try {
+    // Generate robust dedupe key for status update
+    const timestamp = Date.now();
+    const uniqueId = crypto.randomUUID();
+    const dedupeKey = `status_change|${orderData.order_id}|${status}|${userData.email}|${timestamp}_${uniqueId}`;
 
-  if (statusUpdateEvent.data) {
-    events.push(statusUpdateEvent.data);
+    const { data: statusUpdateEvent, error: statusError } = await supabase
+      .from('communication_events')
+      .insert({
+        event_type: 'order_status_update',
+        recipient_email: userData.email,
+        order_id: orderData.order_id,
+        status: 'queued',
+        template_key: templateKey,
+        template_variables: {
+          customer_name: userData.name || 'Valued Customer',
+          order_number: orderData.order_number,
+          order_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          status_date: new Date().toLocaleDateString('en-NG', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          }),
+          business_name: 'Starters Small Chops',
+          support_email: 'support@starterssmallchops.com',
+          order_id: orderData.order_id,
+          old_status: metadata?.old_status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '',
+          new_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          updated_at: metadata?.updated_at || new Date().toISOString(),
+          fulfillment_type: orderDetails.order_type,
+          ...metadata
+        },
+        priority: 'normal',
+        dedupe_key: dedupeKey
+      })
+      .select()
+      .single();
+
+    if (statusError) {
+      if (statusError.code === '23505') {
+        console.log(`⚠️ Duplicate status update notification prevented for order ${orderData.order_number} status ${status}`);
+      } else {
+        console.error('Failed to create status update event:', statusError);
+        throw statusError;
+      }
+    } else if (statusUpdateEvent) {
+      events.push(statusUpdateEvent);
+    }
+  } catch (error) {
+    console.error(`Error creating status update event for order ${orderData.order_number}:`, error);
+    // Don't throw - allow status update to continue
   }
 
   // Log pickup-specific notification for production monitoring

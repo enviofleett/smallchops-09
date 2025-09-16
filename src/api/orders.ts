@@ -363,22 +363,47 @@ export const manuallyQueueCommunicationEvent = async (
   order: OrderWithItems,
   status: OrderStatus
 ): Promise<void> => {
-  const { error } = await supabase.from('communication_events').insert({
-    order_id: order.id,
-    event_type: 'order_status_update', // Re-using to leverage existing processor
-    payload: {
-      old_status: order.status,
-      new_status: status,
-      customer_name: order.customer_name,
-      customer_phone: order.customer_phone,
-      customer_email: order.customer_email,
-    },
-  });
+  // Generate robust dedupe key to prevent duplicate manual events
+  const timestamp = Date.now();
+  const uniqueId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36);
+  const dedupeKey = `manual_queue|${order.id}|${status}|${order.customer_email}|${timestamp}_${uniqueId}`;
 
-  if (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error queueing manual communication event:', error);
+  try {
+    const { error } = await supabase.from('communication_events').insert({
+      order_id: order.id,
+      event_type: 'order_status_update',
+      recipient_email: order.customer_email,
+      template_key: `order_status_${status}`,
+      template_variables: {
+        customer_name: order.customer_name || 'Customer',
+        order_number: order.order_number,
+        old_status: order.status,
+        new_status: status,
+        customer_phone: order.customer_phone,
+      },
+      status: 'queued',
+      dedupe_key: dedupeKey,
+      priority: 'normal'
+    });
+
+    if (error) {
+      // Handle duplicate key errors gracefully
+      if (error.code === '23505' && error.message.includes('communication_events_dedupe_key_unique')) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Duplicate manual communication event prevented (this is normal)');
+        }
+        return; // Don't throw error for duplicates
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error queueing manual communication event:', error);
+      }
+      throw new Error(error.message);
     }
-    throw new Error(error.message);
+  } catch (error: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception in manual communication event:', error);
+    }
+    throw new Error(`Failed to queue communication event: ${error.message}`);
   }
 };

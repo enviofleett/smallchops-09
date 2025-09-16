@@ -77,6 +77,7 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [confirmationReason, setConfirmationReason] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [lastUpdateTimestamp, setLastUpdateTimestamp] = useState<number>(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -143,6 +144,17 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
 
   const handleSave = async () => {
     if (!order || !validateForm()) return;
+
+    // Prevent double-submit within 2 seconds
+    const now = Date.now();
+    if (now - lastUpdateTimestamp < 2000) {
+      toast({
+        title: "Please wait",
+        description: "Update request already in progress",
+      });
+      return;
+    }
+    setLastUpdateTimestamp(now);
 
     const criticalChanges = getCriticalChanges();
     
@@ -507,7 +519,7 @@ export const EnhancedOrderUpdateModal: React.FC<EnhancedOrderUpdateModalProps> =
             </Button>
             <Button 
               onClick={handleSave} 
-              disabled={isSaving || (!isValidTransition && formData.status !== order.status)}
+              disabled={isSaving || (!isValidTransition && formData.status !== order.status) || (Date.now() - lastUpdateTimestamp < 2000)}
             >
               {isSaving ? (
                 <>

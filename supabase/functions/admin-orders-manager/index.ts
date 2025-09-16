@@ -520,10 +520,10 @@ serve(async (req) => {
           })
         }
 
-        // Trigger status change email if status has changed and customer has email
+        // Trigger status change email if status has changed and customer has email with enhanced duplicate prevention
         if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
           try {
-            console.log(`Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
+            console.log(`📧 Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
             
             // Create HMAC signature for internal authentication
             const timestamp = Math.floor(Date.now() / 1000).toString()
@@ -549,7 +549,7 @@ serve(async (req) => {
               .map(b => b.toString(16).padStart(2, '0'))
               .join('')
             
-            const { error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
+            const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
               body: {
                 journey_type: 'order_status_change',
                 user_data: {
@@ -564,7 +564,9 @@ serve(async (req) => {
                 metadata: {
                   old_status: currentOrder.status,
                   new_status: updates.status,
-                  updated_at: new Date().toISOString()
+                  updated_at: new Date().toISOString(),
+                  admin_triggered: true,
+                  request_id: crypto.randomUUID()
                 }
               },
               headers: {
@@ -574,14 +576,31 @@ serve(async (req) => {
             })
 
             if (emailError) {
-              console.error('Failed to trigger status change email:', emailError)
-              // Don't fail the order update if email fails
+              console.error('❌ Failed to trigger status change email:', emailError)
+              // Log for monitoring but don't fail the order update
+              await supabaseClient
+                .from('audit_logs')
+                .insert({
+                  action: 'status_change_email_failed',
+                  category: 'Email System',
+                  message: `Failed to send status change email for order ${currentOrder.order_number}`,
+                  entity_id: orderId,
+                  new_values: {
+                    order_id: orderId,
+                    old_status: currentOrder.status,
+                    new_status: updates.status,
+                    error: emailError.message
+                  }
+                });
             } else {
-              console.log('✅ Status change email triggered successfully')
+              console.log('✅ Status change email triggered successfully');
+              if (emailResult?.email_events_created > 0) {
+                console.log(`📧 Created ${emailResult.email_events_created} email events`);
+              }
             }
           } catch (emailError) {
-            console.error('Error triggering status change email:', emailError)
-            // Don't fail the order update if email fails
+            console.error('❌ Exception triggering status change email:', emailError)
+            // Continue with order update even if email fails
           }
         }
 

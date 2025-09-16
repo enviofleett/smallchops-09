@@ -190,10 +190,8 @@ const Booking = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-foreground mb-6">Planning an event?
-We’ve got you covered.
-
-          </h1>
+            <h1 className="text-4xl font-bold text-foreground mb-6">Planning an event? 
+We’ve got you covered.</h1>
             <div className="text-lg text-muted-foreground space-y-6 max-w-3xl mx-auto leading-relaxed">
               <p className="text-left">From weddings to birthdays, corporate meetings to intimate gatherings - we bring the taste that makes your event unforgettable. 
 Fill out the form below and we will get back to you with the perfect smallchops package.</p>

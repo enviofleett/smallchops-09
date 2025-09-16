@@ -2,36 +2,26 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, Clock, MapPin, FileText, Truck, Package, CheckCircle, AlertTriangle, Info, XCircle, Calendar as CalendarIcon, RefreshCw, Users, TrendingUp } from 'lucide-react';
+import { Calendar, Clock, MapPin, FileText, Truck, Package, CheckCircle, AlertTriangle, Info, XCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { OrderStatus } from '@/types/orders';
 import { useEnhancedDeliverySchedule, ScheduleWarning } from '@/hooks/useEnhancedDeliverySchedule';
-import { useRealTimeAvailability } from '@/hooks/useRealTimeAvailability';
-import { RescheduleWidget } from './RescheduleWidget';
 
 interface DeliveryScheduleDisplayProps {
   schedule: DeliverySchedule;
   orderType?: 'delivery' | 'pickup';
   orderStatus?: OrderStatus;
   className?: string;
-  showRescheduleOption?: boolean;
-  onScheduleUpdated?: (newSchedule: DeliverySchedule) => void;
-  orderId?: string;
 }
 
 export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = ({ 
   schedule, 
   orderType = 'delivery',
   orderStatus = 'pending',
-  className = "",
-  showRescheduleOption = false,
-  onScheduleUpdated,
-  orderId
+  className = "" 
 }) => {
   const { validation, loading } = useEnhancedDeliverySchedule(schedule);
-  const { availability } = useRealTimeAvailability(schedule);
-  const [showReschedule, setShowReschedule] = React.useState(false);
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
     try {
@@ -312,62 +302,6 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
           </div>
         )}
 
-        {/* Real-time Availability Status */}
-        {availability && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium">Real-time Status</span>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge 
-                variant={availability.isSlotFull ? 'destructive' : availability.utilizationPercentage > 70 ? 'outline' : 'secondary'}
-              >
-                <TrendingUp className="w-3 h-3 mr-1" />
-                {availability.utilizationPercentage}% Capacity 
-                ({availability.currentCapacity}/{availability.totalCapacity})
-              </Badge>
-              
-              {availability.isConflicted && (
-                <Badge variant="destructive">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  Slot Conflict
-                </Badge>
-              )}
-              
-              {availability.isSlotFull && (
-                <Badge variant="destructive">
-                  <XCircle className="w-3 h-3 mr-1" />
-                  Fully Booked
-                </Badge>
-              )}
-            </div>
-            
-            {availability.recommendations.length > 0 && (
-              <Alert variant="secondary" className="py-2">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  <div className="font-medium">Recommendation</div>
-                  <div className="text-xs mt-1">{availability.recommendations[0]}</div>
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-        )}
-
-        {/* Reschedule Option */}
-        {showRescheduleOption && (availability?.isConflicted || availability?.isSlotFull || !validation?.isValid) && (
-          <div className="pt-2">
-            <button
-              onClick={() => setShowReschedule(true)}
-              className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Reschedule Delivery
-            </button>
-          </div>
-        )}
-
         {loading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
@@ -380,23 +314,6 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
           Scheduled on {format(new Date(schedule.requested_at), 'MMM d, yyyy \'at\' h:mm a')}
         </div>
       </CardContent>
-
-      {/* Reschedule Modal/Widget */}
-      {showReschedule && orderId && onScheduleUpdated && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <RescheduleWidget
-              schedule={schedule}
-              orderId={orderId}
-              onScheduleUpdated={(newSchedule) => {
-                onScheduleUpdated(newSchedule);
-                setShowReschedule(false);
-              }}
-              onClose={() => setShowReschedule(false)}
-            />
-          </div>
-        </div>
-      )}
     </Card>
   );
 };

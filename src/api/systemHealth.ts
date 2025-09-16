@@ -23,11 +23,8 @@ export const checkSystemHealth = async (): Promise<SystemHealthStatus> => {
 
   // Check database connectivity
   try {
-    const { error } = await supabase
-      .from('business_info')
-      .select('id')
-      .limit(1)
-      .maybeSingle();
+    const { data, error } = await supabase
+      .rpc('get_public_business_info');
     
     if (error) {
       database = 'degraded';

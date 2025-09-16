@@ -178,10 +178,11 @@ export const useCartInternal = () => {
         total_vat: Math.round(vatSummary.total_vat * 100) / 100,
         tax_amount: 0,
         delivery_fee: Math.round(deliveryFee * 100) / 100,
+        applied_promotions: promotionResult.applied_promotions || [],
         discount_amount: Math.round(promotionResult.total_discount * 100) / 100,
         delivery_discount: Math.round(promotionResult.delivery_discount * 100) / 100,
         total_amount: Math.round(total_amount * 100) / 100,
-        applied_promotions: promotionResult.applied_promotions
+        applied_promotions: promotionResult.applied_promotions || [],
       },
       itemCount,
       promotion_code: promotionCode

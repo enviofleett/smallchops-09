@@ -103,10 +103,10 @@ export const PaymentDebugger: React.FC = () => {
     try {
       console.log('🧪 Running payment system diagnostic...');
 
-      // Test 1: Check business settings
+      // Test 1: Check business settings (admin access to business_settings)
       try {
         const { data: settings, error } = await supabase
-          .from('business_info')
+          .from('business_settings')
           .select('allow_guest_checkout')
           .single();
         

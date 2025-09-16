@@ -116,9 +116,9 @@ export const ProductionReadinessChecker = () => {
         });
       }
 
-      // Check Business Settings (using business_info for public data)
+      // Check Business Settings (admin access to business_settings)
       const { data: businessSettings } = await supabase
-        .from('business_info')
+        .from('business_settings')
         .select('*')
         .limit(1)
         .maybeSingle();

@@ -37,7 +37,21 @@ export const useDetailedOrderData = (orderId: string) => {
         }
 
         if (data) {
-          return data as unknown as DetailedOrderData;
+          // Handle both RPC response format and direct query format
+          const orderData = Array.isArray(data) ? data[0] : data;
+          if (orderData) {
+            console.log('✅ RPC order data structure:', {
+              hasOrderDeliverySchedule: !!orderData.order_delivery_schedule,
+              scheduleType: typeof orderData.order_delivery_schedule,
+              scheduleContent: orderData.order_delivery_schedule
+            });
+            
+            return {
+              order: orderData,
+              items: orderData.order_items || [],
+              delivery_schedule: orderData.order_delivery_schedule
+            } as DetailedOrderData;
+          }
         }
       } catch (rpcError) {
         if (process.env.NODE_ENV === 'development') {
@@ -62,7 +76,8 @@ export const useDetailedOrderData = (orderId: string) => {
                   features,
                   ingredients
                 )
-              )
+              ),
+              order_delivery_schedule (*)
             `)
             .eq('id', orderId)
             .maybeSingle();
@@ -104,10 +119,20 @@ export const useDetailedOrderData = (orderId: string) => {
             } : null
           }));
 
+          // Priority order: separate query > joined data > fallback
+          const finalSchedule = deliverySchedule || (orderData as any).order_delivery_schedule;
+          
+          console.log('✅ Fallback query schedule resolution:', {
+            separateQuerySchedule: !!deliverySchedule,
+            joinedSchedule: !!(orderData as any).order_delivery_schedule,
+            finalSchedule: !!finalSchedule,
+            scheduleData: finalSchedule
+          });
+
           return {
             order: orderData,
             items: normalizedItems,
-            delivery_schedule: deliverySchedule
+            delivery_schedule: finalSchedule
           } as DetailedOrderData;
         } catch (fallbackError) {
           if (process.env.NODE_ENV === 'development') {

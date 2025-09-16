@@ -8832,6 +8832,15 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: boolean
       }
+      check_api_rate_limit: {
+        Args: {
+          p_endpoint: string
+          p_identifier: string
+          p_max_requests?: number
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       check_auth_health: {
         Args: Record<PropertyKey, never>
         Returns: Json

@@ -9650,26 +9650,6 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: string
       }
-      gtrgm_compress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_decompress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_in: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_options: {
-        Args: { "": unknown }
-        Returns: undefined
-      }
-      gtrgm_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
       handle_email_webhook: {
         Args: { webhook_data: Json; webhook_type?: string }
         Returns: boolean
@@ -10180,21 +10160,9 @@ export type Database = {
         }
         Returns: Json
       }
-      set_limit: {
-        Args: { "": number }
-        Returns: number
-      }
       setup_admin_permissions: {
         Args: { admin_user_id: string }
         Returns: undefined
-      }
-      show_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      show_trgm: {
-        Args: { "": string }
-        Returns: string[]
       }
       start_delivery: {
         Args: { p_order_id: string; p_rider_id: string }

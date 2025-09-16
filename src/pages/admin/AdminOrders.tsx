@@ -1263,7 +1263,7 @@ function AdminOrderCard({
         {/* Enhanced Delivery Information Display using DeliveryScheduleDisplay */}
         {order.payment_status === 'paid' && (
           <div className="mt-4 border-t pt-4">
-            {/* Customer Delivery/Pickup Schedule Requirements */}
+            {/* Order Delivery Schedule Data */}
             <div className="flex items-center gap-2 mb-4">
               {order.order_type === 'delivery' ? (
                 <Truck className="w-5 h-5 text-primary" />
@@ -1275,20 +1275,30 @@ function AdminOrderCard({
               </h4>
             </div>
             
-            {deliverySchedule ? (
+            {order.delivery_schedule ? (
               <div className="space-y-3">
-                {/* Production-Ready Schedule Display using DeliveryScheduleDisplay component */}
+                {/* Use order's embedded delivery schedule */}
                 <DeliveryScheduleDisplay 
-                  schedule={deliverySchedule}
+                  schedule={order.delivery_schedule}
                   orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
                   orderStatus={order.status}
                   className="mb-0" 
                 />
                 
                 {/* Schedule Request Info */}
-                <div className="text-xs text-muted-foreground border-t pt-3">
-                  Scheduled on {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'MMM d, yyyy \'at\' h:mm a')}
-                </div>
+                {(order.delivery_schedule.requested_at || order.delivery_schedule.created_at) && (
+                  <div className="text-xs text-muted-foreground border-t pt-3">
+                    Scheduled on {(() => {
+                      const dateToFormat = order.delivery_schedule.requested_at || order.delivery_schedule.created_at;
+                      if (!dateToFormat) return 'Date unavailable';
+                      try {
+                        return format(new Date(dateToFormat), 'MMM d, yyyy \'at\' h:mm a');
+                      } catch {
+                        return 'Invalid date';
+                      }
+                    })()}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-4">

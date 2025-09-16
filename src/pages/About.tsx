@@ -3,19 +3,15 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, Target, Award, Globe } from 'lucide-react';
-
 const About = () => {
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       <PublicHeader />
       
       {/* Hero Banner Section */}
       <section className="relative py-20 bg-gradient-to-r from-primary/10 to-primary/5">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
-              About Starters Management Ltd
-            </h1>
+            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">About Starters.</h1>
             <p className="text-xl text-muted-foreground leading-relaxed">
               Revolutionizing the finger food business in Nigeria and West Africa with quality, 
               innovation, and exceptional customer service since 2005.
@@ -25,11 +21,7 @@ const About = () => {
         
         {/* Banner Image */}
         <div className="absolute inset-0 -z-10">
-          <img
-            src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png"
-            alt="Golden fried finger food balls garnished with microgreens"
-            className="w-full h-full object-cover opacity-10"
-          />
+          <img src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png" alt="Golden fried finger food balls garnished with microgreens" className="w-full h-full object-cover opacity-10" />
         </div>
       </section>
 
@@ -41,9 +33,7 @@ const About = () => {
               <div>
                 <h2 className="text-3xl font-bold text-foreground mb-6">How It All Began</h2>
                 <div className="space-y-4 text-muted-foreground leading-relaxed">
-                  <p>
-                    It was a sunny October day in 2005 when STARTERS first came to life in the buzzing city of Abuja. Our founder, Gwendolyn Akogun, had one big dream: to shake up the small chops scene with fresh ideas, bold flavors, and a sprinkle of love.
-                  </p>
+                  <p>It was a sunny October day in 2005 when STARTERS first came to life in the buzzing city of Abuja. Our founder, Gwen, had one big dream: to shake up the small chops scene with fresh ideas, bold flavors, and a sprinkle of love.</p>
                   <p>
                     With a knack for business, a deep passion for food, and a heart full of compassion, Gwen wanted to create more than just another finger food brand — she wanted an experience. One that delivers quality in every bite and leaves every customer with a smile (and maybe a craving for seconds!).
                   </p>
@@ -62,11 +52,7 @@ const About = () => {
                 </div>
               </div>
               <div className="order-2 md:order-1">
-                <img
-                  src="/lovable-uploads/b0faf90f-366c-461d-9966-d8fb3cd9fd20.png"
-                  alt="Golden fried finger food balls on white plate with microgreens"
-                  className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto"
-                />
+                <img src="/lovable-uploads/b0faf90f-366c-461d-9966-d8fb3cd9fd20.png" alt="Golden fried finger food balls on white plate with microgreens" className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto" />
               </div>
             </div>
           </div>
@@ -130,11 +116,7 @@ const About = () => {
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div className="order-1 md:order-1">
-                <img
-                  src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png"
-                  alt="Golden fried finger food balls beautifully plated with garnish"
-                  className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto"
-                />
+                <img src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png" alt="Golden fried finger food balls beautifully plated with garnish" className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto" />
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-foreground mb-6">What We Offer</h2>
@@ -186,25 +168,19 @@ const About = () => {
               <Users className="h-12 w-12 text-primary mr-4" />
               <h2 className="text-3xl font-bold text-foreground">Our Team</h2>
             </div>
-            <p className="text-lg text-muted-foreground mb-8">
-              Founded and led by Gwendolyn Akogun, our company is powered by a dedicated team 
-              of subject matter experts with exceptional culinary skills. Together, we bring 
-              years of experience and passion for creating extraordinary finger food experiences.
-            </p>
+            <p className="text-lg text-muted-foreground mb-8">Founded and led by Gwen, our company is powered by a dedicated team of subject matter experts with exceptional culinary skills. Together, we bring years of experience and passion for creating extraordinary finger food experiences.</p>
             <div className="bg-primary/10 rounded-lg p-8">
               <h3 className="text-xl font-semibold text-foreground mb-4">
                 "Our philosophy is simple: provide amazing food products backed by a unique 
                 customer experience characterized by reliability, honesty, and integrity."
               </h3>
-              <p className="text-muted-foreground">- Gwendolyn Akogun, Founder</p>
+              <p className="text-muted-foreground">- Gwen, Founder</p>
             </div>
           </div>
         </div>
       </section>
 
       <PublicFooter />
-    </div>
-  );
+    </div>;
 };
-
 export default About;

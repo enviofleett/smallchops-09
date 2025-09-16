@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
+import { RequiredFieldLabel } from "@/components/ui/required-field-label";
 interface DeliveryAddress {
   address_line_1: string;
   address_line_2?: string;
@@ -788,12 +789,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <Label htmlFor="customer_name" className="flex items-center gap-2">
-                Full Name *
+              <RequiredFieldLabel htmlFor="customer_name" required className="flex items-center gap-2">
+                Full Name
                 {isAuthenticated && formData.customer_name && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
-              </Label>
+              </RequiredFieldLabel>
               <Input 
                 id="customer_name" 
                 value={formData.customer_name} 
@@ -815,12 +816,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               )}
             </div>
             <div>
-              <Label htmlFor="customer_email" className="flex items-center gap-2">
-                Email *
+              <RequiredFieldLabel htmlFor="customer_email" required className="flex items-center gap-2">
+                Email
                 {isAuthenticated && formData.customer_email && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
-              </Label>
+              </RequiredFieldLabel>
               <Input 
                 id="customer_email" 
                 type="email" 
@@ -843,18 +844,19 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               )}
             </div>
             <div>
-              <Label htmlFor="customer_phone" className="flex items-center gap-2">
+              <RequiredFieldLabel htmlFor="customer_phone" required className="flex items-center gap-2">
                 Phone Number
                 {isAuthenticated && formData.customer_phone && (
                   <span className="text-xs text-green-600">✓ Verified</span>
                 )}
-              </Label>
+              </RequiredFieldLabel>
               <Input 
                 id="customer_phone" 
                 type="tel" 
                 value={formData.customer_phone} 
                 onChange={e => handleFormChange('customer_phone', e.target.value)} 
                 placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
+                required
                 className={cn(
                   "h-10",
                   isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
@@ -877,7 +879,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              When do you need your order? *
+              When do you need your order?
+              <span className="text-red-500 text-sm font-bold ml-1" aria-label="required">*</span>
             </CardTitle>
             <CardDescription>
               Select your preferred date and time for {formData.fulfillment_type === 'delivery' ? 'delivery' : 'pickup'}
@@ -894,7 +897,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         {/* Fulfillment Type - Centered and Production Ready */}
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-base text-center">How would you like to receive your order?</CardTitle>
+            <CardTitle className="text-base text-center flex items-center justify-center gap-2">
+              How would you like to receive your order?
+              <span className="text-red-500 text-sm font-bold" aria-label="required">*</span>
+            </CardTitle>
             <CardDescription className="text-center text-sm">
               Choose delivery for convenience or pickup to save on fees
             </CardDescription>
@@ -962,25 +968,25 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label htmlFor="address_line_1">Street Address *</Label>
+                <RequiredFieldLabel htmlFor="address_line_1" required>Street Address</RequiredFieldLabel>
                 <Input id="address_line_1" value={formData.delivery_address.address_line_1} onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} placeholder="Enter street address" required className="h-10" />
               </div>
               <div>
-                <Label htmlFor="address_line_2">Apartment, suite, etc. (optional)</Label>
+                <RequiredFieldLabel htmlFor="address_line_2">Apartment, suite, etc.</RequiredFieldLabel>
                 <Input id="address_line_2" value={formData.delivery_address.address_line_2} onChange={e => handleFormChange('delivery_address.address_line_2', e.target.value)} placeholder="Apartment, suite, etc." className="h-10" />
               </div>
               <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" value={formData.delivery_address.city} onChange={e => handleFormChange('delivery_address.city', e.target.value)} placeholder="City" className="h-10" />
+                  <RequiredFieldLabel htmlFor="city" required>City</RequiredFieldLabel>
+                  <Input id="city" value={formData.delivery_address.city} onChange={e => handleFormChange('delivery_address.city', e.target.value)} placeholder="City" required className="h-10" />
                 </div>
               </div>
               <div>
-                <Label htmlFor="landmark">Landmark (optional)</Label>
+                <RequiredFieldLabel htmlFor="landmark">Landmark</RequiredFieldLabel>
                 <Input id="landmark" value={formData.delivery_address.landmark} onChange={e => handleFormChange('delivery_address.landmark', e.target.value)} placeholder="Nearby landmark" className="h-10" />
               </div>
               <div>
-                <Label htmlFor="delivery_instructions">Delivery Instructions (optional)</Label>
+                <RequiredFieldLabel htmlFor="delivery_instructions">Delivery Instructions</RequiredFieldLabel>
                 <div className="relative">
                   <Input id="delivery_instructions" value={formData.special_instructions || ''} onChange={e => {
                 const value = e.target.value.slice(0, 160); // Limit to 160 characters
@@ -1014,6 +1020,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               <CardTitle className="text-base text-center flex items-center justify-center gap-2">
                 <MapPin className="w-5 h-5 text-primary" />
                 Select Pickup Location
+                <span className="text-red-500 text-sm font-bold" aria-label="required">*</span>
               </CardTitle>
               <CardDescription className="text-center text-sm">
                 Choose a convenient location to collect your order

@@ -23,7 +23,6 @@ import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { useOverdueOrdersLogic } from '@/hooks/useOverdueOrdersLogic';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
-import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
@@ -512,9 +511,6 @@ function AdminOrdersContent() {
       </Helmet>
 
       <div className="space-y-6">
-        {/* System Status Check */}
-        <SystemStatusChecker />
-        
         {/* Header - Mobile Responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

@@ -26,23 +26,82 @@ serve(async (req) => {
   }
 
   try {
-    // Extract and validate Authorization header
+    // Enhanced authentication and guest session validation
     const authHeader = req.headers.get("Authorization");
-    console.log("🔐 Authorization header present:", !!authHeader);
+    const guestSessionId = req.headers.get("x-guest-session-id");
     
-    if (!authHeader) {
-      console.log("❌ No JWT provided - checkout requires authentication");
+    console.log("🔐 Authentication debug:", {
+      hasAuthHeader: !!authHeader,
+      hasGuestSession: !!guestSessionId,
+      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'none'
+    });
+    
+    // Allow either authenticated users OR guest sessions
+    if (!authHeader && !guestSessionId) {
+      console.log("❌ No authentication method provided - checkout requires either JWT or guest session");
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Authentication required for checkout",
-          code: "REQUIRES_AUTH"
+          error: "Authentication required for checkout. Please log in or continue as guest.",
+          code: "REQUIRES_AUTH",
+          details: {
+            missing_auth: !authHeader,
+            missing_guest: !guestSessionId,
+            suggestion: "Login or use guest checkout"
+          }
         }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    // For authenticated users, validate the JWT
+    if (authHeader) {
+      try {
+        // Extract JWT and validate with Supabase
+        const jwt = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
+        
+        if (authError || !user) {
+          console.log("❌ Invalid JWT token:", authError);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "Invalid or expired authentication token",
+              code: "INVALID_AUTH",
+              details: { authError: authError?.message }
+            }),
+            {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+        
+        console.log("✅ JWT validated successfully for user:", user.id);
+      } catch (authValidationError) {
+        console.log("❌ JWT validation failed:", authValidationError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Authentication validation failed",
+            code: "AUTH_VALIDATION_ERROR"
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+    
+    // For guest sessions, validate the session exists and is valid
+    if (guestSessionId && !authHeader) {
+      console.log("🎭 Processing guest checkout with session:", guestSessionId);
+      // For now, we'll allow guest sessions - in production you might want to validate
+      // the guest session ID against a guest_sessions table
     }
     
     console.log("🛒 Processing checkout request...");

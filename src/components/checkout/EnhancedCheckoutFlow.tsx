@@ -21,7 +21,7 @@ import { PaymentSummaryDebug } from "./PaymentSummaryDebug";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
-import '@/components/payments/payment-styles.css';
+import { AuthStatusIndicator } from './AuthStatusIndicator';
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
@@ -315,23 +315,33 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     onClose();
   };
 
-  // Handle guest checkout choice
+  // Handle guest checkout choice with enhanced validation
   const handleContinueAsGuest = async () => {
     try {
       // Generate guest session if not already present
       if (!guestSessionId) {
+        console.log('🎭 Generating new guest session...');
         await generateGuestSession();
       }
+      
+      // Validate guest session was created successfully
+      const currentGuestSession = guestSession?.sessionId;
+      if (!currentGuestSession) {
+        throw new Error('Failed to create guest session');
+      }
+      
+      console.log('✅ Guest session validated:', currentGuestSession);
       setCheckoutStep('details');
+      
       toast({
         title: "Guest Checkout",
         description: "You can proceed without creating an account.",
       });
     } catch (error) {
-      console.error('Error generating guest session:', error);
+      console.error('❌ Error generating guest session:', error);
       toast({
-        title: "Error",
-        description: "Failed to start guest checkout. Please try again.",
+        title: "Guest Checkout Failed",
+        description: "Failed to start guest checkout. Please try logging in or contact support.",
         variant: "destructive"
       });
     }
@@ -676,18 +686,90 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       
       console.log('📦 Sending to backend:', sanitizedData);
 
-      // Call Supabase edge function with authentication when available
-      const invokeOptions: any = { body: sanitizedData };
-      if (session?.access_token) {
-        invokeOptions.headers = { Authorization: `Bearer ${session.access_token}` };
-      }
-      const { data, error } = await supabase.functions.invoke('process-checkout', invokeOptions);
+  // Enhanced authentication validation before checkout
+  console.log('🔐 Session debugging:', {
+    hasSession: !!session,
+    hasAccessToken: !!session?.access_token,
+    hasUser: !!user,
+    isAuthenticated,
+    isLoading,
+    userEmail: user?.email,
+    sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'none'
+  });
 
-      // 🚨 CRITICAL: Stop flow immediately on order creation failure
+  // CRITICAL: Ensure proper authentication before checkout
+  if (!session?.access_token && !guestSessionId) {
+    console.error('❌ Authentication validation failed:', {
+      noSession: !session,
+      noAccessToken: !session?.access_token,
+      noGuestSession: !guestSessionId,
+      isAuthenticated,
+      checkoutStep
+    });
+    
+    throw new Error('Authentication required for checkout. Please log in or continue as guest.');
+  }
+
+  // Refresh session if it's about to expire (within 5 minutes)
+  if (session?.expires_at) {
+    const expiryTime = new Date(session.expires_at * 1000);
+    const now = new Date();
+    const timeUntilExpiry = expiryTime.getTime() - now.getTime();
+    
+    if (timeUntilExpiry < 5 * 60 * 1000) { // Less than 5 minutes
+      console.log('🔄 Session expires soon, attempting refresh...');
+      try {
+        const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.warn('⚠️ Session refresh failed:', refreshError);
+          // Continue with existing session
+        } else if (refreshedSession.session) {
+          console.log('✅ Session refreshed successfully');
+          // Update local session state would be handled by auth state change listener
+        }
+      } catch (refreshErr) {
+        console.warn('⚠️ Session refresh error:', refreshErr);
+      }
+    }
+  }
+
+  // Call Supabase edge function with proper authentication
+  const invokeOptions: any = { body: sanitizedData };
+  
+  // Always include Authorization header for authenticated checkout
+  if (session?.access_token) {
+    invokeOptions.headers = { Authorization: `Bearer ${session.access_token}` };
+    console.log('✅ Using authenticated checkout with JWT token');
+  } else if (guestSessionId) {
+    // For guest checkout, we could pass the guest session ID in headers
+    invokeOptions.headers = { 'x-guest-session-id': guestSessionId };
+    console.log('✅ Using guest checkout with session ID');
+  } else {
+    // This should not happen due to validation above, but handle gracefully
+    throw new Error('No valid authentication method available for checkout');
+  }
+
+  const { data, error } = await supabase.functions.invoke('process-checkout', invokeOptions);
+
       if (error || !data?.success) {
         console.error('❌ Order creation failed - stopping checkout flow:', error || data);
         const errorMessage = error?.message || data?.error || 'Order creation failed';
         const errorCode = data?.code || 'ORDER_CREATION_FAILED';
+        
+        // Handle authentication errors specifically
+        if (errorCode === 'REQUIRES_AUTH' || errorCode === 'INVALID_AUTH' || errorCode === 'AUTH_VALIDATION_ERROR') {
+          console.log('🔐 Authentication error detected, redirecting to auth step');
+          setCheckoutStep('auth');
+          
+          toast({
+            title: "Authentication Required",
+            description: data?.details?.suggestion || "Please log in or continue as guest to proceed with checkout.",
+            variant: "destructive"
+          });
+          
+          return; // Don't throw error, just redirect to auth step
+        }
+        
         throw new Error(`${errorMessage} [${errorCode}]`);
       }
       console.log('🔄 Raw server response:', data);
@@ -870,14 +952,18 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       return baseValidation && pickupPoint && termsValidation;
     }
   }, [formData, deliveryZone, pickupPoint, checkoutStep, termsRequired, termsAccepted]);
-  const renderAuthStep = () => <div className="space-y-6">
+  const renderAuthStep = () => (
+    <div className="space-y-6">
+      {/* Authentication Status Indicator */}
+      <AuthStatusIndicator showDetails={true} className="mb-4" />
       
       <GuestOrLoginChoice 
         onContinueAsGuest={handleContinueAsGuest} 
         onLogin={handleLogin} 
         totalAmount={total} 
       />
-    </div>;
+    </div>
+  );
   const renderDetailsStep = () => <div className="space-y-6">
       <div className="space-y-4">
         {!isAuthenticated && <div className="flex items-center justify-between md:hidden mb-4">

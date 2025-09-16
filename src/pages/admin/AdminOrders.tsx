@@ -37,8 +37,10 @@ import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
 import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
 import { filterOrdersByDate, getFilterDescription, getFilterStats, DeliveryFilterType } from '@/utils/dateFilterUtils';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
+import { useEnhancedOrderScheduleRecovery } from '@/hooks/useEnhancedOrderScheduleRecovery';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBoundary';
+import OrderErrorBoundary from '@/components/orders/OrderErrorBoundary';
 
 function AdminOrdersContent() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -1322,8 +1324,10 @@ function AdminOrderCard({
 // Wrap the main component in ProductionErrorBoundary for live production safety
 export default function AdminOrders() {
   return (
-    <ProductionErrorBoundary>
-      <AdminOrdersContent />
-    </ProductionErrorBoundary>
+    <OrderErrorBoundary context="Admin Orders">
+      <ProductionErrorBoundary>
+        <AdminOrdersContent />
+      </ProductionErrorBoundary>
+    </OrderErrorBoundary>
   );
 }

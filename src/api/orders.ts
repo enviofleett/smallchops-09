@@ -160,17 +160,11 @@ export const getOrders = async ({
  */
 export const updateOrder = async (
   orderId: string,
-  updates: { status?: OrderStatus; assigned_rider_id?: string | null; phone?: string; customer_phone?: string; [key: string]: any }
+  updates: { status?: OrderStatus; assigned_rider_id?: string | null; customer_phone?: string; [key: string]: any }
 ): Promise<OrderWithItems> => {
-  // CRITICAL: Fix field mapping to prevent database column errors
   const sanitizedUpdates = { ...updates };
   
-  // Always sanitize phone field to customer_phone for orders table compatibility
-  if ('phone' in sanitizedUpdates) {
-    console.log('🔧 Mapping phone to customer_phone for orders table compatibility');
-    sanitizedUpdates.customer_phone = sanitizedUpdates.phone;
-    delete sanitizedUpdates.phone;
-  }
+  // Phone field mapping no longer needed - phone column removed from database
   try {
     if (process.env.NODE_ENV === 'development') {
       console.log('🔄 Updating order via production-safe method:', orderId, updates);

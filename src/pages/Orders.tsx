@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import AbandonedCartsManager from '@/components/admin/AbandonedCartsManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import OrdersErrorBoundary from '@/components/orders/OrdersErrorBoundary';
+import OrderErrorBoundary from '@/components/orders/OrderErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
 import { runPaystackBatchVerify } from '@/utils/paystackBatchVerify';
 import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
@@ -400,7 +400,7 @@ const Orders = () => {
   };
 
   return (
-    <OrdersErrorBoundary>
+    <OrderErrorBoundary>
       <div className="space-y-2 md:space-y-4 px-2 md:px-4 pb-4 max-w-7xl mx-auto">
         <OrdersHeader 
           selectedCount={selectedOrders.length}
@@ -587,7 +587,7 @@ const Orders = () => {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </OrdersErrorBoundary>
+    </OrderErrorBoundary>
   );
 };
 

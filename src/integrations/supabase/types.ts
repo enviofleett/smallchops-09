@@ -5140,7 +5140,6 @@ export type Database = {
           payment_status: Database["public"]["Enums"]["payment_status"]
           payment_verified_at: string | null
           paystack_reference: string | null
-          phone: string | null
           pickup_point_id: string | null
           pickup_ready: boolean | null
           pickup_time: string | null
@@ -5189,7 +5188,6 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           payment_verified_at?: string | null
           paystack_reference?: string | null
-          phone?: string | null
           pickup_point_id?: string | null
           pickup_ready?: boolean | null
           pickup_time?: string | null
@@ -5238,7 +5236,6 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           payment_verified_at?: string | null
           paystack_reference?: string | null
-          phone?: string | null
           pickup_point_id?: string | null
           pickup_ready?: boolean | null
           pickup_time?: string | null

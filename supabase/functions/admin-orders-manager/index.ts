@@ -52,15 +52,10 @@ try {
   };
 }
 
+// SIMPLIFIED: Single service role client for all operations
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-)
-
-// Create a separate client for user token validation
-const supabaseAuthClient = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 )
 
 serve(async (req) => {
@@ -76,11 +71,11 @@ serve(async (req) => {
 
   const corsHeaders = getCorsHeaders(origin)
 
-  // ADMIN AUTHENTICATION: Validate JWT and admin role manually since verify_jwt = false
+  // SIMPLIFIED AUTHENTICATION: Use JWT validation with service client
   try {
     const authHeader = req.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Missing or invalid authorization header')
+      console.log('❌ Missing authorization header')
       return new Response(JSON.stringify({
         success: false,
         error: 'Unauthorized: Missing authentication token'
@@ -92,17 +87,11 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '')
     
-    // Use the auth client with the user's token to validate the session
-    const authClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-    
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    // Validate JWT token using service client
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
     
     if (authError || !user) {
-      console.log('❌ Invalid JWT token: Auth session missing!')
+      console.log('❌ Invalid JWT token:', authError?.message || 'No user found')
       return new Response(JSON.stringify({
         success: false,
         error: 'Unauthorized: Invalid authentication token'
@@ -112,7 +101,7 @@ serve(async (req) => {
       })
     }
 
-    // Check if user is admin
+    // Check admin role with single query
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role, is_active')
@@ -149,15 +138,7 @@ serve(async (req) => {
   try {
     let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
     
-    // CRITICAL: Comprehensive phone field sanitization to prevent ALL column errors
-    if (updates && typeof updates === 'object') {
-      if ('phone' in updates) {
-        console.log('🚨 GLOBAL SANITIZATION: Found phone field in updates, mapping to customer_phone');
-        updates.customer_phone = updates.phone;
-        delete updates.phone;
-        console.log('✅ GLOBAL SANITIZED: Updates after phone field cleanup:', updates);
-      }
-    }
+    // Phone field sanitization no longer needed - phone column removed from database
 
     switch (action) {
       case 'list': {
@@ -450,10 +431,8 @@ serve(async (req) => {
         
         if (updates && typeof updates === 'object') {
           for (const [key, value] of Object.entries(updates)) {
-            if (key === 'phone') {
-              // Map legacy phone field to customer_phone
-              console.log('🔧 Mapping phone to customer_phone:', value);
-              sanitizedUpdates.customer_phone = value;
+            // Phone field mapping no longer needed - phone column removed
+            if (allowedColumns.includes(key)) {
             } else if (key === 'status') {
               // CRITICAL: Validate status enum value
               if (value === null || value === 'null' || value === '' || value === undefined) {

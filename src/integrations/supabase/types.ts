@@ -10130,6 +10130,10 @@ export type Database = {
         }
         Returns: Json
       }
+      run_security_audit: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       safe_delete_product: {
         Args: { product_id: string }
         Returns: Json

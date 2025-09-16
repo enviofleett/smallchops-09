@@ -71,6 +71,7 @@ const Contact = withLazyLoading(() => import("./pages/Contact"), undefined, true
 const About = withLazyLoading(() => import("./pages/About"), undefined, true, 8000);
 const PaystackTest = withLazyLoading(() => import("./pages/PaystackTest"), undefined, false, 10000);
 const PaystackTestingDashboard = withLazyLoading(() => import("./pages/PaystackTestingDashboard"), undefined, false, 12000);
+const ProductionAudit = withLazyLoading(() => import("./pages/ProductionAudit"), undefined, false, 12000);
 const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"), undefined, true, 8000);
 const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"), undefined, true, 8000);
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"), undefined, true, 8000);
@@ -218,7 +219,8 @@ const App = () => {
               <Route path="/blog" element={<Blog />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/paystack-test" element={<PaystackTest />} />
-              <Route path="/paystack-testing" element={<PaystackTestingDashboard />} />
+               <Route path="/paystack-testing" element={<PaystackTestingDashboard />} />
+               <Route path="/production-audit" element={<ProductionAudit />} />
               <Route path="/emergency-fix" element={<EmergencyPaymentFix />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
@@ -284,6 +286,7 @@ const App = () => {
                 <Route path="/audit-logs" element={<ErrorBoundaryWrapper context="Audit Logs"><AuditLogs /></ErrorBoundaryWrapper>} />
                 <Route path="/settings" element={<ErrorBoundaryWrapper context="Settings"><Settings /></ErrorBoundaryWrapper>} />
                 <Route path="/payment-settings" element={<ErrorBoundaryWrapper context="Payment Settings"><PaymentSettings /></ErrorBoundaryWrapper>} />
+                <Route path="/production-audit" element={<ErrorBoundaryWrapper context="Production Audit"><ProductionAudit /></ErrorBoundaryWrapper>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

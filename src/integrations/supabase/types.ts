@@ -9015,6 +9015,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      check_production_security_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_promotion_code_rate_limit: {
         Args: {
           p_block_minutes?: number
@@ -9877,6 +9881,15 @@ export type Database = {
           p_user_agent?: string
         }
         Returns: string
+      }
+      log_critical_payment_access: {
+        Args: {
+          operation_type: string
+          record_id: string
+          table_name: string
+          user_context?: Json
+        }
+        Returns: undefined
       }
       log_customer_operation: {
         Args: {

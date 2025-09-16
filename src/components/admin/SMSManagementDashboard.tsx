@@ -6,6 +6,7 @@ import { SMSTemplateManager } from './SMSTemplateManager';
 import { SMSConfiguration } from './SMSConfiguration';
 import { Badge } from '@/components/ui/badge';
 import { useSMSStats } from '@/hooks/useSMSStats';
+import { SMSProductionStatus } from './SMSProductionStatus';
 
 export const SMSManagementDashboard = () => {
   const { stats, loading: statsLoading } = useSMSStats();
@@ -30,6 +31,9 @@ export const SMSManagementDashboard = () => {
           </Badge>
         </div>
       </div>
+
+      {/* Production Readiness Status */}
+      <SMSProductionStatus />
 
       {/* SMS Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

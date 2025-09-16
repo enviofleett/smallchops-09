@@ -10135,6 +10135,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      log_sms_balance_check: {
+        Args: {
+          p_balance_amount?: number
+          p_error_message?: string
+          p_provider_response?: Json
+          p_status?: string
+        }
+        Returns: undefined
+      }
       log_sms_delivery: {
         Args: {
           p_communication_event_id: string

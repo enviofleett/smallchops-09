@@ -229,11 +229,6 @@ export const SMSConfiguration = () => {
       setTesting(false);
     }
   };
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
 
   if (loading) {
     return (

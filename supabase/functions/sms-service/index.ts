@@ -8,10 +8,11 @@ const corsHeaders = {
 
 interface SMSRequest {
   to: string;
-  template_key: string;
+  template_key?: string;
   variables?: Record<string, string>;
   priority?: 'low' | 'normal' | 'high';
   order_id?: string;
+  action?: 'send_sms' | 'check_balance';
 }
 
 interface MySMSTabResponse {
@@ -34,11 +35,17 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const { to, template_key, variables = {}, priority = 'normal', order_id } = await req.json() as SMSRequest;
+    const requestBody = await req.json() as SMSRequest;
+    const { to, template_key, variables = {}, priority = 'normal', order_id, action = 'send_sms' } = requestBody;
 
-    console.log('SMS Service: Processing SMS request', { to, template_key, priority, order_id });
+    console.log('SMS Service: Processing request', { action, to, template_key, priority, order_id });
 
-    // Validate input
+    // Handle balance checking
+    if (action === 'check_balance') {
+      return await handleBalanceCheck(supabaseAdmin);
+    }
+
+    // Handle SMS sending (existing logic)
     if (!to || !template_key) {
       throw new Error('Missing required parameters: to and template_key');
     }
@@ -234,3 +241,112 @@ serve(async (req) => {
     );
   }
 });
+
+// Balance checking function for MySMSTab
+async function handleBalanceCheck(supabaseAdmin: any) {
+  try {
+    console.log('SMS Service: Checking MySMSTab balance');
+
+    // Get credentials from Supabase secrets
+    const username = Deno.env.get('MYSMSTAB_USERNAME');
+    const password = Deno.env.get('MYSMSTAB_PASSWORD');
+
+    if (!username || !password) {
+      throw new Error('MySMSTab credentials not configured');
+    }
+
+    // MySMSTab balance check API endpoint (this is a placeholder - check MySMSTab docs for actual endpoint)
+    const balanceUrl = 'https://sms.mysmstab.com/api/balance';
+    const params = new URLSearchParams({
+      username,
+      password,
+    });
+
+    console.log('SMS Service: Calling MySMSTab balance API');
+
+    const balanceResponse = await fetch(`${balanceUrl}?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const responseText = await balanceResponse.text();
+    console.log('MySMSTab Balance API Response:', responseText);
+
+    let balanceResult;
+    try {
+      balanceResult = JSON.parse(responseText);
+    } catch {
+      // Handle non-JSON responses - MySMSTab might return plain text balance
+      const balanceMatch = responseText.match(/(\d+\.?\d*)/);
+      if (balanceMatch) {
+        balanceResult = { balance: parseFloat(balanceMatch[1]), credits: parseFloat(balanceMatch[1]) };
+      } else {
+        balanceResult = { error: 'Could not parse balance response', response: responseText };
+      }
+    }
+
+    // Log balance check to audit logs
+    await supabaseAdmin.from('audit_logs').insert({
+      action: 'sms_balance_check',
+      category: 'SMS Service',
+      message: balanceResult.error ? 'SMS balance check failed' : `SMS balance: ₦${balanceResult.balance || balanceResult.credits || 'Unknown'}`,
+      new_values: {
+        balance_result: balanceResult,
+        provider: 'mysmstab',
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    if (balanceResult.error) {
+      throw new Error(balanceResult.error);
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        balance: balanceResult.balance || balanceResult.credits || 0,
+        credits: balanceResult.credits || balanceResult.balance || 0,
+        provider: 'mysmstab',
+        raw_response: balanceResult,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+
+  } catch (error) {
+    console.error('SMS Balance Check Error:', error);
+
+    // Log error to audit logs
+    try {
+      await supabaseAdmin.from('audit_logs').insert({
+        action: 'sms_balance_check_failed',
+        category: 'SMS Service',
+        message: `SMS balance check failed: ${error.message}`,
+        new_values: {
+          error: error.message,
+          provider: 'mysmstab',
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to log balance check error:', logError);
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        balance: 0,
+        credits: 0,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}

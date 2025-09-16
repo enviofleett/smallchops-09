@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { OptimizedImage } from '@/components/OptimizedImage';
 
 interface HeroImage {
   id: string;
@@ -88,19 +89,15 @@ export const HeroCarousel = ({
 
   return (
     <div className={className}>
-      <img 
-        src={currentImage.image_url} 
-        alt={currentImage.alt_text || 'Uploaded product image'} 
+      <OptimizedImage
+        src={currentImage.image_url}
+        alt={currentImage.alt_text || 'Uploaded product image'}
         className={`w-full h-full object-cover rounded-2xl transition-opacity duration-500 ease-in-out ${
           isVisible ? 'opacity-100' : 'opacity-0'
         }`}
-        loading="eager"
-        onError={(e) => {
-          console.error('Failed to load hero image:', currentImage.image_url);
-          // Don't fallback to any hardcoded image
-          const target = e.target as HTMLImageElement;
-          target.style.display = 'none';
-        }}
+        showLoader={true}
+        fit="cover"
+        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
       />
     </div>
   );

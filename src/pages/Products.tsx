@@ -60,6 +60,9 @@ const Products = () => {
       setIsProductDialogOpen(false);
       setSelectedProduct(null);
     },
+    onError: (error: any) => {
+      console.error('Product creation mutation failed:', error);
+    }
   });
 
   const updateMutation = useMutation({
@@ -69,6 +72,9 @@ const Products = () => {
       setIsProductDialogOpen(false);
       setSelectedProduct(null);
     },
+    onError: (error: any) => {
+      console.error('Product update mutation failed:', error);
+    }
   });
 
   const filteredProducts = useMemo(() => {
@@ -111,6 +117,12 @@ const Products = () => {
 
   const handleSubmitProduct = async (data: ProductFormData & { imageFile?: File }) => {
     try {
+      console.log('Submitting product data:', { 
+        isUpdate: !!selectedProduct, 
+        hasImageFile: !!data.imageFile,
+        productId: selectedProduct?.id 
+      });
+      
       const safeData = {
         ...data,
         name: data.name ?? "",
@@ -120,14 +132,35 @@ const Products = () => {
       };
       
       if (selectedProduct) {
+        console.log('Updating existing product...');
         await updateMutation.mutateAsync({ id: selectedProduct.id, data: safeData });
+        console.log('Product update completed successfully');
       } else {
+        console.log('Creating new product...');
         await createMutation.mutateAsync(safeData);
+        console.log('Product creation completed successfully');
       }
     } catch (error: any) {
+      console.error('Product submission failed:', error);
+      
+      // Handle specific error cases with user-friendly messages
       if (error.message?.includes('SKU') && error.message?.includes('already exists')) {
         throw new Error(error.message + ' Try modifying the SKU or leave it blank for auto-generation.');
       }
+      
+      if (error.message?.includes('Rate limit') || error.message?.includes('429')) {
+        throw new Error('Upload rate limit reached. Please wait a moment and try again.');
+      }
+      
+      if (error.message?.includes('timeout')) {
+        throw new Error('Upload timed out. Please check your connection and try again.');
+      }
+      
+      // Enhance error message for better user feedback
+      if (error.message?.includes('image') || error.message?.includes('upload')) {
+        throw new Error(`Image upload failed: ${error.message}. Please try again or use a different image.`);
+      }
+      
       throw error;
     }
   };

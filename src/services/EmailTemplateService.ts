@@ -111,7 +111,15 @@ class EmailTemplateService {
     } = {}
   ): Promise<boolean> {
     try {
-      console.log(`🎨 Sending templated email: ${templateKey} to ${recipient}`);
+      console.log(`🎨 PRODUCTION: Sending templated email: ${templateKey} to ${recipient}`);
+
+      // Verify template exists before sending (production safety check)
+      const template = await this.getTemplate(templateKey);
+      if (!template) {
+        throw new Error(`PRODUCTION_ERROR: Template '${templateKey}' not found. All emails must use valid templates from the database.`);
+      }
+
+      console.log(`✅ Template verified: ${template.template_name}`);
 
       // Send standardized payload to unified SMTP sender
       // Let the edge function handle template processing server-side

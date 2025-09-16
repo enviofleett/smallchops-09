@@ -1,11 +1,14 @@
 import React from 'react';
-import { Settings, ShieldCheck, Send, RefreshCw } from 'lucide-react';
+import { Settings, ShieldCheck, Send, RefreshCw, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SectionHeading } from './SectionHeading';
 import { OrderStatus } from '@/types/orders';
 import { Constants } from '@/integrations/supabase/types';
+import { EmailStatusGuide } from '../EmailStatusGuide';
+import { EmailTestButton } from '../EmailTestButton';
 
 interface DispatchRider {
   id: string;
@@ -33,6 +36,10 @@ interface ActionsDrawerProps {
   isVerifying?: boolean;
   verifyState?: 'idle' | 'success' | 'failed' | 'pending';
   verifyMessage?: string | null;
+  // Order details for email testing
+  orderId?: string;
+  customerEmail?: string;
+  orderNumber?: string;
 }
 
 export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
@@ -52,7 +59,10 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
   isSendingManual,
   isVerifying,
   verifyState = 'idle',
-  verifyMessage
+  verifyMessage,
+  orderId,
+  customerEmail,
+  orderNumber
 }) => {
   return (
     <Card>
@@ -72,23 +82,41 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
             <SelectContent className="bg-background border shadow-lg z-50">
               {Constants.public.Enums.order_status.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}
+                  <div className="flex items-center justify-between w-full">
+                    <span>{status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}</span>
+                    {['ready', 'out_for_delivery', 'delivered', 'cancelled', 'completed', 'returned'].includes(status) && (
+                      <span className="text-xs text-blue-500 ml-2">📧</span>
+                    )}
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {['ready', 'out_for_delivery', 'delivered', 'cancelled', 'completed', 'returned'].includes(selectedStatus) && (
+            <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+              📧 Customer will receive email notification for this status
+            </p>
+          )}
         </div>
 
         {/* Rider Assignment */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Assign Dispatch Rider</label>
+          <label className="text-sm font-medium text-foreground">
+            {selectedStatus === 'out_for_delivery' ? 'Reassign Dispatch Rider' : 'Assign Dispatch Rider'}
+          </label>
           <Select
             value={assignedRider ?? 'unassigned'}
             onValueChange={(value) => onRiderChange(value === 'unassigned' ? null : value)}
-            disabled={isLoadingRiders}
+            disabled={isLoadingRiders || !['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)}
           >
             <SelectTrigger className="w-full bg-background">
-              <SelectValue placeholder={isLoadingRiders ? "Loading riders..." : "Select a rider"} />
+              <SelectValue placeholder={
+                isLoadingRiders 
+                  ? "Loading riders..." 
+                  : !['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)
+                    ? "Change status first to assign rider"
+                    : "Select a rider"
+              } />
             </SelectTrigger>
             <SelectContent className="bg-background border shadow-lg z-50 max-h-[200px] overflow-y-auto">
               <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -109,40 +137,23 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
               ))}
             </SelectContent>
           </Select>
+          {!['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus) && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              ⚠️ Riders can only be assigned when order is confirmed, preparing, ready, or out for delivery
+            </p>
+          )}
           {riders?.length === 0 && !isLoadingRiders && (
             <p className="text-xs text-muted-foreground">
               ⚠️ No active dispatch riders found. Contact admin to add riders.
             </p>
           )}
+          {selectedStatus === 'out_for_delivery' && (
+            <p className="text-xs text-blue-600 dark:text-blue-400">
+              🔄 This will reassign the rider for an order already out for delivery
+            </p>
+          )}
         </div>
 
-        {/* Manual Notification */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Send Manual Notification</label>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Select value={manualStatus} onValueChange={(value) => onManualStatusChange(value as OrderStatus)}>
-              <SelectTrigger className="flex-1 bg-background">
-                <SelectValue placeholder="Select notification type" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
-                {Constants.public.Enums.order_status.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button 
-              variant="secondary" 
-              onClick={onManualSend}
-              disabled={!manualStatus || isSendingManual}
-              className="w-full sm:w-auto"
-            >
-              <Send className="w-4 h-4 mr-2" />
-              {isSendingManual ? 'Sending...' : 'Send'}
-            </Button>
-          </div>
-        </div>
 
         {/* Payment Verification */}
         <div className="space-y-2">
@@ -197,6 +208,7 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
             )}
           </Button>
         </div>
+
       </CardContent>
     </Card>
   );

@@ -79,6 +79,7 @@ export const validatePaystackCSP = () => {
       
       const requiredDomains = [
         'checkout.paystack.com',
+        'paystack.com',
         'js.paystack.co', 
         'api.paystack.co'
       ];

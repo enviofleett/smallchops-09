@@ -38,10 +38,8 @@ export function useProductionPromotions() {
   const getPromotionsForDay = (dayOfWeek: string) => {
     return allPromotions.filter((promotion: Promotion) => {
       try {
-        if (!promotion.applicable_days || promotion.applicable_days.length === 0) {
-          return true; // Applies to all days
-        }
-        return promotion.applicable_days.includes(dayOfWeek.toLowerCase());
+    // Simplified system: all promotions apply to all days
+    return true;
       } catch (error) {
         console.warn('Error checking promotion day:', error);
         return false;

@@ -1,20 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { FileText, Save, AlertCircle, CheckCircle, Shield } from 'lucide-react';
+import { FileText, Save, AlertCircle, CheckCircle, Shield, Eye, Timer } from 'lucide-react';
 import { SafeHtml } from "@/components/ui/safe-html";
 
 export const LegalTermsManager = () => {
   const [termsContent, setTermsContent] = useState('');
+  const [originalContent, setOriginalContent] = useState('');
   const [requireAcceptance, setRequireAcceptance] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  // Check for unsaved changes
+  useEffect(() => {
+    const hasChanges = termsContent !== originalContent;
+    setHasUnsavedChanges(hasChanges);
+  }, [termsContent, originalContent]);
+
+  // Auto-save functionality
+  const autoSave = useCallback(async () => {
+    if (!hasUnsavedChanges || isSaving) return;
+    
+    try {
+      await supabase
+        .from('content_management')
+        .upsert({
+          key: 'legal_terms_draft',
+          content: termsContent,
+          is_published: false,
+          updated_at: new Date().toISOString()
+        });
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+    }
+  }, [termsContent, hasUnsavedChanges, isSaving]);
+
+  // Auto-save every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(autoSave, 30000);
+    return () => clearInterval(interval);
+  }, [autoSave]);
+
+  // Validation functions
+  const validateContent = () => {
+    if (!termsContent.trim()) {
+      return { isValid: false, message: 'Terms content cannot be empty' };
+    }
+    if (termsContent.length < 100) {
+      return { isValid: false, message: 'Terms content should be at least 100 characters for legal validity' };
+    }
+    return { isValid: true, message: '' };
+  };
+
+  const getWordCount = () => {
+    return termsContent.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
 
   // Load existing terms settings
   useEffect(() => {
@@ -22,29 +72,39 @@ export const LegalTermsManager = () => {
       try {
         setIsLoading(true);
 
-        // Load terms content
-        const { data: termsData } = await supabase
+        // Load terms content with better error handling
+        const { data: termsData, error: termsError } = await supabase
           .from('content_management')
-          .select('content, is_published')
+          .select('content, is_published, updated_at')
           .eq('key', 'legal_terms')
-          .single();
+          .maybeSingle();
+
+        if (termsError && termsError.code !== 'PGRST116') {
+          throw termsError;
+        }
 
         // Load requirement setting
-        const { data: requirementData } = await supabase
+        const { data: requirementData, error: requirementError } = await supabase
           .from('content_management')
           .select('content')
           .eq('key', 'legal_require_terms_acceptance')
-          .single();
+          .maybeSingle();
 
-        if (termsData) {
-          setTermsContent(termsData.content || '');
+        if (requirementError && requirementError.code !== 'PGRST116') {
+          throw requirementError;
         }
 
-        if (requirementData) {
-          setRequireAcceptance(requirementData.content === 'true');
+        const content = termsData?.content || '';
+        setTermsContent(content);
+        setOriginalContent(content);
+        setRequireAcceptance(requirementData?.content === 'true');
+
+        if (termsData?.updated_at) {
+          setLastSaved(new Date(termsData.updated_at));
         }
-      } catch (error) {
-        console.log('No existing terms data found, starting fresh');
+      } catch (error: any) {
+        console.error('Error loading terms data:', error);
+        toast.error(`Failed to load terms data: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
@@ -54,17 +114,38 @@ export const LegalTermsManager = () => {
   }, []);
 
   const handleSave = async () => {
+    // Validate content before saving
+    const validation = validateContent();
+    if (!validation.isValid) {
+      toast.error(validation.message);
+      return;
+    }
+
+    // Show confirmation for publishing changes
+    if (requireAcceptance && termsContent !== originalContent) {
+      setShowConfirmDialog(true);
+      return;
+    }
+
+    await performSave();
+  };
+
+  const performSave = async () => {
     try {
       setIsSaving(true);
 
-      // Save terms content
+      // Save terms content with proper conflict resolution
       const { error: termsError } = await supabase
         .from('content_management')
         .upsert({
           key: 'legal_terms',
+          title: 'Terms and Conditions',
           content: termsContent,
-          is_published: termsContent.trim().length > 0,
+          content_type: 'html',
+          is_published: true,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'key'
         });
 
       if (termsError) throw termsError;
@@ -74,17 +155,26 @@ export const LegalTermsManager = () => {
         .from('content_management')
         .upsert({
           key: 'legal_require_terms_acceptance',
+          title: 'Require Terms Acceptance',
           content: requireAcceptance.toString(),
+          content_type: 'text',
           is_published: true,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'key'
         });
 
       if (requirementError) throw requirementError;
 
-      toast.success('Legal terms settings saved successfully!');
+      // Update state to reflect saved changes
+      setOriginalContent(termsContent);
+      setLastSaved(new Date());
+      setShowConfirmDialog(false);
+
+      toast.success('Legal terms settings published successfully! Changes are now live.');
     } catch (error: any) {
       console.error('Error saving terms:', error);
-      toast.error(`Failed to save: ${error.message}`);
+      toast.error(`Failed to publish changes: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -135,16 +225,36 @@ export const LegalTermsManager = () => {
 
           {/* Terms Content Editor */}
           <div className="space-y-2">
-            <Label htmlFor="terms-content">Terms and Conditions Content</Label>
-            <Textarea
-              id="terms-content"
+            <div className="flex items-center justify-between">
+              <Label htmlFor="terms-content">Terms and Conditions Content</Label>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span>{getWordCount()} words</span>
+                <span>{termsContent.length} characters</span>
+                {hasUnsavedChanges && (
+                  <div className="flex items-center gap-1 text-amber-600">
+                    <Timer className="h-3 w-3" />
+                    <span>Unsaved changes</span>
+                  </div>
+                )}
+                {lastSaved && !hasUnsavedChanges && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <CheckCircle className="h-3 w-3" />
+                    <span>Saved {lastSaved.toLocaleTimeString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <RichTextEditor
               value={termsContent}
-              onChange={(e) => setTermsContent(e.target.value)}
-              placeholder="Enter your terms and conditions here. HTML formatting is supported."
-              className="min-h-[300px] font-mono text-sm"
+              onChange={setTermsContent}
+              placeholder="Enter your terms and conditions here. Use the toolbar to format your content professionally."
+              className="min-h-[300px]"
             />
-            <div className="text-xs text-muted-foreground">
-              HTML tags are supported for formatting (e.g., &lt;h2&gt;, &lt;p&gt;, &lt;strong&gt;, &lt;ul&gt;, etc.)
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Use the formatting toolbar above to create professional, well-structured terms and conditions</span>
+              {termsContent.length < 100 && termsContent.length > 0 && (
+                <span className="text-amber-600">Minimum 100 characters recommended for legal validity</span>
+              )}
             </div>
           </div>
 
@@ -179,24 +289,70 @@ export const LegalTermsManager = () => {
           )}
 
           {/* Save Button */}
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full"
-            size="lg"
-          >
-            {isSaving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Saving Terms Settings...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Terms Settings
-              </>
-            )}
-          </Button>
+          <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || !hasUnsavedChanges}
+              className="w-full"
+              size="lg"
+              variant={hasUnsavedChanges && requireAcceptance ? "default" : "secondary"}
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Publishing Changes...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  {hasUnsavedChanges 
+                    ? (requireAcceptance ? 'Publish Terms (Live Production)' : 'Save Changes')
+                    : 'No Changes to Save'
+                  }
+                </>
+              )}
+            </Button>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Publish Terms to Production?</DialogTitle>
+                <DialogDescription>
+                  You are about to publish changes to your terms and conditions. These changes will be immediately visible to all customers and required for checkout completion.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800">
+                    <strong>Production Impact:</strong> All customers will be required to accept the updated terms before completing their orders.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="text-sm space-y-2">
+                  <div><strong>Word Count:</strong> {getWordCount()} words</div>
+                  <div><strong>Character Count:</strong> {termsContent.length} characters</div>
+                  <div><strong>Terms Required:</strong> {requireAcceptance ? 'Yes' : 'No'}</div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={performSave} disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Publishing...
+                    </>
+                  ) : (
+                    'Publish to Production'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
 

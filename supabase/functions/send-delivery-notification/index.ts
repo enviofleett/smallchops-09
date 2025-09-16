@@ -58,9 +58,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Get notification template
+    // Use enhanced_email_templates instead of notification_templates
+    // This ensures all templates are managed through the Email Template Manager
     const { data: template, error: templateError } = await supabase
-      .from('notification_templates')
+      .from('enhanced_email_templates')
       .select('*')
       .eq('template_key', request.template_key)
       .eq('is_active', true)
@@ -82,13 +83,13 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Replace variables in template content
-    let processedContent = template.content;
-    let processedSubject = template.subject || '';
+    // Process template using enhanced_email_templates fields
+    let processedContent = template.html_template || template.html_content || template.content;
+    let processedSubject = template.subject_template || template.subject || '';
 
     if (request.variables) {
       Object.entries(request.variables).forEach(([key, value]) => {
-        const regex = new RegExp(`{${key}}`, 'g');
+        const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
         processedContent = processedContent.replace(regex, value);
         processedSubject = processedSubject.replace(regex, value);
       });
@@ -108,15 +109,13 @@ const handler = async (req: Request): Promise<Response> => {
 
       try {
         if (channel === 'email') {
-          // Send email using unified SMTP sender
+          // Send email using unified SMTP sender with templateKey
           const { data: emailResult, error: emailError } = await supabase.functions.invoke('unified-smtp-sender', {
             headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
             body: {
               to: request.recipient,
-              subject: processedSubject,
-              html: processedContent,
-              from: 'Starters <noreply@starters.app>',
               templateKey: request.template_key,
+              variables: request.variables || {},
               emailType: 'transactional'
             }
           });

@@ -9,88 +9,98 @@ max_rows = 1000
 
 [auth]
 enabled = true
-port = 54322
-site_url = "https://preview--smallchops-09.lovable.app"
-additional_redirect_urls = ["https://preview--smallchops-09.lovable.app", "http://localhost:3000"]
+port = 54324
+site_url = "https://oknnklksdiqaifhxaccs.lovable.app"
+additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
 enable_signup = true
-enable_email_confirmations = true
-enable_email_autoconfirm = false
-enable_phone_confirmations = false
-enable_phone_autoconfirm = false
+enable_confirmations = false
+enable_manual_linking = false
 
-# SECURE EMAIL SYSTEM - Production Ready
-[functions.email-service-core]
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.external]
+
+[auth.sms]
+
+[db]
+port = 54322
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+port = 54323
+ip_version = "ipv4"
+
+[storage]
+enabled = true
+port = 54324
+file_size_limit = "50MiB"
+image_transformation = {enabled = true}
+
+[edge_functions]
+enabled = true
+port = 54325
+ip_version = "ipv4"
+
+[functions.admin-security-lockdown]
 verify_jwt = true
 
-[functions.unified-smtp-sender]
+[functions.delivery-availability]
 verify_jwt = false
 
-[functions.unified-email-queue-processor]
+[functions.validate-promotion-code]
+verify_jwt = false
+
+[functions.track-promotion-usage]
+verify_jwt = true
+
+[functions.verify-payment]
+verify_jwt = false
+
+[functions.paystack-secure]
+verify_jwt = false
+
+[functions.payment-callback]
+verify_jwt = false
+
+[functions.admin-orders-manager]
+verify_jwt = false
+
+[functions.user-journey-automation]
 verify_jwt = false
 
 [functions.instant-email-processor]
 verify_jwt = false
 
-# SECURE AUTHENTICATION
-[functions.secure-customer-auth]
+[functions.email-cron-automation]
 verify_jwt = false
 
-[functions.customer-otp-verification]
+[functions.upload-product-image]
+verify_jwt = true
+
+[functions.check_upload_rate_limit]
 verify_jwt = false
 
-[functions.auth-profile]
-verify_jwt = true
-
-# SECURE PAYMENT PROCESSING
-[functions.paystack-secure]
-verify_jwt = true
-
-[functions.secure-payment-processor]
-verify_jwt = true
-
-[functions.payment-callback]
+[functions.smtp-health-check]
 verify_jwt = false
 
-[functions.paystack-webhook-secure]
-verify_jwt = false
+[analytics]
+enabled = false
+port = 54327
+vector_port = 54328
+backend = "postgres"
 
-[functions.payment-health-check]
-verify_jwt = true
-
-[functions.paystack-health]
-verify_jwt = true
-
-# ADMIN FUNCTIONS (require authentication)
-[functions.admin-orders-manager]
-verify_jwt = true
-
-[functions.reports]
-verify_jwt = true
-
-[functions.shipping-fees-report]
-verify_jwt = true
-
-# PUBLIC UTILITIES
-[functions.unsubscribe-email]
-verify_jwt = false
-
-[functions.get-turnstile-key]
-verify_jwt = false
-
-[functions.public-api]
-verify_jwt = false
-
-# HEALTH & MONITORING
-[functions.security-monitor]
-verify_jwt = false
-
-[functions.delivery-schedule-health]
-verify_jwt = false
-
-# AUTOMATED PROCESSORS (service-to-service)
-[functions.backfill-missing-schedules]
-verify_jwt = true
-
-[functions.recover-order-schedule]
-verify_jwt = true
+[experimental]
+s3_storage_backend = false
+orioledb_version = ""
+webhooks = false

@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, XCircle, AlertTriangle, Rocket, Settings, Database, Mail, Shield, Users } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, Rocket, Settings, Database, Mail, Shield, Users, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,9 +12,17 @@ interface ReadinessCheck {
   name: string;
   description: string;
   status: 'pass' | 'fail' | 'warning' | 'checking';
-  category: 'security' | 'email' | 'database' | 'auth' | 'performance';
+  category: 'Security' | 'Email' | 'Database' | 'Authentication' | 'Production';
   critical: boolean;
   details?: string;
+}
+
+interface SecurityValidationData {
+  auth_health: any;
+  security_compliance: any;
+  production_ready: any;
+  success: boolean;
+  error?: string;
 }
 
 export const ProductionReadinessStatus = () => {
@@ -22,356 +30,465 @@ export const ProductionReadinessStatus = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [overallScore, setOverallScore] = useState(0);
   const [readyForProduction, setReadyForProduction] = useState(false);
+  const [validationData, setValidationData] = useState<SecurityValidationData | null>(null);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const { toast } = useToast();
 
-  const initialChecks: ReadinessCheck[] = [
-    {
-      id: 'rls_policies',
-      name: 'Row Level Security Policies',
-      description: 'All tables have proper RLS policies configured',
-      status: 'checking',
-      category: 'security',
-      critical: true
-    },
-    {
-      id: 'email_delivery',
-      name: 'Email Delivery System',
-      description: 'Email system is configured and delivering messages',
-      status: 'checking',
-      category: 'email',
-      critical: true
-    },
-    {
-      id: 'auth_flow',
-      name: 'Authentication Flow',
-      description: 'User registration and login working correctly',
-      status: 'checking',
-      category: 'auth',
-      critical: true
-    },
-    {
-      id: 'rate_limiting',
-      name: 'Rate Limiting',
-      description: 'API rate limiting is properly configured',
-      status: 'checking',
-      category: 'security',
-      critical: true
-    },
-    {
-      id: 'smtp_health',
-      name: 'SMTP Health Check',
-      description: 'SMTP providers are healthy and responsive',
-      status: 'checking',
-      category: 'email',
-      critical: false
-    },
-    {
-      id: 'bounce_handling',
-      name: 'Email Bounce Handling',
-      description: 'Email bounce and complaint handling is active',
-      status: 'checking',
-      category: 'email',
-      critical: false
-    },
-    {
-      id: 'monitoring',
-      name: 'System Monitoring',
-      description: 'Monitoring and alerting systems are configured',
-      status: 'checking',
-      category: 'performance',
-      critical: false
-    },
-    {
-      id: 'backup_systems',
-      name: 'Backup Systems',
-      description: 'Database backups and recovery systems are active',
-      status: 'checking',
-      category: 'database',
-      critical: true
-    }
-  ];
-
-  const runReadinessChecks = async () => {
+  const runProductionReadinessCheck = async () => {
     setIsRunning(true);
-    setChecks(initialChecks);
-
-    const updatedChecks = [...initialChecks];
-
+    setChecks([]);
+    
     try {
-      // Check RLS Policies
-      const { data: linterResults, error: linterError } = await supabase.functions.invoke('supabase-linter-check');
+      // Initialize checking status
+      const initialChecks: ReadinessCheck[] = [
+        {
+          id: 'auth-health',
+          name: 'Authentication System Health',
+          description: 'User registration, verification, and authentication success rates',
+          status: 'checking',
+          category: 'Authentication',
+          critical: true
+        },
+        {
+          id: 'security-compliance',
+          name: 'Security & Database Protection',
+          description: 'RLS policies, database security, and access controls',
+          status: 'checking',
+          category: 'Security',
+          critical: true
+        },
+        {
+          id: 'email-system',
+          name: 'Email System Status',
+          description: 'SMTP health, delivery rates, and email configuration',
+          status: 'checking',
+          category: 'Email',
+          critical: true
+        },
+        {
+          id: 'production-validation',
+          name: 'Production Readiness',
+          description: 'Comprehensive system validation for production deployment',
+          status: 'checking',
+          category: 'Production',
+          critical: true
+        }
+      ];
       
-      if (!linterError && linterResults) {
-        const criticalIssues = linterResults.filter((issue: any) => issue.level === 'ERROR').length;
-        updatedChecks[0].status = criticalIssues === 0 ? 'pass' : 'fail';
-        updatedChecks[0].details = `${criticalIssues} critical security issues found`;
+      setChecks(initialChecks);
+
+      // Run comprehensive security and auth validation
+      const { data: validationResult, error: validationError } = await supabase.functions.invoke('auth-security-validator');
+      
+      if (validationError) {
+        throw new Error(`Validation failed: ${validationError.message}`);
       }
 
-      // Check Email Delivery
-      const { data: emailHealth } = await supabase
-        .from('communication_events')
-        .select('status')
-        .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()); // Last hour
+      if (!validationResult?.success) {
+        throw new Error(validationResult?.error || 'Security validation failed');
+      }
 
-      const emailSuccessRate = emailHealth?.length > 0 ? 
-        (emailHealth.filter(e => e.status === 'sent').length / emailHealth.length) * 100 : 0;
+      setValidationData(validationResult);
+
+      // Run email system check
+      const { data: emailResult, error: emailError } = await supabase.functions.invoke('email-delivery-monitor');
       
-      updatedChecks[1].status = emailSuccessRate >= 90 ? 'pass' : emailSuccessRate >= 70 ? 'warning' : 'fail';
-      updatedChecks[1].details = `${Math.round(emailSuccessRate)}% success rate in last hour`;
+      const updatedChecks: ReadinessCheck[] = [];
 
-      // Check Auth Flow
-      const { data: recentRegistrations } = await supabase
-        .from('customer_accounts')
-        .select('email_verified')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
+      // Process authentication health
+      if (validationResult.auth_health) {
+        const authHealth = validationResult.auth_health;
+        updatedChecks.push({
+          id: 'auth-health',
+          name: 'Authentication System Health',
+          description: 'User registration, verification, and authentication success rates',
+          status: authHealth.healthy ? 'pass' : 'fail',
+          category: 'Authentication',
+          critical: true,
+          details: `Score: ${authHealth.score}/100 - Status: ${authHealth.status}${authHealth.metrics ? ` | Users: ${authHealth.metrics.total_users}, Verified: ${authHealth.metrics.verification_rate}%` : ''}`
+        });
+      }
 
-      const authSuccessRate = recentRegistrations?.length > 0 ?
-        (recentRegistrations.filter(r => r.email_verified).length / recentRegistrations.length) * 100 : 100;
+      // Process security compliance
+      if (validationResult.security_compliance) {
+        const security = validationResult.security_compliance;
+        updatedChecks.push({
+          id: 'security-compliance',
+          name: 'Security & Database Protection',
+          description: 'RLS policies, database security, and access controls',
+          status: security.compliant ? 'pass' : 'fail',
+          category: 'Security',
+          critical: true,
+          details: `Score: ${security.score}/100 | RLS Tables: ${security.metrics?.tables_with_rls || 0}/${(security.metrics?.tables_with_rls || 0) + (security.metrics?.tables_without_rls || 0)}`
+        });
+      }
 
-      updatedChecks[2].status = authSuccessRate >= 80 ? 'pass' : authSuccessRate >= 60 ? 'warning' : 'fail';
-      updatedChecks[2].details = `${Math.round(authSuccessRate)}% email verification rate`;
+      // Process email system
+      if (emailResult && !emailError) {
+        const emailHealthy = emailResult.smtp_health?.healthy && emailResult.delivery_health?.healthy;
+        updatedChecks.push({
+          id: 'email-system',
+          name: 'Email System Status',
+          description: 'SMTP health, delivery rates, and email configuration',
+          status: emailHealthy ? 'pass' : (emailResult.smtp_health?.healthy ? 'warning' : 'fail'),
+          category: 'Email',
+          critical: true,
+          details: `SMTP: ${emailResult.smtp_health?.status || 'unknown'} | Delivery: ${emailResult.delivery_health?.status || 'unknown'}`
+        });
+      } else {
+        updatedChecks.push({
+          id: 'email-system',
+          name: 'Email System Status',
+          description: 'SMTP health, delivery rates, and email configuration',
+          status: 'warning',
+          category: 'Email',
+          critical: true,
+          details: 'Email health check unavailable'
+        });
+      }
 
-      // Check Rate Limiting
-      const { data: rateLimitData } = await supabase
-        .from('enhanced_rate_limits')
-        .select('*')
-        .limit(1);
-
-      updatedChecks[3].status = rateLimitData && rateLimitData.length > 0 ? 'pass' : 'warning';
-      updatedChecks[3].details = rateLimitData?.length > 0 ? 'Rate limiting active' : 'Rate limiting not tested';
-
-      // Check SMTP Health
-      const { data: smtpHealth } = await supabase
-        .from('smtp_health_metrics')
-        .select('provider_name')
-        .gte('recorded_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
-        .limit(5);
-
-      const healthyProviders = smtpHealth?.length || 0;
-      updatedChecks[4].status = healthyProviders > 0 ? 'pass' : 'warning';
-      updatedChecks[4].details = `${healthyProviders} healthy SMTP providers`;
-
-      // Check Bounce Handling
-      const { data: bounceData } = await supabase
-        .from('email_bounce_tracking')
-        .select('*')
-        .limit(1);
-
-      updatedChecks[5].status = bounceData && bounceData.length >= 0 ? 'pass' : 'warning';
-      updatedChecks[5].details = 'Bounce tracking system active';
-
-      // Check Monitoring
-      const { data: auditLogs } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .gte('event_time', new Date(Date.now() - 60 * 60 * 1000).toISOString())
-        .limit(1);
-
-      updatedChecks[6].status = auditLogs && auditLogs.length > 0 ? 'pass' : 'warning';
-      updatedChecks[6].details = auditLogs?.length > 0 ? 'Recent audit activity detected' : 'No recent monitoring activity';
-
-      // Check Backup Systems (Supabase handles this automatically)
-      updatedChecks[7].status = 'pass';
-      updatedChecks[7].details = 'Supabase automatic backups active';
+      // Process production readiness
+      if (validationResult.production_ready) {
+        const production = validationResult.production_ready;
+        updatedChecks.push({
+          id: 'production-validation',
+          name: 'Production Readiness',
+          description: 'Comprehensive system validation for production deployment',
+          status: production.ready_for_production ? 'pass' : 'fail',
+          category: 'Production',
+          critical: true,
+          details: `Overall Score: ${production.overall_score}/100 | Status: ${production.status} | Issues: ${production.issues?.length || 0}`
+        });
+      }
 
       setChecks(updatedChecks);
 
-      // Calculate overall score
-      const totalChecks = updatedChecks.length;
+      // Calculate overall metrics
       const passedChecks = updatedChecks.filter(c => c.status === 'pass').length;
-      const warningChecks = updatedChecks.filter(c => c.status === 'warning').length;
-      const score = Math.round(((passedChecks + warningChecks * 0.5) / totalChecks) * 100);
+      const totalChecks = updatedChecks.length;
+      const calculatedScore = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 0;
       
-      setOverallScore(score);
-
-      // Check if ready for production (all critical checks must pass)
-      const criticalFailures = updatedChecks.filter(c => c.critical && c.status === 'fail').length;
-      setReadyForProduction(criticalFailures === 0 && score >= 80);
+      setOverallScore(calculatedScore);
+      setReadyForProduction(calculatedScore >= 80 && updatedChecks.every(c => c.status !== 'fail'));
+      setLastChecked(new Date());
 
       toast({
-        title: "Readiness Check Complete",
-        description: `Overall score: ${score}%. ${criticalFailures === 0 ? 'Ready for production!' : `${criticalFailures} critical issues need attention.`}`,
-        variant: criticalFailures === 0 ? 'default' : 'destructive'
+        title: "Production Readiness Check Completed",
+        description: `System scored ${calculatedScore}/100. ${readyForProduction ? 'Ready for production!' : 'Needs attention before production.'}`,
+        variant: calculatedScore >= 80 ? "default" : "destructive"
       });
 
     } catch (error) {
-      console.error('Error running readiness checks:', error);
+      console.error('Production readiness check failed:', error);
       toast({
-        title: "Error",
-        description: "Failed to complete readiness checks",
+        title: "Check Failed",
+        description: error instanceof Error ? error.message : 'Failed to run production readiness check',
         variant: "destructive"
       });
+
+      // Set error state
+      setChecks([
+        {
+          id: 'system-error',
+          name: 'System Check Error',
+          description: 'Unable to complete production readiness verification',
+          status: 'fail',
+          category: 'Production',
+          critical: true,
+          details: error instanceof Error ? error.message : 'Unknown error occurred'
+        }
+      ]);
+      setOverallScore(0);
+      setReadyForProduction(false);
     } finally {
       setIsRunning(false);
     }
   };
 
   useEffect(() => {
-    runReadinessChecks();
+    runProductionReadinessCheck();
   }, []);
 
-  const getStatusIcon = (status: ReadinessCheck['status']) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pass':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'fail':
-        return <XCircle className="h-5 w-5 text-red-600" />;
+        return <XCircle className="w-5 h-5 text-red-500" />;
       case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
+        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
       case 'checking':
-        return <div className="h-5 w-5 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />;
+        return <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />;
+      default:
+        return <AlertTriangle className="w-5 h-5 text-gray-500" />;
     }
   };
 
-  const getCategoryIcon = (category: ReadinessCheck['category']) => {
-    switch (category) {
-      case 'security':
-        return <Shield className="h-4 w-4" />;
-      case 'email':
-        return <Mail className="h-4 w-4" />;
-      case 'database':
-        return <Database className="h-4 w-4" />;
-      case 'auth':
-        return <Users className="h-4 w-4" />;
-      case 'performance':
-        return <Settings className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusBadgeVariant = (status: ReadinessCheck['status']) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pass':
-        return 'secondary';
+        return <Badge variant="default" className="bg-green-100 text-green-800">PASS</Badge>;
       case 'fail':
-        return 'destructive';
+        return <Badge variant="destructive">FAIL</Badge>;
       case 'warning':
-        return 'secondary';
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">WARNING</Badge>;
+      case 'checking':
+        return <Badge variant="outline">CHECKING</Badge>;
       default:
-        return 'outline';
+        return <Badge variant="outline">UNKNOWN</Badge>;
     }
   };
 
-  const criticalFailures = checks.filter(c => c.critical && c.status === 'fail').length;
-  const warningCount = checks.filter(c => c.status === 'warning').length;
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'Authentication':
+        return <Users className="w-5 h-5 text-blue-500" />;
+      case 'Security':
+        return <Shield className="w-5 h-5 text-red-500" />;
+      case 'Email':
+        return <Mail className="w-5 h-5 text-green-500" />;
+      case 'Database':
+        return <Database className="w-5 h-5 text-purple-500" />;
+      case 'Production':
+        return <Rocket className="w-5 h-5 text-orange-500" />;
+      default:
+        return <Settings className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
+  const criticalIssues = checks.filter(c => c.critical && c.status === 'fail');
+  const warnings = checks.filter(c => c.status === 'warning');
+  const recommendations = validationData?.production_ready?.recommendations || [];
 
   return (
     <div className="space-y-6">
-      {/* Overall Status Header */}
-      <Card className={`border-2 ${readyForProduction ? 'border-green-500 bg-green-50' : criticalFailures > 0 ? 'border-red-500 bg-red-50' : 'border-yellow-500 bg-yellow-50'}`}>
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Rocket className={`h-8 w-8 ${readyForProduction ? 'text-green-600' : 'text-gray-500'}`} />
-              <div>
-                <CardTitle className="text-xl">
-                  {readyForProduction ? 'Ready for Production!' : 'Production Readiness Check'}
-                </CardTitle>
-                <CardDescription>
-                  {readyForProduction 
-                    ? 'All critical systems are operational and ready for live deployment'
-                    : `${criticalFailures} critical issue${criticalFailures !== 1 ? 's' : ''} need${criticalFailures === 1 ? 's' : ''} attention before going live`
-                  }
-                </CardDescription>
-              </div>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Rocket className="w-6 h-6" />
+                Production Readiness Status
+              </CardTitle>
+              <CardDescription>
+                Comprehensive system validation for production deployment
+                {lastChecked && (
+                  <span className="block mt-1 text-xs text-muted-foreground">
+                    Last checked: {lastChecked.toLocaleString()}
+                  </span>
+                )}
+              </CardDescription>
             </div>
-            <Button onClick={runReadinessChecks} disabled={isRunning}>
-              {isRunning ? 'Running Checks...' : 'Re-run Checks'}
+            <Button 
+              onClick={runProductionReadinessCheck} 
+              disabled={isRunning}
+              variant="outline"
+            >
+              {isRunning ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Re-check
+                </>
+              )}
             </Button>
           </div>
-          
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Overall Score</span>
-              <span className="text-2xl font-bold">{overallScore}%</span>
-            </div>
-            <Progress value={overallScore} className="h-3" />
-            
-            <div className="flex gap-4 text-sm">
-              <span className="flex items-center gap-1">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                {checks.filter(c => c.status === 'pass').length} Passed
-              </span>
-              {warningCount > 0 && (
-                <span className="flex items-center gap-1">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  {warningCount} Warnings
-                </span>
-              )}
-              {criticalFailures > 0 && (
-                <span className="flex items-center gap-1">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  {criticalFailures} Critical Failures
-                </span>
-              )}
-            </div>
-          </div>
         </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Overall Status */}
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center gap-3">
+              {readyForProduction ? (
+                <CheckCircle className="w-8 h-8 text-green-500" />
+              ) : (
+                <XCircle className="w-8 h-8 text-red-500" />
+              )}
+              <div>
+                <h3 className="text-lg font-semibold">
+                  {readyForProduction ? 'Ready for Production' : 'Not Ready for Production'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Overall Score: {overallScore}/100
+                </p>
+              </div>
+            </div>
+            <Progress value={overallScore} className="w-32" />
+          </div>
+
+          {/* Critical Issues Alert */}
+          {criticalIssues.length > 0 && (
+            <div className="p-4 border-l-4 border-l-red-500 bg-red-50 rounded-r-lg">
+              <h4 className="font-semibold text-red-800 flex items-center gap-2">
+                <XCircle className="w-5 h-5" />
+                Critical Issues ({criticalIssues.length})
+              </h4>
+              <ul className="mt-2 space-y-1">
+                {criticalIssues.map(issue => (
+                  <li key={issue.id} className="text-sm text-red-700">
+                    • {issue.name}: {issue.details || 'Failed validation'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Warnings */}
+          {warnings.length > 0 && (
+            <div className="p-4 border-l-4 border-l-yellow-500 bg-yellow-50 rounded-r-lg">
+              <h4 className="font-semibold text-yellow-800 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Warnings ({warnings.length})
+              </h4>
+              <ul className="mt-2 space-y-1">
+                {warnings.map(warning => (
+                  <li key={warning.id} className="text-sm text-yellow-700">
+                    • {warning.name}: {warning.details || 'Needs attention'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {recommendations.length > 0 && (
+            <div className="p-4 border-l-4 border-l-blue-500 bg-blue-50 rounded-r-lg">
+              <h4 className="font-semibold text-blue-800 flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Recommendations ({recommendations.length})
+              </h4>
+              <ul className="mt-2 space-y-1">
+                {recommendations.map((rec: string, index: number) => (
+                  <li key={index} className="text-sm text-blue-700">
+                    • {rec}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
-      {/* Detailed Checks */}
-      <div className="grid gap-4">
-        <h3 className="text-lg font-semibold">Detailed System Checks</h3>
-        
-        {checks.map((check) => (
-          <Card key={check.id} className={check.critical ? 'border-l-4 border-l-blue-500' : ''}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {getCategoryIcon(check.category)}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{check.name}</span>
-                      {check.critical && (
-                        <Badge variant="outline" className="text-xs">CRITICAL</Badge>
-                      )}
+      {/* Detailed System Checks */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Detailed System Checks</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            {checks.map((check) => (
+              <Card key={check.id} className={check.critical ? 'border-l-4 border-l-blue-500' : ''}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {getCategoryIcon(check.category)}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{check.name}</span>
+                          {check.critical && (
+                            <Badge variant="outline" className="text-xs">CRITICAL</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{check.description}</p>
+                        {check.details && (
+                          <p className="text-xs text-muted-foreground mt-1">{check.details}</p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">{check.description}</p>
-                    {check.details && (
-                      <p className="text-xs text-muted-foreground mt-1">{check.details}</p>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(check.status)}
+                      {getStatusBadge(check.status)}
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(check.status)}
-                  <Badge variant={getStatusBadgeVariant(check.status)}>
-                    {check.status === 'pass' ? 'PASS' : 
-                     check.status === 'fail' ? 'FAIL' : 
-                     check.status === 'warning' ? 'WARN' : 'CHECKING'}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Action Items */}
-      {!readyForProduction && (
+      {/* Security Metrics */}
+      {validationData && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              Action Items Required
-            </CardTitle>
-            <CardDescription>
-              Complete these items before deploying to production
-            </CardDescription>
+            <CardTitle>Security & Performance Metrics</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {checks.filter(c => c.status === 'fail').map((check) => (
-                <div key={check.id} className="flex items-center gap-2 p-2 bg-red-50 rounded">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  <span className="text-sm">{check.name}: {check.details || 'Failed check'}</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Authentication Metrics */}
+              {validationData.auth_health?.metrics && (
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-semibold flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4" />
+                    Authentication
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Total Users:</span>
+                      <span className="font-medium">{validationData.auth_health.metrics.total_users}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Verification Rate:</span>
+                      <span className="font-medium">{validationData.auth_health.metrics.verification_rate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Auth Success:</span>
+                      <span className="font-medium">{validationData.auth_health.metrics.successful_auth}</span>
+                    </div>
+                  </div>
                 </div>
-              ))}
-              {checks.filter(c => c.status === 'warning').map((check) => (
-                <div key={check.id} className="flex items-center gap-2 p-2 bg-yellow-50 rounded">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm">{check.name}: {check.details || 'Warning condition'}</span>
+              )}
+
+              {/* Security Metrics */}
+              {validationData.security_compliance?.metrics && (
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-semibold flex items-center gap-2 mb-2">
+                    <Shield className="w-4 h-4" />
+                    Security
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>RLS Protected:</span>
+                      <span className="font-medium">{validationData.security_compliance.metrics.tables_with_rls}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Security Events:</span>
+                      <span className="font-medium">{validationData.security_compliance.metrics.recent_security_events}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Compliance Score:</span>
+                      <span className="font-medium">{validationData.security_compliance.score}/100</span>
+                    </div>
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {/* Production Metrics */}
+              {validationData.production_ready?.component_scores && (
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-semibold flex items-center gap-2 mb-2">
+                    <Rocket className="w-4 h-4" />
+                    Production
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Auth Score:</span>
+                      <span className="font-medium">{validationData.production_ready.component_scores.authentication}/100</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Security Score:</span>
+                      <span className="font-medium">{validationData.production_ready.component_scores.security}/100</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Config Score:</span>
+                      <span className="font-medium">{validationData.production_ready.component_scores.configuration}/100</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

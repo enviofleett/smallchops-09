@@ -6,70 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Build email content function (inline version)
-function buildOutForDeliveryEmailContent(order: any, driver?: any) {
-  const subject = `Your order #${order.order_number} is out for delivery!`;
-  
-  const driverInfo = driver ? `
-    <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">
-      <h3 style="margin: 0 0 8px 0; color: #333;">Your Delivery Driver</h3>
-      <p style="margin: 4px 0;"><strong>${driver.name}</strong></p>
-      <p style="margin: 4px 0;">Phone: ${driver.phone}</p>
-      <p style="margin: 4px 0;">Vehicle: ${driver.vehicle_type}</p>
-    </div>
-  ` : '';
-
-  const itemsList = order.order_items.map((item: any) => `
+// Helper function to build order items HTML for template
+function buildOrderItemsHtml(orderItems: any[]): string {
+  return orderItems.map(item => `
     <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.product_name}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">₦${item.total_price}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #e9ecef;">${item.product_name}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #e9ecef; text-align: center;">${item.quantity}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #e9ecef; text-align: right;">₦${item.total_price?.toLocaleString()}</td>
     </tr>
   `).join('');
+}
 
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h1 style="color: #333; text-align: center;">Your Order is Out for Delivery! 🚚</h1>
-      
-      <p>Hi ${order.customer_name},</p>
-      
-      <p>Great news! Your order <strong>#${order.order_number}</strong> is now out for delivery and should arrive soon.</p>
-      
-      ${driverInfo}
-      
-      <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">
-        <h3 style="margin: 0 0 8px 0; color: #333;">Delivery Details</h3>
-        <p style="margin: 4px 0;"><strong>Address:</strong><br>${order.delivery_address?.street || ''} ${order.delivery_address?.city || ''}</p>
-        ${order.delivery_instructions ? `<p style="margin: 4px 0;"><strong>Instructions:</strong> ${order.delivery_instructions}</p>` : ''}
-        ${order.estimated_delivery_time ? `<p style="margin: 4px 0;"><strong>Estimated Time:</strong> ${new Date(order.estimated_delivery_time).toLocaleString()}</p>` : ''}
-      </div>
-
-      <h3>Order Summary</h3>
-      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-        <thead>
-          <tr style="background-color: #f8f9fa;">
-            <th style="padding: 12px 8px; text-align: left; border-bottom: 2px solid #ddd;">Item</th>
-            <th style="padding: 12px 8px; text-align: center; border-bottom: 2px solid #ddd;">Qty</th>
-            <th style="padding: 12px 8px; text-align: right; border-bottom: 2px solid #ddd;">Price</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsList}
-        </tbody>
-        <tfoot>
-          <tr style="background-color: #f8f9fa; font-weight: bold;">
-            <td colspan="2" style="padding: 12px 8px; border-top: 2px solid #ddd;">Total</td>
-            <td style="padding: 12px 8px; text-align: right; border-top: 2px solid #ddd;">₦${order.total_amount}</td>
-          </tr>
-        </tfoot>
-      </table>
-
-      <p style="margin-top: 24px;">Thank you for your order!</p>
-      <p style="color: #666; font-size: 14px;">If you have any questions, please don't hesitate to contact us.</p>
-    </div>
-  `;
-
-  return { subject, html };
+// Helper function to build order items text for template
+function buildOrderItemsText(orderItems: any[]): string {
+  return orderItems.map(item => 
+    `${item.product_name} - Qty: ${item.quantity} - ₦${item.total_price?.toLocaleString()}`
+  ).join('\n');
 }
 
 serve(async (req) => {
@@ -143,15 +95,30 @@ serve(async (req) => {
       total_amount: order.total_amount
     };
 
-    // Generate email content
-    const { subject, html } = buildOutForDeliveryEmailContent(orderData, driver);
+    // Prepare template variables for the out_for_delivery template
+    const templateVariables = {
+      customer_name: orderData.customer_name,
+      order_number: orderData.order_number,
+      delivery_address: orderData.delivery_address ? 
+        `${orderData.delivery_address?.street || ''} ${orderData.delivery_address?.city || ''}`.trim() : 'N/A',
+      delivery_instructions: orderData.delivery_instructions || '',
+      estimated_delivery_time: orderData.estimated_delivery_time ? 
+        new Date(orderData.estimated_delivery_time).toLocaleString() : '',
+      driver_name: driver?.name || '',
+      driver_phone: driver?.phone || '',
+      driver_vehicle_type: driver?.vehicle_type || '',
+      order_items_html: buildOrderItemsHtml(orderData.order_items || []),
+      order_items_text: buildOrderItemsText(orderData.order_items || []),
+      total_amount: orderData.total_amount?.toLocaleString() || '0',
+      business_name: 'Starters' // Get from business settings if needed
+    };
 
-    // Send email using native SMTP system
+    // Send email using the template from Email Template Manager
     const { data: emailResponse, error: emailError } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         to: order.customer_email,
-        subject: subject,
-        htmlContent: html,
+        templateKey: 'out_for_delivery',
+        variables: templateVariables,
         emailType: 'transactional'
       }
     });

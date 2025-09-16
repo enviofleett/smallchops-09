@@ -8,6 +8,8 @@ import { productionMonitoring } from "./utils/productionMonitoring";
 import { initializeConsoleCleanup, suppressWebSocketErrors } from "./utils/consoleCleanup";
 import { initializeSecureStorage } from "./utils/secureStorage";
 import { initializeSecurityMonitoring } from "./utils/securityHeaders";
+// Import global error handler for ComponentLoadError
+import "./utils/componentErrorHandler";
 
 // Initialize performance monitoring
 initWebVitals();

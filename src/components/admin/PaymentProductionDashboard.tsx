@@ -4,13 +4,15 @@ import { PaymentReconciliation } from './PaymentReconciliation';
 import { PaymentHealthMonitor } from './PaymentHealthMonitor';
 import { PaymentDiagnostics } from '../payments/PaymentDiagnostics';
 import { PaymentEmergencyPanel } from './PaymentEmergencyPanel';
+import { PaystackProductionStatus } from './PaystackProductionStatus';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Helmet } from 'react-helmet-async';
 import { 
   Activity, 
   Search, 
   AlertTriangle, 
-  CheckCircle2 
+  CheckCircle2,
+  Shield
 } from 'lucide-react';
 
 export const PaymentProductionDashboard: React.FC = () => {
@@ -30,10 +32,14 @@ export const PaymentProductionDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="health" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="health" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Health Monitor
+            </TabsTrigger>
+            <TabsTrigger value="production" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Production Status
             </TabsTrigger>
             <TabsTrigger value="reconciliation" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -51,6 +57,10 @@ export const PaymentProductionDashboard: React.FC = () => {
 
           <TabsContent value="health" className="space-y-6">
             <PaymentHealthMonitor />
+          </TabsContent>
+
+          <TabsContent value="production" className="space-y-6">
+            <PaystackProductionStatus />
           </TabsContent>
 
           <TabsContent value="reconciliation" className="space-y-6">

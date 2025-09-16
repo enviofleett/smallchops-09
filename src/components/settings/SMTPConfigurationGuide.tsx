@@ -88,7 +88,13 @@ const SMTP_PROVIDERS: SMTPProvider[] = [
 
 export const SMTPConfigurationGuide: React.FC = () => {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    provider?: string;
+    source?: string;
+    troubleshooting?: string;
+  } | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<SMTPProvider>(SMTP_PROVIDERS[0]);
   const { toast } = useToast();
 
@@ -120,25 +126,39 @@ export const SMTPConfigurationGuide: React.FC = () => {
 
       console.log('📊 SMTP test result:', data);
 
-      if (data.smtpCheck?.configured) {
+      if (data.success && data.connection_healthy) {
         setTestResult({
           success: true,
-          message: `✅ SMTP Connection Successful!\nConnected to ${data.smtpCheck.host}:${data.smtpCheck.port} using ${data.smtpCheck.encryption}\nConfiguration source: ${data.smtpCheck.source}`
+          message: `Connection successful to ${data.provider}`,
+          provider: data.provider,
+          source: data.source
         });
-        
+        const sourceLabel = data.source === 'function_secrets' ? 'Function Secrets (Production)' : 'Database (Development)';
         toast({
-          title: 'SMTP Connection Test Passed',
-          description: `Successfully connected to ${data.smtpCheck.host}`,
+          title: "Connection Test Successful",
+          description: `Successfully connected to ${data.provider} via ${sourceLabel}`,
         });
       } else {
-        throw new Error(data.smtpCheck?.error || 'SMTP not properly configured');
+        setTestResult({
+          success: false,
+          message: data.error || "Connection test failed",
+          provider: data.provider,
+          source: data.source,
+          troubleshooting: data.troubleshooting
+        });
+        toast({
+          title: "Connection Test Failed",
+          description: data.troubleshooting || data.error || "Failed to establish SMTP connection",
+          variant: "destructive",
+        });
       }
     } catch (error: any) {
       console.error('💥 SMTP test error:', error);
       
       setTestResult({
         success: false,
-        message: `❌ SMTP Connection Failed:\n${error.message}`
+        message: error.message,
+        troubleshooting: 'Check your SMTP credentials and configuration'
       });
       
       toast({
@@ -192,16 +212,31 @@ export const SMTPConfigurationGuide: React.FC = () => {
             )}
           </div>
 
-          {testResult && (
-            <Alert variant={testResult.success ? 'default' : 'destructive'}>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <pre className="whitespace-pre-wrap font-mono text-xs">
+            {testResult && (
+              <Alert variant={testResult.success ? "default" : "destructive"}>
+                <AlertDescription>
                   {testResult.message}
-                </pre>
-              </AlertDescription>
-            </Alert>
-          )}
+                  {testResult.provider && (
+                    <div className="text-sm mt-1 opacity-75">
+                      Provider: {testResult.provider}
+                      {testResult.source && (
+                        <Badge 
+                          variant={testResult.source === 'function_secrets' ? "default" : "secondary"}
+                          className="ml-2"
+                        >
+                          {testResult.source === 'function_secrets' ? 'Production Config' : 'Development Config'}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  {testResult.troubleshooting && !testResult.success && (
+                    <div className="text-sm mt-2 p-2 bg-muted rounded">
+                      <strong>Solution:</strong> {testResult.troubleshooting}
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
 
           {/* Provider Configuration */}
           <Tabs defaultValue="gmail" className="w-full">

@@ -51,10 +51,43 @@ export const ProductForm = ({
   });
 
   const handleSubmit = async (data: ProductFormData) => {
-    await onSubmit({
-      ...data,
-      imageFile: imageFile || undefined
-    });
+    try {
+      console.log('Form submission started:', { hasImageFile: !!imageFile, isUpdate: !!product });
+      
+      await onSubmit({
+        ...data,
+        imageFile: imageFile || undefined
+      });
+      
+      console.log('Form submission successful, resetting image state');
+      
+      // Reset image file state after successful submission
+      setImageFile(null);
+      
+      // Reset form to reflect the updated state
+      if (product) {
+        form.reset({
+          ...data,
+          image_url: '', // This will be updated by the parent component
+        });
+      }
+      
+    } catch (error: any) {
+      console.error('Form submission failed:', error);
+      
+      // Don't reset image file on error so user can retry
+      // Provide user-friendly error messages
+      if (error.message?.includes('Rate limit') || error.message?.includes('429')) {
+        throw new Error('Upload rate limit reached. Please wait a moment and try again.');
+      } else if (error.message?.includes('timeout')) {
+        throw new Error('Upload timed out. Please check your connection and try again.');
+      } else if (error.message?.includes('Upload failed')) {
+        throw new Error('Image upload failed. Please try again or contact support if the issue persists.');
+      }
+      
+      // Re-throw to let parent handle the error
+      throw error;
+    }
   };
 
   const watchPrice = form.watch('price');
@@ -288,10 +321,19 @@ export const ProductForm = ({
                   if (!file) {
                     // When file is removed, clear the form URL too
                     form.setValue('image_url', '');
+                  } else {
+                    // When new file is selected, clear any existing URL to prevent conflicts
+                    form.setValue('image_url', '');
                   }
                 }}
+                disabled={isLoading}
                 className="mt-2"
               />
+              {imageFile && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  New image selected: {imageFile.name}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -337,8 +379,21 @@ export const ProductForm = ({
         />
 
         <div className="flex justify-end space-x-4">
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Saving...' : product ? 'Update Product' : 'Create Product'}
+          <Button 
+            type="submit" 
+            disabled={isLoading}
+            className="min-w-[120px]"
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <span>
+                  {imageFile ? 'Uploading...' : (product ? 'Updating...' : 'Creating...')}
+                </span>
+              </div>
+            ) : (
+              product ? 'Update Product' : 'Create Product'
+            )}
           </Button>
         </div>
       </form>

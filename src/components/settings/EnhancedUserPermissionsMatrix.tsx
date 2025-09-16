@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { logPermissionChange, logSecurityEvent } from '@/utils/adminActivityLogger';
+import { PermissionMatrixHealthMonitor } from "@/components/admin/PermissionMatrixHealthMonitor";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -30,6 +32,7 @@ interface AdminUser {
   id: string;
   name: string;
   role: string;
+  is_active: boolean;
 }
 
 interface MenuStructure {
@@ -60,6 +63,50 @@ const permissionLevels = [
   { value: 'edit', label: 'Full Access', color: 'default' },
 ];
 
+// PRODUCTION SECURITY: Validate permission assignments before saving
+const validatePermissionsForProduction = (permissions: Record<string, string>, isAdminUser: boolean) => {
+  const criticalMenus = [
+    'settings_admin_users',
+    'settings_admin_permissions', 
+    'settings_payments_providers',
+    'settings_developer_auth',
+    'settings_developer_payments_webhooks'
+  ];
+  
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  
+  // STRICT ADMIN MODE: Admin users must have 'edit' for all menu access
+  if (isAdminUser) {
+    Object.entries(permissions).forEach(([menuKey, level]) => {
+      if (level === 'view') {
+        warnings.push(`${menuKey}: Admin users need 'Full Access' not 'View Only' for menu access`);
+      }
+      if (level === 'none') {
+        warnings.push(`${menuKey}: Admin user will lose access to this menu with 'No Access'`);
+      }
+    });
+    
+    // Critical: Ensure admin retains user management access
+    if (permissions['settings_admin_users'] !== 'edit') {
+      errors.push('Admin users must maintain Full Access to User Management to prevent lockout');
+    }
+  } else {
+    // Check for critical menus with insufficient permissions for regular users
+    criticalMenus.forEach(menuKey => {
+      const level = permissions[menuKey];
+      if (level === 'view') {
+        warnings.push(`${menuKey}: View-only access to critical system area`);
+      }
+      if (level === 'none') {
+        warnings.push(`${menuKey}: No access to critical system area`);
+      }
+    });
+  }
+  
+  return { warnings, errors, isValid: errors.length === 0 };
+};
+
 const getMenuIcon = (menuKey: string) => {
   switch (menuKey) {
     case 'dashboard': return <Home className="h-4 w-4" />;
@@ -70,6 +117,38 @@ const getMenuIcon = (menuKey: string) => {
     case 'payment': return <CreditCard className="h-4 w-4" />;
     case 'reports': return <BarChart3 className="h-4 w-4" />;
     case 'settings': return <Settings className="h-4 w-4" />;
+    
+    // Settings sub-tabs
+    case 'settings_communications': return <Settings className="h-4 w-4" />;
+    case 'settings_communications_branding': return <RefreshCw className="h-4 w-4" />;
+    case 'settings_communications_content': return <Package className="h-4 w-4" />;
+    case 'settings_communications_support': return <Users className="h-4 w-4" />;
+    case 'settings_communications_email_processing': return <Settings className="h-4 w-4" />;
+    
+    case 'settings_payments': return <CreditCard className="h-4 w-4" />;
+    case 'settings_payments_providers': return <CreditCard className="h-4 w-4" />;
+    case 'settings_payments_pickup_points': return <Truck className="h-4 w-4" />;
+    
+    case 'settings_admin': return <Shield className="h-4 w-4" />;
+    case 'settings_admin_users': return <Users className="h-4 w-4" />;
+    case 'settings_admin_permissions': return <Shield className="h-4 w-4" />;
+    
+    case 'settings_developer': return <Settings className="h-4 w-4" />;
+    case 'settings_developer_auth': return <Shield className="h-4 w-4" />;
+    case 'settings_developer_buying_logic': return <ShoppingCart className="h-4 w-4" />;
+    case 'settings_developer_checkout': return <CreditCard className="h-4 w-4" />;
+    case 'settings_developer_payments_webhooks': return <CreditCard className="h-4 w-4" />;
+    case 'settings_developer_email': return <Settings className="h-4 w-4" />;
+    case 'settings_developer_email_credentials': return <Shield className="h-4 w-4" />;
+    case 'settings_developer_email_communications': return <Settings className="h-4 w-4" />;
+    case 'settings_developer_email_processing': return <RefreshCw className="h-4 w-4" />;
+    case 'settings_developer_email_monitoring': return <BarChart3 className="h-4 w-4" />;
+    case 'settings_developer_email_analytics': return <BarChart3 className="h-4 w-4" />;
+    case 'settings_developer_oauth': return <Shield className="h-4 w-4" />;
+    case 'settings_developer_registration_health': return <BarChart3 className="h-4 w-4" />;
+    case 'settings_developer_production_readiness': return <Shield className="h-4 w-4" />;
+    case 'settings_developer_performance': return <BarChart3 className="h-4 w-4" />;
+    
     default: return <Shield className="h-4 w-4" />;
   }
 };
@@ -83,16 +162,12 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch admin users with error handling
+  // Fetch admin users with error handling using secure RPC
   const { data: adminUsers, isLoading: loadingUsers, error: usersError } = useQuery({
-    queryKey: ['admin-users'],
+    queryKey: ['admin-users-secure'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, name, role')
-          .in('role', ['admin', 'manager'])
-          .order('name');
+        const { data, error } = await supabase.rpc('get_admin_users_secure');
         
         if (error) {
           console.error('Error fetching admin users:', error);
@@ -109,16 +184,12 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
     retryDelay: 1000
   });
 
-  // Fetch comprehensive menu structure including payment permissions
+  // Fetch comprehensive menu structure using secure RPC
   const { data: menuStructure, isLoading: loadingMenus, error: menusError } = useQuery({
-    queryKey: ['enhanced-menu-structure'],
+    queryKey: ['enhanced-menu-structure-secure'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
-          .from('menu_structure')
-          .select('*')
-          .eq('is_active', true)
-          .order('sort_order');
+        const { data, error } = await supabase.rpc('get_menu_structure_secure');
 
         if (error) {
           console.error('Error fetching menu structure:', error);
@@ -160,21 +231,20 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
     retryDelay: 1000
   });
 
-  // Fetch user permissions with enhanced error handling
+  // Fetch user permissions using secure RPC
   const { data: userPermissions, isLoading: loadingPermissions, error: permissionsError, refetch: refetchPermissions } = useQuery({
-    queryKey: ['enhanced-user-permissions', currentUser?.id],
+    queryKey: ['enhanced-user-permissions-secure', currentUser?.id],
     queryFn: async () => {
       if (!currentUser?.id) return [];
 
       try {
-        const { data, error } = await supabase
-          .from('user_permissions')
-          .select('menu_key, permission_level')
-          .eq('user_id', currentUser.id);
+        const { data, error } = await supabase.rpc('get_user_permissions_secure', {
+          target_user_id: currentUser.id
+        });
 
         if (error) {
           console.error('Error fetching user permissions:', error);
-          throw error;
+          throw new Error(`Permission fetch failed: ${error.message}`);
         }
         
         console.log('Fetched user permissions for user:', currentUser.id, data);
@@ -185,8 +255,14 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
       }
     },
     enabled: !!currentUser?.id,
-    retry: 3,
-    retryDelay: 1000
+    retry: (failureCount, error) => {
+      // Don't retry on permission errors
+      if (error?.message?.includes('Permission') || error?.message?.includes('Access denied')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
   });
 
   // Update local permissions state when data loads
@@ -222,9 +298,14 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
       
       setPermissions(permissionMap);
       
-      // Auto-expand payment section to show new permissions
-      if (allKeys.some(key => key.startsWith('payment'))) {
-        setExpandedMenus(prev => new Set([...prev, 'payment']));
+      // Auto-expand settings and payment sections to show new permissions
+      const sectionsToExpand = ['settings', 'payment'];
+      if (allKeys.some(key => sectionsToExpand.some(section => key.startsWith(section)))) {
+        setExpandedMenus(prev => {
+          const newSet = new Set([...prev]);
+          sectionsToExpand.forEach(section => newSet.add(section));
+          return newSet;
+        });
       }
     }
   }, [userPermissions, menuStructure]);
@@ -247,55 +328,171 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
   };
 
   const handleSavePermissions = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      toast({
+        title: "No user selected",
+        description: "Please select a user to update permissions.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     try {
-      // Use admin management edge function for better security and audit logging
-      const response = await supabase.functions.invoke('admin-management', {
-        method: 'POST',
-        body: {
-          action: 'update_permissions',
-          userId: currentUser.id,
-          permissions: Object.fromEntries(
-            Object.entries(permissions).filter(([_, level]) => level !== 'none')
-          )
-        }
-      });
+      // Validate permissions data
+      const validPermissions = Object.entries(permissions).filter(([key, value]) => 
+        key && value && ['none', 'view', 'edit'].includes(value)
+      );
 
-      if (response.error) {
-        console.error('Edge function error:', response.error);
-        throw new Error(response.error.message || 'Failed to update permissions');
-      }
-
-      toast({
-        title: "Permissions updated successfully",
-        description: `Permissions have been updated for ${currentUser.name}`,
-      });
-
-      // Refresh permissions data
-      await refetchPermissions();
-      queryClient.invalidateQueries({ queryKey: ['enhanced-user-permissions'] });
-      setRetryCount(0);
-
-    } catch (error: any) {
-      console.error('Error updating permissions:', error);
-      
-      // Implement retry logic for network errors
-      if (retryCount < 2 && (error.message?.includes('network') || error.message?.includes('fetch'))) {
-        setRetryCount(prev => prev + 1);
-        setTimeout(() => handleSavePermissions(), 2000);
+      if (validPermissions.length === 0) {
         toast({
-          title: "Retrying...",
-          description: `Network error, retrying (${retryCount + 1}/3)`,
+          title: "No permissions to update",
+          description: "Please configure at least one permission.",
           variant: "destructive"
         });
         return;
       }
 
+      // PRODUCTION VALIDATION: Check permissions for admin users
+      const isAdminUser = currentUser.role === 'admin';
+      const validation = validatePermissionsForProduction(permissions, isAdminUser);
+      
+      if (!validation.isValid) {
+        toast({
+          title: "Permission validation failed",
+          description: validation.errors.join('. '),
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Show warnings for admin permission assignments
+      if (validation.warnings.length > 0) {
+        console.warn('Permission warnings:', validation.warnings);
+        // Could add a confirmation dialog here for warnings
+      }
+
+      // Check rate limit first (skip if function not available)
+      try {
+        const { data: rateLimitCheck, error: rateLimitError } = await supabase.rpc('check_permission_change_rate_limit', {
+          target_user_id: currentUser.id
+        });
+
+        if (rateLimitCheck && !rateLimitError) {
+          // Handle different return types from the rate limit function
+          let isAllowed = true;
+          if (typeof rateLimitCheck === 'boolean') {
+            isAllowed = rateLimitCheck;
+          } else if (typeof rateLimitCheck === 'object' && 'allowed' in rateLimitCheck) {
+            isAllowed = (rateLimitCheck as any).allowed;
+          }
+          
+          if (!isAllowed) {
+            toast({
+              title: "Rate limit exceeded",
+              description: `Too many permission changes. Please wait before trying again.`,
+              variant: "destructive"
+            });
+            return;
+          }
+        }
+      } catch (rateLimitError) {
+        // Rate limiting not available, proceed without it
+        console.warn('Rate limiting not available:', rateLimitError);
+      }
+
+      // PRODUCTION ADMIN ACTIVITY LOGGING: Track all permission changes
+      try {
+        // Log the permission change with comprehensive audit trail
+        const previousPermissions = userPermissions?.reduce((acc, perm) => {
+          acc[perm.menu_key] = perm.permission_level;
+          return acc;
+        }, {} as Record<string, string>) || {};
+
+        await logPermissionChange(
+          currentUser.id,
+          Object.fromEntries(validPermissions),
+          previousPermissions
+        );
+
+        // Log security event for admin permission changes
+        if (currentUser.role === 'admin') {
+          await logSecurityEvent(
+            'admin_permission_modified',
+            {
+              target_user_id: currentUser.id,
+              target_user_name: currentUser.name,
+              changes_count: validPermissions.length,
+              validation_warnings: validation.warnings,
+              admin_user: isAdminUser
+            },
+            'high'
+          );
+        }
+      } catch (loggingError) {
+        console.warn('Admin activity logging failed (non-blocking):', loggingError);
+      }
+
+      // Use secure RPC function for permission updates
+      const { data: result, error: updateError } = await supabase.rpc('update_user_permissions_secure', {
+        target_user_id: currentUser.id,
+        permissions_data: Object.fromEntries(validPermissions)
+      });
+
+      if (updateError) {
+        console.error('Permission update error:', updateError);
+        throw new Error(updateError.message || 'Failed to update permissions');
+      }
+
+      // Record the rate limit usage (non-blocking)
+      try {
+        await supabase.rpc('record_permission_change_rate_limit', {
+          target_user_id: currentUser.id,
+          changes_count: (result && typeof result === 'object' && 'changes_count' in result) ? 
+            Number(result.changes_count) || validPermissions.length : validPermissions.length
+        });
+      } catch (rateLimitLogError) {
+        console.warn('Could not log rate limit usage:', rateLimitLogError);
+      }
+
       toast({
-        title: "Error updating permissions",
-        description: error.message || "Failed to update permissions. Please try again.",
+        title: "Permissions updated successfully", 
+        description: `${(result && typeof result === 'object' && 'changes_count' in result) ? (result as any).changes_count : validPermissions.length} permissions updated for ${currentUser.name}`,
+      });
+
+      // Refresh permissions data
+      await refetchPermissions();
+      queryClient.invalidateQueries({ queryKey: ['enhanced-user-permissions-secure'] });
+      setRetryCount(0);
+
+    } catch (error: any) {
+      console.error('Error updating permissions:', error);
+      
+      // Implement retry logic for network errors only
+      if (retryCount < 2 && 
+          (error.message?.includes('network') || 
+           error.message?.includes('fetch') || 
+           error.message?.includes('timeout'))) {
+        setRetryCount(prev => prev + 1);
+        setTimeout(() => handleSavePermissions(), Math.min(2000 * (retryCount + 1), 10000));
+        toast({
+          title: "Connection issue, retrying...",
+          description: `Attempt ${retryCount + 1}/3 - Network error detected`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Handle specific error types
+      const errorMessage = error.message?.includes('Permission denied') 
+        ? "You don't have permission to perform this action."
+        : error.message?.includes('User not found')
+        ? "The selected user could not be found."
+        : error.message || "An unexpected error occurred while updating permissions.";
+
+      toast({
+        title: "Failed to update permissions",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -327,6 +524,16 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
             {menu.key.startsWith('payment') && (
               <Badge variant="outline" className="text-xs">
                 Payment Feature
+              </Badge>
+            )}
+            {menu.key.startsWith('settings_developer') && (
+              <Badge variant="destructive" className="text-xs">
+                Developer Only
+              </Badge>
+            )}
+            {menu.key.startsWith('settings_admin') && (
+              <Badge variant="secondary" className="text-xs">
+                Admin Only
               </Badge>
             )}
           </div>
@@ -380,9 +587,9 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
           </Alert>
           <Button 
             onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-              queryClient.invalidateQueries({ queryKey: ['enhanced-menu-structure'] });
-              queryClient.invalidateQueries({ queryKey: ['enhanced-user-permissions'] });
+              queryClient.invalidateQueries({ queryKey: ['admin-users-secure'] });
+              queryClient.invalidateQueries({ queryKey: ['enhanced-menu-structure-secure'] });
+              queryClient.invalidateQueries({ queryKey: ['enhanced-user-permissions-secure'] });
             }}
             className="mt-4"
             variant="outline"
@@ -433,13 +640,22 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>User Permissions Matrix</CardTitle>
-        <CardDescription>
-          Manage access levels for different features including payment settings
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      {/* Health Monitor */}
+      <PermissionMatrixHealthMonitor />
+      
+      {/* Main Permission Matrix */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            User Permissions Matrix
+          </CardTitle>
+          <CardDescription>
+            Comprehensive access control for all application features including settings, payments, and developer tools. 
+            Configure granular permissions for each admin user across all system areas.
+          </CardDescription>
+        </CardHeader>
       <CardContent className="space-y-6">
         {!selectedUser && (
           <div>
@@ -459,7 +675,7 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
                   <SelectItem key={user.id} value={user.id}>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{user.role}</Badge>
-                      {user.name}
+                      <span>{user.name}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -475,9 +691,10 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
                 <h3 className="text-lg font-semibold">
                   Permissions for {currentUser.name}
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Role: <Badge>{currentUser.role}</Badge>
-                </p>
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <span>Role:</span>
+                  <Badge>{currentUser.role}</Badge>
+                </div>
               </div>
               <Button 
                 onClick={handleSavePermissions} 
@@ -508,5 +725,6 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
         )}
       </CardContent>
     </Card>
+    </div>
   );
 };

@@ -8,7 +8,9 @@ import { CheckoutFlow } from '@/components/checkout/CheckoutFlow';
 import { useCart, Cart } from '@/hooks/useCart';
 import { useMOQValidation } from '@/hooks/useMOQValidation';
 import { formatCurrency } from '@/lib/discountCalculations';
-import { Tag, X, Gift, Loader2, AlertTriangle } from 'lucide-react';
+import { validatePromotionCode } from '@/api/promotionValidation';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { Tag, X, Gift, Loader2, AlertTriangle, Clock, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CartSummaryProps {
@@ -18,9 +20,14 @@ interface CartSummaryProps {
 export function CartSummary({ cart }: CartSummaryProps) {
   const { applyPromotionCode, removePromotionCode } = useCart();
   const { validateMOQ } = useMOQValidation();
+  const { customerAccount } = useCustomerAuth();
   const [showCheckout, setShowCheckout] = useState(false);
   const [promotionCode, setPromotionCode] = useState('');
   const [isApplyingPromotion, setIsApplyingPromotion] = useState(false);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    attempts_remaining?: number;
+    blocked_until?: string;
+  }>({});
 
   // Check for MOQ violations
   const moqValidation = validateMOQ(cart.items, cart.items);
@@ -34,15 +41,48 @@ export function CartSummary({ cart }: CartSummaryProps) {
 
     setIsApplyingPromotion(true);
     try {
-      const result = await applyPromotionCode(promotionCode.trim());
-      if (result.success) {
-        toast.success(result.message);
-        setPromotionCode('');
+      // Use the enhanced validation with rate limiting
+      const result = await validatePromotionCode(
+        promotionCode.trim(),
+        cart.summary.subtotal,
+        customerAccount?.email,
+        customerAccount?.id,
+        cart.items
+      );
+
+      // Update rate limit info
+      setRateLimitInfo({
+        attempts_remaining: result.attempts_remaining,
+        blocked_until: result.rate_limited ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : undefined
+      });
+
+      if (result.valid && result.promotion) {
+        // Apply the promotion using the existing cart logic
+        const applyResult = await applyPromotionCode(promotionCode.trim());
+        
+        if (applyResult.success) {
+          toast.success('🎉 ' + (result.promotion.name || 'Promotion applied successfully!'), {
+            description: result.discount_amount ? `You saved ${formatCurrency(result.discount_amount)}` : undefined
+          });
+          setPromotionCode('');
+          setRateLimitInfo({ attempts_remaining: result.attempts_remaining });
+        } else {
+          toast.error(applyResult.message || 'Failed to apply promotion');
+        }
       } else {
-        toast.error(result.message);
+        // Show specific error messages
+        if (result.rate_limited) {
+          toast.error('🚫 Too many attempts', {
+            description: result.error,
+            duration: 5000
+          });
+        } else {
+          toast.error(result.error || 'Invalid promotion code');
+        }
       }
     } catch (error) {
-      toast.error('Failed to apply promotion code');
+      console.error('Promotion application error:', error);
+      toast.error('Failed to apply promotion code. Please try again.');
     } finally {
       setIsApplyingPromotion(false);
     }
@@ -89,19 +129,44 @@ export function CartSummary({ cart }: CartSummaryProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Tag className="w-4 h-4" />
-                Promo Code
+                <span>Promo Code</span>
+                {rateLimitInfo.attempts_remaining !== undefined && (
+                  <Badge variant="outline" className="ml-auto text-xs">
+                    <Shield className="w-3 h-3 mr-1" />
+                    {rateLimitInfo.attempts_remaining} attempts left
+                  </Badge>
+                )}
               </div>
+              
+              {rateLimitInfo.blocked_until && new Date(rateLimitInfo.blocked_until) > new Date() && (
+                <div className="flex items-center gap-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
+                  <Clock className="w-3 h-3" />
+                  <span>Too many attempts. Try again in 15 minutes.</span>
+                </div>
+              )}
+              
               <div className="flex gap-2">
                 <Input
                   placeholder="Enter code"
                   value={promotionCode}
                   onChange={(e) => setPromotionCode(e.target.value.toUpperCase())}
-                  onKeyPress={(e) => e.key === 'Enter' && handleApplyPromotionCode()}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !isApplyingPromotion) {
+                      handleApplyPromotionCode();
+                    }
+                  }}
                   className="text-sm"
+                  disabled={isApplyingPromotion || (rateLimitInfo.blocked_until && new Date(rateLimitInfo.blocked_until) > new Date())}
+                  maxLength={20}
                 />
                 <Button 
                   onClick={handleApplyPromotionCode} 
-                  disabled={isApplyingPromotion || !promotionCode.trim()}
+                  disabled={
+                    isApplyingPromotion || 
+                    !promotionCode.trim() || 
+                    (rateLimitInfo.blocked_until && new Date(rateLimitInfo.blocked_until) > new Date()) ||
+                    rateLimitInfo.attempts_remaining === 0
+                  }
                   variant="outline"
                   size="sm"
                 >
@@ -112,6 +177,12 @@ export function CartSummary({ cart }: CartSummaryProps) {
                   )}
                 </Button>
               </div>
+              
+              {rateLimitInfo.attempts_remaining === 0 && !rateLimitInfo.blocked_until && (
+                <div className="text-xs text-muted-foreground">
+                  No more attempts available this hour. Please try again later.
+                </div>
+              )}
             </div>
           )}
 
@@ -150,38 +221,8 @@ export function CartSummary({ cart }: CartSummaryProps) {
               <span>{formatCurrency(cart.summary.total_amount)}</span>
             </div>
 
-            {/* Tax Summary Box */}
-            <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Tax Breakdown</h4>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span>Items VAT:</span>
-                  <span>{formatCurrency(cart.summary.total_vat)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>Total VAT Inclusive:</span>
-                  <span className="font-medium">{formatCurrency(cart.summary.total_vat)}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* BOGO Items Display */}
-          {cart.summary.applied_promotions.some(p => p.bogo_items?.length) && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <h4 className="font-medium text-sm text-green-800 mb-2">Free Items (BOGO):</h4>
-              {cart.summary.applied_promotions
-                .filter(p => p.bogo_items?.length)
-                .map(promotion => 
-                  promotion.bogo_items?.map(item => (
-                    <div key={`${promotion.id}-${item.product_id}`} className="flex justify-between text-sm text-green-700">
-                      <span>{item.product_name} x{item.free_quantity}</span>
-                      <span className="font-medium">FREE!</span>
-                    </div>
-                  ))
-                )}
-            </div>
-          )}
 
           {/* MOQ Violation Warning */}
           {hasMOQViolations && (

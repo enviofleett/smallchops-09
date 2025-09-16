@@ -21,9 +21,33 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
   const isMOQViolated = item.quantity < moq;
 
   return (
-    <div className="flex items-start gap-4">
-      {/* Product Image */}
-      <div className="w-20 h-20 sm:w-16 sm:h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+    <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+      {/* Mobile: Product Info First */}
+      <div className="sm:hidden w-full">
+        <div className="flex items-start gap-3">
+          <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+            <img 
+              src={item.image_url || '/placeholder.svg'} 
+              alt={item.product_name}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-sm mb-1 leading-tight">{item.product_name}</h4>
+            <div className="mb-2">
+              <PriceDisplay
+                originalPrice={item.original_price || item.price}
+                discountedPrice={hasDiscount ? item.price : undefined}
+                hasDiscount={hasDiscount}
+                size="sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: Product Image */}
+      <div className="hidden sm:block w-20 h-20 md:w-16 md:h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
         <img 
           src={item.image_url || '/placeholder.svg'} 
           alt={item.product_name}
@@ -31,9 +55,9 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
         />
       </div>
 
-      {/* Product Info */}
-      <div className="flex-1 min-w-0 pr-2">
-        <h4 className="font-medium text-base sm:text-sm mb-1 leading-tight">{item.product_name}</h4>
+      {/* Desktop: Product Info */}
+      <div className="hidden sm:block flex-1 min-w-0 pr-2">
+        <h4 className="font-medium text-base md:text-sm mb-1 leading-tight">{item.product_name}</h4>
         
         {/* Price Display */}
         <div className="mb-2">
@@ -79,29 +103,104 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
         )}
       </div>
       
-      {/* Right Side - Quantity, Price, Remove */}
-      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 sm:gap-6">
-        {/* Mobile Layout: Price First */}
-        <div className="sm:hidden text-right">
-          <div className="font-semibold text-base">
-            {formatCurrency(lineTotal)}
-          </div>
-          
-          {hasDiscount && savings > 0 && (
-            <div className="text-xs text-green-600">
-              Save {formatCurrency(savings)}
-            </div>
-          )}
-          
-          {hasDiscount && (
-            <div className="text-xs text-muted-foreground line-through">
-              {formatCurrency(originalLineTotal)}
-            </div>
+      {/* Mobile: Stock Status and MOQ */}
+      <div className="sm:hidden w-full">
+        <div className="flex flex-wrap gap-2 mb-3">
+          <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+            In Stock
+          </Badge>
+          {moq > 1 && (
+            <MOQBadge 
+              minimumQuantity={moq}
+              currentQuantity={item.quantity}
+              variant={isMOQViolated ? 'warning' : 'success'}
+              className="text-xs"
+            />
           )}
         </div>
+        
+        {/* Mobile: Customizations */}
+        {item.customizations && Object.keys(item.customizations).length > 0 && (
+          <div className="mb-2 text-xs text-muted-foreground">
+            {Object.entries(item.customizations).map(([key, value]) => (
+              <div key={key}>
+                {key}: {Array.isArray(value) ? value.join(', ') : String(value)}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Mobile: Special Instructions */}
+        {item.special_instructions && (
+          <div className="mb-3 text-xs text-muted-foreground italic">
+            Note: {item.special_instructions}
+          </div>
+        )}
+      </div>
+      
+      {/* Controls Row - Mobile Full Width, Desktop Right Side */}
+      <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-6">
+        {/* Mobile: Quantity and Total Price Row */}
+        <div className="sm:hidden flex items-center justify-between">
+          {/* Quantity Controls */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+              disabled={item.quantity <= moq}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            
+            <span className="w-8 text-center text-sm font-medium">
+              {item.quantity}
+            </span>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
 
-        {/* Quantity Controls and Actions */}
-        <div className="flex items-center gap-3 sm:gap-6">
+          {/* Mobile: Price and Remove */}
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="font-semibold text-base">
+                {formatCurrency(lineTotal)}
+              </div>
+              
+              {hasDiscount && savings > 0 && (
+                <div className="text-xs text-green-600">
+                  Save {formatCurrency(savings)}
+                </div>
+              )}
+              
+              {hasDiscount && (
+                <div className="text-xs text-muted-foreground line-through">
+                  {formatCurrency(originalLineTotal)}
+                </div>
+              )}
+            </div>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+              onClick={() => onRemove(item.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Desktop: Quantity Controls and Actions */}
+        <div className="hidden sm:flex items-center gap-3 md:gap-6">
           {/* Quantity Controls */}
           <div className="flex items-center gap-2">
             <Button

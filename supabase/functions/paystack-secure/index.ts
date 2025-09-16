@@ -36,11 +36,65 @@ serve(async (req) => {
   try {
     console.log(`🔄 Paystack secure function called [${VERSION}]`)
     
-    // Initialize Supabase client
+    // Get and validate JWT token
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Authorization required',
+        code: 'UNAUTHORIZED'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const jwt = authHeader.replace('Bearer ', '')
+    
+    // Initialize Supabase clients
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+    
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        }
+      }
+    )
+
+    // Determine if this is an internal service call (service role token)
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const isInternal = jwt === serviceRoleKey
+
+    // Verify user authentication unless internal
+    let user: any = null
+    if (isInternal) {
+      console.log('🛡️ Internal service call authorized via service role')
+      user = { id: 'service-role', email: 'internal@service.local' }
+    } else {
+      const { data: userData, error: authError } = await supabaseClient.auth.getUser(jwt)
+      if (authError || !userData?.user) {
+        console.error('❌ Authentication failed:', authError)
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Invalid authentication token',
+          code: 'AUTH_INVALID'
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      user = userData.user
+      console.log('✅ User authenticated:', user.id)
+    }
 
     // Get environment-specific Paystack configuration
     let paystackConfig;
@@ -84,22 +138,28 @@ serve(async (req) => {
     if (action === 'initialize') {
       return await initializePayment({
         supabaseAdmin,
+        supabaseClient,
+        user,
         paystackConfig,
         email,
         amount,
         reference,
         metadata,
         callback_url,
-        corsHeaders
+        corsHeaders,
+        isInternal
       })
     }
 
     if (action === 'verify') {
       return await verifyPayment({
         supabaseAdmin,
+        supabaseClient,
+        user,
         paystackConfig,
         reference: reference || requestBody.reference,
-        corsHeaders
+        corsHeaders,
+        isInternal
       })
     }
 
@@ -125,13 +185,16 @@ serve(async (req) => {
 
 async function initializePayment({
   supabaseAdmin,
+  supabaseClient,
+  user,
   paystackConfig,
   email,
   amount,
   reference,
   metadata,
   callback_url,
-  corsHeaders
+  corsHeaders,
+  isInternal
 }: any) {
   try {
     const orderId = metadata?.order_id
@@ -141,16 +204,54 @@ async function initializePayment({
 
     console.log('🔍 Fetching authoritative order data:', orderId)
 
-    // Get order details for authoritative amount
+    // Check if user is admin
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = isInternal || profile?.role === 'admin'
+
+    // Get order details for authorization check
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select('id, total_amount, delivery_fee, delivery_zone_id, payment_reference, customer_name, order_number, order_type')
+      .select('id, total_amount, delivery_fee, delivery_zone_id, payment_reference, customer_name, order_number, order_type, customer_email, user_id')
       .eq('id', orderId)
       .single()
 
     if (orderError || !order) {
       throw new Error(`Order not found: ${orderId}`)
     }
+
+    // Authorization check: admin or order owner
+    if (!isAdmin && order.user_id !== user.id) {
+      // For guest orders, check if email matches
+      if (!order.user_id && order.customer_email === user.email) {
+        console.log('✅ Guest order email match authorization')
+      } else {
+        console.error('❌ Authorization failed - user not order owner', {
+          userId: user.id,
+          orderUserId: order.user_id,
+          userEmail: user.email,
+          orderEmail: order.customer_email,
+          isAdmin
+        })
+        throw new Error('Access denied: not authorized for this order')
+      }
+    }
+
+    console.log('✅ User authorized for order:', { userId: user.id, isAdmin, orderId })
+
+    // Get business settings for website URL
+    const { data: businessSettings } = await supabaseAdmin
+      .from('business_settings')
+      .select('website_url')
+      .single()
+
+    const frontendUrl = businessSettings?.website_url || 'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.sandbox.lovable.dev'
+
+    // Order already fetched above for authorization
 
     // Compute authoritative amount to ensure delivery fee is included
     let deliveryFee = Number(order.delivery_fee) || 0
@@ -254,13 +355,14 @@ async function initializePayment({
       order_found: true
     })
 
-    // Prepare Paystack payload
+    // Prepare Paystack payload with frontend callback URL
+    const frontendCallbackUrl = `${frontendUrl}/payment/callback?order_id=${orderId}`
     const paystackPayload: PaystackInitializePayload = {
       email: email,
       amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: finalReference,
-      callback_url: callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${orderId}`,
+      callback_url: callback_url || frontendCallbackUrl,
       channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
       metadata: {
         order_id: orderId,
@@ -331,7 +433,7 @@ async function initializePayment({
             .eq('id', orderId)
           
           paystackPayload.reference = newReference
-          paystackPayload.callback_url = callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${orderId}`
+          paystackPayload.callback_url = callback_url || frontendCallbackUrl
           
           retryAttempt++
           continue
@@ -396,12 +498,50 @@ async function initializePayment({
 
 async function verifyPayment({
   supabaseAdmin,
+  supabaseClient,
+  user,
   paystackConfig,
   reference,
   corsHeaders
 }: any) {
   try {
     console.log('🔍 Verifying payment:', reference)
+
+    // Check if user is admin
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = profile?.role === 'admin'
+
+    // Get payment transaction to check authorization
+    const { data: transaction } = await supabaseAdmin
+      .from('payment_transactions')
+      .select('order_id, customer_email')
+      .eq('reference', reference)
+      .single()
+
+    if (transaction) {
+      // Get order to check ownership
+      const { data: order } = await supabaseAdmin
+        .from('orders')
+        .select('user_id, customer_email')
+        .eq('id', transaction.order_id)
+        .single()
+
+      if (order && !isAdmin && order.user_id !== user.id) {
+        // For guest orders, check email match
+        if (!order.user_id && order.customer_email === user.email) {
+          console.log('✅ Guest order verification authorized')
+        } else {
+          throw new Error('Access denied: not authorized for this payment')
+        }
+      }
+    }
+
+    console.log('✅ User authorized for payment verification:', { userId: user.id, isAdmin, reference })
 
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',

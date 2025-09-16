@@ -12,45 +12,53 @@ interface CustomerTypeFilterProps {
     authenticated: number;
     guest: number;
   };
+  isLoading?: boolean;
 }
 
 export const CustomerTypeFilter = ({ 
   currentFilter, 
   onFilterChange, 
-  counts 
+  counts,
+  isLoading = false
 }: CustomerTypeFilterProps) => {
+  // Production-ready data validation and safety checks
+  const safeCounts = {
+    all: Math.max(0, counts?.all || 0),
+    authenticated: Math.max(0, counts?.authenticated || 0),
+    guest: Math.max(0, counts?.guest || 0)
+  };
   const filters = [
     {
       key: 'all' as CustomerTypeFilter,
       label: 'All Customers',
       icon: Users,
-      count: counts.all,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      activeBg: 'bg-blue-100'
+      count: safeCounts.all,
+      description: 'All customer records',
+      variant: 'default' as const,
+      activeClass: 'bg-primary text-primary-foreground border-primary'
     },
     {
       key: 'authenticated' as CustomerTypeFilter,
       label: 'Authenticated',
       icon: UserCheck,
-      count: counts.authenticated,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
-      activeBg: 'bg-green-100'
+      count: safeCounts.authenticated,
+      description: 'Customers with accounts',
+      variant: 'secondary' as const,
+      activeClass: 'bg-secondary text-secondary-foreground border-secondary'
     },
     {
       key: 'guest' as CustomerTypeFilter,
       label: 'Guest',
       icon: UserX,
-      count: counts.guest,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-      activeBg: 'bg-orange-100'
+      count: safeCounts.guest,
+      description: 'One-time guest customers',
+      variant: 'outline' as const,
+      activeClass: 'bg-accent text-accent-foreground border-accent'
     }
   ];
 
   return (
-    <div className="flex flex-wrap gap-2 mb-6">
+    <div className="flex flex-wrap gap-3 mb-6">
       {filters.map((filter) => {
         const Icon = filter.icon;
         const isActive = currentFilter === filter.key;
@@ -58,22 +66,41 @@ export const CustomerTypeFilter = ({
         return (
           <Button
             key={filter.key}
-            variant={isActive ? "default" : "outline"}
+            variant={isActive ? filter.variant : "outline"}
             onClick={() => onFilterChange(filter.key)}
-            className={`flex items-center gap-2 ${
-              isActive 
-                ? `${filter.activeBg} ${filter.color} border-transparent` 
-                : `${filter.bgColor} ${filter.color} hover:${filter.activeBg}`
-            }`}
+            disabled={isLoading}
+            className={`
+              group relative flex items-center gap-2 px-4 py-2.5 h-auto
+              transition-all duration-200 hover:scale-105
+              ${isActive ? filter.activeClass : 'hover:bg-muted/50'}
+            `}
+            title={`${filter.description} (${filter.count} total)`}
           >
-            <Icon className="h-4 w-4" />
-            <span>{filter.label}</span>
-            <span className="ml-1 px-2 py-0.5 text-xs font-medium rounded-full bg-white/80">
-              {filter.count}
-            </span>
+            <Icon className={`h-4 w-4 ${isLoading ? 'animate-pulse' : ''}`} />
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-medium">{filter.label}</span>
+              <span className="text-xs opacity-80">{filter.count} customers</span>
+            </div>
+            
+            {/* Loading overlay */}
+            {isLoading && (
+              <div className="absolute inset-0 bg-background/50 rounded-md flex items-center justify-center">
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              </div>
+            )}
           </Button>
         );
       })}
+      
+      {/* Summary info */}
+      <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+        <span>Total: {safeCounts.all}</span>
+        {safeCounts.authenticated > 0 && (
+          <span className="text-green-600">
+            {Math.round((safeCounts.authenticated / safeCounts.all) * 100)}% authenticated
+          </span>
+        )}
+      </div>
     </div>
   );
 };

@@ -12,46 +12,158 @@ const PRODUCT_IMAGE_BUCKET = 'product-images';
  * @returns {Promise<string>} The public URL of the uploaded image.
  */
 export const uploadProductImage = async (imageFile: File): Promise<string> => {
-  try {
-    // Convert file to base64
-    const fileData = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remove data URL prefix to get just the base64 data
-        const base64Data = result.split(',')[1];
-        resolve(base64Data);
-      };
-      reader.readAsDataURL(imageFile);
-    });
+  const maxRetries = 3;
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Image upload attempt ${attempt}/${maxRetries} for file: ${imageFile.name}`);
+      
+      // Convert file to base64
+      const fileData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const result = reader.result as string;
+            // Remove data URL prefix to get just the base64 data
+            const base64Data = result.split(',')[1];
+            resolve(base64Data);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(imageFile);
+      });
 
-    // Call the upload function
-    const { data, error } = await supabase.functions.invoke('upload-product-image', {
-      body: {
-        file: {
-          name: imageFile.name,
-          type: imageFile.type,
-          size: imageFile.size,
-          data: fileData
+      // Call the upload function with timeout
+      const uploadPromise = supabase.functions.invoke('upload-product-image', {
+        body: {
+          file: {
+            name: imageFile.name,
+            type: imageFile.type,
+            size: imageFile.size,
+            data: fileData
+          }
         }
+      });
+
+      // Add timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Upload timeout - please try again')), 45000)
+      );
+
+      const result = await Promise.race([uploadPromise, timeoutPromise]) as any;
+      const { data, error } = result;
+
+      // Check for successful response
+      if (!error && data && data.success) {
+        console.log('Product image uploaded successfully:', data.data.url);
+        return data.data.url;
       }
-    });
 
-    if (error) {
-      console.error('Upload function error:', error);
-      throw new Error(error.message || 'Upload failed');
+      // Handle error response
+      if (error) {
+        console.error(`Upload function error (attempt ${attempt}):`, error);
+        
+        // Check for specific error types that shouldn't be retried
+        if (error.message?.includes('Unauthorized') || 
+            error.message?.includes('Invalid file type') ||
+            error.message?.includes('File size exceeds') ||
+            error.message?.includes('Admin access required')) {
+          throw new Error(error.message || 'Upload failed');
+        }
+        
+        // Handle rate limiting with longer delays
+        if (error.message?.includes('Rate limit exceeded') || 
+            error.message?.includes('Maximum 10 uploads per hour')) {
+          lastError = new Error('Upload rate limit exceeded. Please wait an hour and try again.');
+          
+          if (attempt === maxRetries) {
+            throw lastError;
+          }
+          
+          // Very long delay for rate limiting (5 minutes, 10 minutes, 15 minutes)
+          const delay = attempt * 5 * 60 * 1000;
+          console.log(`Rate limited, retrying upload in ${delay/1000/60} minutes...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        lastError = new Error(error.message || 'Upload failed');
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        
+        // Standard exponential backoff for other errors
+        const delay = Math.pow(2, attempt) * 2000;
+        console.log(`Retrying upload in ${delay/1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      if (!data?.success) {
+        const errorMsg = data?.error || 'Upload failed - unknown error';
+        console.error(`Upload failed (attempt ${attempt}):`, errorMsg);
+        
+        lastError = new Error(errorMsg);
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        
+        // Retry for server errors
+        const delay = Math.pow(2, attempt) * 2000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+    } catch (error: any) {
+      console.error(`Upload attempt ${attempt} failed:`, error);
+      lastError = error;
+      
+      // Handle FunctionsHttpError (429 rate limiting)
+      if (error.name === 'FunctionsHttpError' || 
+          error.message?.includes('Edge Function returned a non-2xx status code')) {
+        
+        // Try to extract more details from the error
+        console.log('FunctionsHttpError details:', {
+          name: error.name,
+          message: error.message,
+          context: error.context,
+          stack: error.stack?.split('\n').slice(0, 3)
+        });
+        
+        if (attempt === maxRetries) {
+          throw new Error('Upload service temporarily unavailable. Please wait a few minutes and try again.');
+        }
+        
+        // Long delay for any edge function errors (30s, 60s, 120s)
+        const delay = Math.pow(2, attempt + 4) * 1000;
+        console.log(`Edge function error, waiting ${delay/1000}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // Don't retry for client-side errors
+      if (error.message?.includes('timeout') || 
+          error.message?.includes('Failed to read file') ||
+          error.message?.includes('Unauthorized')) {
+        throw error;
+      }
+      
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+      
+      // Wait before retry
+      const delay = Math.pow(2, attempt) * 2000;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-
-    if (!data?.success) {
-      throw new Error(data?.error || 'Upload failed');
-    }
-
-    console.log('Product image uploaded successfully:', data.data.url);
-    return data.data.url;
-  } catch (error) {
-    console.error('Product image upload error:', error);
-    throw error;
   }
+  
+  throw lastError || new Error('Upload failed after all retry attempts');
 };
 
 /**
@@ -215,6 +327,7 @@ export const createProduct = async (productData: NewProduct & { imageFile?: File
 export const updateProduct = async (id: string, updates: UpdatedProduct & { imageFile?: File }): Promise<Product> => {
     let newImageUrl: string | null = updates.image_url ?? null;
     let oldImageUrl: string | null = null;
+    let uploadAttempted: boolean = false;
 
     try {
         // Handle SKU validation for updates
@@ -222,45 +335,89 @@ export const updateProduct = async (id: string, updates: UpdatedProduct & { imag
             throw new Error(`SKU "${updates.sku}" already exists. Please choose a different SKU.`);
         }
 
-        // Get current product to access old image URL
-        if (updates.imageFile) {
-            const { data: currentProduct } = await supabase
-                .from('products')
-                .select('image_url')
-                .eq('id', id)
-                .single();
+        // Get current product to access old image URL - do this first
+        const { data: currentProduct, error: fetchError } = await supabase
+            .from('products')
+            .select('image_url')
+            .eq('id', id)
+            .single();
             
-            oldImageUrl = currentProduct?.image_url || null;
+        if (fetchError) {
+            throw new Error(`Failed to fetch current product: ${fetchError.message}`);
+        }
+        
+        oldImageUrl = currentProduct?.image_url || null;
+
+        // Upload new image if provided
+        if (updates.imageFile) {
+            uploadAttempted = true;
+            console.log('Uploading new product image...');
             newImageUrl = await uploadProductImage(updates.imageFile);
+            console.log('New image uploaded successfully:', newImageUrl);
+            
+            if (!newImageUrl) {
+                throw new Error('Image upload failed - no URL returned');
+            }
         }
         
         const { imageFile, ...productToUpdate } = updates;
         
         const finalProductUpdates = {
             ...productToUpdate,
-            image_url: newImageUrl,
+            ...(uploadAttempted && { image_url: newImageUrl }), // Only update image_url if we uploaded a new image
         };
 
-        const { data, error } = await supabase.from('products').update(finalProductUpdates).eq('id', id).select().single();
+        console.log('Updating product in database...', { id, updates: finalProductUpdates });
+        
+        const { data, error } = await supabase
+            .from('products')
+            .update(finalProductUpdates)
+            .eq('id', id)
+            .select()
+            .single();
         
         if (error) {
+            console.error('Database update failed:', error);
+            
             // Cleanup new image if update fails
-            if (updates.imageFile && newImageUrl) {
-                await deleteProductImage(newImageUrl);
+            if (uploadAttempted && newImageUrl) {
+                console.log('Cleaning up uploaded image due to database error...');
+                try {
+                    await deleteProductImage(newImageUrl);
+                } catch (cleanupError) {
+                    console.error('Failed to cleanup uploaded image:', cleanupError);
+                }
             }
             throw new Error(`Failed to update product: ${error.message}`);
         }
         
-        // Clean up old image only after successful update
-        if (updates.imageFile && oldImageUrl && oldImageUrl !== newImageUrl) {
-            await deleteProductImage(oldImageUrl);
+        console.log('Product updated successfully');
+        
+        // Clean up old image only after successful update and if we uploaded a new one
+        if (uploadAttempted && oldImageUrl && oldImageUrl !== newImageUrl && newImageUrl) {
+            console.log('Cleaning up old image:', oldImageUrl);
+            try {
+                await deleteProductImage(oldImageUrl);
+                console.log('Old image cleaned up successfully');
+            } catch (cleanupError) {
+                console.error('Failed to cleanup old image (non-critical):', cleanupError);
+                // Don't throw here as the update was successful
+            }
         }
         
         return data;
     } catch (error) {
+        console.error('Product update failed:', error);
+        
         // Cleanup new image if any error occurs during update
-        if (updates.imageFile && newImageUrl && newImageUrl !== oldImageUrl) {
-            await deleteProductImage(newImageUrl);
+        if (uploadAttempted && newImageUrl && newImageUrl !== oldImageUrl) {
+            console.log('Cleaning up new image due to error...');
+            try {
+                await deleteProductImage(newImageUrl);
+                console.log('Cleanup completed');
+            } catch (cleanupError) {
+                console.error('Failed to cleanup new image:', cleanupError);
+            }
         }
         throw error;
     }

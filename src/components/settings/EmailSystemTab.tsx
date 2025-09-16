@@ -5,6 +5,7 @@ import { EmailSystemMonitor } from '../admin/EmailSystemMonitor';
 import { ProductionEmailDashboard } from './ProductionEmailDashboard';
 import { EnhancedEmailProcessor } from '../admin/EnhancedEmailProcessor';
 import { EmailTemplateManager } from '../admin/EmailTemplateManager';
+import { EmailTemplateHealthCard } from './EmailTemplateHealthCard';
 import { EmailDeliveryDashboard } from '../admin/EmailDeliveryDashboard';
 import { ComprehensiveEmailTestDashboard } from '../admin/ComprehensiveEmailTestDashboard';
 import { EmailSystemAuditDashboard } from '../admin/EmailSystemAuditDashboard';
@@ -46,6 +47,7 @@ export const EmailSystemTab = () => {
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-6">
+          <EmailTemplateHealthCard />
           <EmailTemplateManager />
         </TabsContent>
 

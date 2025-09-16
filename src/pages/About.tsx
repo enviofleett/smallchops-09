@@ -26,8 +26,8 @@ const About = () => {
         {/* Banner Image */}
         <div className="absolute inset-0 -z-10">
           <img
-            src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-4.0.3"
-            alt="Delicious finger foods and appetizers"
+            src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png"
+            alt="Golden fried finger food balls garnished with microgreens"
             className="w-full h-full object-cover opacity-10"
           />
         </div>
@@ -61,11 +61,11 @@ const About = () => {
                   </p>
                 </div>
               </div>
-              <div>
+              <div className="order-2 md:order-1">
                 <img
-                  src="https://images.unsplash.com/photo-1541014741259-de529411b96a?ixlib=rb-4.0.3"
-                  alt="Fresh homemade spring rolls and finger foods"
-                  className="w-full rounded-lg shadow-lg"
+                  src="/lovable-uploads/b0faf90f-366c-461d-9966-d8fb3cd9fd20.png"
+                  alt="Golden fried finger food balls on white plate with microgreens"
+                  className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto"
                 />
               </div>
             </div>
@@ -129,11 +129,11 @@ const About = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12 items-center">
-              <div>
+              <div className="order-1 md:order-1">
                 <img
-                  src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3"
-                  alt="Variety of small chops and finger foods for catering"
-                  className="w-full rounded-lg shadow-lg"
+                  src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png"
+                  alt="Golden fried finger food balls beautifully plated with garnish"
+                  className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto"
                 />
               </div>
               <div>

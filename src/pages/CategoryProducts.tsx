@@ -20,6 +20,10 @@ import { CustomizationProvider, useCustomizationContext } from '@/context/Custom
 import { CustomizationOrderBuilder } from '@/components/customization/CustomizationOrderBuilder';
 import { ShoppingCart } from 'lucide-react';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
+import { ProductMOQIndicator, ProductMOQWarning } from '@/components/products/ProductMOQIndicator';
+import { MOQBadge } from '@/components/ui/moq-badge';
+import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
+import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
 
 const CategoryProductsContent = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -27,10 +31,15 @@ const CategoryProductsContent = () => {
   const { addItem } = useCart();
   const { toast } = useToast();
   const customizationContext = useCustomizationContext();
+  const { validateMOQWithPricing, autoAdjustQuantities, showMOQViolationDialog } = useEnhancedMOQValidation();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showCustomizationBuilder, setShowCustomizationBuilder] = useState(false);
+  const [showMOQAdjustmentModal, setShowMOQAdjustmentModal] = useState(false);
+  const [moqAdjustments, setMoqAdjustments] = useState<any[]>([]);
+  const [moqPricingImpact, setMoqPricingImpact] = useState<any>(null);
+  const [isValidatingMOQ, setIsValidatingMOQ] = useState(false);
   const itemsPerPage = 12;
 
   // Fetch products for this category
@@ -49,24 +58,73 @@ const CategoryProductsContent = () => {
   const currentCategory = categories.find(cat => cat.id === categoryId);
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
-  // Filter products based on search
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter and sort products by price (lowest to highest by default) - Production Ready
+  const filteredAndSortedProducts = products
+    .filter(product => 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      const priceA = a.discounted_price || a.price;
+      const priceB = b.discounted_price || b.price;
+      return priceA - priceB;
+    });
 
   // Pagination
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+  const currentProducts = filteredAndSortedProducts.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = async (product: any) => {
     if (isCustomizationCategory) {
-      // For customization category, use the context to add to builder
-      customizationContext.addItem(product);
-      setShowCustomizationBuilder(true); // Auto-show when item is added
+      setIsValidatingMOQ(true);
+      
+      try {
+        // Check if product has MOQ requirements
+        const moq = product.minimum_order_quantity || 1;
+        const currentQuantityInBuilder = customizationContext.items.find(item => item.id === product.id)?.quantity || 0;
+        
+        if (moq > 1 && currentQuantityInBuilder === 0) {
+          // First time adding - check if we need to add the minimum quantity
+          const adjustedQuantity = Math.max(1, moq);
+          
+          // Add with minimum quantity if required
+          customizationContext.addItem(product, adjustedQuantity);
+          
+          if (adjustedQuantity > 1) {
+            toast({
+              title: "MOQ Applied",
+              description: `Added ${adjustedQuantity} ${product.name} to meet minimum order quantity.`,
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "Added to customization",
+              description: `${product.name} has been added to your custom order.`,
+            });
+          }
+        } else {
+          // Normal add (increment by 1)
+          customizationContext.addItem(product, 1);
+          toast({
+            title: "Added to customization",
+            description: `${product.name} has been added to your custom order.`,
+          });
+        }
+        
+        setShowCustomizationBuilder(true);
+      } catch (error) {
+        console.error('MOQ validation error:', error);
+        toast({
+          title: "Error adding item",
+          description: "There was an issue adding the item. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsValidatingMOQ(false);
+      }
     } else {
-      // For regular categories, add directly to cart
+      // For regular categories, add directly to cart (existing logic)
       addItem({
         id: product.id,
         name: product.name,
@@ -230,15 +288,11 @@ const CategoryProductsContent = () => {
 
             {/* Products Grid */}
             {isLoadingProducts ? (
-              <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${
-                isCustomizationCategory 
-                  ? 'grid-cols-2 sm:grid-cols-2' 
-                  : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3'
-              }`}>
+              <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Card key={i} className="animate-pulse">
                     <CardContent className="p-0">
-                      <div className={`${isCustomizationCategory ? 'aspect-[4/3]' : 'aspect-square'} bg-muted rounded-t-lg`}></div>
+                      <div className="aspect-square bg-muted rounded-t-lg"></div>
                       <div className="p-3 sm:p-4 space-y-2">
                         <div className="h-4 bg-muted rounded"></div>
                         <div className="h-3 bg-muted rounded w-2/3"></div>
@@ -248,7 +302,7 @@ const CategoryProductsContent = () => {
                   </Card>
                 ))}
               </div>
-            ) : filteredProducts.length === 0 ? (
+            ) : filteredAndSortedProducts.length === 0 ? (
               <div className="text-center py-8 sm:py-12">
                 <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
                 <p className="text-muted-foreground mb-4 px-4">
@@ -260,58 +314,97 @@ const CategoryProductsContent = () => {
               </div>
             ) : (
               <>
-                <div className={`grid gap-3 sm:gap-4 lg:gap-6 mb-8 ${
-                  isCustomizationCategory 
-                    ? 'grid-cols-2 lg:grid-cols-2' 
-                    : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3'
-                }`}>
+                <div className="grid gap-3 sm:gap-4 lg:gap-6 mb-8 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                   {currentProducts.map((product) => (
                     <Card 
                       key={product.id} 
-                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
                       onClick={() => navigate(`/product/${product.id}`)}
                     >
-                      <div className={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'} relative`}>
+                      <div className="aspect-square relative overflow-hidden">
                          <ProductImageGallery
                            images={toImagesArray(product)}
                            alt={product.name}
-                           containerClassName={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'}`}
-                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 33vw"
+                           containerClassName="aspect-square"
+                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                          />
                          {(product.discount_percentage || 0) > 0 && (
-                           <div className="absolute top-1 sm:top-2 left-1 sm:left-2">
+                           <div className="absolute top-1 sm:top-2 left-1 sm:left-2 z-10">
                              <DiscountBadge 
                                discountPercentage={product.discount_percentage || 0}
                                size="sm"
                              />
                            </div>
                          )}
+                         
+                         {/* MOQ Badge - Only for customization category */}
+                         {isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+                           <div className="absolute top-1 sm:top-2 right-1 sm:right-2 z-10">
+                             <MOQBadge 
+                               minimumQuantity={product.minimum_order_quantity}
+                               variant="default"
+                               showIcon={false}
+                               className="bg-blue-100 text-blue-800 border-blue-200 text-xs"
+                             />
+                           </div>
+                         )}
+                         
+                         {/* Hover overlay for better UX */}
+                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 z-5" />
                        </div>
-                      <CardContent className="p-2 sm:p-3 lg:p-4">
-                        <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
-                        <div className="mb-1 sm:mb-2">
-                          <ProductRatingDisplay productId={product.id} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <PriceDisplay
-                            originalPrice={product.price}
-                            discountedPrice={product.discounted_price}
-                            hasDiscount={(product.discount_percentage || 0) > 0}
-                            size="sm"
-                          />
-                          <Button 
-                            size="sm" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddToCart(product);
-                            }}
-                            className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
-                            variant={isCustomizationCategory ? "outline" : "default"}
-                          >
-                            Add
-                          </Button>
-                        </div>
-                      </CardContent>
+                       <CardContent className="p-2 sm:p-3 lg:p-4">
+                         <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
+                         <div className="mb-1 sm:mb-2">
+                           <ProductRatingDisplay productId={product.id} />
+                         </div>
+                         
+                          {/* MOQ Requirements - Only for non-customization categories */}
+                          {!isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+                            <div className="mb-3">
+                              <ProductMOQIndicator
+                                minimumOrderQuantity={product.minimum_order_quantity}
+                                price={product.discounted_price || product.price}
+                                stockQuantity={product.stock_quantity}
+                                currentCartQuantity={0}
+                                className="text-xs"
+                              />
+                            </div>
+                          )}
+                         
+                         <div className="flex items-center justify-between">
+                           <PriceDisplay
+                             originalPrice={product.price}
+                             discountedPrice={product.discounted_price}
+                             hasDiscount={(product.discount_percentage || 0) > 0}
+                             size="sm"
+                           />
+                            <Button 
+                              size="sm" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(product);
+                              }}
+                              className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
+                              variant={isCustomizationCategory ? "outline" : "default"}
+                              disabled={isValidatingMOQ}
+                            >
+                              {isValidatingMOQ ? "..." : 
+                               (isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1) 
+                                 ? `Add ${product.minimum_order_quantity}+`
+                                 : "Add"
+                              }
+                            </Button>
+                          </div>
+                          
+                          {/* Min. order text - Only for customization category */}
+                          {isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+                            <div className="text-center pt-2 mt-2 border-t border-muted">
+                              <span className="text-xs text-muted-foreground">
+                                Min. order: {product.minimum_order_quantity} units
+                              </span>
+                            </div>
+                          )}
+                       </CardContent>
                     </Card>
                   ))}
                 </div>
@@ -361,6 +454,25 @@ const CategoryProductsContent = () => {
           onClose={() => setShowCustomizationBuilder(false)}
         />
       )}
+
+      {/* MOQ Adjustment Modal */}
+      <MOQAdjustmentModal
+        isOpen={showMOQAdjustmentModal}
+        onClose={() => setShowMOQAdjustmentModal(false)}
+        onConfirm={() => {
+          // Handle MOQ adjustment confirmation
+          toast({
+            title: "MOQ Adjustments Applied",
+            description: "Your order quantities have been adjusted to meet minimum requirements.",
+          });
+          setShowMOQAdjustmentModal(false);
+        }}
+        onCancel={() => {
+          setShowMOQAdjustmentModal(false);
+        }}
+        adjustments={moqAdjustments}
+        pricingImpact={moqPricingImpact}
+      />
 
       <PublicFooter />
     </div>

@@ -111,16 +111,7 @@ const Dashboard = () => {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <RevenueChart 
-            data={data?.revenueTrends || []} 
-            isLoading={false}
-          />
-          <OrdersChart 
-            data={data?.orderTrends || []} 
-            isLoading={false}
-          />
-        </div>
+        {/* Charts section removed for production */}
 
         <TopCustomersChart 
           customers={data?.topCustomersByOrders || []} 

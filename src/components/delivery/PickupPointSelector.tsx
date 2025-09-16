@@ -20,6 +20,20 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
     loadPickupPoints();
   }, []);
 
+  // Auto-select pickup point if there's only one available - Production Ready
+  useEffect(() => {
+    if (!loading && 
+        pickupPoints.length === 1 && 
+        !selectedPointId && 
+        !disabled) {
+      // Automatically select the only available pickup point
+      const singlePickupPoint = pickupPoints[0];
+      if (singlePickupPoint.is_active) {
+        onSelect(singlePickupPoint);
+      }
+    }
+  }, [loading, pickupPoints, selectedPointId, disabled, onSelect]);
+
   const loadPickupPoints = async () => {
     try {
       setLoading(true);
@@ -27,140 +41,166 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
       setPickupPoints(points);
     } catch (error) {
       console.error('Error loading pickup points:', error);
+      // Fallback to default pickup point if API fails
+      setPickupPoints([{
+        id: '00000000-0000-0000-0000-000000000001',
+        name: 'Main Store',
+        address: '2B Close Off 11Crescent Kado Estate, Kado',
+        contact_phone: '0807 301 1100',
+        operating_hours: {
+          monday: { open: '08:00', close: '18:00' },
+          tuesday: { open: '08:00', close: '18:00' },
+          wednesday: { open: '08:00', close: '18:00' },
+          thursday: { open: '08:00', close: '18:00' },
+          friday: { open: '08:00', close: '18:00' },
+          saturday: { open: '08:00', close: '18:00' },
+          sunday: { open: '10:00', close: '16:00' }
+        },
+        instructions: 'Please call us when you arrive for quick pickup',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as PickupPoint]);
     } finally {
       setLoading(false);
     }
   };
 
   const formatOperatingHours = (hours: any) => {
-    if (!hours || typeof hours !== 'object') return 'Open ⋅ Closes 6 pm';
-    
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const todayKey = days[new Date().getDay()];
-    
-    if (hours[todayKey]) {
-      return `Today: ${hours[todayKey].open} - ${hours[todayKey].close}`;
-    }
-    
-    return 'Open ⋅ Closes 6 pm';
+    // Show production business hours
+    return "Mon-Sat: 8:00AM - 6:00PM | Sun: 10:00AM - 4:00PM";
   };
 
   const isCurrentlyOpen = (hours: any) => {
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    
+    // Production business hours:
+    // Monday-Saturday: 8am-6pm (8:00-18:00)
+    // Sunday: 10am-4pm (10:00-16:00)
+    
     if (!hours || typeof hours !== 'object') {
-      // Default to open during business hours (9 AM - 6 PM)
-      const now = new Date();
-      const currentTime = now.getHours() * 60 + now.getMinutes();
-      const openTime = 9 * 60; // 9 AM
-      const closeTime = 18 * 60; // 6 PM
-      return currentTime >= openTime && currentTime <= closeTime;
+      // Fallback to default business hours if no hours provided
+      if (currentDay === 0) { // Sunday
+        const openTime = 10 * 60; // 10 AM
+        const closeTime = 16 * 60; // 4 PM
+        return currentTime >= openTime && currentTime < closeTime;
+      } else { // Monday-Saturday
+        const openTime = 8 * 60; // 8 AM
+        const closeTime = 18 * 60; // 6 PM
+        return currentTime >= openTime && currentTime < closeTime;
+      }
     }
     
-    const now = new Date();
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const todayKey = days[now.getDay()];
+    const todayKey = days[currentDay];
     
-    if (!hours[todayKey]) return false;
+    if (!hours[todayKey] || !hours[todayKey].open || !hours[todayKey].close) {
+      // If no hours for today, return false
+      return false;
+    }
     
-    const currentTime = now.getHours() * 60 + now.getMinutes();
-    const [openHour, openMin] = hours[todayKey].open.split(':').map(Number);
-    const [closeHour, closeMin] = hours[todayKey].close.split(':').map(Number);
-    const openTime = openHour * 60 + openMin;
-    const closeTime = closeHour * 60 + closeMin;
-    
-    return currentTime >= openTime && currentTime <= closeTime;
+    try {
+      const [openHour, openMin] = hours[todayKey].open.split(':').map(Number);
+      const [closeHour, closeMin] = hours[todayKey].close.split(':').map(Number);
+      const openTime = openHour * 60 + openMin;
+      const closeTime = closeHour * 60 + closeMin;
+      
+      return currentTime >= openTime && currentTime < closeTime;
+    } catch (error) {
+      console.error('Error parsing operating hours:', error);
+      return false;
+    }
   };
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="space-y-3">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-24 bg-muted rounded animate-pulse" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-24 bg-muted rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (pickupPoints.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+        <p className="text-muted-foreground">No pickup points available</p>
+        <p className="text-sm text-muted-foreground mt-1">Please contact us for pickup arrangements</p>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MapPin className="h-5 w-5" />
-          Choose Pickup Location
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <Card
-            className={`cursor-pointer transition-all ${
-              selectedPointId === '00000000-0000-0000-0000-000000000001'
-                ? 'ring-2 ring-primary border-primary'
-                : 'hover:border-primary/50'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={() => !disabled && onSelect({
-              id: '00000000-0000-0000-0000-000000000001',
-              name: 'Main Store',
-              address: '2B Close Off 11Crescent Kado Estate, Kado',
-              contact_phone: '0807 301 1100',
-              operating_hours: {
-                monday: { open: '09:00', close: '18:00' },
-                tuesday: { open: '09:00', close: '18:00' },
-                wednesday: { open: '09:00', close: '18:00' },
-                thursday: { open: '09:00', close: '18:00' },
-                friday: { open: '09:00', close: '18:00' },
-                saturday: { open: '09:00', close: '18:00' },
-                sunday: { open: '09:00', close: '18:00' }
-              },
-              instructions: null,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            } as PickupPoint)}
+    <div className="grid gap-3">
+      {pickupPoints.map((point) => {
+        const isSelected = selectedPointId === point.id;
+        const isOpen = isCurrentlyOpen(point.operating_hours);
+        
+        return (
+          <div
+            key={point.id}
+            onClick={() => !disabled && onSelect(point)}
+            className={`
+              p-4 border-2 rounded-lg cursor-pointer transition-all duration-200
+              hover:border-primary/20 hover:bg-accent/5 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+              ${isSelected 
+                ? 'border-primary bg-primary/5 shadow-md' 
+                : 'border-border'
+              }
+              ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+            `}
           >
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold">Main Store</h3>
-                <div className="flex gap-2">
-                  {isCurrentlyOpen(null) ? (
-                    <Badge variant="default" className="bg-green-100 text-green-800">
-                      Open
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary">
-                      Closed
-                    </Badge>
-                  )}
-                  {selectedPointId === '00000000-0000-0000-0000-000000000001' && (
-                    <Badge variant="default">
-                      Selected
-                    </Badge>
-                  )}
-                </div>
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="font-semibold text-base">{point.name}</h3>
+              <div className="flex items-center gap-2">
+                {isSelected && (
+                  <div className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                    ✓
+                  </div>
+                )}
+                <Badge 
+                  variant={isOpen ? "default" : "secondary"}
+                  className={isOpen 
+                    ? "bg-green-100 text-green-800 border-green-200" 
+                    : "bg-red-100 text-red-800 border-red-200"
+                  }
+                >
+                  {isOpen ? 'Open Now' : 'Closed'}
+                </Badge>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>{point.address}</span>
               </div>
               
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <span>2B Close Off 11Crescent Kado Estate, Kado</span>
+              {point.contact_phone && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Phone className="h-4 w-4 flex-shrink-0" />
+                  <span>{point.contact_phone}</span>
                 </div>
-                
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  <span>0807 301 1100</span>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  <span>Open ⋅ Closes 6 pm</span>
-                </div>
+              )}
+              
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4 flex-shrink-0" />
+                <span>{formatOperatingHours(point.operating_hours)}</span>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </CardContent>
-    </Card>
+            </div>
+
+            {point.instructions && (
+              <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                <span className="font-medium">📋 Pickup Instructions:</span> {point.instructions}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

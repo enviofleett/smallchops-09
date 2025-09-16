@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import '../../styles/thermal-print.css';
 import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,10 +12,11 @@ import { getOrders, OrderWithItems } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
+import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck, BarChart3, Send, RefreshCw } from 'lucide-react';
+import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck, BarChart3, Send, RefreshCw, Calendar, MessageSquare, Printer, Loader2 } from 'lucide-react';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
@@ -33,13 +35,15 @@ import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFi
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
 import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
 import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
+import { filterOrdersByDate, getFilterDescription, getFilterStats, DeliveryFilterType } from '@/utils/dateFilterUtils';
+import { useThermalPrint } from '@/hooks/useThermalPrint';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus | 'overdue'>('all');
-  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'due_today' | 'upcoming'>('all');
+  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilterType>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
   const [showDeliveryReport, setShowDeliveryReport] = useState(false);
@@ -54,6 +58,37 @@ export default function AdminOrders() {
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Thermal printing functionality
+  const { 
+    showPreview, 
+    closePreview, 
+    printFromPreview, 
+    isPrinting, 
+    isPreviewOpen, 
+    previewOrder, 
+    previewDeliverySchedule, 
+    previewBusinessInfo 
+  } = useThermalPrint();
+
+  // Fetch business info for receipts
+  const { data: businessInfo } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('business_settings')
+        .select('name, admin_notification_email, whatsapp_support_number, logo_url')
+        .single();
+      
+      if (error) {
+        console.warn('Could not fetch business info:', error);
+        return null;
+      }
+      
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
 
   // Debounce search query to avoid excessive API calls
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -240,76 +275,76 @@ export default function AdminOrders() {
     }
   }, [overdueOrders, selectedOverdueDateFilter]);
 
+  // Production-ready filtering with performance optimizations
   const filteredOrders = useMemo(() => {
-    // Use overdue orders for the overdue tab, regular orders for others
+    // Use overdue orders for the overdue tab, regular orders for others  
     let result = statusFilter === 'overdue' ? filteredOverdueOrders : prioritySortedOrders;
     
-    // Apply delivery filter first (existing logic) - only for non-overdue tabs
-    if (deliveryFilter !== 'all' && statusFilter !== 'overdue') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      result = result.filter(order => {
-        // Only apply delivery schedule filter to paid delivery orders
-        if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
-          return false; // Exclude non-delivery/unpaid orders when applying delivery filters
-        }
-        
-        const schedule = deliverySchedules[order.id];
-        if (!schedule || !schedule.delivery_date) return false;
-        
-        try {
-          const deliveryDate = new Date(schedule.delivery_date);
-          if (isNaN(deliveryDate.getTime())) return false;
-          
-          deliveryDate.setHours(0, 0, 0, 0);
-          
-          if (deliveryFilter === 'due_today') {
-            return deliveryDate.getTime() === today.getTime();
-          } else if (deliveryFilter === 'upcoming') {
-            return deliveryDate.getTime() > today.getTime();
-          }
-        } catch (error) {
-          console.warn('Error parsing delivery date:', schedule.delivery_date, error);
-          return false;
-        }
-        
-        return false;
-      });
+    // Apply comprehensive delivery/pickup date filter using utility functions
+    if (deliveryFilter !== 'all' && (statusFilter as string) !== 'overdue') {
+      try {
+        result = filterOrdersByDate(result, deliveryFilter, deliverySchedules);
+      } catch (error) {
+        console.error('Error applying date filter:', error);
+        // Fallback to showing all orders if filtering fails
+        result = statusFilter === 'overdue' ? filteredOverdueOrders : prioritySortedOrders;
+      }
     }
     
     // Apply hourly filtering for confirmed tab
-    if (statusFilter === 'confirmed' && (selectedDay || selectedHour)) {
+    if (activeTab === 'confirmed' && (selectedDay || selectedHour)) {
       const today = startOfDay(new Date());
       const tomorrow = startOfDay(addDays(new Date(), 1));
       
       result = result.filter(order => {
+        // Only filter delivery orders with paid status that have schedules
+        if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
+          return false;
+        }
+        
         const schedule = deliverySchedules[order.id];
-        if (!schedule || !schedule.delivery_date) return false;
+        if (!schedule?.delivery_date) return false;
         
         try {
-          const deliveryDate = startOfDay(new Date(schedule.delivery_date));
+          const deliveryDate = new Date(schedule.delivery_date);
           
-          // Filter by selected day
+          // Validate delivery date
+          if (isNaN(deliveryDate.getTime())) {
+            console.warn('Invalid delivery date for order:', order.id, schedule.delivery_date);
+            return false;
+          }
+          
+          const normalizedDeliveryDate = startOfDay(deliveryDate);
+          
+          // Filter by selected day - must match exactly
           if (selectedDay) {
             const targetDate = selectedDay === 'today' ? today : tomorrow;
-            if (deliveryDate.getTime() !== targetDate.getTime()) {
+            if (normalizedDeliveryDate.getTime() !== targetDate.getTime()) {
               return false;
             }
           }
           
-          // Filter by selected hour
+          // Filter by selected hour - more robust hour matching
           if (selectedHour && schedule.delivery_time_start) {
-            const orderHour = schedule.delivery_time_start.split(':')[0];
-            const selectedHourFormatted = selectedHour.split(':')[0];
-            if (orderHour !== selectedHourFormatted) {
+            const orderTimeComponents = schedule.delivery_time_start.split(':');
+            const selectedTimeComponents = selectedHour.split(':');
+            
+            if (orderTimeComponents.length < 2 || selectedTimeComponents.length < 2) {
+              console.warn('Invalid time format for order:', order.id, schedule.delivery_time_start);
+              return false;
+            }
+            
+            const orderHour = parseInt(orderTimeComponents[0], 10);
+            const selectedHourInt = parseInt(selectedTimeComponents[0], 10);
+            
+            if (isNaN(orderHour) || isNaN(selectedHourInt) || orderHour !== selectedHourInt) {
               return false;
             }
           }
           
           return true;
         } catch (error) {
-          console.warn('Error parsing delivery date for hourly filter:', schedule.delivery_date, error);
+          console.warn('Error processing delivery schedule for order:', order.id, error);
           return false;
         }
       });
@@ -320,7 +355,7 @@ export default function AdminOrders() {
 
   // Calculate hourly order counts for confirmed orders
   const hourlyOrderCounts = useMemo(() => {
-    if (statusFilter !== 'confirmed') return { today: {}, tomorrow: {} };
+    if (activeTab !== 'confirmed') return { today: {}, tomorrow: {} };
     
     const today = startOfDay(new Date());
     const tomorrow = startOfDay(addDays(new Date(), 1));
@@ -329,27 +364,51 @@ export default function AdminOrders() {
       tomorrow: {} as Record<string, number>
     };
     
-    // Initialize hourly slots
+    // Initialize hourly slots (8 AM to 10 PM)
     for (let hour = 8; hour <= 22; hour++) {
       const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
       counts.today[timeSlot] = 0;
       counts.tomorrow[timeSlot] = 0;
     }
     
-    // Count orders for each hour
+    // Count orders for each hour - only paid delivery orders with valid schedules
     prioritySortedOrders.forEach(order => {
-      if (order.status !== 'confirmed' || order.payment_status !== 'paid') return;
+      // Only count relevant orders in confirmed tab (not just confirmed status)
+      if (order.order_type !== 'delivery' || order.payment_status !== 'paid') return;
       
       const schedule = deliverySchedules[order.id];
-      if (!schedule || !schedule.delivery_date || !schedule.delivery_time_start) return;
+      if (!schedule?.delivery_date || !schedule.delivery_time_start) return;
       
       try {
-        const deliveryDate = startOfDay(new Date(schedule.delivery_date));
-        const orderHour = `${schedule.delivery_time_start.split(':')[0]}:00`;
+        const deliveryDate = new Date(schedule.delivery_date);
         
-        if (deliveryDate.getTime() === today.getTime()) {
+        // Validate delivery date
+        if (isNaN(deliveryDate.getTime())) {
+          console.warn('Invalid delivery date for counting:', order.id, schedule.delivery_date);
+          return;
+        }
+        
+        const normalizedDeliveryDate = startOfDay(deliveryDate);
+        
+        // Parse hour more robustly
+        const timeComponents = schedule.delivery_time_start.split(':');
+        if (timeComponents.length < 2) {
+          console.warn('Invalid time format for counting:', order.id, schedule.delivery_time_start);
+          return;
+        }
+        
+        const hourInt = parseInt(timeComponents[0], 10);
+        if (isNaN(hourInt) || hourInt < 8 || hourInt > 22) {
+          console.warn('Hour out of range for counting:', order.id, hourInt);
+          return;
+        }
+        
+        const orderHour = `${hourInt.toString().padStart(2, '0')}:00`;
+        
+        // Count for today and tomorrow only
+        if (normalizedDeliveryDate.getTime() === today.getTime()) {
           counts.today[orderHour] = (counts.today[orderHour] || 0) + 1;
-        } else if (deliveryDate.getTime() === tomorrow.getTime()) {
+        } else if (normalizedDeliveryDate.getTime() === tomorrow.getTime()) {
           counts.tomorrow[orderHour] = (counts.tomorrow[orderHour] || 0) + 1;
         }
       } catch (error) {
@@ -358,7 +417,7 @@ export default function AdminOrders() {
     });
     
     return counts;
-  }, [prioritySortedOrders, deliverySchedules, statusFilter]);
+  }, [prioritySortedOrders, deliverySchedules, activeTab]);
 
   // Calculate overdue order counts by date ranges
   const overdueOrderCounts = useMemo(() => {
@@ -609,17 +668,64 @@ export default function AdminOrders() {
                   <Truck className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Delivery Schedule:</span>
                 </div>
-                <Select value={deliveryFilter} onValueChange={(value: 'all' | 'due_today' | 'upcoming') => setDeliveryFilter(value)}>
+                <Select value={deliveryFilter} onValueChange={(value: DeliveryFilterType) => setDeliveryFilter(value)}>
                   <SelectTrigger className="w-full sm:w-48">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Orders</SelectItem>
                     <SelectItem value="due_today">Due Today</SelectItem>
-                    <SelectItem value="upcoming">Upcoming Deliveries</SelectItem>
+                    <SelectItem value="past_due">Past Due</SelectItem>
+                    <SelectItem value="upcoming">Future Orders</SelectItem>
+                    <SelectItem value="this_week">This Week</SelectItem>
+                    <SelectItem value="next_week">Next Week</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* Enhanced Filter Statistics - Production Ready */}
+              {deliveryFilter !== 'all' && (
+                <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {getFilterDescription(deliveryFilter, filteredOrders.length, 
+                          statusFilter === 'overdue' ? filteredOverdueOrders.length : prioritySortedOrders.length
+                        ).split(':')[0]}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {getFilterDescription(deliveryFilter, filteredOrders.length, 
+                          statusFilter === 'overdue' ? filteredOverdueOrders.length : prioritySortedOrders.length
+                        )}
+                      </p>
+                      {filteredOrders.length === 0 && (
+                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                            <span>No orders found for this time period. Try selecting a different date range or check if orders have delivery schedules.</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Quick Stats for Current Filter */}
+                      {filteredOrders.length > 0 && (
+                        <div className="mt-2 flex items-center gap-4 text-xs">
+                          <span className="text-muted-foreground">
+                            Pickup: {filteredOrders.filter(o => o.order_type === 'pickup').length}
+                          </span>
+                          <span className="text-muted-foreground">
+                            Delivery: {filteredOrders.filter(o => o.order_type === 'delivery').length}
+                          </span>
+                          <span className="text-muted-foreground">
+                            Paid: {filteredOrders.filter(o => o.payment_status === 'paid').length}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -633,8 +739,19 @@ export default function AdminOrders() {
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 orderCounts={orderCounts}
-              />
-            </div>
+        />
+
+        {/* Thermal Receipt Preview Modal */}
+        <ThermalReceiptPreview
+          isOpen={isPreviewOpen}
+          onClose={closePreview}
+          onPrint={printFromPreview}
+          order={previewOrder}
+          deliverySchedule={previewDeliverySchedule}
+          businessInfo={previewBusinessInfo}
+          isPrinting={isPrinting}
+        />
+      </div>
             
             {/* Desktop: Full grid layout */}
             <div className="hidden md:block">
@@ -764,8 +881,30 @@ export default function AdminOrders() {
                 {/* Orders List */}
                 <div className="space-y-4">
                   {filteredOrders.map(order => (
-                    <div key={order.id} onClick={() => handleOrderClick(order)} className="cursor-pointer transition-transform hover:scale-[1.01]">
-                      <AdminOrderCard order={order} deliverySchedule={deliverySchedules[order.id]} />
+                    <div key={order.id} className="flex items-center gap-2">
+                      <div onClick={() => handleOrderClick(order)} className="flex-1 cursor-pointer transition-transform hover:scale-[1.01]">
+                        <AdminOrderCard order={order} deliverySchedule={deliverySchedules[order.id]} />
+                      </div>
+                      {/* Print Receipt Button */}
+                      {order.payment_status === 'paid' && (
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showPreview(order, deliverySchedules[order.id], businessInfo);
+                          }}
+                          disabled={isPrinting}
+                          size="sm"
+                          variant="outline"
+                          className="flex-shrink-0"
+                          title="Preview thermal receipt"
+                        >
+                          {isPrinting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Printer className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -818,6 +957,17 @@ export default function AdminOrders() {
             }} 
           />
         )}
+
+        {/* Thermal Receipt Preview Modal */}
+        <ThermalReceiptPreview
+          isOpen={isPreviewOpen}
+          onClose={closePreview}
+          onPrint={printFromPreview}
+          order={previewOrder}
+          deliverySchedule={previewDeliverySchedule}
+          businessInfo={previewBusinessInfo}
+          isPrinting={isPrinting}
+        />
       </div>
     </>
   );
@@ -1106,113 +1256,60 @@ function AdminOrderCard({
         {/* Enhanced Delivery Information Display using DeliveryScheduleDisplay */}
         {order.payment_status === 'paid' && (
           <div className="mt-4 border-t pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              {order.order_type === 'delivery' ? (
-                <Truck className="w-4 h-4 text-primary" />
-              ) : (
-                <Package className="w-4 h-4 text-primary" />
-              )}
-              <h4 className="font-medium">
-                {order.order_type === 'delivery' ? 'Delivery Information' : 'Pickup Information'}
-              </h4>
-            </div>
-            
-            <div className="space-y-4">
-              {/* Delivery Address */}
-              {order.order_type === 'delivery' && order.delivery_address && (
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium mb-1">Delivery Address</p>
-                  <p className="text-sm font-semibold">
-                    {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
-                      ? `${(order.delivery_address as any).street || ''} ${(order.delivery_address as any).city || ''} ${(order.delivery_address as any).state || ''}`.trim()
-                      : typeof order.delivery_address === 'string' 
-                        ? order.delivery_address
-                        : 'Address details available'
-                    }
-                  </p>
-                </div>
-              )}
+            {/* Customer Delivery/Pickup Schedule Requirements */}
+            <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-4 border border-primary/20">
+              <div className="flex items-center gap-2 mb-4">
+                {order.order_type === 'delivery' ? (
+                  <Truck className="w-5 h-5 text-primary" />
+                ) : (
+                  <Package className="w-5 h-5 text-primary" />
+                )}
+                <h4 className="font-semibold text-base">
+                  {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
+                </h4>
+              </div>
               
-              {/* Pickup Point */}
-              {order.order_type === 'pickup' && order.pickup_point_id && (
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium mb-1">Pickup Point</p>
-                  <PickupPointDisplay 
-                    pickupPointId={order.pickup_point_id} 
-                    pickupSchedule={
-                      order.delivery_schedule ? {
-                        pickup_date: order.delivery_schedule.delivery_date,
-                        pickup_time_start: order.delivery_schedule.delivery_time_start,
-                        pickup_time_end: order.delivery_schedule.delivery_time_end
-                      } : undefined
-                    }
-                  />
-                </div>
-              )}
-              
-              {/* Delivery Zone */}
-              {order.order_type === 'delivery' && deliveryZone && (
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium mb-1">Delivery Zone</p>
-                  <p className="text-sm font-semibold">{deliveryZone.name}</p>
-                  {order.delivery_fee && Number(order.delivery_fee) > 0 && (
-                    <p className="text-sm text-green-600 font-medium">
-                      Delivery Fee: {formatCurrency(Number(order.delivery_fee))}
-                    </p>
-                  )}
-                </div>
-              )}
-              
-              {/* Delivery Schedule Display or Fallback */}
               {deliverySchedule ? (
                 <div className="space-y-3">
+                  {/* Production-Ready Schedule Display using DeliveryScheduleDisplay component */}
                   <DeliveryScheduleDisplay 
                     schedule={deliverySchedule}
                     orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
                     orderStatus={order.status}
-                    className="mt-3"
+                    className="mb-0" 
                   />
-                  {/* Countdown Timer for Confirmed Orders */}
-                  {order.status === 'confirmed' && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <MiniCountdownTimer
-                        deliveryDate={deliverySchedule.delivery_date}
-                        deliveryTimeStart={deliverySchedule.delivery_time_start}
-                        deliveryTimeEnd={deliverySchedule.delivery_time_end}
-                        orderStatus={order.status}
-                        className="text-sm"
-                      />
-                    </div>
-                  )}
+                  
+                  {/* Schedule Request Info */}
+                  <div className="text-xs text-muted-foreground border-t pt-3">
+                    Scheduled on {format(new Date(deliverySchedule.requested_at || deliverySchedule.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+                  </div>
                 </div>
               ) : (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3">
-                  <div className="flex items-start gap-2">
-                    <span className="text-amber-600 text-lg">⚠️</span>
-                    <div>
-                      <p className="text-sm font-medium text-amber-800">Schedule not yet set</p>
-                      <p className="text-xs text-amber-600 mt-1">
-                        Customer will receive confirmation once {order.order_type === 'delivery' ? 'delivery' : 'pickup'} is scheduled
-                      </p>
-                    </div>
+                <div className="text-center py-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 dark:bg-amber-950 dark:border-amber-800">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Schedule will be confirmed after payment is verified.
+                    </p>
                   </div>
                 </div>
               )}
-
-              {/* Special Instructions Fallback */}
-              {!deliverySchedule?.special_instructions && order.special_instructions && (
-                <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
-                  <p className="text-sm font-medium text-orange-800 mb-1">Order Special Instructions:</p>
-                  <p className="text-sm text-orange-700 break-words">
-                    {order.special_instructions}
-                  </p>
-                </div>
-              )}
             </div>
+            
+            {/* Special Instructions Fallback */}
+            {!order.delivery_schedule?.special_instructions && order.special_instructions && (
+              <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mt-4">
+                <p className="text-sm font-medium text-orange-800 mb-1">Order Special Instructions:</p>
+                <p className="text-sm text-orange-700 break-words">
+                  {order.special_instructions}
+                </p>
+              </div>
+            )}
           </div>
         )}
-      </CardContent>
-    </Card>
-  );
-}
+        </CardContent>
+      </Card>
+    );
+  }

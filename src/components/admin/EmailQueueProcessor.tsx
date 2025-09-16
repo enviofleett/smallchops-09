@@ -130,14 +130,8 @@ export const EmailQueueProcessor = () => {
 
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
-          to: 'test@example.com',
-          subject: 'SMTP Connection Test',
-          emailType: 'transactional',
-          textContent: 'SMTP Connection Test - ' + new Date().toISOString(),
-          variables: {
-            test_message: 'SMTP Connection Test',
-            timestamp: new Date().toISOString()
-          }
+          healthcheck: true,
+          check: 'smtp'
         }
       });
 

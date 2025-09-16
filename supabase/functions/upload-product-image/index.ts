@@ -86,20 +86,54 @@ Deno.serve(async (req) => {
 
     console.log('Admin access confirmed');
 
-    // Check rate limiting
-    const { data: rateLimitCheck, error: rateLimitError } = await supabase
-      .rpc('check_upload_rate_limit', { p_user_id: user.id });
+    // Check rate limiting using direct database query instead of RPC
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    
+    const { data: recentUploads, error: rateLimitError } = await supabase
+      .from('audit_logs')
+      .select('id')
+      .eq('action', 'product_image_upload')
+      .eq('user_id', user.id)
+      .gte('created_at', oneHourAgo);
 
     if (rateLimitError) {
       console.error('Rate limit check error:', rateLimitError);
-      throw new Error('Rate limit check failed');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Rate limit check failed'
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
     }
 
-    if (!rateLimitCheck) {
-      throw new Error('Rate limit exceeded. Maximum 10 uploads per hour.');
+    const uploadCount = recentUploads?.length || 0;
+    if (uploadCount >= 10) {
+      console.log(`Rate limit exceeded for user ${user.id}: ${uploadCount} uploads in last hour`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Rate limit exceeded. Maximum 10 uploads per hour.',
+          retry_after: 3600 // seconds
+        }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': '3600'
+          }
+        }
+      );
     }
 
-    console.log('Rate limit check passed');
+    console.log(`Rate limit check passed: ${uploadCount}/10 uploads used`);
 
     if (req.method === 'POST') {
       const body: ProductImageUploadRequest = await req.json();

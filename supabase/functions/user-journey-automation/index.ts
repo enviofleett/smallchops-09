@@ -30,11 +30,59 @@ serve(async (req: Request) => {
   }
 
   try {
+    // Verify internal authentication for server-to-server calls
+    const internalSecret = req.headers.get('x-internal-secret')
+    const timestamp = req.headers.get('x-timestamp')
+    
+    if (internalSecret && timestamp) {
+      console.log('🔐 Verifying internal authentication...')
+      
+      const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
+      const message = `${timestamp}:user-journey-automation`
+      
+      // Verify timestamp is recent (within 5 minutes)
+      const currentTime = Math.floor(Date.now() / 1000)
+      const requestTime = parseInt(timestamp)
+      if (Math.abs(currentTime - requestTime) > 300) {
+        console.error('❌ Request timestamp too old or invalid')
+        return new Response(
+          JSON.stringify({ error: 'Request timestamp invalid' }), 
+          { status: 401, headers: corsHeaders }
+        )
+      }
+      
+      // Verify HMAC signature
+      const encoder = new TextEncoder()
+      const keyData = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      )
+      
+      const signature = await crypto.subtle.sign('HMAC', keyData, encoder.encode(message))
+      const signatureHex = Array.from(new Uint8Array(signature))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('')
+      
+      if (signatureHex !== internalSecret) {
+        console.error('❌ Invalid HMAC signature')
+        return new Response(
+          JSON.stringify({ error: 'Invalid authentication signature' }), 
+          { status: 401, headers: corsHeaders }
+        )
+      }
+      
+      console.log('✅ Internal authentication verified')
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { journey_type, user_data, order_data, metadata }: UserJourneyEvent = await req.json();
+    const requestBody = await req.json()
+    const { journey_type, user_data, order_data, metadata }: UserJourneyEvent = requestBody;
 
     console.log(`Processing user journey: ${journey_type} for ${user_data.email}`);
 
@@ -77,7 +125,7 @@ serve(async (req: Request) => {
       });
 
     // Trigger immediate email processing for high-priority events
-    if (['order_placement', 'password_reset'].includes(journey_type)) {
+    if (['order_placement', 'order_status_change', 'password_reset'].includes(journey_type)) {
       try {
         await supabase.functions.invoke('instant-email-processor');
       } catch (processError) {
@@ -240,20 +288,120 @@ async function handleOrderStatusChangeJourney(
     throw new Error('Order status is required for status change journey');
   }
 
-  // Map status to template
+  // Get order details to check fulfillment type
+  const { data: orderDetails, error: orderError } = await supabase
+    .from('orders')
+    .select('id, order_type, order_number, customer_email, customer_name')
+    .eq('id', orderData.order_id)
+    .single();
+
+  if (orderError) {
+    console.error('Failed to fetch order details:', orderError);
+    throw new Error(`Failed to fetch order details: ${orderError.message}`);
+  }
+
+  // Special handling for delivery orders changing to "out_for_delivery"
+  if (status === 'out_for_delivery' && orderDetails.order_type === 'delivery') {
+    console.log(`🚚 DELIVERY OUT FOR DELIVERY: Processing delivery notification for order ${orderData.order_number}`);
+    
+    try {
+      // Call the dedicated delivery notification function with driver info
+      const { data: deliveryEmailResponse, error: deliveryEmailError } = await supabase.functions.invoke('send-out-for-delivery-email', {
+        body: {
+          order_id: orderData.order_id
+        }
+      });
+
+      if (deliveryEmailError) {
+        console.error('Failed to send delivery notification:', deliveryEmailError);
+        throw new Error(`Failed to send delivery notification: ${deliveryEmailError.message}`);
+      }
+
+      // Log successful delivery notification
+      await supabase
+        .from('audit_logs')
+        .insert({
+          action: 'delivery_out_for_delivery_notification_sent',
+          category: 'Order Fulfillment',
+          message: `Delivery out-for-delivery notification with driver info sent for order ${orderData.order_number}`,
+          entity_id: orderData.order_id,
+          new_values: {
+            order_id: orderData.order_id,
+            order_number: orderData.order_number,
+            customer_email: orderDetails.customer_email,
+            fulfillment_type: 'delivery',
+            notification_type: 'out_for_delivery_with_driver',
+            notification_time: new Date().toISOString(),
+            email_response: deliveryEmailResponse
+          }
+        });
+
+      console.log(`✅ Delivery notification sent successfully for order ${orderData.order_number}`);
+      
+      // Return early - the dedicated function handles the email
+      return events;
+      
+    } catch (error: any) {
+      console.error('Error in delivery notification process:', error);
+      
+      // Log the failure
+      await supabase
+        .from('audit_logs')
+        .insert({
+          action: 'delivery_notification_failed',
+          category: 'Order Fulfillment',
+          message: `Failed to send delivery notification for order ${orderData.order_number}: ${error.message}`,
+          entity_id: orderData.order_id,
+          new_values: {
+            order_id: orderData.order_id,
+            order_number: orderData.order_number,
+            error: error.message,
+            fulfillment_type: 'delivery',
+            failed_at: new Date().toISOString()
+          }
+        });
+
+      // Continue with standard template-based notification as fallback
+      console.log('Falling back to standard template notification...');
+    }
+  }
+
+  // Check for existing ready emails to prevent duplicates
+  if (status === 'ready') {
+    const { data: existingReadyEmail } = await supabase
+      .from('communication_events')
+      .select('id')
+      .eq('order_id', orderData.order_id)
+      .eq('event_type', 'order_status_update')
+      .eq('template_key', 'order_ready')
+      .eq('status', 'sent')
+      .limit(1);
+
+    if (existingReadyEmail && existingReadyEmail.length > 0) {
+      console.log(`⚠️ Order ${orderData.order_number} already has ready notification sent, skipping duplicate`);
+      return events;
+    }
+  }
+
+  // Map status to correct template keys that exist in enhanced_email_templates
   const statusTemplateMap: Record<string, string> = {
-    'processing': 'order_processing',
-    'shipped': 'order_shipped',
+    'confirmed': 'order_confirmation',    // Fix: changed from order_confirmed
+    'preparing': 'order_processing',     // Fix: changed from order_preparing
+    'ready': 'order_ready',
     'out_for_delivery': 'order_out_for_delivery',
     'delivered': 'order_delivered',
-    'cancelled': 'order_cancelled'
+    'cancelled': 'order_cancellation',    // Fix: changed from order_cancelled
+    'completed': 'order_completed',
+    'returned': 'order_returned'
   };
 
   const templateKey = statusTemplateMap[status];
   if (!templateKey) {
-    console.warn(`No template found for status: ${status}`);
+    console.warn(`❌ No template found for status: ${status}. Available mappings:`, Object.keys(statusTemplateMap));
     return events;
   }
+
+  console.log(`📧 Using template key: ${templateKey} for status: ${status}`);
 
   const statusUpdateEvent = await supabase
     .from('communication_events')
@@ -264,12 +412,21 @@ async function handleOrderStatusChangeJourney(
       status: 'queued',
       template_key: templateKey,
       template_variables: {
-        customer_name: userData.name || 'Customer',
+        customer_name: userData.name || 'Valued Customer',
         order_number: orderData.order_number,
-        order_status: status,
-        status_date: new Date().toLocaleDateString(),
-        tracking_url: `https://yourdomain.com/track/${orderData.order_id}`,
-        estimated_delivery: metadata?.estimated_delivery || 'Soon',
+        order_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        status_date: new Date().toLocaleDateString('en-NG', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        business_name: 'Starters Small Chops',
+        support_email: 'support@starterssmallchops.com',
+        order_id: orderData.order_id,
+        old_status: metadata?.old_status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '',
+        new_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        updated_at: metadata?.updated_at || new Date().toISOString(),
+        fulfillment_type: orderDetails.order_type,
         ...metadata
       },
       priority: 'normal'
@@ -281,7 +438,30 @@ async function handleOrderStatusChangeJourney(
     events.push(statusUpdateEvent.data);
   }
 
-  console.log(`Created status update email for order ${orderData.order_number}: ${status}`);
+  // Log pickup-specific notification for production monitoring
+  if (templateKey === 'pickup_ready') {
+    console.log(`🚚 PICKUP READY: Notification sent for order ${orderData.order_number} to ${userData.email}`);
+    
+    // Additional audit log for pickup notifications
+    await supabase
+      .from('audit_logs')
+      .insert({
+        action: 'pickup_ready_notification_sent',
+        category: 'Order Fulfillment',
+        message: `Pickup ready notification sent for order ${orderData.order_number}`,
+        entity_id: orderData.order_id,
+        new_values: {
+          order_id: orderData.order_id,
+          order_number: orderData.order_number,
+          customer_email: userData.email,
+          template_used: templateKey,
+          fulfillment_type: 'pickup',
+          notification_time: new Date().toISOString()
+        }
+      });
+  }
+
+  console.log(`Created status update email for order ${orderData.order_number}: ${status} (template: ${templateKey})`);
   return events;
 }
 

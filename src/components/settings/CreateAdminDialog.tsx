@@ -89,7 +89,7 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
         toast({
           title: 'Admin Created Successfully',
           description: useImmediateAccess 
-            ? `Admin user created with immediate access. Password: ${data.data?.password || immediatePassword}`
+            ? `Admin user created with immediate access and auto-verified email. Password: ${data.data?.password || immediatePassword}`
             : 'Admin user created and invitation email sent',
         });
 
@@ -101,14 +101,45 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
         setSendEmail(true);
         onOpenChange(false);
         onSuccess?.();
+      } else if (data?.code === 'USER_EXISTS') {
+        toast({
+          title: 'User Already Exists',
+          description: 'An account with this email already exists. You can set their role to admin instead.',
+          variant: 'destructive'
+        });
+        return;
       } else {
         throw new Error(data?.error || 'Failed to create admin user');
       }
     } catch (error: any) {
       console.error('Admin creation error:', error);
+      
+      // Enhanced error handling for production
+      let errorTitle = 'Creation Failed';
+      let errorDescription = 'Failed to create admin user. Please try again.';
+      
+      if (error.message.includes('FunctionsHttpError')) {
+        errorTitle = 'Server Error';
+        errorDescription = 'Admin creation service is temporarily unavailable. Please try again in a moment.';
+      } else if (error.message.includes('already exists')) {
+        errorTitle = 'User Already Exists';
+        errorDescription = 'An admin user with this email already exists. Please use a different email address.';
+      } else if (error.message.includes('Invalid email')) {
+        errorTitle = 'Invalid Email';
+        errorDescription = 'Please enter a valid email address.';
+      } else if (error.message.includes('Authorization')) {
+        errorTitle = 'Permission Denied';
+        errorDescription = 'You do not have permission to create admin users. Please contact a system administrator.';
+      } else if (error.message.includes('Server configuration')) {
+        errorTitle = 'System Configuration Error';
+        errorDescription = 'The admin creation system is not properly configured. Please contact technical support.';
+      } else if (error.message) {
+        errorDescription = error.message;
+      }
+      
       toast({
-        title: 'Creation Failed',
-        description: error.message || 'Failed to create admin user. Please try again.',
+        title: errorTitle,
+        description: errorDescription,
         variant: 'destructive'
       });
     } finally {
@@ -169,7 +200,7 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
               <div className="space-y-0.5">
                 <Label className="text-base font-medium">Immediate Access</Label>
                 <p className="text-sm text-muted-foreground">
-                  Create user with password for immediate login
+                  Create user with password and auto-verify email for immediate login
                 </p>
               </div>
               <Switch
@@ -177,6 +208,18 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                 onCheckedChange={setUseImmediateAccess}
               />
             </div>
+
+            {useImmediateAccess && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2 text-green-800">
+                  <Shield className="h-4 w-4" />
+                  <span className="text-sm font-medium">Immediate Access Enabled</span>
+                </div>
+                <p className="text-xs text-green-700 mt-1">
+                  Email verification will be bypassed. User can login immediately with the provided password.
+                </p>
+              </div>
+            )}
 
             {useImmediateAccess && (
               <div className="space-y-2">
@@ -202,7 +245,7 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  User should change this password after first login
+                  User should change this password after first login. Email will be auto-verified.
                 </p>
               </div>
             )}

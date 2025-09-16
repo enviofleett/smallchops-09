@@ -67,7 +67,7 @@ class DeliverySchedulingService {
   private async loadConfiguration(): Promise<void> {
     try {
       const { data, error } = await supabase
-        .from('business_settings')
+        .from('business_info')
         .select('delivery_scheduling_config, business_hours')
         .single();
 
@@ -111,18 +111,18 @@ class DeliverySchedulingService {
 
   private getDefaultConfig(): DeliverySchedulingConfig {
     return {
-      minimum_lead_time_minutes: 90,
-      max_advance_booking_days: 30,
-      default_delivery_duration_minutes: 60,
+      minimum_lead_time_minutes: 60, // Production: 60 minutes lead time
+      max_advance_booking_days: 60, // 2 months for better planning
+      default_delivery_duration_minutes: 60, // 1-hour delivery slots
       allow_same_day_delivery: true,
       business_hours: {
-        monday: { open: '08:00', close: '18:00', is_open: true },
-        tuesday: { open: '08:00', close: '18:00', is_open: true },
-        wednesday: { open: '08:00', close: '18:00', is_open: true },
-        thursday: { open: '08:00', close: '18:00', is_open: true },
-        friday: { open: '08:00', close: '18:00', is_open: true },
-        saturday: { open: '08:00', close: '18:00', is_open: true },
-        sunday: { open: '08:00', close: '18:00', is_open: true },
+        monday: { open: '08:00', close: '19:00', is_open: true },
+        tuesday: { open: '08:00', close: '19:00', is_open: true },
+        wednesday: { open: '08:00', close: '19:00', is_open: true },
+        thursday: { open: '08:00', close: '19:00', is_open: true },
+        friday: { open: '08:00', close: '19:00', is_open: true },
+        saturday: { open: '08:00', close: '19:00', is_open: true },
+        sunday: { open: '10:00', close: '16:00', is_open: true },
       }
     };
   }
@@ -196,13 +196,17 @@ class DeliverySchedulingService {
     if (!businessHours.is_open) return [];
 
     const slots: DeliveryTimeSlot[] = [];
+    
+    // Production: Use dynamic hours based on day of week
+    // Monday-Saturday: 8am-7pm, Sunday: 10am-4pm
     const openTime = this.parseTime(businessHours.open);
     const closeTime = this.parseTime(businessHours.close);
-    const slotDuration = this.config.default_delivery_duration_minutes;
+    const slotDuration = this.config.default_delivery_duration_minutes; // Use config duration
     const minDeliveryTime = this.getMinimumDeliveryTime();
 
     let currentTime = openTime;
 
+    // Generate hourly slots within business hours
     while (currentTime < closeTime) {
       const slotEnd = addMinutes(currentTime, slotDuration);
       
@@ -210,19 +214,30 @@ class DeliverySchedulingService {
       if (isAfter(slotEnd, closeTime)) break;
 
       const slotDateTime = this.combineDateAndTime(date, currentTime);
-      const slotEndDateTime = this.combineDateAndTime(date, slotEnd);
 
-      // Check if slot is available (not in the past)
-      const available = !isBefore(slotDateTime, minDeliveryTime);
+      // Production logic: Check if slot meets lead time requirement  
+      const now = new Date();
+      const isToday = isSameDay(date, now);
+      
+      let available = true;
+      let reason: string | undefined;
+
+      if (isToday && isBefore(slotDateTime, minDeliveryTime)) {
+        available = false;
+        reason = `Booking window closed - minimum ${this.config.minimum_lead_time_minutes} minutes required`;
+      } else if (isBefore(slotDateTime, now)) {
+        available = false;
+        reason = 'Time slot has passed';
+      }
       
       slots.push({
         start_time: format(currentTime, 'HH:mm'),
         end_time: format(slotEnd, 'HH:mm'),
         available,
-        reason: available ? undefined : 'Too soon - minimum lead time required'
+        reason
       });
 
-      // Move to next slot (1-hour intervals)
+      // Move to next slot
       currentTime = addMinutes(currentTime, slotDuration);
     }
 

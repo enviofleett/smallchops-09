@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import ErrorBoundaryWrapper from "./components/ErrorBoundaryWrapper";
@@ -20,7 +21,9 @@ import { ErrorTrackerComponent } from "./components/monitoring/ErrorTracker";
 import { NetworkProvider } from "./components/network/NetworkProvider";
 import { OnlineStatusBanner } from "./components/network/OnlineStatusBanner";
 import { DeploymentInfo } from "./components/common/DeploymentInfo";
+import { NotificationIntegration } from "@/components/notifications/NotificationIntegration";
 import AdminLayout from "./components/layout/AdminLayout";
+import { CartProvider } from "@/contexts/CartProvider";
 
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();
@@ -60,7 +63,7 @@ const SimpleRegisterPage = withLazyLoading(() => import("./pages/SimpleRegisterP
 const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"), undefined, false, 10000);
 const AuthPage = withLazyLoading(() => import("./pages/AuthPage"), undefined, true, 8000); // Critical auth page
 const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"), undefined, true, 8000); // Critical auth page
-const Cart = withLazyLoading(() => import("./pages/Cart"), undefined, true, 10000); // Critical customer journey
+const Favorites = withLazyLoading(() => import("./pages/Favorites"), undefined, true, 10000);
 const Booking = withLazyLoading(() => import("./pages/Booking"), undefined, true, 12000); // Complex booking component
 const PublicProducts = withLazyLoading(() => import("./pages/PublicProducts"), undefined, true, 10000); // High traffic page
 const Contact = withLazyLoading(() => import("./pages/Contact"), undefined, true, 8000);
@@ -70,8 +73,10 @@ const PaystackTestingDashboard = withLazyLoading(() => import("./pages/PaystackT
 const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"), undefined, true, 8000);
 const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"), undefined, true, 8000);
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"), undefined, true, 8000);
+const Cart = withLazyLoading(() => import("./pages/Cart"), undefined, true, 10000);
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"), undefined, false, 10000);
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"), undefined, true, 10000);
+const Blog = withLazyLoading(() => import("./pages/Blog"), undefined, true, 10000);
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })), undefined, false, 15000);
 
 // Hardened QueryClient with comprehensive error handling and performance optimizations
@@ -192,6 +197,9 @@ const App = () => {
           <DynamicFavicon />
           <OnlineStatusBanner />
           <AuthProvider>
+            <NotificationProvider>
+              <NotificationIntegration />
+              <CartProvider>
             <BrowserRouter>
             <Routes>
               {/* Customer store at root */}
@@ -201,8 +209,10 @@ const App = () => {
               <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="/products" element={<PublicProducts />} />
               <Route path="/cart" element={<Cart />} />
+              <Route path="/favorites" element={<Favorites />} />
               <Route path="/booking" element={<Booking />} />
               <Route path="/about" element={<About />} />
+              <Route path="/blog" element={<Blog />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/paystack-test" element={<PaystackTest />} />
               <Route path="/paystack-testing" element={<PaystackTestingDashboard />} />
@@ -273,8 +283,10 @@ const App = () => {
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </AuthProvider>
+            </BrowserRouter>
+            </CartProvider>
+            </NotificationProvider>
+          </AuthProvider>
         </NetworkProvider>
       </TooltipProvider>
       <DeploymentInfo />

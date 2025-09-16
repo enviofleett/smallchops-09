@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { Edit, CalendarIcon } from "lucide-react";
-import { DaysSelector } from "./DaysSelector";
+
 import { useUpdatePromotion } from "@/hooks/usePromotions";
 import { Button } from "@/components/ui/button";
 import {
@@ -120,7 +120,7 @@ export default function EditPromotionDialog({
         value: promotion.value || undefined,
         min_order_amount: promotion.min_order_amount || undefined,
         code: promotion.code || "",
-        applicable_days: promotion.applicable_days || [],
+        // applicable_days removed in simplified system
         valid_from: promotion.valid_from ? new Date(promotion.valid_from) : undefined,
         valid_until: promotion.valid_until ? new Date(promotion.valid_until) : undefined,
       });
@@ -316,23 +316,6 @@ export default function EditPromotionDialog({
                 )}
               />
 
-              {/* Days Selection */}
-              <FormField
-                control={form.control}
-                name="applicable_days"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <DaysSelector
-                        selectedDays={field.value || []}
-                        onDaysChange={field.onChange}
-                        disabled={false}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               {/* Dates */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

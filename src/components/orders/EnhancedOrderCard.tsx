@@ -8,6 +8,7 @@ import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
 import { ProductDetailCard } from './ProductDetailCard';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
+import { usePayment } from '@/hooks/usePayment';
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -17,24 +18,32 @@ import {
   CreditCard,
   Clock,
   Truck,
-  CheckCircle
+  CheckCircle,
+  Loader2,
+  Printer
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface EnhancedOrderCardProps {
   order: any;
   deliverySchedule?: any;
   showExpandedByDefault?: boolean;
   className?: string;
+  onPrintPreview?: (order: any, deliverySchedule?: any) => void;
+  isPrinting?: boolean;
 }
 
 export function EnhancedOrderCard({ 
   order, 
   deliverySchedule, 
   showExpandedByDefault = false,
-  className = "" 
+  className = "",
+  onPrintPreview,
+  isPrinting = false
 }: EnhancedOrderCardProps) {
   const [isExpanded, setIsExpanded] = useState(showExpandedByDefault);
+  const { processing, processPayment } = usePayment();
   // Note: Removed useDetailedOrderData to prevent flickering - using direct order data instead
 
   const formatCurrency = (amount: number) => {
@@ -91,6 +100,37 @@ export function EnhancedOrderCard({
 
   const statusConfig = getStatusConfig(order.status);
   const StatusIcon = statusConfig.icon;
+
+  // Check if payment can be continued
+  const canContinuePayment = 
+    order.payment_status !== 'paid' && 
+    order.total_amount > 0 && 
+    ['pending', 'confirmed', 'preparing'].includes(order.status);
+
+  const handleContinuePayment = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!order.customer_email) {
+      toast.error('Customer email not found for this order');
+      return;
+    }
+
+    try {
+      const success = await processPayment(
+        order.id,
+        order.total_amount,
+        order.customer_email,
+        true // Open in new tab
+      );
+
+      if (success) {
+        toast.success('Payment window opened. Complete your payment to continue.');
+      }
+    } catch (error) {
+      console.error('Payment continuation error:', error);
+      toast.error('Failed to continue payment. Please try again.');
+    }
+  };
 
   // Calculate totals from order items
   const subtotal = order.order_items?.reduce((sum: number, item: any) => 
@@ -149,32 +189,72 @@ export function EnhancedOrderCard({
             <div className="text-xl sm:text-2xl font-bold text-primary">
               {formatCurrency(order.total_amount)}
             </div>
-            <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-              <CollapsibleTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+            <div className="flex items-center gap-2">
+              {canContinuePayment && (
+                <Button
+                  onClick={handleContinuePayment}
+                  disabled={processing}
+                  size="sm"
                   className="text-xs sm:text-sm"
-                  aria-expanded={isExpanded}
-                  aria-controls="order-details-content"
-                  aria-label={isExpanded ? 'Hide order details' : 'Show order details'}
                 >
-                  {isExpanded ? (
+                  {processing ? (
                     <>
-                      <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 transition-transform duration-200" />
-                      <span className="hidden sm:inline">Hide Details</span>
-                      <span className="sm:hidden">Hide</span>
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin" />
+                      Processing...
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 transition-transform duration-200" />
-                      <span className="hidden sm:inline">View Details</span>
-                      <span className="sm:hidden">Details</span>
+                      <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      Pay Now
                     </>
                   )}
                 </Button>
-              </CollapsibleTrigger>
-            </Collapsible>
+              )}
+              {/* Print Preview Button - Only for paid orders */}
+              {order.payment_status === 'paid' && onPrintPreview && (
+                <Button
+                  onClick={() => onPrintPreview(order, deliverySchedule)}
+                  disabled={isPrinting}
+                  size="sm"
+                  variant="outline"
+                  className="text-xs sm:text-sm"
+                  title="Preview thermal receipt"
+                >
+                  {isPrinting ? (
+                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                  ) : (
+                    <Printer className="h-3 w-3 sm:h-4 sm:w-4" />
+                  )}
+                  <span className="hidden sm:inline ml-1 sm:ml-2">Preview</span>
+                </Button>
+              )}
+              <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+                <CollapsibleTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs sm:text-sm"
+                    aria-expanded={isExpanded}
+                    aria-controls="order-details-content"
+                    aria-label={isExpanded ? 'Hide order details' : 'Show order details'}
+                  >
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 transition-transform duration-200" />
+                        <span className="hidden sm:inline">Hide Details</span>
+                        <span className="sm:hidden">Hide</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 transition-transform duration-200" />
+                        <span className="hidden sm:inline">View Details</span>
+                        <span className="sm:hidden">Details</span>
+                      </>
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+              </Collapsible>
+            </div>
           </div>
         </div>
       </div>
@@ -200,13 +280,37 @@ export function EnhancedOrderCard({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Payment Details */}
-              <PaymentDetailsCard
-                paymentStatus={order.payment_status}
-                paymentMethod={order.payment_method}
-                paymentReference={order.payment_reference}
-                paidAt={order.paid_at}
-                totalAmount={order.total_amount}
-              />
+              <div className="space-y-4">
+                <PaymentDetailsCard
+                  paymentStatus={order.payment_status}
+                  paymentMethod={order.payment_method}
+                  paymentReference={order.payment_reference}
+                  paidAt={order.paid_at}
+                  totalAmount={order.total_amount}
+                />
+                
+                {/* Continue Payment Button in Expanded View */}
+                {canContinuePayment && (
+                  <Button
+                    onClick={handleContinuePayment}
+                    disabled={processing}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {processing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing Payment...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Continue Payment - {formatCurrency(order.total_amount)}
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
 
               {/* Delivery Schedule */}
               {order.order_type === 'delivery' && deliverySchedule && (

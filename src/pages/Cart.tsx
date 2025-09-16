@@ -34,7 +34,7 @@ export default function Cart() {
   }
 
   const handleBackClick = () => {
-    navigate('/');
+    navigate(-1);
   };
 
 
@@ -78,7 +78,7 @@ export default function Cart() {
                 </div>
                 <div className="divide-y">
                   {cart.items.map((item) => (
-                    <div key={item.id} className="p-4 sm:p-6">
+                    <div key={item.id} className="p-3 sm:p-4 md:p-6">
                       <CartItemRow
                         item={item}
                         onUpdateQuantity={updateQuantity}

@@ -185,15 +185,14 @@ export const EmailTemplateManager: React.FC = () => {
 
   const testTemplate = async (template: EmailTemplate) => {
     try {
+      // Load production data for realistic template variables
+      const productionVariables = await loadProductionData();
+      
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: 'test@example.com',
           template_key: template.template_key,
-          variables: {
-            customerName: 'Test User',
-            orderNumber: 'TEST-001',
-            amount: '100.00'
-          }
+          variables: productionVariables
         }
       });
 
@@ -201,7 +200,7 @@ export const EmailTemplateManager: React.FC = () => {
 
       toast({
         title: "Test Email Sent",
-        description: "Template test email sent successfully",
+        description: `Template "${template.template_name}" sent with live production data`,
       });
     } catch (error: any) {
       toast({
@@ -209,6 +208,196 @@ export const EmailTemplateManager: React.FC = () => {
         description: error.message || "Failed to send test email",
         variant: "destructive",
       });
+    }
+  };
+
+  const loadProductionData = async () => {
+    try {
+      // Get business settings for production branding
+      const { data: businessSettings } = await supabase
+        .from('business_info')
+        .select('name, tagline, website_url, working_hours')
+        .limit(1)
+        .maybeSingle();
+
+      // Get recent customer data for realistic examples
+      const { data: customerData } = await supabase
+        .from('customer_accounts')
+        .select('name, email')
+        .limit(1)
+        .maybeSingle();
+
+      // Get recent order data for realistic examples
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('order_number, total_amount, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Build comprehensive production data object
+      return {
+        // Business information
+        business_name: businessSettings?.name || 'Your Business',
+        business_tagline: businessSettings?.tagline || 'Quality products delivered',
+        business_website: businessSettings?.website_url || 'https://yourbusiness.com',
+        business_email: 'store@startersmallchops.com',
+        business_phone: '+234123456789',
+        business_hours: businessSettings?.working_hours || 'Mon-Fri 9AM-6PM',
+        
+        // Customer information
+        customer_name: customerData?.name || 'John Doe',
+        customer_email: customerData?.email || 'john@example.com',
+        customerName: customerData?.name || 'John Doe',
+        
+        // Order information
+        order_number: orderData?.order_number || 'ORD-2024-001',
+        orderNumber: orderData?.order_number || 'ORD-2024-001',
+        order_total: orderData?.total_amount?.toString() || '150.00',
+        amount: orderData?.total_amount?.toString() || '150.00',
+        order_status: orderData?.status || 'confirmed',
+        
+        // Common variables
+        current_year: new Date().getFullYear().toString(),
+        current_date: new Date().toLocaleDateString(),
+        support_email: 'support@startersmallchops.com',
+        
+        // Delivery information
+        delivery_address: '123 Main Street, Lagos, Nigeria',
+        estimated_delivery: new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString()
+      };
+    } catch (error) {
+      console.error('Error loading production data:', error);
+      // Return fallback sample data if production data fails
+      return {
+        business_name: 'Your Business',
+        customer_name: 'John Doe',
+        customerName: 'John Doe',
+        order_number: 'ORD-2024-001',
+        orderNumber: 'ORD-2024-001',
+        amount: '150.00',
+        order_total: '150.00',
+        current_year: new Date().getFullYear().toString(),
+        current_date: new Date().toLocaleDateString()
+      };
+    }
+  };
+
+  const sendToCustomers = async (template: EmailTemplate) => {
+    if (!confirm(`Are you sure you want to send "${template.template_name}" to all verified customers? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Get all verified customers
+      const { data: paidCustomers, error: customerError } = await supabase
+        .from('customer_accounts')
+        .select('id, email, name')
+        .eq('email_verified', true);
+
+      if (customerError) throw customerError;
+
+      if (!paidCustomers || paidCustomers.length === 0) {
+        toast({
+          title: "No Recipients Found",
+          description: "No verified customers found to send emails to",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Load production data with all tags
+      const productionVariables = await loadProductionData();
+      
+      let successCount = 0;
+      let failureCount = 0;
+
+      // Send emails in batches to avoid overwhelming the system
+      const batchSize = 10;
+      for (let i = 0; i < paidCustomers.length; i += batchSize) {
+        const batch = paidCustomers.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (customer) => {
+          try {
+            // Personalize variables for each customer
+            const personalizedVariables = {
+              ...productionVariables,
+              customer_name: customer.name || 'Valued Customer',
+              customer_email: customer.email,
+              customerName: customer.name || 'Valued Customer'
+            };
+
+            const { error } = await supabase.functions.invoke('unified-smtp-sender', {
+              body: {
+                to: customer.email,
+                template_key: template.template_key,
+                variables: personalizedVariables
+              }
+            });
+
+            if (error) throw error;
+            
+            // Log successful send for audit
+            await supabase
+              .from('audit_logs')
+              .insert({
+                action: 'mass_email_sent',
+                category: 'Email Marketing',
+                message: `Template "${template.template_name}" sent to ${customer.email}`,
+                new_values: {
+                  template_key: template.template_key,
+                  recipient: customer.email,
+                  customer_id: customer.id
+                }
+              });
+
+            successCount++;
+          } catch (error: any) {
+            console.error(`Failed to send email to ${customer.email}:`, error);
+            failureCount++;
+            
+            // Log failed send for tracking
+            await supabase
+              .from('audit_logs')
+              .insert({
+                action: 'mass_email_failed',
+                category: 'Email Marketing', 
+                message: `Failed to send template "${template.template_name}" to ${customer.email}: ${error.message}`,
+                new_values: {
+                  template_key: template.template_key,
+                  recipient: customer.email,
+                  customer_id: customer.id,
+                  error: error.message
+                }
+              });
+          }
+        });
+
+        // Wait for batch to complete before next batch
+        await Promise.allSettled(batchPromises);
+        
+        // Small delay between batches to be respectful to email servers
+        if (i + batchSize < paidCustomers.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      toast({
+        title: "Mass Email Campaign Complete",
+        description: `Successfully sent to ${successCount} customers. ${failureCount} failed.`,
+        variant: successCount > 0 ? "default" : "destructive"
+      });
+
+    } catch (error: any) {
+      console.error('Error in mass email campaign:', error);
+      toast({
+        title: "Campaign Failed", 
+        description: error.message || "Failed to send mass email campaign",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -244,10 +433,27 @@ export const EmailTemplateManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Production Mode Alert */}
+      <Alert className="border-orange-200 bg-orange-50">
+        <AlertDescription>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-orange-600 border-orange-300">
+              PRODUCTION MODE
+            </Badge>
+            <span className="text-orange-700">
+              All email communications in production MUST use templates from this manager. 
+              Fallback emails are disabled to ensure brand consistency and security.
+            </span>
+          </div>
+        </AlertDescription>
+      </Alert>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Email Template Manager</h2>
-          <p className="text-muted-foreground">Create and manage email templates</p>
+          <p className="text-muted-foreground">
+            Manage production email templates - the single source of truth for all email communications
+          </p>
         </div>
         <Button onClick={startCreate}>
           <Plus className="h-4 w-4 mr-2" />
@@ -407,6 +613,70 @@ export const EmailTemplateManager: React.FC = () => {
                 placeholder="e.g., customerName, orderNumber, amount"
               />
             </div>
+
+            {/* Available Variables Reference */}
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Code className="h-4 w-4" />
+                  Available Template Variables
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Use these variables in your templates with double curly braces: <code>{'{{variable_name}}'}</code>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <h4 className="font-medium text-green-700 mb-2">Business Information</h4>
+                    <div className="space-y-1 text-xs">
+                      <div><code>business_name</code> - Business name</div>
+                      <div><code>business_tagline</code> - Business tagline</div>
+                      <div><code>business_website</code> - Website URL</div>
+                      <div><code>business_email</code> - Business email</div>
+                      <div><code>business_phone</code> - WhatsApp number</div>
+                      <div><code>business_hours</code> - Working hours</div>
+                      <div><code>support_email</code> - Support email</div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-blue-700 mb-2">Customer Information</h4>
+                    <div className="space-y-1 text-xs">
+                      <div><code>customer_name</code> - Customer full name</div>
+                      <div><code>customerName</code> - Customer name (alias)</div>
+                      <div><code>customer_email</code> - Customer email</div>
+                    </div>
+                    
+                    <h4 className="font-medium text-purple-700 mb-2 mt-3">Date & Time</h4>
+                    <div className="space-y-1 text-xs">
+                      <div><code>current_year</code> - Current year</div>
+                      <div><code>current_date</code> - Current date</div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-orange-700 mb-2">Order Information</h4>
+                    <div className="space-y-1 text-xs">
+                      <div><code>order_number</code> - Order number</div>
+                      <div><code>orderNumber</code> - Order number (alias)</div>
+                      <div><code>order_total</code> - Order total amount</div>
+                      <div><code>amount</code> - Amount (alias)</div>
+                      <div><code>order_status</code> - Order status</div>
+                      <div><code>delivery_address</code> - Delivery address</div>
+                      <div><code>estimated_delivery</code> - Estimated delivery</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertDescription className="text-xs">
+                    <strong>Pro tip:</strong> All variables are automatically populated with live production data when templates are sent. 
+                    Test templates use real data from your database for accurate previews.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
 
             <div className="flex items-center justify-between pt-4">
               <div className="flex items-center space-x-2">

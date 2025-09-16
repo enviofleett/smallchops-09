@@ -13,6 +13,8 @@ import { ProductWithDiscount } from '@/lib/discountCalculations';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { CheckoutButton } from '@/components/ui/checkout-button';
+import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
+import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
 
 interface ProductCatalogProps {
   onToggleFavorite?: (productId: string) => void;
@@ -23,9 +25,12 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
+  const [showMOQModal, setShowMOQModal] = useState(false);
+  const [moqAdjustments, setMoqAdjustments] = useState<any>(null);
   
   const { addItem } = useCart();
   const { toast } = useToast();
+  const { validateMOQWithPricing, autoAdjustQuantities } = useEnhancedMOQValidation();
   
   // Fetch products with discounts - Production Ready
   const { 
@@ -72,7 +77,8 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
       }
     });
   
-  const handleAddToCart = (product: ProductWithDiscount) => {
+  const handleAddToCart = async (product: ProductWithDiscount) => {
+    // Add product with MOQ information
     addItem({
       id: product.id,
       name: product.name,
@@ -81,6 +87,7 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
       discount_amount: product.discount_amount,
       vat_rate: 7.5, // Default VAT rate
       image_url: product.image_url,
+      minimum_order_quantity: product.minimum_order_quantity || 1,
     });
     
     toast({
@@ -257,6 +264,22 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
       
       {/* Floating Checkout Button */}
       <CheckoutButton />
+      
+      {/* MOQ Adjustment Modal */}
+      <MOQAdjustmentModal
+        isOpen={showMOQModal}
+        onClose={() => setShowMOQModal(false)}
+        onConfirm={async () => {
+          setShowMOQModal(false);
+          toast({
+            title: "Cart Updated",
+            description: "Quantities have been adjusted to meet minimum order requirements.",
+          });
+        }}
+        onCancel={() => setShowMOQModal(false)}
+        adjustments={moqAdjustments?.adjustmentsMade || []}
+        pricingImpact={moqAdjustments?.pricingImpact}
+      />
     </div>
   );
 }

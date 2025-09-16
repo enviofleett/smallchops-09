@@ -11,6 +11,7 @@ import { OrderItemsBreakdown } from './OrderItemsBreakdown';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
 import { usePayment } from '@/hooks/usePayment';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import {
   Calendar,
   MapPin,
@@ -39,6 +40,7 @@ export function OrderDetailsModal({
   onClose
 }: OrderDetailsModalProps) {
   const { processing, processPayment } = usePayment();
+  const adminPermissions = useAdminPermissions();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
@@ -250,6 +252,12 @@ export function OrderDetailsModal({
                 orderType={order.order_type}
                 orderStatus={order.status}
                 className="h-fit"
+                showRescheduleOption={adminPermissions.canRescheduleDeliveries}
+                orderId={order.id}
+                onScheduleUpdated={(newSchedule) => {
+                  // Handle schedule update - you might want to refresh the order data
+                  console.log('Schedule updated:', newSchedule);
+                }}
               />
             )}
           </div>

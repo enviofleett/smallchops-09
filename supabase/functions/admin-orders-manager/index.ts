@@ -424,6 +424,12 @@ serve(async (req) => {
           'internal_notes', 'updated_at'
         ];
 
+        // CRITICAL: Validate status enum values to prevent database errors
+        const validStatuses = [
+          'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 
+          'delivered', 'cancelled', 'refunded', 'completed', 'returned'
+        ];
+
         // Sanitize and validate updates
         const sanitizedUpdates = {};
         console.log('Raw updates before sanitization:', updates);
@@ -434,6 +440,38 @@ serve(async (req) => {
               // Map legacy phone field to customer_phone
               console.log('🔧 Mapping phone to customer_phone:', value);
               sanitizedUpdates.customer_phone = value;
+            } else if (key === 'status') {
+              // CRITICAL: Validate status enum value
+              if (value === null || value === 'null' || value === '' || value === undefined) {
+                console.error('❌ CRITICAL: Null or invalid status value detected:', value);
+                return new Response(JSON.stringify({
+                  success: false,
+                  error: 'Status cannot be null, undefined, or empty'
+                }), {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  status: 400
+                });
+              }
+              
+              if (!validStatuses.includes(value)) {
+                console.error('❌ CRITICAL: Invalid status enum value:', value);
+                return new Response(JSON.stringify({
+                  success: false,
+                  error: `Invalid status value: ${value}. Valid values are: ${validStatuses.join(', ')}`
+                }), {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  status: 400
+                });
+              }
+              
+              sanitizedUpdates[key] = value;
+            } else if (key === 'assigned_rider_id') {
+              // CRITICAL: Validate rider_id - allow null for unassignment
+              if (value === 'null' || value === '') {
+                sanitizedUpdates[key] = null;
+              } else {
+                sanitizedUpdates[key] = value;
+              }
             } else if (allowedColumns.includes(key)) {
               sanitizedUpdates[key] = value;
             } else {

@@ -37,6 +37,8 @@ import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
 import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
 import { filterOrdersByDate, getFilterDescription, getFilterStats, DeliveryFilterType } from '@/utils/dateFilterUtils';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
+import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
+import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBoundary';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -47,6 +49,9 @@ export default function AdminOrders() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
   const [showDeliveryReport, setShowDeliveryReport] = useState(false);
+  
+  // Production-safe schedule recovery with circuit breaker
+  const { attemptScheduleRecovery, getRecoveryStatus } = useOrderScheduleRecovery();
   
   // Hourly delivery filter state for confirmed tab
   const [selectedDay, setSelectedDay] = useState<'today' | 'tomorrow' | null>(null);

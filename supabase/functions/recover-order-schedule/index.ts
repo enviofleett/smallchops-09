@@ -29,12 +29,24 @@ serve(async (req) => {
 
     console.log(`🔍 Attempting to recover schedule for order: ${order_id}`)
 
-    // Check if schedule already exists
-    const { data: existingSchedule } = await supabase
+    // CRITICAL: Check if schedule already exists with proper error handling
+    const { data: existingSchedule, error: scheduleCheckError } = await supabase
       .from('order_delivery_schedule')
       .select('id')
       .eq('order_id', order_id)
-      .single()
+      .maybeSingle()
+
+    if (scheduleCheckError) {
+      console.error(`❌ Error checking existing schedule: ${scheduleCheckError.message}`)
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Database error while checking schedule',
+          found: false 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     if (existingSchedule) {
       console.log(`✅ Schedule already exists for order: ${order_id}`)

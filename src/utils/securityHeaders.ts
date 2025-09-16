@@ -118,12 +118,29 @@ export const initializeSecurityMonitoring = () => {
     reportSecurityStatus();
   }
   
-  // Set up CSP violation reporting
+  // Set up CSP violation reporting with production-safe filtering
   document.addEventListener('securitypolicyviolation', (e) => {
-    console.error('CSP Violation:', {
-      violatedDirective: e.violatedDirective,
-      blockedURI: e.blockedURI,
-      documentURI: e.documentURI
-    });
+    // Filter out common false positives to reduce noise in production
+    const ignoredViolations = [
+      'manifest-src',
+      'https://lovable.dev/auth-bridge',
+      'chrome-extension:',
+      'moz-extension:',
+      'safari-web-extension:'
+    ];
+    
+    const shouldIgnore = ignoredViolations.some(pattern => 
+      e.blockedURI?.includes(pattern) || 
+      e.violatedDirective?.includes(pattern) ||
+      e.sourceFile?.includes(pattern)
+    );
+    
+    if (!shouldIgnore) {
+      console.error('CSP Violation:', {
+        violatedDirective: e.violatedDirective,
+        blockedURI: e.blockedURI,
+        documentURI: e.documentURI
+      });
+    }
   });
 };

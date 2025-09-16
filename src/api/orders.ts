@@ -250,8 +250,13 @@ export const updateOrder = async (
     return data.order;
     
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('❌ Error updating order via admin function:', error);
+    console.error('❌ Error updating order via admin function:', error);
+    
+    // CRITICAL: Add better error handling for production stability
+    if (error.message && error.message.includes('delivery schedule recovery')) {
+      // Prevent infinite loops by not triggering recovery attempts
+      console.warn('🛑 Delivery schedule recovery loop detected, breaking chain');
+      throw new Error('Order update failed: Delivery schedule issue detected');
     }
     
     // NO FALLBACK: For production security, we only allow updates through the hardened edge function

@@ -1,24 +1,16 @@
 {
-  "name": "Starters - Food Delivery",
-  "short_name": "Starters",
-  "description": "Order delicious food from Starters. Fresh ingredients, fast delivery, and amazing taste.",
+  "name": "Starters Admin Dashboard",
+  "short_name": "Starters", 
+  "description": "Admin dashboard for managing orders and operations",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
-  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
+      "src": "/favicon.ico",
+      "sizes": "32x32",
+      "type": "image/x-icon"
     }
   ]
 }

@@ -115,14 +115,6 @@ const PublicFooterContent = () => {
               {settings?.twitter_url && <Link to={settings.twitter_url} className="text-gray-400 hover:text-white transition-colors" target="_blank">
                   <Twitter className="w-5 h-5" />
                 </Link>}
-              <a 
-                href="https://www.instagram.com/startersmallchops/" 
-                className="text-gray-400 hover:text-white transition-colors" 
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
             </div>
           </div>
         </div>

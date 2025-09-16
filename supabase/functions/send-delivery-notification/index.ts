@@ -141,25 +141,38 @@ const handler = async (req: Request): Promise<Response> => {
           });
 
         } else if (channel === 'sms') {
-          // For SMS, we would integrate with a provider like Twilio
-          // For now, we'll log it as a placeholder
-          console.log('SMS would be sent:', {
-            to: request.recipient,
-            message: processedContent
+          // Send SMS using sms-service function
+          console.log('Sending SMS notification via sms-service');
+          
+          const { data: smsResult, error: smsError } = await supabase.functions.invoke('sms-service', {
+            body: {
+              to: request.recipient,
+              template_key: request.template_key,
+              variables: request.variables || {},
+              priority: 'normal',
+              order_id: request.order_id
+            }
           });
 
-          // Log SMS attempt (placeholder - would be real with Twilio integration)
+          if (smsError) {
+            console.error('SMS sending failed:', smsError);
+            results.push({ channel: 'sms', success: false, error: smsError.message });
+          } else {
+            console.log('SMS sent successfully:', smsResult);
+            results.push({ channel: 'sms', success: true });
+          }
+
+          // Log delivery attempt (SMS service logs automatically, but we add here for completeness)
           await supabase.from('notification_delivery_log').insert({
             order_id: request.order_id,
             customer_id: request.customer_id,
             template_id: template.id,
             channel: 'sms',
             recipient: request.recipient,
-            status: 'sent', // Would be determined by actual SMS provider response
-            sent_at: new Date().toISOString()
+            status: smsError ? 'failed' : 'sent',
+            error_message: smsError?.message,
+            sent_at: smsError ? null : new Date().toISOString()
           });
-
-          results.push({ channel: 'sms', success: true });
         }
       } catch (error: any) {
         console.error(`Failed to send ${channel} notification:`, error);

@@ -7627,6 +7627,48 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_configuration: {
+        Row: {
+          balance_threshold: number | null
+          cost_per_sms: number | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          provider: string | null
+          rate_limit_per_minute: number | null
+          sender_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          balance_threshold?: number | null
+          cost_per_sms?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider?: string | null
+          rate_limit_per_minute?: number | null
+          sender_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          balance_threshold?: number | null
+          cost_per_sms?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider?: string | null
+          rate_limit_per_minute?: number | null
+          sender_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       sms_delivery_logs: {
         Row: {
           communication_event_id: string | null
@@ -7751,38 +7793,44 @@ export type Database = {
       }
       sms_templates: {
         Row: {
+          category: string | null
           content: string
-          created_at: string
+          created_at: string | null
           created_by: string | null
           id: string
-          is_active: boolean
-          name: string
-          template_type: Database["public"]["Enums"]["sms_template_type"]
-          updated_at: string
+          is_active: boolean | null
+          max_length: number | null
+          template_key: string
+          template_name: string
+          updated_at: string | null
           updated_by: string | null
           variables: Json | null
         }
         Insert: {
+          category?: string | null
           content: string
-          created_at?: string
+          created_at?: string | null
           created_by?: string | null
           id?: string
-          is_active?: boolean
-          name: string
-          template_type: Database["public"]["Enums"]["sms_template_type"]
-          updated_at?: string
+          is_active?: boolean | null
+          max_length?: number | null
+          template_key: string
+          template_name: string
+          updated_at?: string | null
           updated_by?: string | null
           variables?: Json | null
         }
         Update: {
+          category?: string | null
           content?: string
-          created_at?: string
+          created_at?: string | null
           created_by?: string | null
           id?: string
-          is_active?: boolean
-          name?: string
-          template_type?: Database["public"]["Enums"]["sms_template_type"]
-          updated_at?: string
+          is_active?: boolean | null
+          max_length?: number | null
+          template_key?: string
+          template_name?: string
+          updated_at?: string | null
           updated_by?: string | null
           variables?: Json | null
         }

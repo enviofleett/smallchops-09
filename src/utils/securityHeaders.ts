@@ -120,13 +120,15 @@ export const initializeSecurityMonitoring = () => {
   
   // Set up CSP violation reporting with production-safe filtering
   document.addEventListener('securitypolicyviolation', (e) => {
-    // Filter out common false positives to reduce noise in production
+    // Enhanced filtering for known safe violations in production
     const ignoredViolations = [
       'manifest-src',
       'https://lovable.dev/auth-bridge',
       'chrome-extension:',
       'moz-extension:',
-      'safari-web-extension:'
+      'safari-web-extension:',
+      'manifest.json',
+      '.lovableproject.com/manifest.json'
     ];
     
     const shouldIgnore = ignoredViolations.some(pattern => 
@@ -135,7 +137,15 @@ export const initializeSecurityMonitoring = () => {
       e.sourceFile?.includes(pattern)
     );
     
-    if (!shouldIgnore) {
+    // Additional check for known safe auth-bridge and manifest violations
+    const isKnownSafeViolation = e.blockedURI && (
+      e.blockedURI.includes('manifest.json') ||
+      e.blockedURI.includes('auth-bridge') ||
+      e.blockedURI.includes('lovable.dev/auth-bridge') ||
+      e.blockedURI.includes('.lovableproject.com/manifest.json')
+    );
+    
+    if (!shouldIgnore && !isKnownSafeViolation) {
       console.error('CSP Violation:', {
         violatedDirective: e.violatedDirective,
         blockedURI: e.blockedURI,

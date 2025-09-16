@@ -40,7 +40,7 @@ import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBoundary';
 
-export default function AdminOrders() {
+function AdminOrdersContent() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1317,4 +1317,13 @@ function AdminOrderCard({
         </CardContent>
       </Card>
     );
-  }
+}
+
+// Wrap the main component in ProductionErrorBoundary for live production safety
+export default function AdminOrders() {
+  return (
+    <ProductionErrorBoundary>
+      <AdminOrdersContent />
+    </ProductionErrorBoundary>
+  );
+}

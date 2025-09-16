@@ -93,10 +93,13 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     enabled: !!order.id
   });
 
-  // Auto-recovery mutation for missing schedules
+  // Auto-recovery mutation for missing schedules with circuit breaker
+  const [recoveryAttempts, setRecoveryAttempts] = useState(0);
+  const maxRecoveryAttempts = 3;
+  
   const recoveryMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      console.log(`🔄 Attempting to recover delivery schedule for order: ${orderId}`);
+      console.log(`🔄 Attempting to recover delivery schedule for order: ${orderId} (attempt ${recoveryAttempts + 1}/${maxRecoveryAttempts})`);
       const {
         data,
         error
@@ -109,27 +112,53 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       return data;
     },
     onSuccess: data => {
-      if (data.recovered) {
-        console.log('✅ Schedule recovered successfully');
-        toast({
-          title: 'Schedule Recovered',
-          description: 'Missing delivery schedule has been recovered from order logs.'
-        });
+      console.log('📋 Recovery response:', data);
+      
+      // CRITICAL FIX: Check for both 'found' (existing schedule) and 'recovered' (newly recovered)
+      if (data?.found || data?.recovered || data?.success) {
+        console.log('✅ Schedule available or recovered successfully');
+        if (data.recovered) {
+          toast({
+            title: 'Schedule Recovered',
+            description: 'Missing delivery schedule has been recovered from order logs.'
+          });
+        } else if (data.found) {
+          console.log('✅ Schedule already exists, no recovery needed');
+        }
         refetchSchedule();
+        setRecoveryAttempts(0); // Reset attempts on success
+      } else {
+        console.log('⚠️ Recovery returned no schedule data');
+        setRecoveryAttempts(prev => prev + 1);
       }
     },
     onError: error => {
       console.error('❌ Schedule recovery failed:', error);
+      setRecoveryAttempts(prev => prev + 1);
+      
+      if (recoveryAttempts >= maxRecoveryAttempts - 1) {
+        toast({
+          title: 'Recovery Failed',
+          description: 'Unable to recover delivery schedule after multiple attempts.',
+          variant: 'destructive'
+        });
+      }
     }
   });
 
-  // Attempt auto-recovery when no schedule is found
+  // Attempt auto-recovery with circuit breaker
   useEffect(() => {
-    if (!isLoadingSchedule && !deliverySchedule && order.id && !recoveryMutation.isPending) {
-      console.log(`⚠️ No delivery schedule found for order ${order.id}, attempting recovery...`);
+    if (!isLoadingSchedule && 
+        !deliverySchedule && 
+        order.id && 
+        !recoveryMutation.isPending && 
+        recoveryAttempts < maxRecoveryAttempts) {
+      console.log(`⚠️ No delivery schedule found for order ${order.id}, attempting recovery... (${recoveryAttempts + 1}/${maxRecoveryAttempts})`);
       recoveryMutation.mutate(order.id);
+    } else if (recoveryAttempts >= maxRecoveryAttempts) {
+      console.log(`🛑 Recovery circuit breaker active for order ${order.id} - max attempts reached`);
     }
-  }, [deliverySchedule, isLoadingSchedule, order.id, recoveryMutation]);
+  }, [deliverySchedule, isLoadingSchedule, order.id, recoveryMutation, recoveryAttempts, maxRecoveryAttempts]);
 
   // Fetch pickup point for pickup orders
   const {

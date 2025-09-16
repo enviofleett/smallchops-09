@@ -29,7 +29,10 @@ export function detectEnvironment(request?: Request): EnvironmentDetectionResult
     'startersmallchops.com',
     'www.startersmallchops.com',
     'startersmallchops.lovableproject.com',
-    'startersmallchops.lovable.app'
+    'startersmallchops.lovable.app',
+    'oknnklksdiqaifhxaccs.supabase.co',
+    'oknnklksdiqaifhxaccs.lovableproject.com',
+    '7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com'
     // Add your production domains here
   ]
   

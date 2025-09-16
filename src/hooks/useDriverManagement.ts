@@ -143,9 +143,20 @@ export const useDriverManagement = () => {
 
   const toggleDriverStatus = async (id: string): Promise<boolean> => {
     const driver = drivers.find(d => d.id === id);
-    if (!driver) return false;
+    if (!driver) {
+      toast.error('Driver not found');
+      return false;
+    }
 
-    return await updateDriverData(id, { is_active: !driver.is_active }) !== null;
+    console.log('🔄 Toggling driver status:', id, 'current status:', driver.is_active);
+    const newStatus = !driver.is_active;
+    const result = await updateDriverData(id, { is_active: newStatus });
+    
+    if (result) {
+      console.log('✅ Driver status toggled successfully:', newStatus);
+    }
+    
+    return result !== null;
   };
 
   useEffect(() => {

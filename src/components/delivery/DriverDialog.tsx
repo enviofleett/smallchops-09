@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { toast } from 'sonner';
 import type { Driver, NewDriver } from '@/api/drivers';
 
 interface DriverDialogProps {
@@ -17,6 +18,8 @@ interface DriverDialogProps {
 }
 
 export const DriverDialog = ({ driver, open, onOpenChange, onSave }: DriverDialogProps) => {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  
   const form = useForm<NewDriver>({
     defaultValues: {
       name: '',
@@ -49,9 +52,52 @@ export const DriverDialog = ({ driver, open, onOpenChange, onSave }: DriverDialo
   }, [driver, open, form]);
 
   const handleSubmit = async (data: NewDriver) => {
-    await onSave(data);
-    form.reset();
-    onOpenChange(false);
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      console.log('🔄 Submitting driver data:', data);
+      
+      // Client-side validation
+      if (!data.name?.trim()) {
+        toast.error('Driver name is required');
+        return;
+      }
+      
+      if (!data.phone?.trim()) {
+        toast.error('Driver phone number is required');
+        return;
+      }
+
+      // Validate email format if provided
+      if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        toast.error('Please enter a valid email address');
+        return;
+      }
+
+      // Clean up the data
+      const cleanData: NewDriver = {
+        ...data,
+        name: data.name.trim(),
+        phone: data.phone.trim(),
+        email: data.email?.trim() || undefined,
+        license_number: data.license_number?.trim() || undefined,
+        vehicle_brand: data.vehicle_brand?.trim() || undefined,
+        vehicle_model: data.vehicle_model?.trim() || undefined,
+        license_plate: data.license_plate?.trim() || undefined,
+      };
+
+      await onSave(cleanData);
+      form.reset();
+      onOpenChange(false);
+      console.log('✅ Driver saved successfully');
+    } catch (error) {
+      console.error('❌ Error saving driver:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save driver';
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -208,11 +254,21 @@ export const DriverDialog = ({ driver, open, onOpenChange, onSave }: DriverDialo
             />
 
             <div className="flex gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleClose} 
+                className="flex-1"
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1">
-                {driver ? 'Update' : 'Create'} Driver
+              <Button 
+                type="submit" 
+                className="flex-1"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Saving...' : (driver ? 'Update' : 'Create')} Driver
               </Button>
             </div>
           </form>

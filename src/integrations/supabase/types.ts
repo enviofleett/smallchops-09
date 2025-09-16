@@ -8930,6 +8930,10 @@ export type Database = {
             }
         Returns: Json
       }
+      check_production_payment_safety: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_production_readiness: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -9868,13 +9872,15 @@ export type Database = {
         Returns: string
       }
       log_payment_security_event: {
-        Args: {
-          details?: Json
-          event_type: string
-          ip_address?: unknown
-          severity?: string
-          user_agent?: string
-        }
+        Args:
+          | {
+              details?: Json
+              event_type: string
+              ip_address?: unknown
+              severity?: string
+              user_agent?: string
+            }
+          | { p_details?: Json; p_event_type: string; p_severity?: string }
         Returns: string
       }
       log_payment_verification_attempt: {

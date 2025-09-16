@@ -101,7 +101,7 @@ const Booking = () => {
               Hosting an Event? We've Got You Covered.
             </h1>
             <div className="text-lg text-muted-foreground space-y-6 max-w-3xl mx-auto leading-relaxed">
-              <p className="text-left">From weddings to birthdays, corporate meetings to intimate gatherings- we bring the taste that makes your event unforgettable. 
+              <p className="text-center">From weddings to birthdays, corporate meetings to intimate gatherings- we bring the taste that makes your event unforgettable. 
 Fill out the form below and we will get back to you with the perfect smallchops package.</p>
 
               <p className="font-semibold text-foreground text-left">

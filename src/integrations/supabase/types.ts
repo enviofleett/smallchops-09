@@ -8788,7 +8788,7 @@ export type Database = {
       }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
-        Returns: undefined
+        Returns: Json
       }
       calculate_delivery_metrics: {
         Args: { p_date: string }

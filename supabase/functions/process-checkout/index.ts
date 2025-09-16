@@ -56,21 +56,97 @@ serve(async (req) => {
       );
     }
 
-    // For authenticated users, validate the JWT
+    // For authenticated users, validate the JWT with enhanced error handling
     if (authHeader) {
       try {
-        // Extract JWT and validate with Supabase
+        // Extract JWT and validate format first
         const jwt = authHeader.replace('Bearer ', '');
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
         
-        if (authError || !user) {
-          console.log("❌ Invalid JWT token:", authError);
+        // Basic JWT format validation - must have 3 parts separated by dots
+        const jwtParts = jwt.split('.');
+        if (jwtParts.length !== 3) {
+          console.log("❌ Invalid JWT format: JWT must have 3 parts (header.payload.signature)");
           return new Response(
             JSON.stringify({
               success: false,
-              error: "Invalid or expired authentication token",
-              code: "INVALID_AUTH",
-              details: { authError: authError?.message }
+              error: "Invalid authentication token format",
+              code: "INVALID_JWT_FORMAT",
+              details: { reason: "JWT must have 3 parts separated by dots" }
+            }),
+            {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Try to decode payload to check for required claims before calling Supabase
+        try {
+          const payload = JSON.parse(atob(jwtParts[1]));
+          if (!payload.sub) {
+            console.log("❌ JWT missing required 'sub' claim");
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: "Authentication token missing required claims",
+                code: "JWT_MISSING_SUB_CLAIM",
+                details: { reason: "Token does not contain user identification" }
+              }),
+              {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+          
+          // Check token expiration
+          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+            console.log("❌ JWT token has expired");
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: "Authentication token has expired",
+                code: "JWT_EXPIRED",
+                details: { reason: "Please refresh your session and try again" }
+              }),
+              {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+          
+          console.log("✅ JWT format and claims validation passed for user:", payload.sub);
+        } catch (decodeError) {
+          console.log("❌ Failed to decode JWT payload:", decodeError);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "Malformed authentication token",
+              code: "JWT_DECODE_ERROR",
+              details: { reason: "Token payload cannot be decoded" }
+            }),
+            {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Now validate with Supabase (should succeed since we pre-validated)
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
+        
+        if (authError || !user) {
+          console.log("❌ Supabase JWT validation failed:", authError);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "Authentication validation failed with auth service",
+              code: "SUPABASE_AUTH_ERROR",
+              details: { 
+                authError: authError?.message,
+                suggestion: "Please refresh your session and try again"
+              }
             }),
             {
               status: 401,
@@ -79,14 +155,18 @@ serve(async (req) => {
           );
         }
         
-        console.log("✅ JWT validated successfully for user:", user.id);
+        console.log("✅ Full JWT validation successful for user:", user.id);
       } catch (authValidationError) {
-        console.log("❌ JWT validation failed:", authValidationError);
+        console.log("❌ JWT validation caught unexpected error:", authValidationError);
         return new Response(
           JSON.stringify({
             success: false,
             error: "Authentication validation failed",
-            code: "AUTH_VALIDATION_ERROR"
+            code: "AUTH_VALIDATION_ERROR",
+            details: { 
+              error: authValidationError.message,
+              suggestion: "Please refresh your session and try again"
+            }
           }),
           {
             status: 401,

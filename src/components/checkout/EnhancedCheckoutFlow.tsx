@@ -710,38 +710,82 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     throw new Error('Authentication required for checkout. Please log in or continue as guest.');
   }
 
-  // Refresh session if it's about to expire (within 5 minutes)
-  if (session?.expires_at) {
-    const expiryTime = new Date(session.expires_at * 1000);
-    const now = new Date();
-    const timeUntilExpiry = expiryTime.getTime() - now.getTime();
-    
-    if (timeUntilExpiry < 5 * 60 * 1000) { // Less than 5 minutes
-      console.log('🔄 Session expires soon, attempting refresh...');
-      try {
-        const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          console.warn('⚠️ Session refresh failed:', refreshError);
-          // Continue with existing session
-        } else if (refreshedSession.session) {
-          console.log('✅ Session refreshed successfully');
-          // Update local session state would be handled by auth state change listener
+  // Enhanced session validation and refresh logic for production stability
+  let validatedSession = session;
+  
+  if (session?.access_token) {
+    // Validate JWT token format before sending to prevent edge function errors
+    try {
+      const jwtParts = session.access_token.split('.');
+      if (jwtParts.length !== 3) {
+        throw new Error('Invalid JWT format - token must have 3 parts');
+      }
+
+      // Decode and validate payload for required claims
+      const payload = JSON.parse(atob(jwtParts[1]));
+      if (!payload.sub) {
+        throw new Error('JWT missing required sub claim - user identifier not found');
+      }
+
+      // Check if token is expired and handle accordingly
+      if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+        console.log('🔄 JWT token expired, attempting refresh...');
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshData.session) {
+          console.error('❌ Token refresh failed:', refreshError);
+          throw new Error('Session expired and refresh failed - please log in again');
         }
-      } catch (refreshErr) {
-        console.warn('⚠️ Session refresh error:', refreshErr);
+        
+        validatedSession = refreshData.session;
+        console.log('✅ Session refreshed successfully');
+      } else if (payload.exp) {
+        // Check if token expires soon (< 10 minutes) and proactively refresh
+        const timeUntilExpiry = (payload.exp * 1000) - Date.now();
+        const tenMinutes = 10 * 60 * 1000;
+        
+        if (timeUntilExpiry < tenMinutes && timeUntilExpiry > 0) {
+          console.log('🔄 Token expires soon, proactively refreshing...');
+          try {
+            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+            if (!refreshError && refreshData.session) {
+              validatedSession = refreshData.session;
+              console.log('✅ Proactive session refresh successful');
+            }
+          } catch (refreshErr) {
+            console.warn('⚠️ Proactive refresh failed, continuing with current session:', refreshErr);
+          }
+        }
+      }
+
+      console.log('✅ JWT validation passed for user:', payload.sub);
+    } catch (jwtError) {
+      console.error('❌ JWT validation failed:', jwtError);
+      
+      // Try to refresh session as recovery mechanism
+      try {
+        console.log('🔄 Attempting session recovery through refresh...');
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshData.session) {
+          throw new Error(`Authentication failed: ${jwtError.message}. Please log in again.`);
+        }
+        validatedSession = refreshData.session;
+        console.log('✅ Recovered with session refresh after JWT validation failure');
+      } catch (recoveryError) {
+        throw new Error(`Authentication failed: ${jwtError.message}. Session recovery failed: ${recoveryError.message}`);
       }
     }
   }
 
-  // Call Supabase edge function with proper authentication
+  // Call Supabase edge function with validated authentication
   const invokeOptions: any = { body: sanitizedData };
   
-  // Always include Authorization header for authenticated checkout
-  if (session?.access_token) {
-    invokeOptions.headers = { Authorization: `Bearer ${session.access_token}` };
-    console.log('✅ Using authenticated checkout with JWT token');
+  // Use validated session for authenticated checkout
+  if (validatedSession?.access_token) {
+    invokeOptions.headers = { Authorization: `Bearer ${validatedSession.access_token}` };
+    console.log('✅ Using authenticated checkout with validated JWT token');
   } else if (guestSessionId) {
-    // For guest checkout, we could pass the guest session ID in headers
+    // For guest checkout, pass the guest session ID in headers  
     invokeOptions.headers = { 'x-guest-session-id': guestSessionId };
     console.log('✅ Using guest checkout with session ID');
   } else {
@@ -756,14 +800,41 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         const errorMessage = error?.message || data?.error || 'Order creation failed';
         const errorCode = data?.code || 'ORDER_CREATION_FAILED';
         
-        // Handle authentication errors specifically
-        if (errorCode === 'REQUIRES_AUTH' || errorCode === 'INVALID_AUTH' || errorCode === 'AUTH_VALIDATION_ERROR') {
-          console.log('🔐 Authentication error detected, redirecting to auth step');
+        // Handle authentication errors specifically with enhanced messaging
+        if (errorCode === 'REQUIRES_AUTH' || errorCode === 'INVALID_AUTH' || errorCode === 'AUTH_VALIDATION_ERROR' || 
+            errorCode === 'INVALID_JWT_FORMAT' || errorCode === 'JWT_MISSING_SUB_CLAIM' || 
+            errorCode === 'JWT_EXPIRED' || errorCode === 'JWT_DECODE_ERROR' || errorCode === 'SUPABASE_AUTH_ERROR') {
+          console.log('🔐 Authentication error detected:', errorCode, '-', errorMessage);
+          
+          // For JWT specific errors, try to recover by refreshing session
+          if (errorCode.includes('JWT') && session) {
+            try {
+              console.log('🔄 Attempting session recovery for JWT error...');
+              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+              if (!refreshError && refreshData.session) {
+                console.log('✅ Session recovered, retrying checkout...');
+                // Retry checkout with refreshed session
+                return await handleFormSubmit(); // Recursive call with fresh session
+              }
+            } catch (recoveryError) {
+              console.error('❌ Session recovery failed:', recoveryError);
+            }
+          }
+          
+          // Redirect to auth step for all auth errors
           setCheckoutStep('auth');
+          
+          // Provide specific messaging based on error type
+          let authErrorMessage = "Please log in or continue as guest to proceed with checkout.";
+          if (errorCode === 'JWT_EXPIRED') {
+            authErrorMessage = "Your session has expired. Please log in again to continue.";
+          } else if (errorCode === 'JWT_MISSING_SUB_CLAIM' || errorCode === 'INVALID_JWT_FORMAT') {
+            authErrorMessage = "Authentication issue detected. Please log in again to continue.";
+          }
           
           toast({
             title: "Authentication Required",
-            description: data?.details?.suggestion || "Please log in or continue as guest to proceed with checkout.",
+            description: data?.details?.suggestion || authErrorMessage,
             variant: "destructive"
           });
           

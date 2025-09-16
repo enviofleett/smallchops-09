@@ -26,6 +26,7 @@ import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel'
 import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
 import { ErrorTestComponent } from '@/components/error/ErrorTestComponent';
 import { EmailCredentialsManager } from '@/components/admin/EmailCredentialsManager';
+import { SMSManagementDashboard } from '@/components/admin/SMSManagementDashboard';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -76,10 +77,11 @@ const Settings = () => {
         <TabsContent value="communications" className="space-y-4 md:space-y-6">
           <Tabs defaultValue="branding" className="space-y-4 md:space-y-6">
             <div className="overflow-x-auto pb-2 -mx-4 px-4">
-              <TabsList className="grid w-full min-w-[320px] grid-cols-2 sm:grid-cols-4 h-auto p-1">
+              <TabsList className="grid w-full min-w-[320px] grid-cols-2 sm:grid-cols-5 h-auto p-1">
                 <TabsTrigger value="branding" className="text-xs sm:text-sm px-2 py-2">Branding</TabsTrigger>
                 <TabsTrigger value="content" className="text-xs sm:text-sm px-2 py-2">Content</TabsTrigger>
                 <TabsTrigger value="cooms" className="text-xs sm:text-sm px-2 py-2">Support</TabsTrigger>
+                <TabsTrigger value="sms" className="text-xs sm:text-sm px-2 py-2">SMS</TabsTrigger>
                 <TabsTrigger value="email-processing" className="text-xs sm:text-sm px-2 py-2">Queue</TabsTrigger>
               </TabsList>
             </div>
@@ -94,6 +96,10 @@ const Settings = () => {
             
             <TabsContent value="cooms" className="space-y-4 md:space-y-6">
               <WhatsAppSupportTab />
+            </TabsContent>
+            
+            <TabsContent value="sms" className="space-y-4 md:space-y-6">
+              <SMSManagementDashboard />
             </TabsContent>
             
             <TabsContent value="email-processing" className="space-y-4 md:space-y-6">

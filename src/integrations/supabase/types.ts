@@ -9193,6 +9193,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      emergency_safe_order_update: {
+        Args: { p_admin_id?: string; p_order_id: string; p_status: string }
+        Returns: Json
+      }
       enhanced_security_check: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -9252,6 +9256,15 @@ export type Database = {
       }
       generate_payment_reference: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_safe_dedupe_key: {
+        Args: {
+          p_event_type: string
+          p_order_id?: string
+          p_recipient_email: string
+          p_template_key?: string
+        }
         Returns: string
       }
       generate_secure_payment_reference: {

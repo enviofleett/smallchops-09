@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0'
+import { OrderManagerErrorHandler, createErrorResponse } from './error-handler.ts'
 
 // Import shared CORS with inline fallback for production stability
 let getCorsHeaders: (origin?: string | null) => Record<string, string>;
@@ -56,6 +57,14 @@ const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
+
+// Initialize error handler for emergency stabilization
+const errorHandler = new OrderManagerErrorHandler({
+  maxRetries: 3,
+  retryDelayMs: 1000,
+  circuitBreakerThreshold: 5,
+  timeoutMs: 30000
+});
 
 serve(async (req) => {
   const origin = req.headers.get('origin')
@@ -194,6 +203,8 @@ serve(async (req) => {
 
         if (error) {
           console.error('Error fetching orders:', error)
+          return createErrorResponse(errorHandler, error, 'fetch_orders', corsHeaders)
+        }
           
           // Defensive fallback: try without embeds if embedding fails
           if (error.code === 'PGRST200' || error.message.includes('relationship')) {

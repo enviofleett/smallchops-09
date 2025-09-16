@@ -105,7 +105,7 @@ const Booking = () => {
               <p className="text-center">From weddings to birthdays, corporate meetings to intimate gatherings- we bring the taste that makes your event unforgettable. 
 Fill out the form below and we will get back to you with the perfect smallchops package.</p>
 
-              <p className="font-semibold text-foreground text-left">
+              <p className="font-semibold text-foreground text-center">
                 Submit your request to receive a custom quote
               </p>
             </div>

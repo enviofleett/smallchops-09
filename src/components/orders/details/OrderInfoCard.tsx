@@ -20,6 +20,13 @@ interface OrderInfoCardProps {
   onRecoveryAttempt?: () => void;
   recoveryPending?: boolean;
   recoveryError?: boolean;
+  recoveryStatus?: {
+    canRecover: boolean;
+    attempts: number;
+    maxAttempts: number;
+    isRecovering: boolean;
+    lastAttempt?: number;
+  };
 }
 
 export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
@@ -34,7 +41,8 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
   isLoadingSchedule,
   onRecoveryAttempt,
   recoveryPending,
-  recoveryError
+  recoveryError,
+  recoveryStatus
 }) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
@@ -155,19 +163,31 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
               <p className="text-sm text-amber-800 dark:text-amber-200">
                 No {orderType === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
               </p>
+              
+              {recoveryStatus && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {recoveryStatus.canRecover ? (
+                    <span>Recovery attempts: {recoveryStatus.attempts}/{recoveryStatus.maxAttempts}</span>
+                  ) : (
+                    <span className="text-amber-600">Recovery limit reached ({recoveryStatus.maxAttempts} attempts)</span>
+                  )}
+                </div>
+              )}
+              
               <p className="text-xs text-muted-foreground mt-1">
                 {recoveryError ? 
                   'Recovery failed. Schedule will be confirmed after payment is verified.' :
                   'Schedule will be confirmed after payment is verified.'
                 }
               </p>
-              {recoveryError && onRecoveryAttempt && (
+              
+              {onRecoveryAttempt && recoveryStatus?.canRecover && (
                 <button 
                   onClick={onRecoveryAttempt}
-                  className="mt-2 text-xs text-primary hover:underline"
-                  disabled={recoveryPending}
+                  className="mt-2 text-xs text-primary hover:underline disabled:opacity-50"
+                  disabled={recoveryPending || !recoveryStatus.canRecover}
                 >
-                  Retry Recovery
+                  {recoveryPending ? 'Retrying...' : 'Retry Recovery'}
                 </button>
               )}
             </div>

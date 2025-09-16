@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { emergencyCircuitBreaker } from '@/utils/emergencyCircuitBreaker';
 
 interface RecoveryAttempt {
   orderId: string;
@@ -58,34 +59,40 @@ export const useOrderScheduleRecovery = () => {
   };
   
   const attemptScheduleRecovery = async (orderId: string): Promise<boolean> => {
+    // Check emergency circuit breaker first
+    if (!emergencyCircuitBreaker.recordAttempt(orderId)) {
+      console.warn(`🛑 Emergency circuit breaker blocked recovery for order ${orderId}`);
+      return false;
+    }
+
     if (!canAttemptRecovery(orderId)) {
       console.warn(`🛑 Recovery circuit breaker active for order ${orderId}`);
       return false;
     }
-    
+
     if (isRecovering) {
       console.warn('🔄 Recovery already in progress, skipping duplicate attempt');
       return false;
     }
-    
+
     setIsRecovering(true);
     recordAttempt(orderId);
-    
+
     try {
       console.log(`🔧 Attempting schedule recovery for order: ${orderId}`);
-      
+
       const { data, error } = await supabase.functions.invoke('recover-order-schedule', {
         body: { order_id: orderId }
       });
-      
+
       if (error) {
         console.error('❌ Schedule recovery failed:', error);
         throw error;
       }
-      
+
       if (data?.success) {
         console.log('✅ Schedule recovery successful:', data.message);
-        
+
         // Clear successful recovery from attempts map
         recoveryAttemptsRef.current.delete(orderId);
         return true;

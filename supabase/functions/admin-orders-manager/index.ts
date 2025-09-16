@@ -57,6 +57,12 @@ const supabaseClient = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
+// Create a separate client for user token validation
+const supabaseAuthClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+)
+
 serve(async (req) => {
   const origin = req.headers.get('origin')
   
@@ -85,10 +91,18 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    
+    // Use the auth client with the user's token to validate the session
+    const authClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    )
+    
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
     
     if (authError || !user) {
-      console.log('❌ Invalid JWT token:', authError?.message)
+      console.log('❌ Invalid JWT token: Auth session missing!')
       return new Response(JSON.stringify({
         success: false,
         error: 'Unauthorized: Invalid authentication token'

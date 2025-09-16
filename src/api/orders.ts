@@ -55,10 +55,7 @@ export const getOrders = async ({
     });
 
     if (error) {
-      // Only log errors in development
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error fetching orders via admin function:', error);
-      }
+      console.error('Error fetching orders via admin function:', error);
       throw new Error(error.message || 'Failed to fetch orders');
     }
 
@@ -68,10 +65,7 @@ export const getOrders = async ({
 
     return { orders: data.orders || [], count: data.count || 0 };
   } catch (error) {
-    // Only log errors in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error fetching orders:', error);
-    }
+    console.error('Error fetching orders:', error);
     
     // Fallback to direct Supabase query for backward compatibility
     const from = (page - 1) * pageSize;

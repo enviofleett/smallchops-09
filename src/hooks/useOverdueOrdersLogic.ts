@@ -34,7 +34,7 @@ export const useOverdueOrdersLogic = () => {
           *,
           order_items(*),
           delivery_zones(*),
-          delivery_schedule:order_delivery_schedule(*)
+          delivery_schedule:order_delivery_schedule!order_delivery_schedule_order_id_fkey(*)
         `)
         .eq('payment_status', 'paid')
         .not('status', 'in', '(delivered,completed,cancelled,refunded)')

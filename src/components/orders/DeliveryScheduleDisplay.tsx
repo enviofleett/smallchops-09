@@ -310,9 +310,19 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
         )}
 
         {/* Requested Date */}
-        <div className="text-xs text-gray-500 border-t pt-2 mt-3">
-          Scheduled on {format(new Date(schedule.requested_at), 'MMM d, yyyy \'at\' h:mm a')}
-        </div>
+        {schedule.requested_at && (
+          <div className="text-xs text-gray-500 border-t pt-2 mt-3">
+            Scheduled on {(() => {
+              try {
+                const date = new Date(schedule.requested_at);
+                if (isNaN(date.getTime())) return 'Invalid date';
+                return format(date, 'MMM d, yyyy \'at\' h:mm a');
+              } catch {
+                return 'Invalid date';
+              }
+            })()}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

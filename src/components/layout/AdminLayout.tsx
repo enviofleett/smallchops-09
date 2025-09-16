@@ -5,6 +5,7 @@ import { AppSidebar } from '../AppSidebar';
 import TopNav from '../TopNav';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBoundary';
 
 const AdminLayout = () => {
   const isMobile = useIsMobile();
@@ -21,7 +22,9 @@ const AdminLayout = () => {
               isMobile ? "p-4" : "p-6 lg:p-8"
             )}>
               <div className="admin-container">
-                <Outlet />
+                <ProductionErrorBoundary>
+                  <Outlet />
+                </ProductionErrorBoundary>
               </div>
             </main>
           </div>

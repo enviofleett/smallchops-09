@@ -4833,42 +4833,58 @@ export type Database = {
       }
       order_delivery_schedule: {
         Row: {
+          business_context: Json | null
           created_at: string
           delivery_date: string
           delivery_time_end: string
           delivery_time_start: string
           id: string
           is_flexible: boolean
+          last_validated_at: string | null
           order_id: string
           requested_at: string
           special_instructions: string | null
           updated_at: string
+          validation_status: string | null
         }
         Insert: {
+          business_context?: Json | null
           created_at?: string
           delivery_date: string
           delivery_time_end: string
           delivery_time_start: string
           id?: string
           is_flexible?: boolean
+          last_validated_at?: string | null
           order_id: string
           requested_at?: string
           special_instructions?: string | null
           updated_at?: string
+          validation_status?: string | null
         }
         Update: {
+          business_context?: Json | null
           created_at?: string
           delivery_date?: string
           delivery_time_end?: string
           delivery_time_start?: string
           id?: string
           is_flexible?: boolean
+          last_validated_at?: string | null
           order_id?: string
           requested_at?: string
           special_instructions?: string | null
           updated_at?: string
+          validation_status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_order_delivery_schedule_order_id"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "order_delivery_schedule_order_id_fkey"
             columns: ["order_id"]

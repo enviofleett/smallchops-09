@@ -1,255 +1,133 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getPaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface HealthCheckResult {
-  component: string;
-  status: 'healthy' | 'warning' | 'critical';
-  message: string;
-  details?: any;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing Supabase configuration');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const healthChecks: HealthCheckResult[] = [];
-
-    // 1. Check Paystack Secret Key Configuration
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    const paystackWebhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
-    
-    if (!paystackSecretKey) {
-      healthChecks.push({
-        component: 'Edge Function Secrets',
-        status: 'critical',
-        message: 'PAYSTACK_SECRET_KEY not configured in edge functions'
-      });
-    } else if (paystackSecretKey.startsWith('sk_test_')) {
-      healthChecks.push({
-        component: 'Edge Function Secrets',
-        status: 'critical',
-        message: 'Edge functions still using TEST secret key',
-        details: { keyPrefix: paystackSecretKey.substring(0, 8) + '...' }
-      });
-    } else if (paystackSecretKey.startsWith('sk_live_')) {
-      healthChecks.push({
-        component: 'Edge Function Secrets',
-        status: 'healthy',
-        message: 'Live secret key configured correctly',
-        details: { keyPrefix: paystackSecretKey.substring(0, 8) + '...' }
-      });
-    } else {
-      healthChecks.push({
-        component: 'Edge Function Secrets',
-        status: 'warning',
-        message: 'Unexpected secret key format',
-        details: { keyPrefix: paystackSecretKey.substring(0, 8) + '...' }
-      });
-    }
-
-    if (!paystackWebhookSecret) {
-      healthChecks.push({
-        component: 'Webhook Configuration',
-        status: 'critical',
-        message: 'PAYSTACK_WEBHOOK_SECRET not configured'
-      });
-    } else {
-      healthChecks.push({
-        component: 'Webhook Configuration',
-        status: 'healthy',
-        message: 'Webhook secret configured'
-      });
-    }
-
-    // 2. Test Paystack API Connectivity with Live Key
-    if (paystackSecretKey && paystackSecretKey.startsWith('sk_live_')) {
-      try {
-        const response = await fetch('https://api.paystack.co/bank', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${paystackSecretKey}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          healthChecks.push({
-            component: 'Paystack API Connectivity',
-            status: 'healthy',
-            message: 'Live API connection successful',
-            details: { status: response.status }
-          });
-        } else {
-          healthChecks.push({
-            component: 'Paystack API Connectivity',
-            status: 'warning',
-            message: `API responded with status ${response.status}`,
-            details: { status: response.status, statusText: response.statusText }
-          });
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
         }
-      } catch (error) {
-        healthChecks.push({
-          component: 'Paystack API Connectivity',
-          status: 'critical',
-          message: 'Failed to connect to Paystack API',
-          details: { error: error.message }
-        });
+      }
+    )
+
+    console.log('🏥 Starting production health check...')
+
+    // Get Paystack configuration
+    const paystackConfig = getPaystackConfig(req)
+    logPaystackConfigStatus(paystackConfig)
+
+    // Get live payment status from database function
+    const { data: paymentStatus, error: statusError } = await supabase
+      .rpc('get_live_payment_status')
+
+    if (statusError) {
+      console.error('❌ Error getting payment status:', statusError)
+    }
+
+    // Check recent payment transactions
+    const { data: recentPayments, error: paymentsError } = await supabase
+      .from('payment_transactions')
+      .select('id, status, amount, created_at, provider_reference')
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    // Check system health metrics
+    const { data: healthMetrics, error: metricsError } = await supabase
+      .from('production_health_metrics')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    // Check order completion rates
+    const { data: orderStats, error: orderError } = await supabase
+      .from('orders')
+      .select('status, created_at')
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+
+    let orderCompletionRate = 0
+    if (orderStats && orderStats.length > 0) {
+      const completedOrders = orderStats.filter(order => 
+        ['delivered', 'completed'].includes(order.status)
+      ).length
+      orderCompletionRate = Math.round((completedOrders / orderStats.length) * 100)
+    }
+
+    // Compile health report
+    const healthReport = {
+      timestamp: new Date().toISOString(),
+      environment: paystackConfig.environment,
+      paystack_mode: paystackConfig.isTestMode ? 'test' : 'live',
+      status: 'healthy',
+      metrics: {
+        payment_status: paymentStatus || { error: statusError?.message },
+        recent_payments_count: recentPayments?.length || 0,
+        recent_payments: recentPayments?.slice(0, 5) || [],
+        order_completion_rate: orderCompletionRate,
+        total_orders_24h: orderStats?.length || 0,
+        health_metrics: healthMetrics || []
+      },
+      configuration: {
+        has_live_keys: !paystackConfig.secretKey.startsWith('sk_test_'),
+        webhook_url: 'https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/enhanced-paystack-webhook',
+        force_live_mode: Deno.env.get('FORCE_LIVE_MODE') === 'true'
+      },
+      errors: {
+        status_error: statusError?.message,
+        payments_error: paymentsError?.message,
+        metrics_error: metricsError?.message,
+        order_error: orderError?.message
       }
     }
 
-    // 3. Check Database Configuration
-    const { data: paymentIntegration, error: integrationError } = await supabase
-      .from('payment_integrations')
-      .select('*')
-      .eq('provider', 'paystack')
-      .single();
-
-    if (integrationError) {
-      healthChecks.push({
-        component: 'Database Configuration',
-        status: 'critical',
-        message: 'Failed to read payment integration config',
-        details: { error: integrationError.message }
-      });
-    } else {
-      const dbIsLive = !paymentIntegration.test_mode && paymentIntegration.environment === 'live';
-      
-      healthChecks.push({
-        component: 'Database Configuration',
-        status: dbIsLive ? 'healthy' : 'warning',
-        message: dbIsLive ? 'Database configured for live mode' : 'Database not in live mode',
-        details: {
-          testMode: paymentIntegration.test_mode,
-          environment: paymentIntegration.environment,
-          connectionStatus: paymentIntegration.connection_status
-        }
-      });
+    // Log production metric
+    try {
+      await supabase.rpc('log_production_metric', {
+        p_metric_name: 'health_check_success',
+        p_metric_value: 1,
+        p_metric_type: 'counter',
+        p_dimensions: { environment: paystackConfig.environment }
+      })
+    } catch (logError) {
+      console.error('⚠️ Failed to log health metric:', logError)
     }
 
-    // 4. Check Environment Configuration
-    const { data: envConfig, error: envError } = await supabase
-      .from('environment_config')
-      .select('*')
-      .limit(1)
-      .single();
-
-    if (envError) {
-      healthChecks.push({
-        component: 'Environment Configuration',
-        status: 'warning',
-        message: 'No environment configuration found',
-        details: { error: envError.message }
-      });
-    } else {
-      const envIsLive = envConfig.is_live_mode && envConfig.environment === 'production';
-      
-      healthChecks.push({
-        component: 'Environment Configuration',
-        status: envIsLive ? 'healthy' : 'warning',
-        message: envIsLive ? 'Environment set to production' : 'Environment not in production mode',
-        details: {
-          isLiveMode: envConfig.is_live_mode,
-          environment: envConfig.environment
-        }
-      });
-    }
-
-    // 5. Overall Health Assessment
-    const criticalIssues = healthChecks.filter(check => check.status === 'critical').length;
-    const warningIssues = healthChecks.filter(check => check.status === 'warning').length;
-    const healthyComponents = healthChecks.filter(check => check.status === 'healthy').length;
-
-    let overallStatus: 'ready' | 'needs_attention' | 'not_ready';
-    let overallMessage: string;
-
-    if (criticalIssues > 0) {
-      overallStatus = 'not_ready';
-      overallMessage = `${criticalIssues} critical issue(s) must be resolved before going live`;
-    } else if (warningIssues > 0) {
-      overallStatus = 'needs_attention';
-      overallMessage = `${warningIssues} warning(s) should be addressed for optimal production setup`;
-    } else {
-      overallStatus = 'ready';
-      overallMessage = 'All systems ready for production deployment';
-    }
-
-    // Log the health check
-    await supabase.from('audit_logs').insert({
-      action: 'paystack_production_health_check',
-      category: 'Production Readiness',
-      message: `Production health check completed: ${overallStatus}`,
-      new_values: {
-        overallStatus,
-        criticalIssues,
-        warningIssues,
-        healthyComponents,
-        timestamp: new Date().toISOString()
-      }
-    });
+    console.log('✅ Production health check completed successfully')
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        production_readiness: {
-          overall_status: overallStatus,
-          overall_message: overallMessage,
-          summary: {
-            healthy: healthyComponents,
-            warnings: warningIssues,
-            critical: criticalIssues,
-            total_checks: healthChecks.length
-          },
-          detailed_checks: healthChecks,
-          timestamp: new Date().toISOString(),
-          recommendations: criticalIssues > 0 ? [
-            'Update edge function secrets to use live Paystack keys',
-            'Ensure all database configurations are synced to live mode',
-            'Test payment flow end-to-end before processing real transactions'
-          ] : warningIssues > 0 ? [
-            'Review warning messages and optimize configuration',
-            'Consider running a small test transaction to verify complete flow'
-          ] : [
-            'System is production ready',
-            'Monitor first few live transactions closely',
-            'Ensure webhook endpoint is accessible from Paystack servers'
-          ]
-        }
-      }),
+      JSON.stringify(healthReport),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
-      }
-    );
-
+      },
+    )
   } catch (error) {
-    console.error('Production health check error:', error);
+    console.error('🚨 Production health check failed:', error)
     
     return new Response(
       JSON.stringify({
-        success: false,
-        error: 'Production health check failed',
-        details: error.message,
-        timestamp: new Date().toISOString()
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        status: 'unhealthy'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
-      }
-    );
+      },
+    )
   }
-});
+})

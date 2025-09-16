@@ -6756,6 +6756,39 @@ export type Database = {
         }
         Relationships: []
       }
+      production_health_metrics: {
+        Row: {
+          created_at: string | null
+          dimensions: Json | null
+          environment: string
+          id: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          timestamp: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          dimensions?: Json | null
+          environment?: string
+          id?: string
+          metric_name: string
+          metric_type?: string
+          metric_value: number
+          timestamp?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          dimensions?: Json | null
+          environment?: string
+          id?: string
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          timestamp?: string | null
+        }
+        Relationships: []
+      }
       production_readiness_audit: {
         Row: {
           audit_date: string | null
@@ -8728,6 +8761,16 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_success_metrics: {
+        Row: {
+          failed_payments: number | null
+          hour: string | null
+          success_rate_percent: number | null
+          successful_payments: number | null
+          total_payments: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       activate_admin_user: {
@@ -9492,6 +9535,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_live_payment_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_menu_structure_secure: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -9870,6 +9917,15 @@ export type Database = {
           p_reference: string
           p_success?: boolean
           p_user_id?: string
+        }
+        Returns: undefined
+      }
+      log_production_metric: {
+        Args: {
+          p_dimensions?: Json
+          p_metric_name: string
+          p_metric_type?: string
+          p_metric_value: number
         }
         Returns: undefined
       }

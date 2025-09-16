@@ -101,7 +101,7 @@ export function CartSummary({ cart }: CartSummaryProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Promotion Code Section */}
-          {cart.summary.applied_promotions.length > 0 ? (
+          {cart.summary.applied_promotions && cart.summary.applied_promotions.length > 0 ? (
             <div className="space-y-2">
               {cart.summary.applied_promotions.map((promotion) => (
                 <div key={promotion.id} className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">

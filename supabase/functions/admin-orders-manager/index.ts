@@ -563,6 +563,7 @@ serve(async (req) => {
                 console.log(`📧 Created ${emailResult.email_events_created} email events`);
               }
             }
+          }
           } catch (emailError) {
             console.error('❌ Exception triggering status change email:', emailError)
             // Continue with order update even if email fails

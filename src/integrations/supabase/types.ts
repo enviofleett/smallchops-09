@@ -9608,7 +9608,14 @@ export type Database = {
       }
       get_public_business_info: {
         Args: Record<PropertyKey, never>
-        Returns: Json
+        Returns: {
+          accent_color: string
+          logo_url: string
+          name: string
+          primary_color: string
+          secondary_color: string
+          tagline: string
+        }[]
       }
       get_public_delivery_zones: {
         Args: Record<PropertyKey, never>

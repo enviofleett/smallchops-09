@@ -12,7 +12,6 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-
 const Booking = () => {
   const [formData, setFormData] = useState({
     fullName: '',
@@ -24,46 +23,38 @@ const Booking = () => {
   const [eventDate, setEventDate] = useState<Date>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
-
   const handleSubmitBooking = async () => {
     // Validation
-    if (!formData.fullName || !formData.email || !formData.phoneNumber || 
-        !eventDate || !formData.numberOfGuests) {
+    if (!formData.fullName || !formData.email || !formData.phoneNumber || !eventDate || !formData.numberOfGuests) {
       toast.error('Please fill in all required fields');
       return;
     }
-
     if (parseInt(formData.numberOfGuests) < 1) {
       toast.error('Number of guests must be at least 1');
       return;
     }
-
     setIsSubmitting(true);
-
     try {
-      const { error } = await supabase
-        .from('catering_bookings')
-        .insert({
-          full_name: formData.fullName,
-          email: formData.email,
-          phone_number: formData.phoneNumber,
-          event_date: format(eventDate, 'yyyy-MM-dd'),
-          number_of_guests: parseInt(formData.numberOfGuests),
-          additional_details: formData.additionalDetails || null
-        });
-
+      const {
+        error
+      } = await supabase.from('catering_bookings').insert({
+        full_name: formData.fullName,
+        email: formData.email,
+        phone_number: formData.phoneNumber,
+        event_date: format(eventDate, 'yyyy-MM-dd'),
+        number_of_guests: parseInt(formData.numberOfGuests),
+        additional_details: formData.additionalDetails || null
+      });
       if (error) throw error;
-
       setIsSubmitted(true);
       toast.success('Catering request submitted successfully!');
-      
+
       // Reset form
       setFormData({
         fullName: '',
@@ -80,10 +71,8 @@ const Booking = () => {
       setIsSubmitting(false);
     }
   };
-
   if (isSubmitted) {
-    return (
-      <div className="min-h-screen bg-background">
+    return <div className="min-h-screen bg-background">
         <PublicHeader />
         
         <main className="container mx-auto px-4 py-16">
@@ -100,12 +89,9 @@ const Booking = () => {
         </main>
 
         <PublicFooter />
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       <PublicHeader />
       
       <main className="container mx-auto px-4 py-8">
@@ -115,9 +101,8 @@ const Booking = () => {
               Hosting an Event? We've Got You Covered.
             </h1>
             <div className="text-lg text-muted-foreground space-y-6 max-w-3xl mx-auto leading-relaxed">
-              <p className="text-left">
-                Welcome to Starters, your partner in creating a flawlessly catered event. To begin the planning process, please fill in the details of your upcoming event. Our team will review your information and connect with you promptly to finalize a menu that fits your needs and exceeds your expectations.
-              </p>
+              <p className="text-left">From weddings to birthdays, corporate meetings to intimate gatherings- we bring the taste that makes your event unforgettable. 
+Fill out the form below and we will get back to you with the perfect smallchops package.</p>
 
               <p className="font-semibold text-foreground text-left">
                 Submit your request to receive a custom quote
@@ -138,23 +123,14 @@ const Booking = () => {
                   <label className="block text-sm font-medium mb-2">
                     Full Name <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    value={formData.fullName}
-                    onChange={(e) => handleInputChange('fullName', e.target.value)}
-                    placeholder="Enter your full name"
-                  />
+                  <Input value={formData.fullName} onChange={e => handleInputChange('fullName', e.target.value)} placeholder="Enter your full name" />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Email Address <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    placeholder="Enter your email"
-                  />
+                  <Input type="email" value={formData.email} onChange={e => handleInputChange('email', e.target.value)} placeholder="Enter your email" />
                 </div>
               </div>
 
@@ -163,12 +139,7 @@ const Booking = () => {
                   <label className="block text-sm font-medium mb-2">
                     Phone Number <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    type="tel"
-                    value={formData.phoneNumber}
-                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                    placeholder="Enter your phone number"
-                  />
+                  <Input type="tel" value={formData.phoneNumber} onChange={e => handleInputChange('phoneNumber', e.target.value)} placeholder="Enter your phone number" />
                 </div>
 
                 <div>
@@ -177,26 +148,13 @@ const Booking = () => {
                   </label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !eventDate && "text-muted-foreground"
-                        )}
-                      >
+                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !eventDate && "text-muted-foreground")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {eventDate ? format(eventDate, "PPP") : "Select event date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={eventDate}
-                        onSelect={setEventDate}
-                        disabled={(date) => date < new Date()}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
+                      <Calendar mode="single" selected={eventDate} onSelect={setEventDate} disabled={date => date < new Date()} initialFocus className="pointer-events-auto" />
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -206,33 +164,17 @@ const Booking = () => {
                 <label className="block text-sm font-medium mb-2">
                   Number of Guests Expected <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={formData.numberOfGuests}
-                  onChange={(e) => handleInputChange('numberOfGuests', e.target.value)}
-                  placeholder="Enter expected number of guests"
-                />
+                <Input type="number" min="1" value={formData.numberOfGuests} onChange={e => handleInputChange('numberOfGuests', e.target.value)} placeholder="Enter expected number of guests" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Additional Details or Requests
                 </label>
-                <Textarea
-                  value={formData.additionalDetails}
-                  onChange={(e) => handleInputChange('additionalDetails', e.target.value)}
-                  placeholder="Please include any dietary restrictions, preferred menu styles, budget considerations, or special requests..."
-                  rows={4}
-                />
+                <Textarea value={formData.additionalDetails} onChange={e => handleInputChange('additionalDetails', e.target.value)} placeholder="Please include any dietary restrictions, preferred menu styles, budget considerations, or special requests..." rows={4} />
               </div>
 
-              <Button
-                onClick={handleSubmitBooking}
-                disabled={isSubmitting}
-                className="w-full"
-                size="lg"
-              >
+              <Button onClick={handleSubmitBooking} disabled={isSubmitting} className="w-full" size="lg">
                 {isSubmitting ? 'Submitting Request...' : 'Submit Catering Request'}
               </Button>
             </CardContent>
@@ -241,8 +183,6 @@ const Booking = () => {
       </main>
 
       <PublicFooter />
-    </div>
-  );
+    </div>;
 };
-
 export default Booking;

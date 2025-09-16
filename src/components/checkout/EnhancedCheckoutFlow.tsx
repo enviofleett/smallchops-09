@@ -574,6 +574,49 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       // ✅ Get the latest cart state
       const latestCart = cart; // This should have the discount applied
       
+      // ✅ Enhanced authentication validation before checkout
+      console.log('🔐 Validating authentication before checkout...');
+      if (isAuthenticated && session?.access_token) {
+        try {
+          // Basic JWT validation without recursive refresh
+          const tokenParts = session.access_token.split('.');
+          if (tokenParts.length !== 3) {
+            throw new Error('Invalid JWT format');
+          }
+          
+          const payload = JSON.parse(atob(tokenParts[1]));
+          if (!payload.sub) {
+            throw new Error('JWT missing required claims');
+          }
+          
+          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+            throw new Error('JWT token expired');
+          }
+          
+          console.log('✅ JWT token validated successfully');
+        } catch (jwtError) {
+          console.error('❌ JWT validation failed:', jwtError);
+          setFailedAttempts(prev => prev + 1);
+          toast({
+            title: "Session Error", 
+            description: "Your session has expired. Please refresh and log in again.",
+            variant: "destructive"
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      } else if (!guestSessionId) {
+        console.error('❌ No valid authentication method');
+        setFailedAttempts(prev => prev + 1);
+        toast({
+          title: "Authentication Required",
+          description: "Please log in or continue as guest to complete checkout.",
+          variant: "destructive"
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
       // ✅ Calculate final amount with proper validation
       const finalAmount = validatePaymentAmount(latestCart.summary, deliveryFee);
       
@@ -762,18 +805,27 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     } catch (jwtError) {
       console.error('❌ JWT validation failed:', jwtError);
       
-      // Try to refresh session as recovery mechanism
-      try {
-        console.log('🔄 Attempting session recovery through refresh...');
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshData.session) {
-          throw new Error(`Authentication failed: ${jwtError.message}. Please log in again.`);
+        // Try to refresh session as recovery mechanism (NON-RECURSIVE)
+        try {
+          console.log('🔄 Attempting session recovery through refresh...');
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !refreshData.session) {
+            throw new Error(`Authentication failed: ${jwtError.message}. Please log in again.`);
+          }
+          validatedSession = refreshData.session;
+          console.log('✅ Recovered with session refresh after JWT validation failure');
+        } catch (recoveryError) {
+          console.error('❌ Session recovery failed, redirecting to auth');
+          // Instead of throwing error, redirect to auth step
+          setCheckoutStep('auth');
+          toast({
+            title: "Session Expired",
+            description: "Please log in again to complete your order.",
+            variant: "destructive"
+          });
+          setIsSubmitting(false);
+          return;
         }
-        validatedSession = refreshData.session;
-        console.log('✅ Recovered with session refresh after JWT validation failure');
-      } catch (recoveryError) {
-        throw new Error(`Authentication failed: ${jwtError.message}. Session recovery failed: ${recoveryError.message}`);
-      }
     }
   }
 
@@ -812,9 +864,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               console.log('🔄 Attempting session recovery for JWT error...');
               const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
               if (!refreshError && refreshData.session) {
-                console.log('✅ Session recovered, retrying checkout...');
-                // Retry checkout with refreshed session
-                return await handleFormSubmit(); // Recursive call with fresh session
+                console.log('✅ Session recovered, redirecting to login for fresh start');
+                // Don't retry recursively - redirect to auth instead
+                setCheckoutStep('auth');
+                toast({
+                  title: "Session Refreshed",
+                  description: "Please complete authentication and try checkout again.",
+                  variant: "default"
+                });
+                return;
               }
             } catch (recoveryError) {
               console.error('❌ Session recovery failed:', recoveryError);

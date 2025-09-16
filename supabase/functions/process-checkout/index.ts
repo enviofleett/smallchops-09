@@ -14,6 +14,44 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+// Validate and process discount codes with centralized validation
+async function validateAndApplyDiscount(supabase: any, discountCode: string, orderAmount: number, customerEmail: string, isNewCustomer: boolean = false) {
+  console.log(`🎟️ Validating discount code: ${discountCode} for amount: ${orderAmount}`);
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('validate-discount-code', {
+      body: {
+        code: discountCode.trim().toUpperCase(),
+        customer_email: customerEmail,
+        order_amount: orderAmount,
+        is_new_customer: isNewCustomer
+      }
+    });
+
+    if (error) {
+      console.error('❌ Discount validation error:', error);
+      return { valid: false, error: error.message || 'Failed to validate discount code' };
+    }
+
+    if (!data || !data.valid) {
+      console.log('❌ Discount code invalid:', data?.error || 'Unknown error');
+      return { valid: false, error: data?.error || 'Invalid discount code' };
+    }
+
+    console.log('✅ Discount code validated successfully:', data);
+    return {
+      valid: true,
+      discount_amount: data.discount_amount,
+      final_amount: data.final_amount,
+      discount_code_id: data.discount_code_id,
+      discount_type: data.discount_type
+    };
+  } catch (error) {
+    console.error('❌ Discount validation exception:', error);
+    return { valid: false, error: 'Discount validation service error' };
+  }
+}
+
 serve(async (req) => {
   // Get origin and generate CORS headers per-request
   const origin = req.headers.get('origin');
@@ -382,9 +420,10 @@ serve(async (req) => {
       }
     }
 
-    // 🔧 CRITICAL: Apply discount if provided with backend validation
+    // 🔧 CRITICAL: Apply discount with centralized backend validation
     let finalAmount = order.total_amount;
     let discountApplied = 0;
+    let validatedDiscountDetails = null;
     
     console.log('💰 Backend amount calculation:', {
       subtotal: requestBody.cart_totals?.subtotal,
@@ -399,36 +438,61 @@ serve(async (req) => {
     );
 
     let backendDiscountAmount = 0;
-    if (requestBody.discount && requestBody.cart_totals?.discount_code) {
-      console.log('💸 Processing discount with backend validation:', {
+    if (requestBody.discount?.code && requestBody.cart_totals?.discount_code) {
+      console.log('💸 Centralizing discount validation via validate-discount-code function:', {
         code: requestBody.discount.code,
-        client_discount_amount: requestBody.discount.discount_amount,
-        client_final_total: requestBody.cart_totals.final_total
+        customer_email: customerEmail,
+        order_amount: backendSubtotal,
+        client_discount_amount: requestBody.discount.discount_amount
       });
       
-      // Verify discount is still valid on backend
-      const { data: discount, error: discountError } = await supabaseAdmin
-        .from('discount_codes')
-        .select('*')
-        .eq('code', requestBody.discount.code)
-        .eq('is_active', true)
-        .single();
+      try {
+        // ✅ Call centralized discount validation function
+        const discountValidation = await validateAndApplyDiscount(
+          supabaseAdmin,
+          requestBody.discount.code,
+          backendSubtotal,
+          customerEmail,
+          !existingCustomer // isNewCustomer
+        );
         
-      if (discount && !discountError) {
-        if (discount.type === 'percentage') {
-          backendDiscountAmount = backendSubtotal * (discount.value / 100);
-        } else if (discount.type === 'fixed') {
-          backendDiscountAmount = Math.min(discount.value, backendSubtotal);
+        if (discountValidation.valid) {
+          backendDiscountAmount = discountValidation.discount_amount;
+          validatedDiscountDetails = {
+            discount_code_id: discountValidation.discount_code_id,
+            discount_type: discountValidation.discount_type,
+            final_amount: discountValidation.final_amount
+          };
+          console.log('✅ Centralized discount validation successful:', discountValidation);
+        } else {
+          console.warn('⚠️ Centralized discount validation failed:', discountValidation.error);
+          // Don't fail checkout, but log the issue
+          backendDiscountAmount = 0;
         }
-        
-        console.log('✅ Backend discount validation successful:', {
-          backend_discount: backendDiscountAmount,
-          client_discount: requestBody.discount.discount_amount
-        });
-      } else {
-        console.warn('⚠️ Discount code validation failed on backend:', discountError);
-        // Use client calculation as fallback
-        backendDiscountAmount = requestBody.discount.discount_amount;
+      } catch (discountError) {
+        console.error('❌ Discount validation service error:', discountError);
+        // Fallback: validate discount directly from database
+        const { data: discount, error: dbError } = await supabaseAdmin
+          .from('discount_codes')
+          .select('*')
+          .eq('code', requestBody.discount.code.toUpperCase())
+          .eq('is_active', true)
+          .single();
+          
+        if (discount && !dbError) {
+          if (discount.type === 'percentage') {
+            backendDiscountAmount = backendSubtotal * (discount.value / 100);
+          } else if (discount.type === 'fixed') {
+            backendDiscountAmount = Math.min(discount.value, backendSubtotal);
+          }
+          console.log('✅ Fallback discount validation successful:', {
+            backend_discount: backendDiscountAmount,
+            discount_type: discount.type
+          });
+        } else {
+          console.warn('⚠️ Both centralized and fallback discount validation failed');
+          backendDiscountAmount = 0;
+        }
       }
     }
 
@@ -438,7 +502,7 @@ serve(async (req) => {
     // ✅ Validate client calculation matches backend (allow small rounding differences)
     const amountDifference = Math.abs(backendFinalTotal - (requestBody.cart_totals?.final_total || 0));
     if (amountDifference > 0.01 && requestBody.cart_totals?.final_total) {
-      console.warn('⚠️ Amount mismatch detected:', {
+      console.warn('⚠️ Amount mismatch detected - using secure backend calculation:', {
         client_final: requestBody.cart_totals.final_total,
         backend_final: backendFinalTotal,
         difference: amountDifference
@@ -450,17 +514,17 @@ serve(async (req) => {
     } else {
       // Client calculation is accurate, use it
       finalAmount = requestBody.cart_totals?.final_total || backendFinalTotal;
-      discountApplied = requestBody.discount?.discount_amount || backendDiscountAmount;
+      discountApplied = backendDiscountAmount; // Always use backend-validated discount
     }
 
-    // Update the order with final amounts
-    if (requestBody.discount || discountApplied > 0) {
+    // Update the order with final amounts and track discount usage
+    if (requestBody.discount?.code && discountApplied > 0 && validatedDiscountDetails) {
       const { error: discountUpdateError } = await supabaseAdmin
         .from('orders')
         .update({ 
           total_amount: finalAmount,
           discount_amount: discountApplied,
-          discount_code: requestBody.discount?.code || null,
+          discount_code: requestBody.discount.code.toUpperCase(),
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
@@ -469,6 +533,43 @@ serve(async (req) => {
         console.error('⚠️ Failed to update order with discount:', discountUpdateError);
       } else {
         console.log('✅ Order updated with validated amounts. Final amount:', finalAmount);
+        order.total_amount = finalAmount;
+        
+        // ✅ Track discount usage for compliance and analytics
+        try {
+          const { error: usageError } = await supabaseAdmin
+            .from('discount_code_usage')
+            .insert({
+              discount_code_id: validatedDiscountDetails.discount_code_id,
+              order_id: orderId,
+              customer_email: customerEmail,
+              discount_amount: discountApplied,
+              original_amount: backendSubtotal,
+              final_amount: finalAmount,
+              used_at: new Date().toISOString()
+            });
+            
+          if (usageError) {
+            console.error('⚠️ Failed to track discount usage:', usageError);
+          } else {
+            console.log('✅ Discount usage tracked successfully');
+          }
+        } catch (usageTrackingError) {
+          console.error('⚠️ Discount usage tracking error:', usageTrackingError);
+          // Don't fail checkout for tracking errors
+        }
+      }
+    } else if (discountApplied > 0) {
+      // Update order without discount tracking if validation failed
+      const { error: updateError } = await supabaseAdmin
+        .from('orders')
+        .update({ 
+          total_amount: finalAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+        
+      if (!updateError) {
         order.total_amount = finalAmount;
       }
     }

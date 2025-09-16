@@ -926,19 +926,31 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       }
       console.log('🔄 Raw server response:', data);
 
+      // Validate payment response only on success
+      const validationResult = validatePaymentInitializationData(data);
+      
+      if (!validationResult.isValid) {
+        console.error('❌ Payment validation failed:', validationResult);
+        const userFriendlyError = generateUserFriendlyErrorMessage(validationResult, data);
+        throw new Error(userFriendlyError);
+      }
+      
+      console.log('✅ Payment validation passed');
+      
       // Try to parse response, prioritizing backend-returned amounts
       let parsedData;
       try {
         parsedData = normalizePaymentResponse(data);
         console.log('✅ Parsed server response successfully:', parsedData);
       } catch (error) {
-        console.warn('⚠️ Could not parse payment_url from response, proceeding to secure payment handler:', error);
-        // Fall back to minimal order data without payment_url
+        console.warn('⚠️ Could not parse payment_url from response, using validated data:', error);
+        // Use validated data from successful validation
         parsedData = {
-          order_id: data?.order_id,
-          order_number: data?.order_number,
-          amount: data?.amount || total,
-          // Prioritize backend amount
+          order_id: data?.order_id || data?.order?.id,
+          order_number: data?.order_number || data?.order?.order_number,
+          amount: data?.total_amount || data?.amount,
+          payment_url: data?.payment?.authorization_url || data?.payment?.payment_url,
+          reference: data?.payment?.reference,
           customer_email: sanitizedData.customer.email,
           success: true
         };
@@ -1028,12 +1040,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       } else if (errorMessage.includes('Payment URL not available')) {
         userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
       } else {
-        // Generate user-friendly error with safe fallback
-        const validationResult = validatePaymentInitializationData({
-          success: false,
-          error: errorMessage
-        });
-        userFriendlyMessage = generateUserFriendlyErrorMessage(validationResult);
+        // Don't validate error responses - just use fallback message
+        userFriendlyMessage = 'Payment processing failed. Please try again or contact support if the issue persists.';
       }
       setLastPaymentError(userFriendlyMessage);
       logPaymentAttempt(null, 'failure');

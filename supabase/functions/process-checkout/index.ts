@@ -715,14 +715,19 @@ serve(async (req) => {
     console.log("💳 Payment reference:", paymentReference);
     console.log("🌐 Authorization URL:", authorizationUrl);
 
-    // ✅ Success response
+    // ✅ Success response - FIXED structure to match frontend validator expectations
     return new Response(
       JSON.stringify({
         success: true,
+        // Root level fields required by validator
+        total_amount: finalAmount, // Use final discounted amount
+        order_number: order.order_number,
+        order_id: order.id,
+        // Nested order data for backward compatibility
         order: {
           id: order.id,
           order_number: order.order_number,
-          total_amount: order.total_amount,
+          total_amount: finalAmount,
           status: "pending",
         },
         customer: {
@@ -731,8 +736,13 @@ serve(async (req) => {
         },
         payment: {
           authorization_url: authorizationUrl,
+          payment_url: authorizationUrl, // Add payment_url field for validator
           reference: paymentReference,
         },
+        // Additional fields for comprehensive response
+        amount: finalAmount,
+        delivery_fee: deliveryFee,
+        discount_applied: discountApplied
       }),
       {
         status: 200,

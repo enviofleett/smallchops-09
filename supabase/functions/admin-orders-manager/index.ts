@@ -602,7 +602,6 @@ serve(async (req) => {
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
-        break
       }
 
       case 'bulk_delete': {

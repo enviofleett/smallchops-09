@@ -451,79 +451,104 @@ serve(async (req) => {
 
         if (error) {
           console.error('Error updating order:', error)
-          return new Response(JSON.stringify({
-            success: false,
-            error: error.message
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          })
+          return createErrorResponse(errorHandler, error, 'update_order', corsHeaders)
         }
 
-        // Trigger status change email if status has changed and customer has email with enhanced duplicate prevention
+        // 🎯 PRODUCTION-READY: Queue communication event for status change with robust handling
         if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
           try {
             console.log(`📧 Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
             
-            // Create HMAC signature for internal authentication
-            const timestamp = Math.floor(Date.now() / 1000).toString()
-            const message = `${timestamp}:user-journey-automation`
-            const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
+            // Import communication utilities for robust handling
+            const { upsertCommunicationEventSafe } = await import('../_shared/communication-utils.ts');
             
-            const encoder = new TextEncoder()
-            const keyData = await crypto.subtle.importKey(
-              'raw',
-              encoder.encode(secret),
-              { name: 'HMAC', hash: 'SHA-256' },
-              false,
-              ['sign']
-            )
-            
-            const signature = await crypto.subtle.sign(
-              'HMAC',
-              keyData,
-              encoder.encode(message)
-            )
-            
-            const signatureHex = Array.from(new Uint8Array(signature))
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('')
-            
-            const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
-              body: {
-                journey_type: 'order_status_change',
-                user_data: {
-                  email: currentOrder.customer_email,
-                  name: currentOrder.customer_name
-                },
-                order_data: {
-                  order_id: orderId,
-                  order_number: currentOrder.order_number,
-                  status: updates.status
-                },
-                metadata: {
-                  old_status: currentOrder.status,
-                  new_status: updates.status,
-                  updated_at: new Date().toISOString(),
-                  admin_triggered: true,
-                  request_id: crypto.randomUUID()
-                }
+            // Create communication event with robust duplicate prevention
+            const eventResult = await upsertCommunicationEventSafe(supabaseClient, {
+              event_type: 'order_status_update',
+              recipient_email: currentOrder.customer_email,
+              template_key: `order_status_${updates.status}`,
+              template_variables: {
+                customer_name: currentOrder.customer_name || 'Customer',
+                order_number: currentOrder.order_number,
+                status: updates.status,
+                old_status: currentOrder.status,
+                updated_at: new Date().toISOString()
               },
-              headers: {
-                'x-internal-secret': signatureHex,
-                'x-timestamp': timestamp
-              }
-            })
+              order_id: orderId,
+              priority: 'normal'
+            });
+            
+            if (eventResult.success) {
+              console.log('✅ Communication event created successfully:', {
+                event_id: eventResult.event_id,
+                attempts: eventResult.attempts,
+                isDuplicate: eventResult.isDuplicate
+              });
+            } else {
+              console.error('❌ Failed to create communication event:', eventResult.error);
+              
+              // Fallback: Use user-journey-automation as backup
+              console.log('🔄 Attempting fallback via user-journey-automation...');
+              
+              // Create HMAC signature for internal authentication
+              const timestamp = Math.floor(Date.now() / 1000).toString()
+              const message = `${timestamp}:user-journey-automation`
+              const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
+              
+              const encoder = new TextEncoder()
+              const keyData = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode(secret),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+              )
+              
+              const signature = await crypto.subtle.sign(
+                'HMAC',
+                keyData,
+                encoder.encode(message)
+              )
+              
+              const signatureHex = Array.from(new Uint8Array(signature))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('')
+              
+              const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
+                body: {
+                  journey_type: 'order_status_change',
+                  user_data: {
+                    email: currentOrder.customer_email,
+                    name: currentOrder.customer_name
+                  },
+                  order_data: {
+                    order_id: orderId,
+                    order_number: currentOrder.order_number,
+                    status: updates.status
+                  },
+                  metadata: {
+                    old_status: currentOrder.status,
+                    new_status: updates.status,
+                    updated_at: new Date().toISOString(),
+                    admin_triggered: true,
+                    request_id: crypto.randomUUID()
+                  }
+                },
+                headers: {
+                  'x-internal-secret': signatureHex,
+                  'x-timestamp': timestamp
+                }
+              })
 
-            if (emailError) {
-              console.error('❌ Failed to trigger status change email:', emailError)
-              // Log for monitoring but don't fail the order update
-              await supabaseClient
-                .from('audit_logs')
-                .insert({
-                  action: 'status_change_email_failed',
-                  category: 'Email System',
-                  message: `Failed to send status change email for order ${currentOrder.order_number}`,
+              if (emailError) {
+                console.error('❌ Fallback user-journey-automation also failed:', emailError)
+                // Log for monitoring but don't fail the order update
+                await supabaseClient
+                  .from('audit_logs')
+                  .insert({
+                    action: 'all_email_methods_failed',
+                    category: 'Email System',
+                    message: `All email methods failed for order ${currentOrder.order_number}`,
                   entity_id: orderId,
                   new_values: {
                     order_id: orderId,

@@ -217,7 +217,7 @@ const Booking = () => {
             </h1>
             <div className="text-lg text-muted-foreground space-y-6 max-w-3xl mx-auto leading-relaxed">
               <p className="text-left">
-                Welcome to Starters, your partner in creating a flawlessly catered event. To begin the planning process, please fill in the details of your upcoming event. Our team will review your information and connect with you promptly to finalize a menu that fits your needs and exceeds your expectations.
+                From weddings to birthdays, corporate meetings to intimate gatherings - we bring the taste that makes your event unforgettable. Fill out the form below and we will get back to you with the perfect smallchops package.
               </p>
 
               <p className="font-semibold text-foreground text-left">

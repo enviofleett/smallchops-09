@@ -431,9 +431,7 @@ serve(async (req) => {
         
         if (updates && typeof updates === 'object') {
           for (const [key, value] of Object.entries(updates)) {
-            // Phone field mapping no longer needed - phone column removed
-            if (allowedColumns.includes(key)) {
-            } else if (key === 'status') {
+            if (key === 'status') {
               // CRITICAL: Validate status enum value
               if (value === null || value === 'null' || value === '' || value === undefined) {
                 console.error('❌ CRITICAL: Null or invalid status value detected:', value);
@@ -466,6 +464,7 @@ serve(async (req) => {
                 sanitizedUpdates[key] = value;
               }
             } else if (allowedColumns.includes(key)) {
+              // Add allowed columns to sanitized updates
               sanitizedUpdates[key] = value;
             } else {
               console.warn(`⚠️ Blocked unauthorized column update attempt: ${key}`);

@@ -114,8 +114,7 @@ export const SMSConfiguration = () => {
 
   const checkBalance = async () => {
     try {
-      // This would be implemented to call MySMSTab balance API
-      // For now, we'll simulate it
+      // Call MySMSTab API to check real balance
       const response = await supabase.functions.invoke('sms-service', {
         body: {
           action: 'check_balance'
@@ -124,18 +123,35 @@ export const SMSConfiguration = () => {
 
       if (response.error) throw response.error;
       
-      // Mock balance for demo
-      setBalance(Math.floor(Math.random() * 1000) + 100);
+      // Use real balance from MySMSTab API
+      const balanceData = response.data;
+      if (balanceData?.balance !== undefined) {
+        setBalance(balanceData.balance);
+      } else {
+        // Fallback: try to parse balance from SMS provider response
+        setBalance(balanceData?.credits || 0);
+      }
       
       toast({
         title: 'Balance Updated',
-        description: 'SMS balance retrieved successfully',
+        description: `Current balance: ₦${balanceData?.balance || balanceData?.credits || 'Unknown'}`,
       });
     } catch (error) {
       console.error('Error checking balance:', error);
+      
+      // Production error handling with specific error messages
+      let errorMessage = 'Failed to check SMS balance';
+      if (error.message?.includes('credentials')) {
+        errorMessage = 'MySMSTab credentials not configured. Please check your settings.';
+      } else if (error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message?.includes('unauthorized')) {
+        errorMessage = 'Invalid MySMSTab credentials. Please verify your username and password.';
+      }
+      
       toast({
-        title: 'Error',
-        description: 'Failed to check SMS balance',
+        title: 'Balance Check Failed',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -144,8 +160,19 @@ export const SMSConfiguration = () => {
   const testSMS = async () => {
     if (!testPhone) {
       toast({
-        title: 'Error',
-        description: 'Please enter a phone number to test',
+        title: 'Phone Number Required',
+        description: 'Please enter a phone number to test SMS functionality',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate Nigerian phone number format
+    const phoneRegex = /^(\+?234|0)?[789][01]\d{8}$/;
+    if (!phoneRegex.test(testPhone.replace(/\s+/g, ''))) {
+      toast({
+        title: 'Invalid Phone Number',
+        description: 'Please enter a valid Nigerian phone number (e.g., 08012345678)',
         variant: 'destructive',
       });
       return;
@@ -159,25 +186,49 @@ export const SMSConfiguration = () => {
           template_key: 'order_confirmed',
           variables: {
             customer_name: 'Test User',
-            order_number: 'TEST001',
+            order_number: 'TEST' + Date.now().toString().slice(-6),
             total_amount: '5,000',
-            tracking_url: 'https://example.com/track/TEST001'
+            tracking_url: `${window.location.origin}/track/TEST001`
           }
         }
       });
 
       if (error) throw error;
 
-      toast({
-        title: 'Test SMS Sent',
-        description: 'Test SMS has been sent successfully',
-      });
+      if (data?.success) {
+        toast({
+          title: 'Test SMS Sent Successfully ✅',
+          description: `SMS delivered to ${testPhone}. Cost: ₦${data.cost || config.cost_per_sms}`,
+        });
+        
+        // Refresh balance after successful send
+        setTimeout(checkBalance, 2000);
+      } else {
+        throw new Error(data?.error || 'Unknown error occurred');
+      }
     } catch (error) {
       console.error('Error sending test SMS:', error);
+      
+      let errorMessage = 'Failed to send test SMS. Please check your configuration.';
+      if (error.message?.includes('credentials')) {
+        errorMessage = 'MySMSTab credentials missing or invalid. Please configure them first.';
+      } else if (error.message?.includes('inactive')) {
+        errorMessage = 'SMS service is not active. Please enable it in configuration.';
+      } else if (error.message?.includes('balance')) {
+        errorMessage = 'Insufficient SMS balance. Please top up your MySMSTab account.';
+      } else if (error.message?.includes('rate limit')) {
+        errorMessage = 'Rate limit exceeded. Please wait a moment before testing again.';
+      }
+      
       toast({
-        title: 'Test Failed',
-        description: 'Failed to send test SMS. Check your configuration.',
+        title: 'SMS Test Failed',
+        description: errorMessage,
         variant: 'destructive',
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
       });
     } finally {
       setTesting(false);
@@ -200,10 +251,26 @@ export const SMSConfiguration = () => {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-center">
+          <div className="text-center space-y-4">
             <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-destructive" />
-            <h3 className="text-lg font-semibold mb-2">Configuration Error</h3>
-            <p className="text-muted-foreground">Failed to load SMS configuration</p>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">SMS Configuration Error</h3>
+              <p className="text-muted-foreground mb-4">
+                Failed to load SMS configuration. This could indicate a database connection issue or missing setup.
+              </p>
+            </div>
+            <div className="bg-muted p-4 rounded-lg text-left">
+              <h4 className="font-medium mb-2">Troubleshooting Steps:</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Verify database connection is working</li>
+                <li>• Ensure SMS configuration table exists</li>
+                <li>• Check if MySMSTab provider is set up</li>
+                <li>• Refresh the page to retry connection</li>
+              </ul>
+            </div>
+            <Button onClick={loadConfiguration} className="mt-4">
+              Retry Configuration Load
+            </Button>
           </div>
         </CardContent>
       </Card>

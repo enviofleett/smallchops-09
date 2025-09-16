@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Settings, Building2 } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Settings, Building2, MessageCircle } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 export const PublicFooter = () => {
@@ -65,9 +65,23 @@ const PublicFooterContent = () => {
               Contact Us
             </h3>
             <div className="space-y-2 text-gray-300">
-              <div>+234 807 3011 100</div>
+              <a 
+                href="https://wa.me/2348073011100" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 hover:text-white transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                +234 807 3011 100
+              </a>
               
-              <div>support@startersmallchops.com</div>
+              <a 
+                href="mailto:support@startersmallchops.com"
+                className="flex items-center gap-2 hover:text-white transition-colors"
+              >
+                <Mail className="w-4 h-4" />
+                support@startersmallchops.com
+              </a>
             </div>
           </div>
         </div>
@@ -91,9 +105,14 @@ const PublicFooterContent = () => {
               {settings?.twitter_url && <Link to={settings.twitter_url} className="text-gray-400 hover:text-white transition-colors" target="_blank">
                   <Twitter className="w-5 h-5" />
                 </Link>}
-              {settings?.instagram_url && <Link to={settings.instagram_url} className="text-gray-400 hover:text-white transition-colors" target="_blank">
-                  <Instagram className="w-5 h-5" />
-                </Link>}
+              <a 
+                href="https://www.instagram.com/startersmallchops/" 
+                className="text-gray-400 hover:text-white transition-colors" 
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Instagram className="w-5 h-5" />
+              </a>
             </div>
           </div>
         </div>

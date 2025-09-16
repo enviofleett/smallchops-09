@@ -81,23 +81,26 @@ export const useOrderManagement = () => {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      const { error } = await supabase
-        .from('orders')
-        .update({ 
-          payment_status: paymentStatus,
-          status: paymentStatus === 'paid' ? 'confirmed' : 'cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
+      // STANDARDIZED: Use edge function for all status updates
+      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'update',
+          orderId,
+          updates: { 
+            payment_status: paymentStatus,
+            status: paymentStatus === 'paid' ? 'confirmed' : 'cancelled'
+          }
+        }
+      });
 
-      if (error) throw error;
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Failed to update payment status');
+      }
 
-      // Note: Payment confirmation email will be automatically triggered by database trigger
-      console.log('Order payment status updated, notification email will be sent automatically');
-
+      console.log('✅ Order payment status updated via secure edge function');
       toast.success(`Order ${paymentStatus === 'paid' ? 'confirmed' : 'cancelled'} successfully`);
     } catch (error) {
-      console.error('Error updating order payment status:', error);
+      console.error('❌ Error updating order payment status:', error);
       throw error;
     }
   };

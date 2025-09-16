@@ -130,12 +130,18 @@ export function UnifiedDeliveryManagement({
         toast.error('Cannot move to "Out for Delivery" without assigning a driver. Please assign a driver first.');
         return;
       }
+
+      // ENHANCED: Centralized error handling with loading state
       await updateOrder(orderId, { status: newStatus as any });
-      toast.success('Order status updated successfully');
+      toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
       refetch();
-    } catch (error) {
-      toast.error('Failed to update order status');
-      console.error('Status update error:', error);
+    } catch (error: any) {
+      // ENHANCED: Detailed error messaging
+      const errorMessage = error?.message?.includes('edge function') 
+        ? 'Service temporarily unavailable. Please try again.'
+        : 'Failed to update order status';
+      toast.error(errorMessage);
+      console.error('❌ Status update error:', error);
     }
   };
 

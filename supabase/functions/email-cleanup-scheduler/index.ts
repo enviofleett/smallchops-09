@@ -29,6 +29,7 @@ serve(async (req) => {
         queue_cutoff_days: 1,      // Mark queued items as failed after 1 day
         fail_log_retention_days: 7,  // Archive failed logs after 7 days
         sent_log_retention_days: 30  // Keep sent logs for 30 days
+      }
     });
 
     if (error) {

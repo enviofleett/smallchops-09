@@ -167,7 +167,27 @@ serve(async (req: Request) => {
       hasSignature: !!webhookSignature
     });
 
-    // Validate method
+    // Handle GET requests (user redirects from Paystack)
+    if (req.method === 'GET') {
+      console.log('🔄 GET request received - redirecting to frontend callback');
+      const url = new URL(req.url);
+      const orderId = url.searchParams.get('order_id');
+      
+      const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com";
+      const redirectUrl = orderId ? 
+        `${FRONTEND_URL}/payment/callback?order_id=${orderId}` : 
+        `${FRONTEND_URL}/payment/callback`;
+      
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          'Location': redirectUrl
+        }
+      });
+    }
+
+    // Validate method (only POST for webhooks)
     if (req.method !== 'POST') {
       await logSecurityEvent(supabase, 'invalid_method', { 
         method: req.method, 

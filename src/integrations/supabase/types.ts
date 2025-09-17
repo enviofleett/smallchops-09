@@ -9858,6 +9858,20 @@ export type Database = {
           variables: Json | null
         }[]
       }
+      get_security_events: {
+        Args: { p_limit?: number; p_risk_level?: string }
+        Returns: {
+          action: string
+          category: string
+          entity_id: string
+          event_time: string
+          id: string
+          message: string
+          new_values: Json
+          risk_level: string
+          user_id: string
+        }[]
+      }
       get_smtp_config_with_fallback: {
         Args: Record<PropertyKey, never>
         Returns: Json

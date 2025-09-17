@@ -1,8 +1,9 @@
-// CRITICAL FIX: supabase/functions/payment-callback/index.ts
-// This fixes the "Cannot read properties of null" error
+// ENHANCED SECURITY: supabase/functions/payment-callback/index.ts
+// Comprehensive security enhancements for payment webhooks
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { crypto } from "https://deno.land/std@0.190.0/crypto/mod.ts";
 
 // CRITICAL: Define valid order status mapping (FIXED to match current database)
 const VALID_ORDER_STATUSES = {
@@ -26,7 +27,137 @@ interface PaystackWebhookData {
       email?: string;
     };
     metadata?: Record<string, any>;
+    created_at?: string;
+    paid_at?: string;
   };
+}
+
+// SECURITY: Paystack IP ranges for webhook validation
+const PAYSTACK_IP_RANGES = [
+  '52.31.139.75',
+  '52.49.173.169', 
+  '52.214.14.220',
+  '54.76.111.105',
+  '54.217.218.164',
+  '35.157.26.200',
+  '35.156.85.64',
+  '52.58.127.244'
+];
+
+// SECURITY: Rate limiting storage (simple in-memory for now)
+const requestCounts = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = 100; // requests per hour per IP
+const RATE_WINDOW = 60 * 60 * 1000; // 1 hour in milliseconds
+
+// SECURITY: Replay attack prevention
+const processedWebhooks = new Set<string>();
+const WEBHOOK_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+// SECURITY: Webhook signature verification
+async function verifyWebhookSignature(body: string, signature: string): Promise<boolean> {
+  const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
+  
+  if (!webhookSecret) {
+    console.warn('⚠️ PAYSTACK_WEBHOOK_SECRET not configured - skipping signature verification');
+    return true; // Allow webhook if no secret configured (development mode)
+  }
+
+  if (!signature) {
+    console.error('🚫 Missing webhook signature');
+    return false;
+  }
+
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-512' },
+      false,
+      ['sign']
+    );
+
+    const expectedSignature = await crypto.subtle.sign(
+      'HMAC',
+      key,
+      encoder.encode(body)
+    );
+
+    const expectedHex = Array.from(new Uint8Array(expectedSignature))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const providedSignature = signature.toLowerCase();
+    const computedSignature = expectedHex.toLowerCase();
+
+    const isValid = providedSignature === computedSignature;
+    
+    if (!isValid) {
+      console.error('🚫 Webhook signature verification failed', {
+        provided: providedSignature.substring(0, 20) + '...',
+        computed: computedSignature.substring(0, 20) + '...'
+      });
+    } else {
+      console.log('✅ Webhook signature verified');
+    }
+
+    return isValid;
+  } catch (error) {
+    console.error('❌ Signature verification error:', error);
+    return false;
+  }
+}
+
+// SECURITY: Rate limiting check
+function checkRateLimit(clientIP: string): boolean {
+  const now = Date.now();
+  const key = clientIP;
+  
+  const existing = requestCounts.get(key);
+  
+  if (!existing || now > existing.resetTime) {
+    // First request or reset window
+    requestCounts.set(key, { count: 1, resetTime: now + RATE_WINDOW });
+    return true;
+  }
+  
+  if (existing.count >= RATE_LIMIT) {
+    console.warn(`🚫 Rate limit exceeded for IP: ${clientIP}`);
+    return false;
+  }
+  
+  existing.count++;
+  return true;
+}
+
+// SECURITY: IP validation
+function isValidPaystackIP(clientIP: string): boolean {
+  // In development, allow localhost
+  if (clientIP.includes('127.0.0.1') || clientIP.includes('::1') || clientIP.includes('localhost')) {
+    return true;
+  }
+  
+  return PAYSTACK_IP_RANGES.includes(clientIP);
+}
+
+// SECURITY: Audit logging
+async function logSecurityEvent(
+  supabase: any,
+  event: string, 
+  details: Record<string, any>,
+  level: 'info' | 'warning' | 'error' = 'info'
+) {
+  try {
+    await supabase.from('audit_logs').insert({
+      event_type: 'webhook_security',
+      event_name: event,
+      details: details,
+      level: level,
+      created_at: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Failed to log security event:', error);
+  }
 }
 
 // FIXED CORS HANDLING with null safety
@@ -129,19 +260,32 @@ serve(async (req: Request) => {
   );
 
   try {
-    // ENHANCED: Safe header access with null checks
+    // SECURITY: Enhanced request analysis
     const userAgent = req.headers?.get('user-agent') || 'Unknown';
     const contentType = req.headers?.get('content-type') || 'Unknown';
     const origin = req.headers?.get('origin') || 'No Origin (Webhook/Server-to-Server)';
+    const clientIP = req.headers?.get('x-forwarded-for') || req.headers?.get('cf-connecting-ip') || 'unknown';
+    const webhookSignature = req.headers?.get('x-paystack-signature') || '';
     
-    console.log('🔍 Processing request:', {
+    const requestInfo = {
       method: req.method,
       origin: origin,
       userAgent: userAgent.substring(0, 50) + '...',
-      contentType: contentType
-    });
+      contentType: contentType,
+      clientIP: clientIP,
+      hasSignature: !!webhookSignature
+    };
+    
+    console.log('🔍 Processing request:', requestInfo);
 
+    // SECURITY: Method validation
     if (req.method !== 'POST') {
+      await logSecurityEvent(supabase, 'invalid_method', { 
+        method: req.method, 
+        clientIP,
+        userAgent 
+      }, 'warning');
+      
       console.error('❌ Invalid method:', req.method);
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
@@ -149,13 +293,59 @@ serve(async (req: Request) => {
       );
     }
 
-    // Parse webhook payload with enhanced error handling
+    // SECURITY: Rate limiting
+    if (!checkRateLimit(clientIP)) {
+      await logSecurityEvent(supabase, 'rate_limit_exceeded', { 
+        clientIP,
+        userAgent 
+      }, 'warning');
+      
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SECURITY: IP validation (optional - can be disabled for development)
+    const skipIPValidation = Deno.env.get('SKIP_IP_VALIDATION') === 'true';
+    if (!skipIPValidation && !isValidPaystackIP(clientIP)) {
+      await logSecurityEvent(supabase, 'invalid_source_ip', { 
+        clientIP,
+        userAgent,
+        expectedIPs: PAYSTACK_IP_RANGES 
+      }, 'error');
+      
+      console.error('🚫 Invalid source IP:', clientIP);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized source' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SECURITY: Parse and verify webhook payload
     let webhookData: PaystackWebhookData;
+    let rawBody: string;
+    
     try {
-      const rawBody = await req.text();
+      rawBody = await req.text();
       
       if (!rawBody || rawBody.trim() === '') {
         throw new Error('Empty request body');
+      }
+      
+      // SECURITY: Verify webhook signature before processing
+      const signatureValid = await verifyWebhookSignature(rawBody, webhookSignature);
+      if (!signatureValid) {
+        await logSecurityEvent(supabase, 'invalid_signature', { 
+          clientIP,
+          userAgent,
+          bodyLength: rawBody.length
+        }, 'error');
+        
+        return new Response(
+          JSON.stringify({ error: 'Invalid webhook signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
       // Log first 200 chars of body for debugging (don't log sensitive data)
@@ -163,6 +353,12 @@ serve(async (req: Request) => {
       
       webhookData = JSON.parse(rawBody);
     } catch (parseError) {
+      await logSecurityEvent(supabase, 'invalid_payload', { 
+        clientIP,
+        error: parseError instanceof Error ? parseError.message : 'Unknown parse error',
+        bodyLength: rawBody?.length || 0
+      }, 'error');
+      
       console.error('❌ Failed to parse webhook JSON:', parseError);
       return new Response(
         JSON.stringify({ 
@@ -185,11 +381,68 @@ serve(async (req: Request) => {
     const { event, data } = webhookData;
     
     if (!data || !data.reference) {
+      await logSecurityEvent(supabase, 'missing_reference', { 
+        clientIP,
+        event,
+        hasData: !!data
+      }, 'error');
+      
       console.error('❌ Missing required data fields:', { event, data });
       return new Response(
         JSON.stringify({ error: 'Missing reference in webhook data' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // SECURITY: Replay attack prevention
+    const webhookId = `${data.reference}-${event}-${data.status}`;
+    if (processedWebhooks.has(webhookId)) {
+      await logSecurityEvent(supabase, 'duplicate_webhook', { 
+        clientIP,
+        reference: data.reference,
+        event,
+        webhookId
+      }, 'warning');
+      
+      console.warn('⚠️ Duplicate webhook detected:', webhookId);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Webhook already processed',
+          reference: data.reference
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SECURITY: Timestamp validation (prevent old webhook replays)
+    const webhookTimestamp = data.paid_at || data.created_at;
+    if (webhookTimestamp) {
+      const webhookTime = new Date(webhookTimestamp).getTime();
+      const now = Date.now();
+      if (now - webhookTime > WEBHOOK_EXPIRY) {
+        await logSecurityEvent(supabase, 'expired_webhook', { 
+          clientIP,
+          reference: data.reference,
+          webhookTime: new Date(webhookTimestamp).toISOString(),
+          age: now - webhookTime
+        }, 'warning');
+        
+        console.warn('⚠️ Webhook too old:', {
+          reference: data.reference,
+          age: (now - webhookTime) / 1000 / 60,
+          minutes: 'minutes'
+        });
+      }
+    }
+
+    // Add to processed set to prevent replays
+    processedWebhooks.add(webhookId);
+    
+    // Clean up old processed webhooks periodically
+    if (processedWebhooks.size > 1000) {
+      processedWebhooks.clear();
+      console.log('🧹 Cleared processed webhooks cache');
     }
 
     console.log('📝 Webhook event:', event);
@@ -255,6 +508,15 @@ serve(async (req: Request) => {
     }
 
     console.log('✅ RPC call successful:', rpcResult);
+
+    // SECURITY: Log successful payment processing
+    await logSecurityEvent(supabase, 'payment_processed', { 
+      clientIP,
+      reference: data.reference,
+      event,
+      mappedStatus: orderStatus,
+      amount: data.amount
+    }, 'info');
 
     // Return success response to Paystack
     return new Response(

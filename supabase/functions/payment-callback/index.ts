@@ -472,12 +472,11 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       };
     }
 
-    // Use the new RPC to update order status with proper enum values
+    // Use the RPC to update order status with proper enum values (payment_data removed)
     const { error: rpcError } = await supabase.rpc('update_order_status', {
       order_id: orderData.id,
       new_order_status: 'confirmed',
-      new_payment_status: 'paid',
-      payment_data: paystackData
+      new_payment_status: 'paid'
     });
 
     if (rpcError) {

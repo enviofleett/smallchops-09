@@ -246,13 +246,9 @@ async function processIndividualEmail(supabase: any, email: QueuedEmail): Promis
 }
 
 function selectEmailSender(email: QueuedEmail): string {
-  // High priority emails use Auth sender with SMTP fallback
-  if (email.priority === 'high') {
-    return 'supabase-auth-email-sender';
-  }
-  
-  // Transactional emails use primary SMTP sender
-  // Always use unified SMTP sender
+  // All emails now use unified SMTP sender
+  return 'unified-smtp-sender';
+}
   return 'unified-smtp-sender';
   
   // All emails use unified SMTP sender

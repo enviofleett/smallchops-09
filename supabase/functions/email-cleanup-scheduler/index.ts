@@ -22,12 +22,13 @@ serve(async (req) => {
     console.log('📧 Starting daily email cleanup...');
 
     // Execute email cleanup with production-ready parameters
-    const { data: cleanupResult, error } = await supabase.rpc('cleanup_email_legacy', {
-      p_dry_run: false,
-      p_queue_stale_hours: 2,      // Mark processing items as failed after 2 hours
-      p_queue_cutoff_days: 1,      // Mark queued items as failed after 1 day
-      p_fail_log_retention_days: 7,  // Archive failed logs after 7 days
-      p_sent_log_retention_days: 30  // Keep sent logs for 30 days
+    const { data: cleanupResult, error } = await supabase.functions.invoke('email-queue-cleanup', {
+      body: {
+        dry_run: false,
+        queue_stale_hours: 2,      // Mark processing items as failed after 2 hours
+        queue_cutoff_days: 1,      // Mark queued items as failed after 1 day
+        fail_log_retention_days: 7,  // Archive failed logs after 7 days
+        sent_log_retention_days: 30  // Keep sent logs for 30 days
     });
 
     if (error) {

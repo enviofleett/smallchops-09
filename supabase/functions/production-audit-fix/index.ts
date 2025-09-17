@@ -119,12 +119,11 @@ async function performSecurityAudit(supabase: any) {
   const recommendations: string[] = []
   let securityScore = 100
 
-  // Check environment variables
+  // Check environment variables (SMTP native only)
   const requiredEnvVars = [
     'SUPABASE_URL',
     'SUPABASE_SERVICE_ROLE_KEY',
-    'SUPABASE_ANON_KEY',
-    'MAILERSEND_API_TOKEN'
+    'SUPABASE_ANON_KEY'
   ]
 
   for (const envVar of requiredEnvVars) {
@@ -182,16 +181,20 @@ async function performSecurityAudit(supabase: any) {
     // Ignore if table doesn't exist
   }
 
-  // Check communication settings
+  // Check communication settings (SMTP native)
   try {
     const { data: commSettings } = await supabase
       .from('communication_settings')
-      .select('sender_email, mailersend_domain_verified')
+      .select('sender_email, smtp_host, smtp_user, use_smtp')
       .single()
 
-    if (!commSettings?.mailersend_domain_verified) {
-      warnings.push('MailerSend domain not verified')
-      recommendations.push('Verify your sending domain in MailerSend dashboard')
+    if (!commSettings?.use_smtp || !commSettings?.smtp_host) {
+      warnings.push('SMTP configuration not properly set up')
+      recommendations.push('Configure native SMTP settings in communication_settings')
+      securityScore -= 10
+    } else if (!commSettings?.sender_email) {
+      warnings.push('No sender email configured')
+      recommendations.push('Set sender_email in communication settings')
       securityScore -= 5
     }
   } catch (error) {

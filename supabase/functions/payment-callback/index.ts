@@ -36,26 +36,44 @@ const requestCounts = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT = 100;
 const RATE_WINDOW = 60 * 60 * 1000; // 1 hour
 
-// SECURITY: Webhook signature verification using built-in crypto
+// SECURITY: Webhook signature verification using built-in crypto (PRODUCTION FIXED)
 async function verifyWebhookSignature(body: string, signature: string): Promise<boolean> {
   const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
+  const isDevelopment = Deno.env.get('DENO_DEPLOYMENT_ID') === undefined;
   
+  // 🔍 PRODUCTION FIX: Enhanced environment validation
   if (!webhookSecret) {
-    console.warn('⚠️ PAYSTACK_WEBHOOK_SECRET not configured - skipping signature verification');
-    return true;
+    console.error('🚨 CRITICAL: PAYSTACK_WEBHOOK_SECRET not configured in production!');
+    if (isDevelopment) {
+      console.warn('🟡 Development mode: Bypassing webhook signature verification');
+      return true;
+    }
+    // In production, fail secure - do not bypass signature verification
+    return false;
   }
 
   if (!signature) {
-    console.error('🚫 Missing webhook signature');
+    console.error('🚫 Missing webhook signature header (x-paystack-signature)');
     return false;
   }
 
   try {
+    // 🔍 PRODUCTION FIX: Handle signature format (remove sha256= prefix if present)
+    const cleanSignature = signature.replace(/^sha256=/, '').trim();
+    console.log('🔐 Signature processing:', {
+      originalLength: signature.length,
+      cleanedLength: cleanSignature.length,
+      hasPrefix: signature.startsWith('sha256='),
+      bodyLength: body.length
+    });
+
     const encoder = new TextEncoder();
+    
+    // 🔍 PRODUCTION FIX: Use SHA-256 (Paystack standard) instead of SHA-512
     const key = await crypto.subtle.importKey(
       'raw',
       encoder.encode(webhookSecret),
-      { name: 'HMAC', hash: 'SHA-512' },
+      { name: 'HMAC', hash: 'SHA-256' },  // ✅ FIXED: Changed from SHA-512 to SHA-256
       false,
       ['sign']
     );
@@ -70,18 +88,58 @@ async function verifyWebhookSignature(body: string, signature: string): Promise<
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
 
-    const isValid = signature.toLowerCase() === expectedHex.toLowerCase();
+    const isValid = cleanSignature.toLowerCase() === expectedHex.toLowerCase();
     
+    // 🔍 PRODUCTION FIX: Enhanced debugging for signature verification
     if (!isValid) {
-      console.error('🚫 Webhook signature verification failed');
+      console.error('🚫 Webhook signature verification FAILED:', {
+        receivedSignature: cleanSignature.substring(0, 16) + '...', // Masked for security
+        expectedSignature: expectedHex.substring(0, 16) + '...', // Masked for security
+        receivedLength: cleanSignature.length,
+        expectedLength: expectedHex.length,
+        bodyLength: body.length,
+        algorithm: 'SHA-256'
+      });
     } else {
-      console.log('✅ Webhook signature verified');
+      console.log('✅ Webhook signature verified successfully (SHA-256)');
     }
 
     return isValid;
   } catch (error) {
-    console.error('❌ Signature verification error:', error);
+    console.error('❌ Signature verification error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      algorithm: 'SHA-256',
+      signatureLength: signature?.length || 0,
+      bodyLength: body?.length || 0
+    });
     return false;
+  }
+}
+
+// 🔍 PRODUCTION FIX: Environment validation at startup
+function validateProductionEnvironment(): void {
+  const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const isDevelopment = Deno.env.get('DENO_DEPLOYMENT_ID') === undefined;
+
+  console.log('🔧 Environment validation:', {
+    hasWebhookSecret: !!webhookSecret,
+    hasSupabaseUrl: !!supabaseUrl,
+    hasServiceRoleKey: !!serviceRoleKey,
+    isDevelopment,
+    secretLength: webhookSecret?.length || 0
+  });
+
+  if (!isDevelopment) {
+    const missingSecrets = [];
+    if (!webhookSecret) missingSecrets.push('PAYSTACK_WEBHOOK_SECRET');
+    if (!supabaseUrl) missingSecrets.push('SUPABASE_URL');
+    if (!serviceRoleKey) missingSecrets.push('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (missingSecrets.length > 0) {
+      console.error('🚨 CRITICAL PRODUCTION ERROR: Missing required environment variables:', missingSecrets);
+    }
   }
 }
 
@@ -133,6 +191,9 @@ const getCorsHeaders = () => ({
 });
 
 serve(async (req: Request) => {
+  // 🔍 PRODUCTION FIX: Validate environment at startup
+  validateProductionEnvironment();
+
   if (!req) {
     console.error('❌ Null request object received');
     return new Response(

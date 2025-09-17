@@ -9168,10 +9168,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      cleanup_old_communication_events: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       cleanup_old_email_events: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -10456,6 +10452,17 @@ export type Database = {
           p_event_type: string
           p_order_id?: string
           p_recipient_email: string
+          p_template_key: string
+          p_template_variables?: Json
+        }
+        Returns: Json
+      }
+      upsert_communication_event_production: {
+        Args: {
+          p_event_type: string
+          p_order_id?: string
+          p_recipient_email: string
+          p_source?: string
           p_template_key: string
           p_template_variables?: Json
         }

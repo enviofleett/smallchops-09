@@ -61,7 +61,19 @@ const supabaseClient = createClient(
 // PRODUCTION: Background notification handler - completely isolated from order updates
 async function handleStatusChangeNotification(supabaseClient: any, orderId: string, order: any, newStatus: string) {
   try {
-    console.log(`📱 Processing status change notification for order ${order.order_number}`)
+    // CRITICAL: Additional validation to prevent enum errors
+    const validStatuses = [
+      'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 
+      'delivered', 'cancelled', 'refunded', 'completed', 'returned'
+    ];
+    
+    if (!newStatus || typeof newStatus !== 'string' || !validStatuses.includes(newStatus.trim())) {
+      console.error(`❌ CRITICAL: Invalid status in notification handler: "${newStatus}"`);
+      return; // Abort notification for invalid status
+    }
+    
+    const sanitizedStatus = newStatus.trim();
+    console.log(`📱 Processing status change notification for order ${order.order_number} -> ${sanitizedStatus}`)
     
     // Try email first
     if (order.customer_email) {
@@ -72,12 +84,12 @@ async function handleStatusChangeNotification(supabaseClient: any, orderId: stri
           .rpc('upsert_communication_event_production', {
             p_event_type: 'order_status_update',
             p_recipient_email: order.customer_email,
-            p_template_key: `order_${newStatus}`,
+            p_template_key: `order_${sanitizedStatus}`,
             p_template_variables: {
               customer_name: order.customer_name || 'Customer',
               order_number: order.order_number,
-              status: newStatus,
-              status_display: newStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              status: sanitizedStatus,
+              status_display: sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
               updated_at: new Date().toISOString()
             },
             p_order_id: orderId,
@@ -618,17 +630,17 @@ serve(async (req) => {
         }
 
         // PRODUCTION: Send status change notification (completely non-blocking)
-        if (updates.status && updates.status !== currentOrder.status) {
+        if (sanitizedUpdates.status && sanitizedUpdates.status !== currentOrder.status) {
           // Fire and forget - run notification in background without blocking order update
           const notificationPromise = handleStatusChangeNotification(
             supabaseClient,
             orderId,
             currentOrder,
-            updates.status
+            sanitizedUpdates.status
           );
           
           // Log that notification was triggered but don't await it
-          console.log(`🔔 Status change notification triggered: ${currentOrder.status} -> ${updates.status}`)
+          console.log(`🔔 Status change notification triggered: ${currentOrder.status} -> ${sanitizedUpdates.status}`)
           
           // Use background task pattern to ensure it runs but doesn't block
           notificationPromise.catch(error => {

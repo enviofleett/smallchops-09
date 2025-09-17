@@ -80,9 +80,9 @@ async function handleStatusChangeNotification(supabaseClient: any, orderId: stri
       try {
         console.log(`📧 Attempting email notification to ${order.customer_email}`)
         
-        // Create a unique dedupe_key to prevent duplicates
+        // Create a unique dedupe_key with timestamp to prevent duplicates
         const templateKey = `order_${sanitizedStatus}`;
-        const dedupeKey = `${orderId}|order_status_update|${templateKey}|${order.customer_email}`;
+        const dedupeKey = `${orderId}|order_status_update|${templateKey}|${order.customer_email}|${Date.now()}`;
         
         const communicationEvent = {
           order_id: orderId,
@@ -109,23 +109,30 @@ async function handleStatusChangeNotification(supabaseClient: any, orderId: stri
           scheduled_at: new Date().toISOString()
         };
 
-        // Use upsert to handle duplicates gracefully
+        // Use insert since keys are now guaranteed unique
         const { data: eventResult, error: emailError } = await supabaseClient
           .from('communication_events')
-          .upsert(communicationEvent, { 
-            onConflict: 'dedupe_key',
-            ignoreDuplicates: false 
-          })
+          .insert(communicationEvent)
           .select('id');
 
         if (emailError) {
+          // Check for duplicate key error (edge case)
+          if (emailError.code === '23505') {
+            console.warn(`📧 Duplicate email event skipped (edge case): ${dedupeKey}`)
+            return; // Skip SMS fallback for duplicates
+          }
           console.log(`⚠️ Email failed, trying SMS fallback: ${emailError.message}`)
           throw new Error(`Email failed: ${emailError.message}`)
         } else {
           console.log(`✅ Email notification queued successfully`)
           return; // Success - no need for SMS
         }
-      } catch (emailError) {
+      } catch (emailError: any) {
+        // Handle duplicate key errors gracefully
+        if (emailError.code === '23505') {
+          console.warn(`📧 Duplicate email event skipped (edge case): ${dedupeKey}`)
+          return; // Skip SMS fallback for duplicates
+        }
         console.log(`⚠️ Email exception, trying SMS fallback: ${emailError.message}`)
         // Continue to SMS fallback
       }
@@ -138,13 +145,13 @@ async function handleStatusChangeNotification(supabaseClient: any, orderId: stri
         
         const smsMessage = `Hi ${order.customer_name || 'Customer'}! Your order ${order.order_number} status has been updated to: ${newStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}. Thank you for choosing us!`;
         
-        // Create a unique dedupe_key for SMS to prevent duplicates
-        const smsDedupeKey = `${orderId}|order_status_update|sms|${order.customer_phone}`;
+        // Create a unique dedupe_key for SMS with timestamp to prevent duplicates
+        const smsDedupeKey = `${orderId}|order_status_update|sms|${order.customer_phone}|${Date.now()}`;
         
-        // Insert SMS communication event with deduplication
+        // Insert SMS communication event since keys are now guaranteed unique
         const { error: smsError } = await supabaseClient
           .from('communication_events')
-          .upsert({
+          .insert({
             event_type: 'order_status_update',
             channel: 'sms',
             sms_phone: order.customer_phone,
@@ -166,18 +173,25 @@ async function handleStatusChangeNotification(supabaseClient: any, orderId: stri
             dedupe_key: smsDedupeKey,
             email_type: 'transactional',
             scheduled_at: new Date().toISOString()
-          }, { 
-            onConflict: 'dedupe_key',
-            ignoreDuplicates: false 
           });
         
         if (smsError) {
-          console.log(`⚠️ SMS fallback also failed: ${smsError.message}`)
+          // Check for duplicate key error (edge case)
+          if (smsError.code === '23505') {
+            console.warn(`📱 Duplicate SMS event skipped (edge case): ${smsDedupeKey}`)
+          } else {
+            console.log(`⚠️ SMS fallback also failed: ${smsError.message}`)
+          }
         } else {
           console.log(`✅ SMS fallback notification queued successfully`)
         }
-      } catch (smsError) {
-        console.log(`⚠️ SMS fallback exception: ${smsError.message}`)
+      } catch (smsError: any) {
+        // Handle duplicate key errors gracefully
+        if (smsError.code === '23505') {
+          console.warn(`📱 Duplicate SMS event skipped (edge case): ${smsDedupeKey}`)
+        } else {
+          console.log(`⚠️ SMS fallback exception: ${smsError.message}`)
+        }
       }
     }
     

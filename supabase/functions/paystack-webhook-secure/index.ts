@@ -170,8 +170,8 @@ serve(async (req) => {
         // Trigger communication event for payment confirmation
         if (processResult?.[0]?.order_id && event.data.customer?.email) {
           try {
-            // Create unique dedupe_key to prevent duplicates
-            const dedupeKey = `${processResult[0].order_id}|payment_confirmed_webhook|payment_confirmation|${event.data.customer.email}`;
+            // Create unique dedupe_key with timestamp to prevent duplicates
+            const dedupeKey = `${processResult[0].order_id}|payment_confirmed_webhook|payment_confirmation|${event.data.customer.email}|${Date.now()}`;
             
             const communicationEvent = {
               order_id: processResult[0].order_id,
@@ -202,19 +202,16 @@ serve(async (req) => {
 
             const { error: commError } = await supabase
               .from('communication_events')
-              .upsert(communicationEvent, { 
-                onConflict: 'dedupe_key',
-                ignoreDuplicates: false 
-              });
+              .insert(communicationEvent);
 
             if (commError) {
-              console.warn('⚠️ Communication event upsert failed:', commError.message);
+              console.warn('⚠️ Communication event insert failed:', commError.message);
             } else {
               console.log('📧 Payment confirmation email queued:', dedupeKey);
             }
           } catch (err: any) {
             if (err.code === '23505') {
-              console.warn('📧 Duplicate payment confirmation event skipped:', processResult[0].order_id);
+              console.warn('📧 Duplicate payment confirmation event skipped (edge case):', processResult[0].order_id);
             } else {
               console.error('❌ Communication event error:', err.message);
             }

@@ -8903,6 +8903,42 @@ export type Database = {
         }
         Relationships: []
       }
+      security_monitor_view: {
+        Row: {
+          action: string | null
+          category: string | null
+          entity_id: string | null
+          event_time: string | null
+          id: string | null
+          message: string | null
+          new_values: Json | null
+          risk_level: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          category?: string | null
+          entity_id?: string | null
+          event_time?: string | null
+          id?: string | null
+          message?: string | null
+          new_values?: Json | null
+          risk_level?: never
+          user_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          category?: string | null
+          entity_id?: string | null
+          event_time?: string | null
+          id?: string | null
+          message?: string | null
+          new_values?: Json | null
+          risk_level?: never
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       activate_admin_user: {
@@ -9211,6 +9247,10 @@ export type Database = {
       cleanup_monitoring_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      cleanup_old_audit_logs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       cleanup_old_email_events: {
         Args: Record<PropertyKey, never>

@@ -94,7 +94,6 @@ function validateSMTPUser(user: string, host: string): SMTPUserValidation {
     if (h.includes('mailgun')) return 'mailgun';
     if (h.includes('ses') || h.includes('amazonses')) return 'aws_ses';
     if (h.includes('postmark')) return 'postmark';
-    if (h.includes('mailersend')) return 'mailersend';
     if (h.includes('yahoo')) return 'yahoo';
     return undefined;
   };

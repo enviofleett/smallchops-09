@@ -513,67 +513,43 @@ serve(async (req) => {
           })
         }
 
-        // Trigger status change email if status has changed and customer has email
+        // PRODUCTION: Queue communication event for status change email
         if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
           try {
-            console.log(`Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
+            console.log(`Queueing status change email: ${currentOrder.status} -> ${updates.status}`)
             
-            // Create HMAC signature for internal authentication
-            const timestamp = Math.floor(Date.now() / 1000).toString()
-            const message = `${timestamp}:user-journey-automation`
-            const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
+            // Use robust communication event with collision-resistant dedupe key
+            const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(2)}_${crypto.randomUUID()}`;
+            const dedupeKey = `${orderId}|status_${updates.status}|${currentOrder.customer_email}|${uniqueSuffix}`;
             
-            const encoder = new TextEncoder()
-            const keyData = await crypto.subtle.importKey(
-              'raw',
-              encoder.encode(secret),
-              { name: 'HMAC', hash: 'SHA-256' },
-              false,
-              ['sign']
-            )
-            
-            const signature = await crypto.subtle.sign(
-              'HMAC',
-              keyData,
-              encoder.encode(message)
-            )
-            
-            const signatureHex = Array.from(new Uint8Array(signature))
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('')
-            
-            const { error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
-              body: {
-                journey_type: 'order_status_change',
-                user_data: {
-                  email: currentOrder.customer_email,
-                  name: currentOrder.customer_name
-                },
-                order_data: {
-                  order_id: orderId,
+            const { error: eventError } = await supabaseClient
+              .from('communication_events')
+              .insert({
+                event_type: 'order_status_update',
+                recipient_email: currentOrder.customer_email,
+                template_key: `order_${updates.status}`,
+                template_variables: {
+                  customer_name: currentOrder.customer_name || 'Customer',
                   order_number: currentOrder.order_number,
-                  status: updates.status
-                },
-                metadata: {
-                  old_status: currentOrder.status,
-                  new_status: updates.status,
+                  status: updates.status,
+                  status_display: updates.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
                   updated_at: new Date().toISOString()
-                }
-              },
-              headers: {
-                'x-internal-secret': signatureHex,
-                'x-timestamp': timestamp
-              }
-            })
+                },
+                order_id: orderId,
+                status: 'queued',
+                dedupe_key: dedupeKey,
+                priority: 'normal',
+                source: 'admin_update'
+              });
 
-            if (emailError) {
-              console.error('Failed to trigger status change email:', emailError)
+            if (eventError) {
+              console.error('Failed to queue status change email:', eventError)
               // Don't fail the order update if email fails
             } else {
-              console.log('✅ Status change email triggered successfully')
+              console.log('✅ Status change email queued successfully')
             }
           } catch (emailError) {
-            console.error('Error triggering status change email:', emailError)
+            console.error('Error queueing status change email:', emailError)
             // Don't fail the order update if email fails
           }
         }

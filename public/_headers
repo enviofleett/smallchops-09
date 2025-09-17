@@ -1,0 +1,9 @@
+/*
+  # Production-Ready Security Headers
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://js.paystack.co https://checkout.paystack.com https://paystack.com https://cdn.gpteng.co; script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://js.paystack.co https://checkout.paystack.com https://paystack.com https://cdn.gpteng.co; connect-src 'self' https://oknnklksdiqaifhxaccs.supabase.co https://oknnklksdiqaifhxaccs.functions.supabase.co https://api.paystack.co https://checkout.paystack.com https://paystack.com https://challenges.cloudflare.com https://*.cloudflare.com wss://*.supabase.co; frame-src 'self' https://challenges.cloudflare.com https://checkout.paystack.com https://paystack.com https://js.paystack.co; frame-ancestors 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://checkout.paystack.com https://paystack.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://checkout.paystack.com https://paystack.com; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com https://checkout.paystack.com https://paystack.com data:; img-src 'self' data: blob: https: https://checkout.paystack.com https://paystack.com; worker-src 'self' blob:;
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  X-XSS-Protection: 1; mode=block
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(self)

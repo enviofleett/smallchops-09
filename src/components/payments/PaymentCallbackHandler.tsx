@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { handlePaymentCallback } from '@/utils/paymentVerification';
+import { validatePaymentCallback, logValidationResult } from '@/utils/paymentValidation';
 import { toast } from 'sonner';
 
 export const PaymentCallbackHandler: React.FC = () => {
@@ -19,18 +20,35 @@ export const PaymentCallbackHandler: React.FC = () => {
   useEffect(() => {
     const handleCallback = async (attemptNumber = 0) => {
       try {
-        // Get reference from URL params (prefer reference over trxref)
-        const reference = searchParams.get('reference') || searchParams.get('trxref');
-        const urlStatus = searchParams.get('status');
-        const orderId = searchParams.get('order_id');
+        // Extract all callback parameters
+        const callbackData = {
+          reference: searchParams.get('reference') || searchParams.get('trxref'),
+          status: searchParams.get('status'),
+          order_id: searchParams.get('order_id'),
+          order_status: searchParams.get('order_status'),
+          payment_status: searchParams.get('payment_status'),
+          amount: searchParams.get('amount')
+        };
+
+        // Validate callback data using production-ready validation
+        const validation = validatePaymentCallback(callbackData);
+        logValidationResult(validation, 'Payment Callback');
         
+        if (!validation.isValid) {
+          setStatus('error');
+          setMessage(`Payment data validation failed: ${validation.errors.join(', ')}`);
+          console.error('❌ Payment callback validation failed:', validation.errors);
+          return;
+        }
+
+        const { reference } = validation.sanitizedData;
         if (!reference) {
           setStatus('error');
           setMessage('No payment reference found in callback URL');
           return;
         }
 
-        console.log(`🔄 Processing payment callback for reference: ${reference} (attempt ${attemptNumber + 1})`);
+        console.log(`🔄 Processing validated payment callback for reference: ${reference} (attempt ${attemptNumber + 1})`);
         
         if (attemptNumber === 0) {
           setMessage('We\'re verifying your payment... This usually takes just a few seconds.');

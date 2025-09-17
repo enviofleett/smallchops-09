@@ -58,6 +58,110 @@ const supabaseClient = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
+// PRODUCTION: Background notification handler - completely isolated from order updates
+async function handleStatusChangeNotification(supabaseClient: any, orderId: string, order: any, newStatus: string) {
+  try {
+    console.log(`📱 Processing status change notification for order ${order.order_number}`)
+    
+    // Try email first
+    if (order.customer_email) {
+      try {
+        console.log(`📧 Attempting email notification to ${order.customer_email}`)
+        
+        const { data: eventResult, error: emailError } = await supabaseClient
+          .rpc('upsert_communication_event_production', {
+            p_event_type: 'order_status_update',
+            p_recipient_email: order.customer_email,
+            p_template_key: `order_${newStatus}`,
+            p_template_variables: {
+              customer_name: order.customer_name || 'Customer',
+              order_number: order.order_number,
+              status: newStatus,
+              status_display: newStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              updated_at: new Date().toISOString()
+            },
+            p_order_id: orderId,
+            p_source: 'admin_update'
+          });
+
+        if (emailError) {
+          console.log(`⚠️ Email failed, trying SMS fallback: ${emailError.message}`)
+          throw new Error(`Email failed: ${emailError.message}`)
+        } else {
+          console.log(`✅ Email notification queued successfully`)
+          return; // Success - no need for SMS
+        }
+      } catch (emailError) {
+        console.log(`⚠️ Email exception, trying SMS fallback: ${emailError.message}`)
+        // Continue to SMS fallback
+      }
+    }
+    
+    // SMS Fallback - if email fails or no email available
+    if (order.customer_phone) {
+      try {
+        console.log(`📱 Attempting SMS notification to ${order.customer_phone}`)
+        
+        const smsMessage = `Hi ${order.customer_name || 'Customer'}! Your order ${order.order_number} status has been updated to: ${newStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}. Thank you for choosing us!`;
+        
+        // Insert SMS communication event
+        const { error: smsError } = await supabaseClient
+          .from('communication_events')
+          .insert({
+            event_type: 'order_status_update',
+            channel: 'sms',
+            sms_phone: order.customer_phone,
+            template_variables: {
+              customer_name: order.customer_name || 'Customer',
+              order_number: order.order_number,
+              status: newStatus,
+              message: smsMessage
+            },
+            order_id: orderId,
+            status: 'queued',
+            priority: 'normal',
+            source: 'admin_update_fallback',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        
+        if (smsError) {
+          console.log(`⚠️ SMS fallback also failed: ${smsError.message}`)
+        } else {
+          console.log(`✅ SMS fallback notification queued successfully`)
+        }
+      } catch (smsError) {
+        console.log(`⚠️ SMS fallback exception: ${smsError.message}`)
+      }
+    }
+    
+    // Log notification attempt in audit trail
+    await supabaseClient
+      .from('audit_logs')
+      .insert({
+        action: 'status_change_notification_attempted',
+        category: 'Order Management',
+        message: `Notification attempted for order ${order.order_number} status change to ${newStatus}`,
+        entity_id: orderId,
+        new_values: {
+          old_status: order.status,
+          new_status: newStatus,
+          customer_email: order.customer_email,
+          customer_phone: order.customer_phone,
+          notification_channels_attempted: [
+            order.customer_email ? 'email' : null,
+            order.customer_phone ? 'sms' : null
+          ].filter(Boolean)
+        }
+      })
+      .single();
+      
+  } catch (error) {
+    console.error(`⚠️ Complete notification failure for order ${orderId}:`, error)
+    // Even complete failure should not throw - this is truly fire-and-forget
+  }
+}
+
 serve(async (req) => {
   const origin = req.headers.get('origin')
   
@@ -513,38 +617,23 @@ serve(async (req) => {
           })
         }
 
-        // PRODUCTION: Queue communication event using production-safe function
-        if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
-          try {
-            console.log(`🔔 Queueing production-safe status change email: ${currentOrder.status} -> ${updates.status}`)
-            
-            // Use production-safe upsert function with collision-resistant dedupe keys
-            const { data: eventResult, error: eventError } = await supabaseClient
-              .rpc('upsert_communication_event_production', {
-                p_event_type: 'order_status_update',
-                p_recipient_email: currentOrder.customer_email,
-                p_template_key: `order_${updates.status}`,
-                p_template_variables: {
-                  customer_name: currentOrder.customer_name || 'Customer',
-                  order_number: currentOrder.order_number,
-                  status: updates.status,
-                  status_display: updates.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                  updated_at: new Date().toISOString()
-                },
-                p_order_id: orderId,
-                p_source: 'admin_update'
-              });
-
-            if (eventError) {
-              console.error('⚠️ Non-blocking email queue error:', eventError)
-              // Don't fail the order update - email is non-blocking
-            } else {
-              console.log('✅ Production-safe email queued:', eventResult?.success ? 'SUCCESS' : 'HANDLED')
-            }
-          } catch (emailError) {
-            console.error('⚠️ Non-blocking email queue exception:', emailError)
-            // Don't fail the order update - email is non-blocking
-          }
+        // PRODUCTION: Send status change notification (completely non-blocking)
+        if (updates.status && updates.status !== currentOrder.status) {
+          // Fire and forget - run notification in background without blocking order update
+          const notificationPromise = handleStatusChangeNotification(
+            supabaseClient,
+            orderId,
+            currentOrder,
+            updates.status
+          );
+          
+          // Log that notification was triggered but don't await it
+          console.log(`🔔 Status change notification triggered: ${currentOrder.status} -> ${updates.status}`)
+          
+          // Use background task pattern to ensure it runs but doesn't block
+          notificationPromise.catch(error => {
+            console.error('⚠️ Background notification failed (non-blocking):', error)
+          });
         }
 
         return new Response(JSON.stringify({

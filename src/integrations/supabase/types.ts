@@ -5842,6 +5842,50 @@ export type Database = {
           },
         ]
       }
+      payment_logs: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          customer_email: string | null
+          id: number
+          log_data: Json | null
+          order_id: string | null
+          processed_at: string | null
+          reference: string
+          status: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          customer_email?: string | null
+          id?: number
+          log_data?: Json | null
+          order_id?: string | null
+          processed_at?: string | null
+          reference: string
+          status?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          customer_email?: string | null
+          id?: number
+          log_data?: Json | null
+          order_id?: string | null
+          processed_at?: string | null
+          reference?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_polling_state: {
         Row: {
           created_at: string
@@ -10415,6 +10459,15 @@ export type Database = {
           payment_data?: Json
         }
         Returns: undefined
+      }
+      update_order_status_safe: {
+        Args: {
+          p_amount?: number
+          p_customer_email?: string
+          p_reference: string
+          p_status: string
+        }
+        Returns: Json
       }
       update_order_with_payment_reference: {
         Args: {

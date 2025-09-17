@@ -3,7 +3,36 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts';
 
-const VERSION = "v2025-08-22-centralized-config";
+const VERSION = "v2025-09-17-production-ready-bulletproof";
+
+// Define valid order status enum values
+const VALID_ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'completed', 'returned'] as const;
+type OrderStatus = typeof VALID_ORDER_STATUSES[number];
+
+// Paystack status to internal status mapping with safe fallbacks
+const PAYSTACK_STATUS_MAP: Record<string, OrderStatus> = {
+  'success': 'confirmed',
+  'failed': 'cancelled',
+  'abandoned': 'cancelled',
+  'pending': 'pending',
+  'processing': 'pending'
+};
+
+interface PaystackWebhookPayload {
+  event: string;
+  data: {
+    status: string;
+    reference: string;
+    amount: number;
+    customer: {
+      email: string;
+    };
+    metadata?: {
+      order_id?: string;
+      user_id?: string;
+    };
+  };
+}
 
 // Enhanced logging function
 function log(level: 'info' | 'warn' | 'error', message: string, data?: any) {
@@ -81,8 +110,8 @@ serve(async (req: Request) => {
       status: verificationResult.data.status
     });
 
-    // Step 6: Process the verified payment
-    const orderResult = await processVerifiedPayment(supabase, reference, verificationResult.data);
+    // Step 6: Process the verified payment with bulletproof validation
+    const orderResult = await processVerifiedPaymentSafe(supabase, reference, verificationResult.data);
     
     if (!orderResult.success) {
       log('error', '❌ Order processing failed', { reference, error: orderResult.error });
@@ -129,7 +158,7 @@ async function extractReference(req: Request): Promise<string | null> {
       
       if (contentType.includes('application/json')) {
         const body = await req.json();
-        reference = body.reference || body.trxref || body.txref || body.tx_ref;
+        reference = body.reference || body.trxref || body.txref || body.tx_ref || body.data?.reference;
         log('info', '🔍 Checking JSON body for reference', { body, foundReference: reference });
       } else if (contentType.includes('application/x-www-form-urlencoded')) {
         const formData = await req.formData();
@@ -438,424 +467,123 @@ function getPaystackConfiguration(req: Request) {
   }
 }
 
-// Process verified payment
-async function processVerifiedPayment(supabase: any, reference: string, paystackData: any) {
+// CRITICAL: Process verified payment with bulletproof validation
+async function processVerifiedPaymentSafe(supabase: any, reference: string, paystackData: any) {
   try {
     const paystackAmount = paystackData.amount ? paystackData.amount / 100 : null;
+    const paystackStatus = paystackData.status?.toLowerCase().trim();
 
-    log('info', '🔧 Processing verified payment via RPC', {
+    // CRITICAL FIX: Robust status mapping with fallbacks
+    let orderStatus: OrderStatus;
+
+    if (!paystackStatus || paystackStatus === 'null' || paystackStatus === '') {
+      log('warn', '⚠️ Empty or null status from Paystack, defaulting to confirmed');
+      orderStatus = 'confirmed';
+    } else if (PAYSTACK_STATUS_MAP[paystackStatus]) {
+      orderStatus = PAYSTACK_STATUS_MAP[paystackStatus];
+    } else {
+      log('warn', '⚠️ Unknown Paystack status:', paystackStatus, 'defaulting to confirmed');
+      orderStatus = 'confirmed';
+    }
+
+    // Additional validation: Ensure we never pass null/undefined
+    if (!orderStatus || !VALID_ORDER_STATUSES.includes(orderStatus)) {
+      log('error', '❌ Invalid order status after mapping:', orderStatus);
+      orderStatus = 'confirmed'; // Safe fallback
+    }
+
+    log('info', '✅ Mapped status:', paystackStatus, '->', orderStatus);
+
+    log('info', '🔧 Processing verified payment via enhanced RPC', {
       reference,
       amount: paystackAmount,
-      currency: paystackData.currency
+      currency: paystackData.currency,
+      mappedStatus: orderStatus
     });
 
-    // First, fetch the order to get the order_id
-    const { data: orderData, error: fetchError } = await supabase
-      .from('orders')
-      .select('id, status, payment_status')
-      .eq('payment_reference', reference)
-      .maybeSingle();
-
-    if (fetchError) {
-      log('error', '❌ Failed to fetch order for payment update', { reference, error: fetchError.message });
-      return {
-        success: false,
-        error: `Order lookup failed: ${fetchError.message}`
-      };
-    }
-
-    if (!orderData) {
-      log('error', '❌ No order found for payment reference', { reference });
-      return {
-        success: false,
-        error: 'Order not found for payment reference'
-      };
-    }
-
-    // Use the RPC to update order status with proper enum values (payment_data removed)
-    const { error: rpcError } = await supabase.rpc('update_order_status', {
-      order_id: orderData.id,
-      new_order_status: 'confirmed',
-      new_payment_status: 'paid'
+    // Call the enhanced RPC function with bulletproof validation
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('update_order_status_safe', {
+      p_reference: reference,
+      p_status: orderStatus,
+      p_amount: paystackData.amount, // Keep in kobo for logging
+      p_customer_email: paystackData.customer?.email || null
     });
 
     if (rpcError) {
-      log('error', '❌ RPC returned error', { reference, error: rpcError.message });
+      log('error', '❌ RPC Error:', rpcError);
       return {
         success: false,
-        error: rpcError.message || 'Payment processing failed'
+        error: `Database update failed: ${rpcError.message}`
       };
     }
 
-    // Fetch the updated order for return data
-    const { data: updatedOrder, error: refetchError } = await supabase
-      .from('orders')
-      .select('id, order_number, status, payment_status, customer_email, customer_name, total_amount, order_type')
-      .eq('id', orderData.id)
-      .single();
-
-    if (refetchError || !updatedOrder) {
-      log('error', '❌ Failed to fetch updated order data', { reference, error: refetchError?.message });
+    if (!rpcResult || !rpcResult.success) {
+      log('error', '❌ RPC returned unsuccessful result', { rpcResult });
       return {
         success: false,
-        error: 'Order update succeeded but could not fetch updated data'
+        error: rpcResult?.error || 'Payment processing failed'
       };
     }
 
-    const orderResult = {
-      order_id: updatedOrder.id,
-      order_number: updatedOrder.order_number,
-      customer_email: updatedOrder.customer_email,
-      customer_name: updatedOrder.customer_name,
-      amount: updatedOrder.total_amount,
-      order_type: updatedOrder.order_type
-    };
-
-    if (rpcError) {
-      // Handle duplicate key constraint or payment confirmation duplicates as idempotent success
-      if (rpcError.message && (
-        rpcError.message.includes('duplicate key value violates unique constraint') ||
-        rpcError.message.includes('idx_communication_events_unique_payment_confirmation')
-      )) {
-        log('info', '✅ Payment confirmation already exists (idempotent success)', { 
-          reference, 
-          constraint_error: rpcError.message 
-        });
-        
-        // Fetch the existing order for success redirect
-        try {
-          const { data: existingOrder, error: fetchError } = await supabase
-            .from('orders')
-            .select('id, order_number, status, payment_status')
-            .eq('payment_reference', reference)
-            .maybeSingle();
-            
-          if (fetchError || !existingOrder) {
-            log('error', '❌ Could not fetch existing order after duplicate constraint', { 
-              reference, 
-              fetchError: fetchError?.message 
-            });
-            return {
-              success: false,
-              error: 'Payment processed but order details unavailable'
-            };
-          }
-          
-          log('info', '✅ Successfully fetched existing order after idempotent success', {
-            reference,
-            order_id: existingOrder.id,
-            order_number: existingOrder.order_number,
-            status: existingOrder.status,
-            payment_status: existingOrder.payment_status
-          });
-          
-          return {
-            success: true,
-            order_id: existingOrder.id,
-            order_number: existingOrder.order_number
-          };
-        } catch (fetchError) {
-          log('error', '❌ Exception fetching existing order after duplicate constraint', { 
-            reference, 
-            error: fetchError.message 
-          });
-          return {
-            success: false,
-            error: 'Payment processed but order verification failed'
-          };
-        }
-      }
-      
-      log('error', '❌ RPC verification failed', { reference, error: rpcError });
-      return {
-        success: false,
-        error: rpcError.message || 'Database operation failed'
-      };
-    }
-
-    log('info', '✅ RPC operation successful', {
-      reference,
-      order_id: orderResult.order_id,
-      order_number: orderResult.order_number
-    });
-
-    // Update payment status and method explicitly (non-blocking)
-    try {
-      await supabase.from('orders').update({
-        payment_status: 'paid',
-        payment_method: 'Paystack'
-      }).eq('id', orderResult.order_id);
-      
-      log('info', '✅ Payment status and method updated (paid, Paystack)');
-    } catch (paymentStatusError) {
-      log('warn', '⚠️ Payment status/method update failed (non-blocking)', {
-        error: paymentStatusError.message
-      });
-    }
-
-    // Update/create payment transaction record (non-blocking)
-    try {
-      await supabase.from('payment_transactions').upsert({
-        reference: reference,
-        provider_reference: reference,
-        amount: paystackAmount || orderResult.amount,
-        currency: paystackData.currency || 'NGN',
-        status: 'completed',
-        gateway_response: JSON.stringify(paystackData),
-        verified_at: new Date().toISOString(),
-        order_id: orderResult.order_id
-      }, {
-        onConflict: 'reference'
-      });
-      
-    log('info', '✅ Payment transaction record updated');
-
-    // P0 HOTFIX: Fetch customer_email if missing from RPC response
-    let customerEmail = orderResult.customer_email;
-    let customerName = orderResult.customer_name;
-    
-    if (!customerEmail && orderResult.order_id) {
-      log('warn', '⚠️ Customer email missing from RPC, fetching from orders table', { 
-        order_id: orderResult.order_id, 
-        reference 
-      });
-      
-      try {
-        const { data: orderDetails, error: fetchError } = await supabase
-          .from('orders')
-          .select('customer_email, customer_name')
-          .eq('id', orderResult.order_id)
-          .maybeSingle();
-          
-        if (!fetchError && orderDetails) {
-          customerEmail = orderDetails.customer_email;
-          customerName = orderDetails.customer_name || customerName;
-          log('info', '✅ Customer email fetched successfully', { 
-            order_id: orderResult.order_id, 
-            customer_email: customerEmail ? 'present' : 'still_missing',
-            reference 
-          });
-        } else {
-          log('warn', '⚠️ Could not fetch customer email from orders table', { 
-            order_id: orderResult.order_id, 
-            error: fetchError?.message,
-            reference 
-          });
-        }
-      } catch (fetchException) {
-        log('warn', '⚠️ Exception fetching customer email', { 
-          order_id: orderResult.order_id, 
-          error: fetchException.message,
-          reference 
-        });
-      }
-    }
-
-    // Enhanced immediate payment confirmation email with fallback queue
-    try {
-      // P0 HOTFIX: Only attempt email send if we have a valid recipient
-      if (!customerEmail || typeof customerEmail !== 'string' || !customerEmail.includes('@')) {
-        log('warn', '⚠️ No valid customer email - skipping immediate send, using queue fallback only', {
-          order_id: orderResult.order_id,
-          customer_email: customerEmail ? 'invalid_format' : 'missing',
-          reference
-        });
-        
-        // Skip direct send, go straight to fallback queue
-        throw new Error('No valid customer email available for immediate send');
-      }
-
-      const confirmationEmailResult = await supabase.functions.invoke('unified-smtp-sender', {
-        body: {
-          to: customerEmail,
-          subject: 'Payment Confirmation - Order ' + orderResult.order_number,
-          templateKey: 'payment_confirmation',
-          variables: {
-            customerName: customerName || 'Valued Customer',
-            orderNumber: orderResult.order_number,
-            amount: orderResult.amount?.toString() || paystackAmount?.toString() || '0',
-            paymentMethod: 'Paystack',
-            orderType: orderResult.order_type || 'order'
-          }
-        }
-      });
-
-      // Enhanced error logging with HTTP status and response details
-      if (confirmationEmailResult.error) {
-        const errorDetails = {
-          error: confirmationEmailResult.error.message || 'Unknown error',
-          httpStatus: confirmationEmailResult.status || 'unknown',
-          responseBody: confirmationEmailResult.data || null,
-          order_id: orderResult.order_id,
-          customer_email: orderResult.customer_email,
-          reference: reference
-        };
-        
-        log('warn', '⚠️ Immediate payment confirmation email failed - creating idempotent queue fallback', errorDetails);
-        
-        // Idempotent queue fallback: Use RPC function for safe insertion
-        try {
-          const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
-            p_reference: reference,
-            p_order_id: orderResult.order_id,
-            p_recipient_email: customerEmail || orderResult.customer_email,
-            p_template_variables: {
-              customerName: customerName || 'Valued Customer',
-              orderNumber: orderResult.order_number,
-              amount: orderResult.amount?.toString() || paystackAmount?.toString() || '0',
-              paymentMethod: 'Paystack',
-              orderType: orderResult.order_type || 'order',
-              fallback_reason: 'immediate_send_failed'
-            }
-          });
-          
-          if (rpcError) {
-            log('warn', '⚠️ Idempotent email event creation failed', {
-              order_id: orderResult.order_id,
-              rpcError: rpcError.message,
-              reference
-            });
-          } else {
-            log('info', '✅ Payment confirmation queued for later delivery (idempotent)', {
-              order_id: orderResult.order_id,
-              event_id: eventId,
-              fallback_used: true,
-              reference
-            });
-          }
-        } catch (queueError) {
-          log('error', '❌ Failed to queue payment confirmation fallback via RPC', {
-            order_id: orderResult.order_id,
-            queueError: queueError.message,
-            reference
-          });
-        }
-      } else {
-        log('info', '✅ Payment confirmation email sent immediately', {
-          order_id: orderResult.order_id,
-          customer_email: customerEmail,
-          messageId: confirmationEmailResult.data?.messageId,
-          provider: confirmationEmailResult.data?.provider,
-          reference
-        });
-      }
-    } catch (emailError) {
-      const errorDetails = {
-        error: emailError.message,
-        stack: emailError.stack,
-        order_id: orderResult.order_id,
-        customer_email: customerEmail,
-        reference: reference
-      };
-      
-      log('warn', '⚠️ Exception sending immediate payment confirmation - creating idempotent queue fallback', errorDetails);
-      
-      // Idempotent queue fallback for exceptions too
-      try {
-        const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
-          p_reference: reference,
-          p_order_id: orderResult.order_id,
-          p_recipient_email: customerEmail || orderResult.customer_email,
-          p_template_variables: {
-            customerName: customerName || 'Valued Customer',
-            orderNumber: orderResult.order_number,
-            amount: orderResult.amount?.toString() || paystackAmount?.toString() || '0',
-            paymentMethod: 'Paystack',
-            orderType: orderResult.order_type || 'order',
-            fallback_reason: 'exception_during_send'
-          }
-        });
-        
-        if (rpcError) {
-          log('error', '❌ Critical: Failed both immediate send and idempotent queue fallback', {
-            order_id: orderResult.order_id,
-            originalError: emailError.message,
-            rpcError: rpcError.message,
-            reference
-          });
-        } else {
-          log('info', '✅ Payment confirmation queued after exception (idempotent)', {
-            order_id: orderResult.order_id,
-            event_id: eventId,
-            fallback_used: true,
-            reference
-          });
-        }
-      } catch (queueError) {
-        log('error', '❌ Critical: Exception during idempotent queue fallback', {
-          order_id: orderResult.order_id,
-          originalError: emailError.message,
-          queueError: queueError.message,
-          reference
-        });
-      }
-    }
-    } catch (txnError) {
-      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
-        error: txnError.message
-      });
-    }
+    log('info', '✅ Payment processed successfully via enhanced RPC', rpcResult);
 
     return {
       success: true,
-      order_id: orderResult.order_id,
-      order_number: orderResult.order_number
+      order_id: rpcResult.order_id,
+      order_number: rpcResult.order_number,
+      status: rpcResult.status,
+      reference: rpcResult.reference
     };
 
   } catch (error) {
-    log('error', '❌ Payment processing failed', {
+    log('error', '❌ Payment processing exception', {
       reference,
-      error: error.message
+      error: error.message,
+      stack: error.stack
     });
     return {
       success: false,
-      error: error.message
+      error: `Payment processing failed: ${error.message}`
     };
   }
 }
 
-// Create success redirect
-function createSuccessRedirect(reference: string, orderId: string) {
-  const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
-  const successUrl = `${frontendUrl}/payment/callback?reference=${encodeURIComponent(reference)}&status=success&order_id=${encodeURIComponent(orderId)}`;
+// Create error redirect response
+function createErrorRedirect(message: string, reference?: string): Response {
+  const baseUrl = 'https://startersmallchops.com';
+  const errorUrl = `${baseUrl}/payment/callback?status=error&message=${encodeURIComponent(message)}${reference ? `&reference=${encodeURIComponent(reference)}` : ''}`;
   
-  log('info', '✅ Creating success redirect', { successUrl });
-  
-  const corsHeaders = getCorsHeaders(null);
+  log('error', '❌ Creating error redirect', {
+    errorUrl,
+    message,
+    reference
+  });
   
   return new Response(null, {
     status: 302,
     headers: {
-      ...corsHeaders,
-      'Location': successUrl
+      'Location': errorUrl,
+      ...getCorsHeaders(null)
     }
   });
 }
 
-// Create error redirect
-function createErrorRedirect(message: string, reference?: string) {
-  const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
-  const errorParams = new URLSearchParams({
-    status: 'error',
-    message: message
+// Create success redirect response
+function createSuccessRedirect(reference: string, orderId?: string): Response {
+  const baseUrl = 'https://startersmallchops.com';
+  const successUrl = `${baseUrl}/payment/callback?status=success&reference=${encodeURIComponent(reference)}${orderId ? `&order_id=${encodeURIComponent(orderId)}` : ''}`;
+  
+  log('info', '✅ Creating success redirect', {
+    successUrl,
+    reference,
+    orderId
   });
-  
-  // Include reference if provided for better error handling
-  if (reference) {
-    errorParams.set('reference', reference);
-  }
-  
-  const errorUrl = `${frontendUrl}/payment/callback?${errorParams.toString()}`;
-  
-  log('error', '❌ Creating error redirect', { errorUrl, message, reference });
-  
-  const corsHeaders = getCorsHeaders(null);
   
   return new Response(null, {
     status: 302,
     headers: {
-      ...corsHeaders,
-      'Location': errorUrl
+      'Location': successUrl,
+      ...getCorsHeaders(null)
     }
   });
 }

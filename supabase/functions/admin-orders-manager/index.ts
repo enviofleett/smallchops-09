@@ -513,44 +513,37 @@ serve(async (req) => {
           })
         }
 
-        // PRODUCTION: Queue communication event for status change email
+        // PRODUCTION: Queue communication event using production-safe function
         if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
           try {
-            console.log(`Queueing status change email: ${currentOrder.status} -> ${updates.status}`)
+            console.log(`🔔 Queueing production-safe status change email: ${currentOrder.status} -> ${updates.status}`)
             
-            // Use robust communication event with collision-resistant dedupe key
-            const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substring(2)}_${crypto.randomUUID()}`;
-            const dedupeKey = `${orderId}|status_${updates.status}|${currentOrder.customer_email}|${uniqueSuffix}`;
-            
-            const { error: eventError } = await supabaseClient
-              .from('communication_events')
-              .insert({
-                event_type: 'order_status_update',
-                recipient_email: currentOrder.customer_email,
-                template_key: `order_${updates.status}`,
-                template_variables: {
+            // Use production-safe upsert function with collision-resistant dedupe keys
+            const { data: eventResult, error: eventError } = await supabaseClient
+              .rpc('upsert_communication_event_production', {
+                p_event_type: 'order_status_update',
+                p_recipient_email: currentOrder.customer_email,
+                p_template_key: `order_${updates.status}`,
+                p_template_variables: {
                   customer_name: currentOrder.customer_name || 'Customer',
                   order_number: currentOrder.order_number,
                   status: updates.status,
                   status_display: updates.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
                   updated_at: new Date().toISOString()
                 },
-                order_id: orderId,
-                status: 'queued',
-                dedupe_key: dedupeKey,
-                priority: 'normal',
-                source: 'admin_update'
+                p_order_id: orderId,
+                p_source: 'admin_update'
               });
 
             if (eventError) {
-              console.error('Failed to queue status change email:', eventError)
-              // Don't fail the order update if email fails
+              console.error('⚠️ Non-blocking email queue error:', eventError)
+              // Don't fail the order update - email is non-blocking
             } else {
-              console.log('✅ Status change email queued successfully')
+              console.log('✅ Production-safe email queued:', eventResult?.success ? 'SUCCESS' : 'HANDLED')
             }
           } catch (emailError) {
-            console.error('Error queueing status change email:', emailError)
-            // Don't fail the order update if email fails
+            console.error('⚠️ Non-blocking email queue exception:', emailError)
+            // Don't fail the order update - email is non-blocking
           }
         }
 

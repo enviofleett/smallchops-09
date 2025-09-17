@@ -449,13 +449,68 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       currency: paystackData.currency
     });
 
-    // Use secure RPC to verify and update payment status (avoids double trigger firing)
-    const { data: orderResult, error: rpcError } = await supabase.rpc('verify_and_update_payment_status', {
-      payment_ref: reference,
-      new_status: 'confirmed',
-      payment_amount: paystackAmount,
-      payment_gateway_response: paystackData
+    // First, fetch the order to get the order_id
+    const { data: orderData, error: fetchError } = await supabase
+      .from('orders')
+      .select('id, status, payment_status')
+      .eq('payment_reference', reference)
+      .maybeSingle();
+
+    if (fetchError) {
+      log('error', '❌ Failed to fetch order for payment update', { reference, error: fetchError.message });
+      return {
+        success: false,
+        error: `Order lookup failed: ${fetchError.message}`
+      };
+    }
+
+    if (!orderData) {
+      log('error', '❌ No order found for payment reference', { reference });
+      return {
+        success: false,
+        error: 'Order not found for payment reference'
+      };
+    }
+
+    // Use the new RPC to update order status with proper enum values
+    const { error: rpcError } = await supabase.rpc('update_order_status', {
+      order_id: orderData.id,
+      new_order_status: 'confirmed',
+      new_payment_status: 'paid',
+      payment_data: paystackData
     });
+
+    if (rpcError) {
+      log('error', '❌ RPC returned error', { reference, error: rpcError.message });
+      return {
+        success: false,
+        error: rpcError.message || 'Payment processing failed'
+      };
+    }
+
+    // Fetch the updated order for return data
+    const { data: updatedOrder, error: refetchError } = await supabase
+      .from('orders')
+      .select('id, order_number, status, payment_status, customer_email, customer_name, total_amount, order_type')
+      .eq('id', orderData.id)
+      .single();
+
+    if (refetchError || !updatedOrder) {
+      log('error', '❌ Failed to fetch updated order data', { reference, error: refetchError?.message });
+      return {
+        success: false,
+        error: 'Order update succeeded but could not fetch updated data'
+      };
+    }
+
+    const orderResult = {
+      order_id: updatedOrder.id,
+      order_number: updatedOrder.order_number,
+      customer_email: updatedOrder.customer_email,
+      customer_name: updatedOrder.customer_name,
+      amount: updatedOrder.total_amount,
+      order_type: updatedOrder.order_type
+    };
 
     if (rpcError) {
       // Handle duplicate key constraint or payment confirmation duplicates as idempotent success
@@ -519,48 +574,10 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       };
     }
 
-    // Handle both array and object returns from RPC
-    let orderData;
-    if (Array.isArray(orderResult)) {
-      if (!orderResult || orderResult.length === 0) {
-        log('error', '❌ No order data returned from RPC (array empty)', { reference });
-        return {
-          success: false,
-          error: 'Order not found or already processed'
-        };
-      }
-      orderData = orderResult[0];
-    } else if (orderResult && typeof orderResult === 'object') {
-      orderData = orderResult;
-    } else {
-      log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
-      return {
-        success: false,
-        error: 'Order not found or already processed'
-      };
-    }
-
-    // Check if RPC returned error result
-    if (orderData && orderData.success === false) {
-      log('error', '❌ RPC returned error', { reference, error: orderData.error });
-      return {
-        success: false,
-        error: orderData.error || 'Payment processing failed'
-      };
-    }
-
-    // Ensure we have required fields
-    if (!orderData || !orderData.order_id) {
-      log('error', '❌ Order data missing required fields', { reference, orderData });
-      return {
-        success: false,
-        error: 'Invalid order data returned'
-      };
-    }
     log('info', '✅ RPC operation successful', {
       reference,
-      order_id: orderData.order_id,
-      order_number: orderData.order_number
+      order_id: orderResult.order_id,
+      order_number: orderResult.order_number
     });
 
     // Update payment status and method explicitly (non-blocking)
@@ -568,7 +585,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       await supabase.from('orders').update({
         payment_status: 'paid',
         payment_method: 'Paystack'
-      }).eq('id', orderData.order_id);
+      }).eq('id', orderResult.order_id);
       
       log('info', '✅ Payment status and method updated (paid, Paystack)');
     } catch (paymentStatusError) {
@@ -582,12 +599,12 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       await supabase.from('payment_transactions').upsert({
         reference: reference,
         provider_reference: reference,
-        amount: paystackAmount || orderData.amount,
+        amount: paystackAmount || orderResult.amount,
         currency: paystackData.currency || 'NGN',
         status: 'completed',
         gateway_response: JSON.stringify(paystackData),
         verified_at: new Date().toISOString(),
-        order_id: orderData.order_id
+        order_id: orderResult.order_id
       }, {
         onConflict: 'reference'
       });
@@ -595,12 +612,12 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
     log('info', '✅ Payment transaction record updated');
 
     // P0 HOTFIX: Fetch customer_email if missing from RPC response
-    let customerEmail = orderData.customer_email;
-    let customerName = orderData.customer_name;
+    let customerEmail = orderResult.customer_email;
+    let customerName = orderResult.customer_name;
     
-    if (!customerEmail && orderData.order_id) {
+    if (!customerEmail && orderResult.order_id) {
       log('warn', '⚠️ Customer email missing from RPC, fetching from orders table', { 
-        order_id: orderData.order_id, 
+        order_id: orderResult.order_id, 
         reference 
       });
       
@@ -608,27 +625,27 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         const { data: orderDetails, error: fetchError } = await supabase
           .from('orders')
           .select('customer_email, customer_name')
-          .eq('id', orderData.order_id)
+          .eq('id', orderResult.order_id)
           .maybeSingle();
           
         if (!fetchError && orderDetails) {
           customerEmail = orderDetails.customer_email;
           customerName = orderDetails.customer_name || customerName;
           log('info', '✅ Customer email fetched successfully', { 
-            order_id: orderData.order_id, 
+            order_id: orderResult.order_id, 
             customer_email: customerEmail ? 'present' : 'still_missing',
             reference 
           });
         } else {
           log('warn', '⚠️ Could not fetch customer email from orders table', { 
-            order_id: orderData.order_id, 
+            order_id: orderResult.order_id, 
             error: fetchError?.message,
             reference 
           });
         }
       } catch (fetchException) {
         log('warn', '⚠️ Exception fetching customer email', { 
-          order_id: orderData.order_id, 
+          order_id: orderResult.order_id, 
           error: fetchException.message,
           reference 
         });
@@ -640,7 +657,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       // P0 HOTFIX: Only attempt email send if we have a valid recipient
       if (!customerEmail || typeof customerEmail !== 'string' || !customerEmail.includes('@')) {
         log('warn', '⚠️ No valid customer email - skipping immediate send, using queue fallback only', {
-          order_id: orderData.order_id,
+          order_id: orderResult.order_id,
           customer_email: customerEmail ? 'invalid_format' : 'missing',
           reference
         });
@@ -652,14 +669,14 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       const confirmationEmailResult = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: customerEmail,
-          subject: 'Payment Confirmation - Order ' + orderData.order_number,
+          subject: 'Payment Confirmation - Order ' + orderResult.order_number,
           templateKey: 'payment_confirmation',
           variables: {
             customerName: customerName || 'Valued Customer',
-            orderNumber: orderData.order_number,
-            amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+            orderNumber: orderResult.order_number,
+            amount: orderResult.amount?.toString() || paystackAmount?.toString() || '0',
             paymentMethod: 'Paystack',
-            orderType: orderData.order_type || 'order'
+            orderType: orderResult.order_type || 'order'
           }
         }
       });
@@ -670,8 +687,8 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
           error: confirmationEmailResult.error.message || 'Unknown error',
           httpStatus: confirmationEmailResult.status || 'unknown',
           responseBody: confirmationEmailResult.data || null,
-          order_id: orderData.order_id,
-          customer_email: orderData.customer_email,
+          order_id: orderResult.order_id,
+          customer_email: orderResult.customer_email,
           reference: reference
         };
         
@@ -681,27 +698,27 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         try {
           const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
             p_reference: reference,
-            p_order_id: orderData.order_id,
-            p_recipient_email: customerEmail || orderData.customer_email,
+            p_order_id: orderResult.order_id,
+            p_recipient_email: customerEmail || orderResult.customer_email,
             p_template_variables: {
               customerName: customerName || 'Valued Customer',
-              orderNumber: orderData.order_number,
-              amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+              orderNumber: orderResult.order_number,
+              amount: orderResult.amount?.toString() || paystackAmount?.toString() || '0',
               paymentMethod: 'Paystack',
-              orderType: orderData.order_type || 'order',
+              orderType: orderResult.order_type || 'order',
               fallback_reason: 'immediate_send_failed'
             }
           });
           
           if (rpcError) {
             log('warn', '⚠️ Idempotent email event creation failed', {
-              order_id: orderData.order_id,
+              order_id: orderResult.order_id,
               rpcError: rpcError.message,
               reference
             });
           } else {
             log('info', '✅ Payment confirmation queued for later delivery (idempotent)', {
-              order_id: orderData.order_id,
+              order_id: orderResult.order_id,
               event_id: eventId,
               fallback_used: true,
               reference
@@ -709,14 +726,14 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
           }
         } catch (queueError) {
           log('error', '❌ Failed to queue payment confirmation fallback via RPC', {
-            order_id: orderData.order_id,
+            order_id: orderResult.order_id,
             queueError: queueError.message,
             reference
           });
         }
       } else {
         log('info', '✅ Payment confirmation email sent immediately', {
-          order_id: orderData.order_id,
+          order_id: orderResult.order_id,
           customer_email: customerEmail,
           messageId: confirmationEmailResult.data?.messageId,
           provider: confirmationEmailResult.data?.provider,
@@ -727,7 +744,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       const errorDetails = {
         error: emailError.message,
         stack: emailError.stack,
-        order_id: orderData.order_id,
+        order_id: orderResult.order_id,
         customer_email: customerEmail,
         reference: reference
       };
@@ -738,28 +755,28 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       try {
         const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
           p_reference: reference,
-          p_order_id: orderData.order_id,
-          p_recipient_email: customerEmail || orderData.customer_email,
+          p_order_id: orderResult.order_id,
+          p_recipient_email: customerEmail || orderResult.customer_email,
           p_template_variables: {
             customerName: customerName || 'Valued Customer',
-            orderNumber: orderData.order_number,
-            amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+            orderNumber: orderResult.order_number,
+            amount: orderResult.amount?.toString() || paystackAmount?.toString() || '0',
             paymentMethod: 'Paystack',
-            orderType: orderData.order_type || 'order',
+            orderType: orderResult.order_type || 'order',
             fallback_reason: 'exception_during_send'
           }
         });
         
         if (rpcError) {
           log('error', '❌ Critical: Failed both immediate send and idempotent queue fallback', {
-            order_id: orderData.order_id,
+            order_id: orderResult.order_id,
             originalError: emailError.message,
             rpcError: rpcError.message,
             reference
           });
         } else {
           log('info', '✅ Payment confirmation queued after exception (idempotent)', {
-            order_id: orderData.order_id,
+            order_id: orderResult.order_id,
             event_id: eventId,
             fallback_used: true,
             reference
@@ -767,7 +784,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         }
       } catch (queueError) {
         log('error', '❌ Critical: Exception during idempotent queue fallback', {
-          order_id: orderData.order_id,
+          order_id: orderResult.order_id,
           originalError: emailError.message,
           queueError: queueError.message,
           reference
@@ -782,8 +799,8 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
 
     return {
       success: true,
-      order_id: orderData.order_id,
-      order_number: orderData.order_number
+      order_id: orderResult.order_id,
+      order_number: orderResult.order_number
     };
 
   } catch (error) {

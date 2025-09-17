@@ -10407,6 +10407,15 @@ export type Database = {
         Args: { p_assignment_id: string; p_notes?: string; p_status: string }
         Returns: Json
       }
+      update_order_status: {
+        Args: {
+          new_order_status: string
+          new_payment_status: string
+          order_id: string
+          payment_data?: Json
+        }
+        Returns: undefined
+      }
       update_order_with_payment_reference: {
         Args: {
           new_payment_reference: string

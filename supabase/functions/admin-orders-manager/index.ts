@@ -80,21 +80,43 @@ async function handleStatusChangeNotification(supabaseClient: any, orderId: stri
       try {
         console.log(`📧 Attempting email notification to ${order.customer_email}`)
         
+        // Create a unique dedupe_key to prevent duplicates
+        const templateKey = `order_${sanitizedStatus}`;
+        const dedupeKey = `${orderId}|order_status_update|${templateKey}|${order.customer_email}`;
+        
+        const communicationEvent = {
+          order_id: orderId,
+          event_type: 'order_status_update',
+          recipient_email: order.customer_email,
+          template_key: templateKey,
+          template_variables: {
+            customer_name: order.customer_name || 'Customer',
+            order_number: order.order_number,
+            status: sanitizedStatus,
+            status_display: sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            updated_at: new Date().toISOString()
+          },
+          variables: {
+            customer_name: order.customer_name || 'Customer',
+            order_number: order.order_number,
+            status: sanitizedStatus
+          },
+          status: 'queued',
+          dedupe_key: dedupeKey,
+          source: 'admin_update',
+          email_type: 'transactional',
+          priority: 'normal',
+          scheduled_at: new Date().toISOString()
+        };
+
+        // Use upsert to handle duplicates gracefully
         const { data: eventResult, error: emailError } = await supabaseClient
-          .rpc('upsert_communication_event_production', {
-            p_event_type: 'order_status_update',
-            p_recipient_email: order.customer_email,
-            p_template_key: `order_${sanitizedStatus}`,
-            p_template_variables: {
-              customer_name: order.customer_name || 'Customer',
-              order_number: order.order_number,
-              status: sanitizedStatus,
-              status_display: sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-              updated_at: new Date().toISOString()
-            },
-            p_order_id: orderId,
-            p_source: 'admin_update'
-          });
+          .from('communication_events')
+          .upsert(communicationEvent, { 
+            onConflict: 'dedupe_key',
+            ignoreDuplicates: false 
+          })
+          .select('id');
 
         if (emailError) {
           console.log(`⚠️ Email failed, trying SMS fallback: ${emailError.message}`)
@@ -116,10 +138,13 @@ async function handleStatusChangeNotification(supabaseClient: any, orderId: stri
         
         const smsMessage = `Hi ${order.customer_name || 'Customer'}! Your order ${order.order_number} status has been updated to: ${newStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}. Thank you for choosing us!`;
         
-        // Insert SMS communication event
+        // Create a unique dedupe_key for SMS to prevent duplicates
+        const smsDedupeKey = `${orderId}|order_status_update|sms|${order.customer_phone}`;
+        
+        // Insert SMS communication event with deduplication
         const { error: smsError } = await supabaseClient
           .from('communication_events')
-          .insert({
+          .upsert({
             event_type: 'order_status_update',
             channel: 'sms',
             sms_phone: order.customer_phone,
@@ -129,12 +154,21 @@ async function handleStatusChangeNotification(supabaseClient: any, orderId: stri
               status: newStatus,
               message: smsMessage
             },
+            variables: {
+              customer_name: order.customer_name || 'Customer',
+              order_number: order.order_number,
+              status: sanitizedStatus
+            },
             order_id: orderId,
             status: 'queued',
             priority: 'normal',
             source: 'admin_update_fallback',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            dedupe_key: smsDedupeKey,
+            email_type: 'transactional',
+            scheduled_at: new Date().toISOString()
+          }, { 
+            onConflict: 'dedupe_key',
+            ignoreDuplicates: false 
           });
         
         if (smsError) {

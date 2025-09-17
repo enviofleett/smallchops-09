@@ -418,12 +418,8 @@ Never use placeholder, test, or hashed values in production.
     };
   }
 
-  // Database Configuration (Development Fallback Only)  
-  if (isProduction) {
-    throw new Error('PRODUCTION MODE: Database fallback not allowed. Configure Function Secrets for production use.');
-  }
-  
-  console.log('📧 Falling back to database SMTP configuration (development mode)');
+  // Database Configuration (Primary Source - Production & Development)  
+  console.log('📧 Using database SMTP configuration as primary source');
   
   const { data: config } = await supabase
     .from('communication_settings')

@@ -249,11 +249,6 @@ function selectEmailSender(email: QueuedEmail): string {
   // All emails now use unified SMTP sender
   return 'unified-smtp-sender';
 }
-  return 'unified-smtp-sender';
-  
-  // All emails use unified SMTP sender
-  return 'unified-smtp-sender';
-}
 
 function isTransactionalEmail(templateKey: string): boolean {
   const transactionalTemplates = [

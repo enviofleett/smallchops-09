@@ -219,13 +219,13 @@ serve(async (req: Request) => {
     }
 
     // Call the RPC function with validated data
-    console.log('🔧 Calling update_order_status RPC with validated status:', orderStatus);
+    console.log('🔧 Calling update_order_status_safe RPC with validated status:', orderStatus);
     
-    const { data: rpcResult, error: rpcError } = await supabase.rpc('update_order_status', {
-      reference: data.reference,
-      status: orderStatus,
-      amount: data.amount || null,
-      gateway_response: data.gateway_response || null
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('update_order_status_safe', {
+      p_reference: data.reference,
+      p_status: orderStatus,
+      p_amount: data.amount || null,
+      p_customer_email: data.customer?.email || null
     });
 
     if (rpcError) {

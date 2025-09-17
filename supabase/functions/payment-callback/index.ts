@@ -1,7 +1,58 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getCorsHeaders } from '../_shared/cors.ts';
 import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts';
+
+// ENHANCED CORS HANDLING for production
+const getCorsHeaders = (req: Request) => {
+  const origin = req.headers.get('origin');
+  const referer = req.headers.get('referer');
+  
+  // Define allowed origins for your production environment
+  const allowedOrigins = [
+    'https://startersmallchops.com',
+    'https://www.startersmallchops.com',
+    'https://startersmallchops.lovableproject.com',
+    'https://startersmallchops.lovable.app',
+    'https://checkout.paystack.com',
+    'https://api.paystack.co',
+    'https://js.paystack.co',
+    'http://localhost:3000', // Remove in production
+    'http://localhost:5173', // Remove in production
+  ];
+
+  let corsOrigin = '*'; // Default for webhooks
+
+  // For requests with origin, validate against allowed list
+  if (origin) {
+    if (allowedOrigins.includes(origin)) {
+      corsOrigin = origin;
+    } else {
+      console.log(`🔒 Origin not in allowed list: ${origin}`);
+    }
+  } else if (referer) {
+    // Fallback to referer domain
+    try {
+      const refererUrl = new URL(referer);
+      const refererOrigin = `${refererUrl.protocol}//${refererUrl.host}`;
+      if (allowedOrigins.includes(refererOrigin)) {
+        corsOrigin = refererOrigin;
+      }
+    } catch (error) {
+      console.warn('⚠️ Invalid referer URL:', referer);
+    }
+  } else {
+    // No origin/referer - this is normal for webhooks
+    console.log('ℹ️ No origin header - webhook or server-to-server call (normal)');
+  }
+
+  return {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Max-Age': '86400', // Cache preflight for 24 hours
+    'Vary': 'Origin', // Important for caching
+  };
+};
 
 const VERSION = "v2025-09-17-production-ready-bulletproof";
 

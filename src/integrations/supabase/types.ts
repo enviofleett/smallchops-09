@@ -10162,6 +10162,15 @@ export type Database = {
         }
         Returns: string
       }
+      log_order_status_change_with_email: {
+        Args: {
+          p_changed_by: string
+          p_new_status: string
+          p_old_status: string
+          p_order_id: string
+        }
+        Returns: undefined
+      }
       log_payment_access: {
         Args: {
           p_access_reason?: string

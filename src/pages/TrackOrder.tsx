@@ -11,6 +11,7 @@ import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 import { DeliveryScheduleCard } from '@/components/orders/DeliveryScheduleCard';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { useQuery } from '@tanstack/react-query';
+import { ProductionTrackingWrapper } from '@/components/tracking/ProductionTrackingWrapper';
 import { 
   Search, 
   Package, 
@@ -20,7 +21,9 @@ import {
   MapPin,
   Phone,
   User,
-  Navigation
+  Navigation,
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -30,13 +33,21 @@ export default function TrackOrder() {
   const [searchValue, setSearchValue] = useState('');
   const { tracking, loading, error, trackOrder } = useDeliveryTracking();
 
-  // Auto-populate search field from URL parameters
+  // Auto-populate search field from URL parameters with production safety
   useEffect(() => {
     const orderFromUrl = searchParams.get('order') || searchParams.get('id') || searchParams.get('reference');
-    if (orderFromUrl && !searchValue) {
-      setSearchValue(orderFromUrl);
-      setOrderIdentifier(orderFromUrl);
-      trackOrder(orderFromUrl);
+    
+    if (orderFromUrl && orderFromUrl.trim() && !searchValue) {
+      const cleanOrderId = orderFromUrl.trim();
+      console.log(`🔗 [TRACK-PAGE] Auto-tracking from URL parameter: ${cleanOrderId}`);
+      
+      setSearchValue(cleanOrderId);
+      setOrderIdentifier(cleanOrderId);
+      
+      // Small delay to ensure component is fully mounted
+      setTimeout(() => {
+        trackOrder(cleanOrderId);
+      }, 100);
     }
   }, [searchParams, trackOrder, searchValue]);
 
@@ -49,10 +60,20 @@ export default function TrackOrder() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchValue.trim()) {
-      setOrderIdentifier(searchValue.trim());
-      trackOrder(searchValue.trim());
+    const cleanValue = searchValue.trim();
+    
+    if (!cleanValue) {
+      return;
     }
+
+    // Basic validation
+    if (cleanValue.length < 3) {
+      return;
+    }
+
+    console.log(`🔍 [TRACK-PAGE] Manual search initiated: ${cleanValue}`);
+    setOrderIdentifier(cleanValue);
+    trackOrder(cleanValue);
   };
 
   const getStatusIcon = (status: string) => {
@@ -84,10 +105,12 @@ export default function TrackOrder() {
   };
 
   return (
-    <>
+    <ProductionTrackingWrapper>
       <Helmet>
         <title>Track Your Order - Real-time Delivery Updates</title>
         <meta name="description" content="Track your order in real-time. Get live updates on your delivery status, estimated arrival time, and rider information." />
+        <meta name="keywords" content="order tracking, delivery status, real-time updates, order status" />
+        <link rel="canonical" href="/track-order" />
       </Helmet>
 
       <PublicHeader />
@@ -131,9 +154,26 @@ export default function TrackOrder() {
             <Card className="mb-8 border-red-200 bg-red-50">
               <CardContent className="pt-6">
                 <div className="text-center text-red-700">
-                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <AlertCircle className="w-8 h-8 mx-auto mb-2 text-red-500" />
                   <p className="font-medium">{error}</p>
-                  <p className="text-sm mt-1">Please check your order number and try again</p>
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm">Double-check your order number or try:</p>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center items-center text-sm">
+                      <span>• Order number (e.g., ORD-12345)</span>
+                      <span>• Order ID (e.g., a1b2c3d4...)</span>
+                    </div>
+                    <div className="mt-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => window.open('/contact', '_blank')}
+                        className="border-red-300 text-red-700 hover:bg-red-100"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Need Help? Contact Support
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -315,6 +355,6 @@ export default function TrackOrder() {
           )}
         </div>
       </main>
-    </>
+    </ProductionTrackingWrapper>
   );
 }

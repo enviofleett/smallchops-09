@@ -29,6 +29,7 @@ import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
 import { useDebounce } from '@/hooks/useDebounce';
 import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFilter';
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
@@ -39,6 +40,7 @@ import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useEnhancedOrderScheduleRecovery } from '@/hooks/useEnhancedOrderScheduleRecovery';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBoundary';
+import ProductionOrderErrorBoundary from '@/components/admin/ProductionOrderErrorBoundary';
 import OrderErrorBoundary from '@/components/orders/OrderErrorBoundary';
 
 function AdminOrdersContent() {
@@ -886,7 +888,11 @@ function AdminOrdersContent() {
                   {filteredOrders.map(order => (
                     <div key={order.id} className="flex items-center gap-2">
                       <div onClick={() => handleOrderClick(order)} className="flex-1 cursor-pointer transition-transform hover:scale-[1.01]">
-                        <AdminOrderCard order={order} deliverySchedule={deliverySchedules[order.id]} />
+                        <EnhancedOrderCard 
+                          order={order} 
+                          deliverySchedule={deliverySchedules[order.id]} 
+                          onOrderSelect={handleOrderClick}
+                        />
                       </div>
                       {/* Print Receipt Button */}
                       {order.payment_status === 'paid' && (
@@ -987,34 +993,8 @@ function AdminOrderCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Status update mutation
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ orderId, newStatus }: { orderId: string; newStatus: OrderStatus }) => {
-      const { data, error } = await supabase
-        .from('orders')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', orderId)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
-      toast({
-        title: "Status Updated",
-        description: "Order status has been updated successfully.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update Failed",
-        description: error.message || "Failed to update order status.",
-        variant: "destructive",
-      });
-    }
-  });
+  // PRODUCTION-SAFE: Use centralized status update hook
+  const { updateStatus, isUpdating } = useProductionStatusUpdate();
 
   // Out-for-delivery email mutation
   const sendDeliveryEmailMutation = useMutation({
@@ -1043,7 +1023,7 @@ function AdminOrderCard({
   });
 
   const handleStatusUpdate = (newStatus: OrderStatus) => {
-    updateStatusMutation.mutate({ orderId: order.id, newStatus });
+    updateStatus({ orderId: order.id, status: newStatus });
   };
 
   const handleSendDeliveryEmail = () => {
@@ -1121,9 +1101,9 @@ function AdminOrderCard({
                   e.stopPropagation();
                   handleStatusUpdate('preparing');
                 }}
-                disabled={updateStatusMutation.isPending}
+                 disabled={isUpdating}
               >
-                {updateStatusMutation.isPending ? (
+                {isUpdating ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
                 ) : (
                   'Start Preparing'
@@ -1139,7 +1119,7 @@ function AdminOrderCard({
                     e.stopPropagation();
                     handleStatusUpdate('ready');
                   }}
-                  disabled={updateStatusMutation.isPending}
+                   disabled={isUpdating}
                 >
                   Mark Ready
                 </Button>
@@ -1189,7 +1169,7 @@ function AdminOrderCard({
                   e.stopPropagation();
                   handleStatusUpdate('delivered');
                 }}
-                disabled={updateStatusMutation.isPending}
+                disabled={isUpdating}
               >
                 Mark Delivered
               </Button>
@@ -1325,13 +1305,10 @@ function AdminOrderCard({
     );
 }
 
-// Wrap the main component in ProductionErrorBoundary for live production safety
 export default function AdminOrders() {
   return (
-    <OrderErrorBoundary context="Admin Orders">
-      <ProductionErrorBoundary>
-        <AdminOrdersContent />
-      </ProductionErrorBoundary>
-    </OrderErrorBoundary>
+    <ProductionOrderErrorBoundary>
+      <AdminOrdersContent />
+    </ProductionOrderErrorBoundary>
   );
 }

@@ -243,11 +243,8 @@ serve(async (req) => {
 
     console.log("💰 Order details:", order);
 
-    // ✅ Build payment callback URL
-    const callbackUrl = `${SUPABASE_URL}/functions/v1/payment-callback?order_id=${order.id}`;
-    console.log("🔗 Payment callback URL:", callbackUrl);
-
     // ✅ Initialize payment with service role for internal authorization
+    // Let paystack-secure handle callback URL construction to avoid duplication
     console.log("💳 Initializing payment via paystack-secure...");
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
       headers: {
@@ -267,8 +264,7 @@ serve(async (req) => {
           delivery_fee: deliveryFee,
           client_total: order.total_amount,
           authoritative_total: order.total_amount,
-        },
-        callback_url: callbackUrl,
+        }
       },
     });
 

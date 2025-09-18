@@ -249,7 +249,8 @@ async function initializePayment({
       .select('website_url')
       .single()
 
-    const frontendUrl = businessSettings?.website_url || 'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.sandbox.lovable.dev'
+    // Use production frontend URL
+    const frontendUrl = businessSettings?.website_url || 'https://startersmallchops.com'
 
     // Order already fetched above for authorization
 
@@ -362,7 +363,7 @@ async function initializePayment({
       amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: finalReference,
-      callback_url: callback_url || frontendCallbackUrl,
+      callback_url: frontendCallbackUrl,
       channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
       metadata: {
         order_id: orderId,

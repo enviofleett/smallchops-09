@@ -16,6 +16,7 @@ import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
+import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
 import { cn } from '@/lib/utils';
 
 // Import our new components
@@ -51,6 +52,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
   // Print ref for react-to-print
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Job order print hook
+  const { printJobOrder } = useJobOrderPrint();
 
   // Use detailed order data to get product features and full information
   const {
@@ -308,7 +312,15 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     });
   };
 
-  // Safe print handler using react-to-print
+  // Job order print handler
+  const handleJobOrderPrint = () => {
+    const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
+    const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
+    
+    printJobOrder(order, items, schedule, pickupPoint);
+  };
+
+  // Safe print handler using react-to-print (for detailed receipt)
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Order-${order.order_number}`,
@@ -349,9 +361,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             
             
-            <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2" aria-label="Print order details">
+            <Button onClick={handleJobOrderPrint} variant="outline" size="sm" className="gap-2" aria-label="Print job order">
               <Printer className="h-4 w-4" />
-              <span className="hidden sm:inline">Print</span>
+              <span className="hidden sm:inline">Print Job Order</span>
             </Button>
             
           </div>

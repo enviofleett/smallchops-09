@@ -487,22 +487,23 @@ serve(async (req)=>{
         }
         // Background notification for status change - trigger instant processing
         if (sanitizedUpdates.status && sanitizedUpdates.status !== currentOrder.status) {
-          // Queue notifications
-          const notificationPromise = handleStatusChangeNotification(supabaseClient, orderId, currentOrder, sanitizedUpdates.status);
-          
-          // Process notifications instantly
-          const processingPromise = supabaseClient.functions.invoke('instant-email-processor', {
-            body: { priority: 'high', limit: 5 }
-          }).then(result => {
-            console.log('📧 Instant email processing result:', result.data);
-          }).catch(error => {
-            console.error('⚠️ Instant email processing failed (non-blocking):', error);
-          });
-
-          // Both promises are fire-and-forget
-          Promise.all([notificationPromise, processingPromise]).catch((error) => {
-            console.error('⚠️ Background notification pipeline failed (non-blocking):', error);
-          });
+          try {
+            // Queue notifications (fire-and-forget)
+            handleStatusChangeNotification(supabaseClient, orderId, currentOrder, sanitizedUpdates.status).catch(error => {
+              console.error('⚠️ Notification queuing failed (non-blocking):', error);
+            });
+            
+            // Process notifications instantly (fire-and-forget)
+            supabaseClient.functions.invoke('instant-email-processor', {
+              body: { priority: 'high', limit: 5 }
+            }).then(result => {
+              console.log('📧 Instant email processing result:', result.data);
+            }).catch(error => {
+              console.error('⚠️ Instant email processing failed (non-blocking):', error);
+            });
+          } catch (error) {
+            console.error('⚠️ Background notification setup failed (non-blocking):', error);
+          }
         }
         return new Response(JSON.stringify({
           success: true,

@@ -9323,6 +9323,20 @@ export type Database = {
         }
         Returns: string
       }
+      create_communication_event: {
+        Args: {
+          p_channel: string
+          p_dedupe_key: string
+          p_event_type: string
+          p_order_id: string
+          p_payload?: Json
+          p_recipient_email: string
+          p_sms_phone: string
+          p_status?: string
+          p_template_key: string
+        }
+        Returns: undefined
+      }
       create_customer_account_secure: {
         Args: {
           p_email: string

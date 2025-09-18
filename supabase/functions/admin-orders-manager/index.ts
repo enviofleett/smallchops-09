@@ -65,7 +65,8 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
       return;
     }
     const sanitizedStatus = newStatus.trim();
-    const dedupeKey = `${orderId}_${sanitizedStatus}_order_status_update`;
+    // ENHANCED: Collision-resistant dedupe key with timestamp and random component
+    const dedupeKey = `${orderId}_${sanitizedStatus}_order_status_update_${Date.now()}_${Math.floor(Math.random()*10000)}`;
 
     let notificationInserted = false;
     if (order.customer_email) {
@@ -87,6 +88,8 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
           order_number: order.order_number,
           status: sanitizedStatus,
           status_display: sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l=>l.toUpperCase()),
+          total_amount: order.total_amount?.toLocaleString() || '0',
+          order_date: new Date(order.order_time || new Date()).toLocaleDateString(),
           updated_at: new Date().toISOString()
         };
 

@@ -70,7 +70,26 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
     let notificationInserted = false;
     if (order.customer_email) {
       // Try upsert (preferred) or fallback to insert-if-not-exists
-      try {
+        try {
+        // Map status to proper template key
+        const templateKeyMap = {
+          'confirmed': 'order_confirmed',
+          'preparing': 'order_preparing', 
+          'ready': 'order_ready',
+          'out_for_delivery': 'order_out_for_delivery',
+          'delivered': 'order_delivered',
+          'cancelled': 'order_cancelled'
+        };
+        const templateKey = templateKeyMap[sanitizedStatus] || 'order_status_update';
+        
+        const templateVars = {
+          customer_name: order.customer_name || 'Customer',
+          order_number: order.order_number,
+          status: sanitizedStatus,
+          status_display: sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l=>l.toUpperCase()),
+          updated_at: new Date().toISOString()
+        };
+
         const { error: upsertError } = await supabaseClient
           .from('communication_events')
           .upsert([{
@@ -80,15 +99,10 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
             recipient_email: order.customer_email,
             order_id: orderId,
             status: 'queued',
-            template_key: `order_${sanitizedStatus}`,
-            template_variables: {
-              customer_name: order.customer_name || 'Customer',
-              order_number: order.order_number,
-              status: sanitizedStatus,
-              status_display: sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l=>l.toUpperCase()),
-              updated_at: new Date().toISOString()
-            },
+            template_key: templateKey,
+            template_variables: templateVars,
             source: 'admin_update',
+            priority: 'high',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }], { onConflict: 'dedupe_key' });
@@ -112,21 +126,23 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
     if (!notificationInserted && order.customer_phone) {
       // SMS Fallback: insert-if-not-exists using dedupe key
       try {
+        const smsTemplateVars = {
+          customer_name: order.customer_name || 'Customer',
+          order_number: order.order_number,
+          status: sanitizedStatus,
+          message: `Hi ${order.customer_name || 'Customer'}! Your order ${order.order_number} status has been updated to: ${sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l=>l.toUpperCase())}. Thank you for choosing us!`
+        };
+
         const { error: smsInsertError } = await supabaseClient.from('communication_events').upsert([{
-          dedupe_key: dedupeKey,
+          dedupe_key: `${dedupeKey}_sms`,
           event_type: 'order_status_update',
           channel: 'sms',
           sms_phone: order.customer_phone,
-          template_variables: {
-            customer_name: order.customer_name || 'Customer',
-            order_number: order.order_number,
-            status: sanitizedStatus,
-            message: `Hi ${order.customer_name || 'Customer'}! Your order ${order.order_number} status has been updated to: ${sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l=>l.toUpperCase())}. Thank you for choosing us!`
-          },
+          template_variables: smsTemplateVars,
           order_id: orderId,
           status: 'queued',
-          priority: 'normal',
-          source: 'admin_update_fallback',
+          priority: 'high',
+          source: 'admin_update_sms',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }], { onConflict: 'dedupe_key' });

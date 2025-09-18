@@ -8969,6 +8969,10 @@ export type Database = {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
+      admin_update_order_status_bulletproof: {
+        Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
       admin_update_order_status_production: {
         Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
         Returns: Json
@@ -9273,6 +9277,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_old_communication_events: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       cleanup_old_email_events: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -9476,6 +9484,15 @@ export type Database = {
       fix_user_linking: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      generate_atomic_dedupe_key: {
+        Args: {
+          p_event_type: string
+          p_order_id: string
+          p_recipient_email: string
+          p_template_key: string
+        }
+        Returns: string
       }
       generate_dedupe_key: {
         Args: {
@@ -10345,6 +10362,16 @@ export type Database = {
       }
       production_go_live_cleanup: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      queue_communication_event_nonblocking: {
+        Args: {
+          p_event_type: string
+          p_order_id: string
+          p_recipient_email: string
+          p_template_key: string
+          p_template_variables?: Json
+        }
         Returns: Json
       }
       reassign_order_rider: {

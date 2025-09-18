@@ -9728,24 +9728,7 @@ export type Database = {
       }
       get_detailed_order_with_products: {
         Args: { p_order_id: string }
-        Returns: {
-          created_at: string
-          customer_email: string
-          customer_name: string
-          customer_phone: string
-          delivery_address: Json
-          delivery_zones: Json
-          id: string
-          order_delivery_schedule: Json
-          order_items: Json
-          order_number: string
-          order_time: string
-          order_type: string
-          payment_status: string
-          status: string
-          total_amount: number
-          updated_at: string
-        }[]
+        Returns: Json
       }
       get_email_health_status: {
         Args: Record<PropertyKey, never>

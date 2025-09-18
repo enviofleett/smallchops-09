@@ -58,22 +58,22 @@ async function verifyWebhookSignature(body: string, signature: string): Promise<
   }
 
   try {
-    // 🔍 PRODUCTION FIX: Handle signature format (remove sha256= prefix if present)
-    const cleanSignature = signature.replace(/^sha256=/, '').trim();
+    // 🔍 PRODUCTION FIX: Handle signature format (remove sha512= prefix if present)
+    const cleanSignature = signature.replace(/^sha512=/, '').trim();
     console.log('🔐 Signature processing:', {
       originalLength: signature.length,
       cleanedLength: cleanSignature.length,
-      hasPrefix: signature.startsWith('sha256='),
+      hasPrefix: signature.startsWith('sha512='),
       bodyLength: body.length
     });
 
     const encoder = new TextEncoder();
     
-    // 🔍 PRODUCTION FIX: Use SHA-256 (Paystack standard) instead of SHA-512
+    // 🔍 PRODUCTION FIX: Use SHA-512 (Paystack standard) - reverted from SHA-256
     const key = await crypto.subtle.importKey(
       'raw',
       encoder.encode(webhookSecret),
-      { name: 'HMAC', hash: 'SHA-256' },  // ✅ FIXED: Changed from SHA-512 to SHA-256
+      { name: 'HMAC', hash: 'SHA-512' },  // ✅ FIXED: Reverted to SHA-512 (128-char signatures)
       false,
       ['sign']
     );
@@ -98,17 +98,17 @@ async function verifyWebhookSignature(body: string, signature: string): Promise<
         receivedLength: cleanSignature.length,
         expectedLength: expectedHex.length,
         bodyLength: body.length,
-        algorithm: 'SHA-256'
+        algorithm: 'SHA-512'
       });
     } else {
-      console.log('✅ Webhook signature verified successfully (SHA-256)');
+      console.log('✅ Webhook signature verified successfully (SHA-512)');
     }
 
     return isValid;
   } catch (error) {
     console.error('❌ Signature verification error:', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      algorithm: 'SHA-256',
+      algorithm: 'SHA-512',
       signatureLength: signature?.length || 0,
       bodyLength: body?.length || 0
     });

@@ -58,10 +58,10 @@ serve(async (req) => {
     }
 
     if (paystackSignature) {
-      const crypto = new TextEncoder().encode(webhookSecret);
+      const secretBytes = new TextEncoder().encode(webhookSecret);
       const key = await crypto.subtle.importKey(
         'raw',
-        crypto,
+        secretBytes,
         { name: 'HMAC', hash: 'SHA-512' },
         false,
         ['sign']

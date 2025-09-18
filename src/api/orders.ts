@@ -193,9 +193,41 @@ export const updateOrder = async (
       });
 
       if (assignmentError || !assignmentResult?.success) {
-        const errorMsg = assignmentResult?.error || assignmentError?.message || 'Failed to assign rider';
+        // Enhanced error handling with structured error response
+        let errorMsg = 'Failed to assign rider';
+        
+        if (assignmentResult?.errorCode) {
+          switch (assignmentResult.errorCode) {
+            case 'RIDER_NOT_FOUND':
+              const availableRiders = assignmentResult.context?.availableRiders || [];
+              errorMsg = `Rider not found. ${availableRiders.length > 0 ? 'Available riders: ' + availableRiders.map(r => r.name).join(', ') : 'No active riders available.'}`;
+              break;
+            case 'RIDER_INACTIVE':
+              const riderName = assignmentResult.context?.riderName || 'Selected rider';
+              errorMsg = `${riderName} is currently inactive. Please select an active rider.`;
+              break;
+            case 'START_DELIVERY_FAILED':
+            case 'REASSIGN_RIDER_FAILED':
+              errorMsg = `${assignmentResult.error || 'Database operation failed'}`;
+              break;
+            case 'INVALID_ORDER_STATUS':
+              const currentStatus = assignmentResult.context?.currentStatus;
+              const validStatuses = assignmentResult.context?.validStatuses?.join(', ') || 'confirmed, preparing, ready, out_for_delivery';
+              errorMsg = `Cannot assign rider to order with status "${currentStatus}". Valid statuses: ${validStatuses}`;
+              break;
+            default:
+              errorMsg = assignmentResult.error || 'Unknown assignment error';
+          }
+        } else {
+          errorMsg = assignmentResult?.error || assignmentError?.message || 'Failed to assign rider';
+        }
+        
         if (process.env.NODE_ENV === 'development') {
-          console.error('❌ Rider assignment failed:', errorMsg);
+          console.error('❌ Rider assignment failed:', {
+            errorCode: assignmentResult?.errorCode,
+            error: errorMsg,
+            context: assignmentResult?.context
+          });
         }
         throw new Error(errorMsg);
       }

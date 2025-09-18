@@ -746,16 +746,38 @@ serve(async (req)=>{
 
       case 'update': {
         console.log('Admin function: Updating order', orderId, 'with updates:', JSON.stringify(updates));
-        const { data: currentOrder, error: fetchError } = await supabaseClient.from('orders').select('status, customer_email, customer_name, order_number').eq('id', orderId).single();
+        
+        // PRODUCTION FIX: Use maybeSingle() to prevent errors when no records found
+        const { data: currentOrder, error: fetchError } = await supabaseClient
+          .from('orders')
+          .select('status, customer_email, customer_name, order_number')
+          .eq('id', orderId)
+          .maybeSingle();
+          
         if (fetchError) {
+          console.error('❌ Failed to fetch current order:', { orderId, error: fetchError.message });
           return new Response(JSON.stringify({
             success: false,
-            error: fetchError.message
+            error: `Failed to fetch order: ${fetchError.message}`,
+            errorCode: 'ORDER_FETCH_FAILED'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
           });
         }
+
+        if (!currentOrder) {
+          console.error('❌ Order not found:', { orderId });
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Order not found: ${orderId}`,
+            errorCode: 'ORDER_NOT_FOUND'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404
+          });
+        }
+
         const allowedColumns = [
           'status', 'customer_name', 'customer_phone', 'customer_email', 'delivery_address',
           'delivery_instructions', 'order_notes', 'assigned_rider_id', 'payment_status',
@@ -766,6 +788,7 @@ serve(async (req)=>{
           'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery',
           'delivered', 'cancelled', 'refunded', 'completed', 'returned'
         ];
+        
         const sanitizedUpdates = {};
         if (updates && typeof updates === 'object') {
           for (const [key, value] of Object.entries(updates)){
@@ -773,7 +796,8 @@ serve(async (req)=>{
               if (value === null || value === 'null' || value === '' || value === undefined || typeof value !== 'string') {
                 return new Response(JSON.stringify({
                   success: false,
-                  error: 'Status cannot be null, undefined, empty, or non-string value'
+                  error: 'Status cannot be null, undefined, empty, or non-string value',
+                  errorCode: 'INVALID_STATUS_VALUE'
                 }), {
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                   status: 400
@@ -783,7 +807,8 @@ serve(async (req)=>{
               if (!trimmedStatus || !validStatuses.includes(trimmedStatus)) {
                 return new Response(JSON.stringify({
                   success: false,
-                  error: `Invalid status value: "${value}". Valid values are: ${validStatuses.join(', ')}`
+                  error: `Invalid status value: "${value}". Valid values are: ${validStatuses.join(', ')}`,
+                  errorCode: 'INVALID_STATUS_VALUE'
                 }), {
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                   status: 400
@@ -799,32 +824,91 @@ serve(async (req)=>{
         }
         sanitizedUpdates.updated_at = new Date().toISOString();
 
-        const { data, error } = await supabaseClient.from('orders').update(sanitizedUpdates)
-          .eq('id', orderId)
-          .select(`
-            *,
-            order_items (*),
-            delivery_zones (id, name, base_fee, is_active),
-            order_delivery_schedule (*)
-          `).single();
-        if (error) {
+        // PRODUCTION FIX: Split complex query into two operations for reliability
+        let updatedOrder, orderError;
+        
+        try {
+          // Step 1: Simple update operation
+          const { data: basicOrder, error: updateError } = await supabaseClient
+            .from('orders')
+            .update(sanitizedUpdates)
+            .eq('id', orderId)
+            .select('*')
+            .maybeSingle();
+
+          if (updateError) {
+            console.error('❌ Order update failed:', { orderId, error: updateError.message });
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Order update failed: ${updateError.message}`,
+              errorCode: 'ORDER_UPDATE_FAILED'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500
+            });
+          }
+
+          if (!basicOrder) {
+            console.error('❌ Order not found after update:', { orderId });
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Order not found after update: ${orderId}`,
+              errorCode: 'ORDER_NOT_FOUND_AFTER_UPDATE'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 404
+            });
+          }
+
+          // Step 2: Fetch relations separately with NULL-safe LEFT JOINs
+          const { data: orderWithRelations, error: fetchRelationsError } = await supabaseClient
+            .from('orders')
+            .select(`
+              *,
+              order_items (*),
+              delivery_zones!left (id, name, base_fee, is_active),
+              order_delivery_schedule!left (*)
+            `)
+            .eq('id', orderId)
+            .maybeSingle();
+
+          // Use fallback if relations fetch fails
+          if (fetchRelationsError) {
+            console.warn('⚠️ Failed to fetch order relations, using basic order:', { 
+              orderId, 
+              error: fetchRelationsError.message 
+            });
+            updatedOrder = basicOrder;
+          } else {
+            updatedOrder = orderWithRelations || basicOrder;
+          }
+
+        } catch (error) {
+          console.error('❌ Critical error during order update:', { 
+            orderId, 
+            error: error.message,
+            stack: error.stack 
+          });
+          
           return new Response(JSON.stringify({
             success: false,
-            error: error.message
+            error: `Database operation failed: ${error.message}`,
+            errorCode: 'DATABASE_OPERATION_FAILED'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
           });
         }
+        
         // Background notification for status change - trigger instant processing
         if (sanitizedUpdates.status && sanitizedUpdates.status !== currentOrder.status) {
           try {
-            // Queue notifications (fire-and-forget)
+            // Queue notifications (fire-and-forget with enhanced error handling)
             handleStatusChangeNotification(supabaseClient, orderId, currentOrder, sanitizedUpdates.status).catch(error => {
               console.error('⚠️ Notification queuing failed (non-blocking):', error);
             });
             
-            // Process notifications instantly (fire-and-forget)
+            // Process notifications instantly (fire-and-forget with enhanced error handling)
             supabaseClient.functions.invoke('instant-email-processor', {
               body: { priority: 'high', limit: 5 }
             }).then(result => {
@@ -836,9 +920,17 @@ serve(async (req)=>{
             console.error('⚠️ Background notification setup failed (non-blocking):', error);
           }
         }
+
+        console.log('✅ Order update completed successfully:', { 
+          orderId, 
+          statusChanged: sanitizedUpdates.status !== currentOrder.status,
+          newStatus: sanitizedUpdates.status 
+        });
+
         return new Response(JSON.stringify({
           success: true,
-          order: data
+          order: updatedOrder,
+          message: 'Order updated successfully'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

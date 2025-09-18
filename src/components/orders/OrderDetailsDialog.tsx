@@ -27,6 +27,7 @@ import { ActionsPanel } from './details/ActionsPanel';
 import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
+import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -394,6 +395,21 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               </h2>
               <OrderInfoCard orderNumber={safeFallback(order.order_number)} orderTime={order.order_time} orderType={order.order_type as 'delivery' | 'pickup'} status={order.status} paymentStatus={order.payment_status} paymentReference={safeFallback(order.payment_reference)} totalAmount={order.total_amount} deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule} isLoadingSchedule={isLoadingDetails || isLoadingSchedule} onRecoveryAttempt={() => attemptScheduleRecovery(order.id)} recoveryPending={isRecovering} recoveryError={!!detailsError} recoveryStatus={recoveryStatus} />
             </section>
+
+            {/* Delivery Schedule Section - Show all delivery_schedule data */}
+            {(detailedOrderData?.delivery_schedule || deliverySchedule) && (
+              <section aria-labelledby="delivery-schedule-heading" className={cn("print:break-inside-avoid print:mb-6")}>
+                <h2 id="delivery-schedule-heading" className={cn("text-lg font-semibold text-foreground mb-4", "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2")}>
+                  {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Schedule
+                </h2>
+                <DeliveryScheduleDisplay 
+                  schedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+                  orderType={order.order_type as 'delivery' | 'pickup'}
+                  orderStatus={order.status}
+                  className="mb-0"
+                />
+              </section>
+            )}
 
             <section aria-labelledby="payment-details-heading" className={cn("print:break-inside-avoid print:mb-6")}>
               <h2 id="payment-details-heading" className={cn("text-lg font-semibold text-foreground mb-4", "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2")}>

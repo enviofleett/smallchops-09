@@ -216,38 +216,21 @@ export const SMSProductionStatus = () => {
         body: { action: 'check_balance' }
       });
 
-      if (error) {
-        console.error('SMS balance check error:', error);
-        return { status: 'fail', message: `Balance check failed: ${error.message}` };
+      if (error || !data?.success) {
+        return { status: 'warn', message: 'Unable to retrieve account balance' };
       }
 
-      if (!data?.success) {
-        console.error('SMS balance check unsuccessful:', data);
-        return { status: 'fail', message: data?.error || 'Balance check unsuccessful' };
-      }
-
-      // Parse balance from MySMSTab API response - handle different formats
-      let balance = 0;
-      if (typeof data.balance === 'number') {
-        balance = data.balance;
-      } else if (typeof data.credits === 'number') {
-        balance = data.credits;
-      } else if (typeof data.balance === 'string') {
-        balance = parseFloat(data.balance) || 0;
-      } else if (data.data && typeof data.data.balance === 'number') {
-        balance = data.data.balance;
-      }
+      const balance = data.balance || data.credits || 0;
       
       if (balance <= 0) {
-        return { status: 'fail', message: 'Account balance is empty (₦0) - Top up required' };
+        return { status: 'fail', message: 'Account balance is empty (₦0)' };
       } else if (balance < 50) {
-        return { status: 'warn', message: `Low balance: ₦${balance.toLocaleString()} - Consider topping up` };
+        return { status: 'warn', message: `Low balance: ₦${balance.toLocaleString()}` };
       } else {
-        return { status: 'pass', message: `Live balance: ₦${balance.toLocaleString()} - MySMSTab Account` };
+        return { status: 'pass', message: `Good balance: ₦${balance.toLocaleString()}` };
       }
     } catch (error) {
-      console.error('Balance check network error:', error);
-      return { status: 'fail', message: 'Network error checking live balance' };
+      return { status: 'warn', message: 'Balance check unavailable' };
     }
   };
 

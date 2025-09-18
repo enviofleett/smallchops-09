@@ -180,7 +180,7 @@ async function handleListOrders(supabase: any, params: any) {
           products (id, name, price, image_url)
         ),
         delivery_zones (
-          id, name, delivery_fee, estimated_delivery_time
+          id, name, base_fee, description
         ),
         order_delivery_schedule (
           delivery_date, delivery_time_start, delivery_time_end,
@@ -231,7 +231,7 @@ async function handleListOrders(supabase: any, params: any) {
             products (id, name, price, image_url)
           ),
           delivery_zones (
-            id, name, delivery_fee, estimated_delivery_time
+            id, name, base_fee, description
           )
         `, { count: 'exact' })
         .order('created_at', { ascending: false });

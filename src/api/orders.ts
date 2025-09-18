@@ -90,7 +90,7 @@ export const getOrders = async ({
     }
 
     const { data: fallbackData, error: fallbackError, count } = await query
-      .order('order_time', { ascending: false })
+      .order('created_at', { ascending: false })
       .range(from, to);
 
     // If query with delivery zones fails, try without them and manually fetch
@@ -115,7 +115,7 @@ export const getOrders = async ({
       }
 
       const { data: noZoneData, error: noZoneError, count: noZoneCount } = await fallbackQuery
-        .order('order_time', { ascending: false })
+        .order('created_at', { ascending: false })
         .range(from, to);
 
       if (noZoneError) {

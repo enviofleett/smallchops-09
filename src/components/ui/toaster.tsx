@@ -20,7 +20,7 @@ export function Toaster() {
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
                 <ToastDescription>
-                  {description}
+                  {typeof description === 'string' ? description : String(description || '')}
                 </ToastDescription>
               )}
             </div>

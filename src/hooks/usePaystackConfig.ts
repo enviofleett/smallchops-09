@@ -26,24 +26,37 @@ export const usePaystackConfig = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error: configError } = await (supabase.rpc as any)('get_public_paystack_config');
+      const { data, error: configError } = await supabase.rpc('get_public_paystack_config');
       
       if (configError) {
+        // Silently handle missing RPC function - Paystack may not be configured
+        if (configError.message?.includes('does not exist') || configError.message?.includes('not found')) {
+          setConfig(null);
+          setError('Paystack not configured');
+          return;
+        }
         throw new Error(`Configuration error: ${configError.message}`);
       }
 
       if (!data) {
-        throw new Error('No Paystack configuration found. Please configure payment settings.');
+        // No configuration found - this is okay, just means Paystack isn't set up
+        setConfig(null);
+        setError('Paystack not configured');
+        return;
       }
 
       const configData = Array.isArray(data) ? data[0] : data;
 
-      if (!configData.public_key) {
-        throw new Error('Paystack public key is missing from configuration.');
+      if (!configData?.public_key) {
+        setConfig(null);
+        setError('Paystack public key missing');
+        return;
       }
 
       if (!validatePublicKey(configData.public_key)) {
-        throw new Error('Invalid Paystack public key format.');
+        setConfig(null);
+        setError('Invalid Paystack public key format');
+        return;
       }
 
       setConfig({
@@ -56,13 +69,16 @@ export const usePaystackConfig = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load payment configuration';
       setError(errorMessage);
-      console.error('Paystack config error:', err);
+      console.warn('Paystack config warning:', errorMessage);
       
-      toast({
-        title: "Payment Configuration Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      // Only show toast for critical errors, not missing configurations
+      if (!errorMessage.includes('not configured') && !errorMessage.includes('not found')) {
+        toast({
+          title: "Payment Configuration Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }

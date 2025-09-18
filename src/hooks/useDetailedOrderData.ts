@@ -37,19 +37,29 @@ export const useDetailedOrderData = (orderId: string) => {
         }
 
         if (data) {
-          // Handle both RPC response format and direct query format
-          const orderData = Array.isArray(data) ? data[0] : data;
-          if (orderData) {
+          // Handle new RPC response format: { order: {}, items: [], delivery_schedule: {} }
+          if (data && typeof data === 'object' && 'order' in data) {
             console.log('✅ RPC order data structure:', {
-              hasOrderDeliverySchedule: !!orderData.order_delivery_schedule,
-              scheduleType: typeof orderData.order_delivery_schedule,
-              scheduleContent: orderData.order_delivery_schedule
+              hasOrder: !!data.order,
+              hasItems: !!data.items,
+              hasDeliverySchedule: !!data.delivery_schedule,
+              itemsCount: Array.isArray(data.items) ? data.items.length : 0
             });
             
             return {
+              order: data.order,
+              items: data.items || [],
+              delivery_schedule: data.delivery_schedule
+            } as DetailedOrderData;
+          }
+          
+          // Fallback for legacy format (if needed)
+          const orderData = Array.isArray(data) ? data[0] : data;
+          if (orderData) {
+            return {
               order: orderData,
-              items: orderData.order_items || [],
-              delivery_schedule: orderData.order_delivery_schedule
+              items: (orderData as any).order_items || [],
+              delivery_schedule: (orderData as any).order_delivery_schedule
             } as DetailedOrderData;
           }
         }

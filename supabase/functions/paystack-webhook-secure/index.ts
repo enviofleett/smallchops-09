@@ -64,20 +64,20 @@ serve(async (req) => {
 
   try {
     // Environment validation with enhanced logging
-    const PAYSTACK_WEBHOOK_SECRET = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
+    const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const isDevelopment = Deno.env.get('ENVIRONMENT') === 'development';
 
     console.log('🔧 Environment validation:', {
-      hasWebhookSecret: !!PAYSTACK_WEBHOOK_SECRET,
+      hasPaystackSecret: !!PAYSTACK_SECRET_KEY,
       hasSupabaseUrl: !!SUPABASE_URL,
       hasServiceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
       isDevelopment,
-      secretLength: PAYSTACK_WEBHOOK_SECRET?.length
+      secretKeyPrefix: PAYSTACK_SECRET_KEY?.substring(0, 8) + '...'
     });
 
-    if (!PAYSTACK_WEBHOOK_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!PAYSTACK_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       console.error('❌ Missing environment variables');
       return new Response('Server configuration error', { 
         status: 500, 
@@ -122,7 +122,7 @@ serve(async (req) => {
     
     // Compute expected signature using HMAC SHA-512
     const encoder = new TextEncoder();
-    const keyData = encoder.encode(PAYSTACK_WEBHOOK_SECRET);
+    const keyData = encoder.encode(PAYSTACK_SECRET_KEY);
     const messageData = encoder.encode(rawBody);
     
     const cryptoKey = await crypto.subtle.importKey(

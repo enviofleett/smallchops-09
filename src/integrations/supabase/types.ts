@@ -9496,6 +9496,15 @@ export type Database = {
         }
         Returns: string
       }
+      generate_dedupe_key_safe: {
+        Args: {
+          p_event_type: string
+          p_order_id: string
+          p_recipient_identifier: string
+          p_template_key: string
+        }
+        Returns: string
+      }
       generate_guest_session_id: {
         Args: Record<PropertyKey, never>
         Returns: string

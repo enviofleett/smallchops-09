@@ -184,8 +184,7 @@ async function handleListOrders(supabase: any, params: any) {
         ),
         order_delivery_schedule (
           delivery_date, delivery_time_start, delivery_time_end,
-          special_instructions, address_line_1, address_line_2,
-          city, postal_code, coordinates
+          special_instructions, is_flexible, requested_at
         )
       `, { count: 'exact' })
       .order('created_at', { ascending: false });

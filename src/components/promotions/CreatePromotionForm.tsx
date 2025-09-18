@@ -175,22 +175,17 @@ export default function CreatePromotionForm({
   }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
-    <div className="h-full flex flex-col max-h-[90vh]">
-      {/* Fixed Header */}
-      <div className="flex items-center justify-between p-4 sm:p-6 pb-3 border-b flex-shrink-0">
-        <h3 className="text-lg sm:text-xl font-semibold">Create New Promotion</h3>
-      </div>
-
+    <div className="h-full flex flex-col overflow-hidden">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(handleSubmit)}
           autoComplete="off"
           noValidate
-          className="flex flex-col h-full"
+          className="flex flex-col h-full overflow-hidden"
         >
           {/* Scrollable Content */}
-          <ScrollArea className="flex-1 px-4 sm:px-6">
-            <div className="space-y-6 sm:space-y-8 py-4 sm:py-6 pb-4">
+          <ScrollArea className="flex-1 overflow-y-auto">
+            <div className="space-y-6 sm:space-y-8 py-4 sm:py-6 px-4 sm:px-6 pb-8">
               {/* Form content will be inserted here */}
               <div className="space-y-6">
                 {/* Basic Information */}
@@ -494,7 +489,7 @@ export default function CreatePromotionForm({
           </ScrollArea>
 
           {/* Fixed Footer with CTA Button */}
-          <div className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mt-auto">
             <div className="p-4 sm:p-6 pt-4">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:justify-end">
                 <Button

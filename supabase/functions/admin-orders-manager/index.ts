@@ -169,65 +169,159 @@ async function handleListOrders(supabase: any, params: any) {
 
   console.log(`📋 Listing orders: page ${page}, status ${status}, search "${searchQuery}"`);
 
-  let query = supabase
-    .from('orders')
-    .select(`
-      *,
-      order_items (
+  try {
+    // First, try the main query with proper relationship syntax
+    let query = supabase
+      .from('orders')
+      .select(`
         *,
-        products (id, name, price, image_url)
-      ),
-      delivery_zones (
-        id, name, delivery_fee, estimated_delivery_time
-      ),
-      delivery_schedule:order_delivery_schedule (
-        delivery_date, delivery_time_start, delivery_time_end,
-        special_instructions, address_line_1, address_line_2,
-        city, postal_code, coordinates
-      )
-    `, { count: 'exact' })
-    .order('created_at', { ascending: false });
+        order_items (
+          *,
+          products (id, name, price, image_url)
+        ),
+        delivery_zones (
+          id, name, delivery_fee, estimated_delivery_time
+        ),
+        order_delivery_schedule (
+          delivery_date, delivery_time_start, delivery_time_end,
+          special_instructions, address_line_1, address_line_2,
+          city, postal_code, coordinates
+        )
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false });
 
-  // Apply filters
-  if (status !== 'all') {
-    query = query.eq('status', status);
+    // Apply filters
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    if (searchQuery.trim()) {
+      query = query.or(`
+        order_number.ilike.%${searchQuery}%,
+        customer_name.ilike.%${searchQuery}%,
+        customer_email.ilike.%${searchQuery}%,
+        customer_phone.ilike.%${searchQuery}%
+      `);
+    }
+
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+
+    if (endDate) {
+      query = query.lte('created_at', endDate);
+    }
+
+    // Pagination
+    const offset = (page - 1) * pageSize;
+    query = query.range(offset, offset + pageSize - 1);
+
+    const { data: orders, error, count } = await query;
+
+    if (error) {
+      console.error('❌ Primary query failed, trying fallback:', error);
+      
+      // Fallback: Query without delivery schedule relationship to prevent 500 errors
+      let fallbackQuery = supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            *,
+            products (id, name, price, image_url)
+          ),
+          delivery_zones (
+            id, name, delivery_fee, estimated_delivery_time
+          )
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      // Reapply filters for fallback
+      if (status !== 'all') {
+        fallbackQuery = fallbackQuery.eq('status', status);
+      }
+
+      if (searchQuery.trim()) {
+        fallbackQuery = fallbackQuery.or(`
+          order_number.ilike.%${searchQuery}%,
+          customer_name.ilike.%${searchQuery}%,
+          customer_email.ilike.%${searchQuery}%,
+          customer_phone.ilike.%${searchQuery}%
+        `);
+      }
+
+      if (startDate) {
+        fallbackQuery = fallbackQuery.gte('created_at', startDate);
+      }
+
+      if (endDate) {
+        fallbackQuery = fallbackQuery.lte('created_at', endDate);
+      }
+
+      fallbackQuery = fallbackQuery.range(offset, offset + pageSize - 1);
+
+      const { data: fallbackOrders, error: fallbackError, count: fallbackCount } = await fallbackQuery;
+
+      if (fallbackError) {
+        console.error('❌ Fallback query also failed:', fallbackError);
+        throw new Error(`Failed to fetch orders: ${fallbackError.message}`);
+      }
+
+      console.log('✅ Fallback query succeeded, fetching delivery schedules separately');
+      
+      // Fetch delivery schedules separately if needed
+      if (fallbackOrders && fallbackOrders.length > 0) {
+        const orderIds = fallbackOrders.map(order => order.id);
+        const { data: schedules } = await supabase
+          .from('order_delivery_schedule')
+          .select('*')
+          .in('order_id', orderIds);
+        
+        // Manually attach schedules to orders
+        if (schedules) {
+          fallbackOrders.forEach(order => {
+            order.order_delivery_schedule = schedules.filter(schedule => schedule.order_id === order.id);
+          });
+        }
+      }
+
+      return {
+        success: true,
+        orders: fallbackOrders || [],
+        count: fallbackCount || 0,
+        page,
+        pageSize,
+        totalPages: Math.ceil((fallbackCount || 0) / pageSize),
+        fallback_used: true
+      };
+    }
+
+    console.log('✅ Primary query succeeded');
+    return {
+      success: true,
+      orders: orders || [],
+      count: count || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((count || 0) / pageSize)
+    };
+
+  } catch (error) {
+    console.error('❌ Critical error in handleListOrders:', error);
+    
+    // Final safety net: Return empty result instead of crashing
+    return {
+      success: false,
+      error: 'Failed to fetch orders',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      orders: [],
+      count: 0,
+      page,
+      pageSize,
+      totalPages: 0,
+      critical_error: true
+    };
   }
-
-  if (searchQuery.trim()) {
-    query = query.or(`
-      order_number.ilike.%${searchQuery}%,
-      customer_name.ilike.%${searchQuery}%,
-      customer_email.ilike.%${searchQuery}%,
-      customer_phone.ilike.%${searchQuery}%
-    `);
-  }
-
-  if (startDate) {
-    query = query.gte('created_at', startDate);
-  }
-
-  if (endDate) {
-    query = query.lte('created_at', endDate);
-  }
-
-  // Pagination
-  const offset = (page - 1) * pageSize;
-  query = query.range(offset, offset + pageSize - 1);
-
-  const { data: orders, error, count } = await query;
-
-  if (error) {
-    throw new Error(`Failed to fetch orders: ${error.message}`);
-  }
-
-  return {
-    success: true,
-    orders: orders || [],
-    count: count || 0,
-    page,
-    pageSize,
-    totalPages: Math.ceil((count || 0) / pageSize)
-  };
 }
 
 async function handleUpdateOrder(supabase: any, orderId: string, updates: any, adminId: string) {

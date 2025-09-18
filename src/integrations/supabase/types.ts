@@ -4897,13 +4897,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_order_delivery_schedule_order_id"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "order_delivery_schedule_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: true

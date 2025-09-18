@@ -3958,6 +3958,30 @@ export type Database = {
         }
         Relationships: []
       }
+      email_template_mapping: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          new_key: string
+          old_key: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          new_key: string
+          old_key: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          new_key?: string
+          old_key?: string
+        }
+        Relationships: []
+      }
       email_trigger_logs: {
         Row: {
           created_at: string | null

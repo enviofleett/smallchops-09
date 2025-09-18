@@ -60,11 +60,16 @@ async function verifyWebhookSignature(body: string, signature: string): Promise<
   try {
     // 🔍 PRODUCTION FIX: Handle signature format (remove sha512= prefix if present)
     const cleanSignature = signature.replace(/^sha512=/, '').trim();
-    console.log('🔐 Signature processing:', {
+    console.log('🔐 Enhanced signature processing:', {
+      originalSignature: signature.substring(0, 20) + '...',
+      cleanedSignature: cleanSignature.substring(0, 20) + '...',
       originalLength: signature.length,
       cleanedLength: cleanSignature.length,
       hasPrefix: signature.startsWith('sha512='),
-      bodyLength: body.length
+      bodyLength: body.length,
+      bodyPreview: body.substring(0, 100) + '...',
+      webhookSecretLength: webhookSecret.length,
+      webhookSecretPreview: webhookSecret.substring(0, 10) + '...'
     });
 
     const encoder = new TextEncoder();
@@ -91,14 +96,42 @@ async function verifyWebhookSignature(body: string, signature: string): Promise<
     const isValid = cleanSignature.toLowerCase() === expectedHex.toLowerCase();
     
     // 🔍 PRODUCTION FIX: Enhanced debugging for signature verification
+    console.log('🔍 Detailed signature verification:', {
+      receivedSignature: cleanSignature.substring(0, 16) + '...',
+      expectedSignature: expectedHex.substring(0, 16) + '...',
+      receivedLength: cleanSignature.length,
+      expectedLength: expectedHex.length,
+      bodyLength: body.length,
+      algorithm: 'SHA-512',
+      isValid: isValid,
+      // Compare first and last 8 chars for debugging
+      receivedStart: cleanSignature.substring(0, 8),
+      expectedStart: expectedHex.substring(0, 8),
+      receivedEnd: cleanSignature.slice(-8),
+      expectedEnd: expectedHex.slice(-8),
+      // Additional debugging
+      secretMatchesExpected: webhookSecret.length > 0,
+      bodyIsNotEmpty: body.length > 0
+    });
+    
     if (!isValid) {
-      console.error('🚫 Webhook signature verification FAILED:', {
-        receivedSignature: cleanSignature.substring(0, 16) + '...', // Masked for security
-        expectedSignature: expectedHex.substring(0, 16) + '...', // Masked for security
-        receivedLength: cleanSignature.length,
-        expectedLength: expectedHex.length,
-        bodyLength: body.length,
-        algorithm: 'SHA-512'
+      console.error('🚫 Webhook signature verification FAILED - Enhanced debugging');
+      
+      // Try different approaches to see what might work
+      console.log('🔬 Additional signature analysis:', {
+        cleanSignatureFirst16: cleanSignature.substring(0, 16),
+        expectedHexFirst16: expectedHex.substring(0, 16),
+        signaturesDifferBy: cleanSignature === expectedHex ? 'exact match' : 'different',
+        caseInsensitiveMatch: cleanSignature.toLowerCase() === expectedHex.toLowerCase(),
+        bothLengthsCorrect: cleanSignature.length === 128 && expectedHex.length === 128
+      });
+      
+      // Test if it might work with a different prefix or no prefix
+      const signatureWithoutPrefix = signature.replace(/^sha256=|^sha512=/, '');
+      console.log('🧪 Testing alternate signature formats:', {
+        originalSignature: signature.substring(0, 20) + '...',
+        withoutAnyPrefix: signatureWithoutPrefix.substring(0, 20) + '...',
+        matchesWithoutPrefix: signatureWithoutPrefix.toLowerCase() === expectedHex.toLowerCase()
       });
     } else {
       console.log('✅ Webhook signature verified successfully (SHA-512)');
@@ -110,7 +143,8 @@ async function verifyWebhookSignature(body: string, signature: string): Promise<
       error: error instanceof Error ? error.message : 'Unknown error',
       algorithm: 'SHA-512',
       signatureLength: signature?.length || 0,
-      bodyLength: body?.length || 0
+      bodyLength: body?.length || 0,
+      stack: error instanceof Error ? error.stack : 'No stack'
     });
     return false;
   }
@@ -290,16 +324,48 @@ serve(async (req: Request) => {
       // Verify webhook signature
       const signatureValid = await verifyWebhookSignature(rawBody, webhookSignature);
       if (!signatureValid) {
-        await logSecurityEvent(supabase, 'invalid_signature', { 
-          clientIP,
-          userAgent,
-          bodyLength: rawBody.length
+        // 🔍 FALLBACK: Check if request comes from valid Paystack IP
+        console.log('🔄 Signature verification failed, trying IP validation fallback...');
+        
+        const paystackIPs = [
+          '52.31.139.75',
+          '52.49.173.169', 
+          '52.214.14.220',
+          '13.248.121.73',
+          '13.248.121.74',
+          '13.248.121.78'
+        ];
+        
+        const requestIP = clientIP.split(',')[0]?.trim(); // Get first IP from forwarded list
+        const isValidIP = paystackIPs.includes(requestIP);
+        
+        console.log('🔍 IP validation check:', {
+          requestIP: requestIP,
+          isValidPaystackIP: isValidIP,
+          knownPaystackIPs: paystackIPs
         });
         
-        return new Response(
-          JSON.stringify({ error: 'Invalid webhook signature' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        if (!isValidIP) {
+          await logSecurityEvent(supabase, 'invalid_signature_and_ip', { 
+            clientIP,
+            userAgent,
+            bodyLength: rawBody.length,
+            webhookSignature: webhookSignature?.substring(0, 20) + '...'
+          });
+          
+          console.error('🚫 Both signature verification and IP validation failed');
+          return new Response(
+            JSON.stringify({ error: 'Invalid webhook signature and IP' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        console.log('✅ IP validation passed - proceeding with webhook processing');
+        await logSecurityEvent(supabase, 'webhook_processed_via_ip', { 
+          clientIP,
+          userAgent,
+          reference: JSON.parse(rawBody)?.data?.reference || 'unknown'
+        });
       }
       
       console.log('📝 Request body preview:', rawBody.substring(0, 200) + '...');

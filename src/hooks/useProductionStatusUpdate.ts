@@ -19,20 +19,17 @@ export const useProductionStatusUpdate = () => {
 
       const validatedStatus = validateOrderStatus(status);
       
-      // Use production-safe status update via edge function
-      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      // Log admin action for audit trail
+      await supabase.functions.invoke('admin-orders-manager', {
         body: {
-          action: 'update',
+          action: 'log_admin_action',
           orderId,
-          updates: { status: validatedStatus }
+          actionType: 'status_update',
+          details: { from_status: 'unknown', to_status: validatedStatus }
         }
       });
 
-      if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || 'Failed to update order status');
-      }
-
-      return data.order;
+      return updateOrder(orderId, { status: validatedStatus });
     },
     onSuccess: (data, variables) => {
       toast.success(`Order status updated to ${variables.status.replace('_', ' ')}`);

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle, XCircle, PartyPopper } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { CheckCircle, XCircle, Loader2, PartyPopper } from 'lucide-react';
 import { useSecurePayment } from '@/hooks/useSecurePayment';
 import { cleanupPaymentCache, validateStoredReference } from '@/utils/paymentCacheCleanup';
 import { paymentCompletionCoordinator } from '@/utils/paymentCompletion';
@@ -15,14 +16,14 @@ export const PaymentCallbackPage: React.FC = () => {
   const { verifySecurePayment, isProcessing } = useSecurePayment();
   const { clearCart } = useCart();
   
-  const [verificationStatus, setVerificationStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'failed'>('loading');
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [retryCount, setRetryCount] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
-
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 2000; // 2 seconds
+  
+  // Check for immediate success from URL
+  const status = searchParams.get('status');
+  const reference = searchParams.get('reference') || searchParams.get('trxref');
+  const isImmediateSuccess = status === 'success' && reference && validateStoredReference(reference);
 
   // Helper to fetch order amount from database
   const fetchOrderAmount = async (orderId: string) => {
@@ -45,39 +46,18 @@ export const PaymentCallbackPage: React.FC = () => {
     }
   };
 
-  // Enhanced payment callback processing with retry logic
-  const processPaymentCallback = async (attempt = 1) => {
-    try {
-      console.log(`🔍 Processing payment callback... (Attempt ${attempt})`);
-      setIsRetrying(attempt > 1);
+  useEffect(() => {
+    const handlePaymentCallback = async () => {
+      console.log('🔍 Processing payment callback...');
       
-      const urlParams = new URLSearchParams(window.location.search);
-      const reference = urlParams.get('reference') || urlParams.get('trxref');
-      const status = urlParams.get('status');
-      const errorMessage = urlParams.get('message');
-      const orderId = urlParams.get('order_id');
+      // Check URL parameters
+      const status = searchParams.get('status');
+      const errorMessage = searchParams.get('message');
+      const reference = searchParams.get('reference') || searchParams.get('trxref');
+      const orderId = searchParams.get('order_id');
       
-      // Handle immediate error from URL
-      if (status === 'error') {
-        throw new Error(errorMessage || 'Payment failed - please try again');
-      }
-      
-      // Use reference or trxref, whichever is available
-      if (!reference) {
-        // Try to get from storage as fallback
-        const fallbackReference = sessionStorage.getItem('paystack_payment_reference') ||
-                                  localStorage.getItem('paystack_last_reference');
-        if (!fallbackReference) {
-          throw new Error('No payment reference found in URL parameters or storage');
-        }
-        console.log('✅ Reference recovered from storage:', fallbackReference.substring(0, 20) + '...');
-      }
-
-      const paymentReference = reference || sessionStorage.getItem('paystack_payment_reference') || 
-                              localStorage.getItem('paystack_last_reference');
-
       // If URL explicitly says success with valid reference, show success immediately
-      if (status === 'success' && paymentReference && validateStoredReference(paymentReference)) {
+      if (status === 'success' && reference && validateStoredReference(reference)) {
         console.log('✅ URL indicates success - showing success immediately');
         setVerificationStatus('success');
         
@@ -87,277 +67,293 @@ export const PaymentCallbackPage: React.FC = () => {
         setOrderDetails({
           orderNumber: orderData?.order_number || orderId || 'Processing...',
           amount: orderData?.total_amount || 'Pending confirmation',
-          reference: paymentReference
+          reference: reference
         });
         
-        // Handle completion
-        paymentCompletionCoordinator.coordinatePaymentCompletion(
-          {
-            reference: paymentReference,
-            orderNumber: orderData?.order_number || orderId,
-            amount: orderData?.total_amount
-          },
-          {
-            onClearCart: clearCart,
-            onNavigate: () => {
-              cleanupPaymentStorage();
-              setTimeout(() => navigate('/orders'), 3000);
-            }
+        // Run verification in background to confirm and get details
+        try {
+          const result = await verifySecurePayment(reference, orderId || undefined, { suppressToasts: true });
+          if (result.success) {
+            console.log('✅ Background verification confirmed success');
+            setOrderDetails(prev => ({
+              ...prev,
+              orderNumber: (result as any).order_id || prev.orderNumber,
+              amount: (result as any).amount || prev.amount,
+              reference: reference
+            }));
+            
+            // Handle cart clearing and notifications
+            paymentCompletionCoordinator.coordinatePaymentCompletion(
+              {
+                reference: reference,
+                orderNumber: (result as any).order_id || orderId,
+                amount: (result as any).amount
+              },
+              {
+                onClearCart: clearCart,
+                onNavigate: () => {
+                  try {
+                    sessionStorage.removeItem('paystack_payment_reference');
+                    sessionStorage.removeItem('payment_order_id');
+                    localStorage.removeItem('paystack_last_reference');
+                    console.log('🧹 Payment storage cleaned after success');
+                  } catch (error) {
+                    console.warn('⚠️ Failed to clean payment storage:', error);
+                  }
+                  cleanupPaymentCache();
+                }
+              }
+            );
+          } else {
+            console.warn('⚠️ Background verification failed, but keeping success UI (URL authority)');
           }
-        );
+        } catch (error) {
+          console.warn('⚠️ Background verification error, but keeping success UI (URL authority):', error);
+        }
         return;
       }
-
-      // Verify payment with backend
-      const result = await verifySecurePayment(
-        paymentReference, 
-        orderId || undefined, 
-        { suppressToasts: true }
-      );
       
-      if (!result.success) {
-        throw new Error(result.error || 'Payment verification failed');
-      }
-
-      // Success case
-      setVerificationStatus('success');
-      setOrderDetails({
-        orderNumber: (result as any).order_id || orderId || 'Unknown',
-        amount: (result as any).amount || 'Processing...',
-        reference: paymentReference
-      });
-      
-      // Handle completion
-      paymentCompletionCoordinator.coordinatePaymentCompletion(
-        {
-          reference: paymentReference,
-          orderNumber: (result as any).order_id || orderId,
-          amount: (result as any).amount
-        },
-        {
-          onClearCart: clearCart,
-          onNavigate: () => {
-            cleanupPaymentStorage();
-            setTimeout(() => navigate('/orders'), 3000);
+      // Check if this is an error callback
+      if (status === 'error') {
+        console.error('❌ Payment callback received error status:', errorMessage);
+        setVerificationStatus('failed');
+        setErrorMessage(decodeURIComponent(errorMessage || 'Payment processing failed'));
+        
+        // If we have a reference, try background verification as fallback
+        if (reference && validateStoredReference(reference)) {
+          console.log('🔄 Attempting background verification despite error status...');
+          try {
+            const result = await verifySecurePayment(reference, orderId || undefined, { suppressToasts: true });
+            if (result.success) {
+              console.log('✅ Background verification succeeded despite error status');
+              setVerificationStatus('success');
+              setOrderDetails({
+                orderNumber: (result as any).order_id,
+                amount: (result as any).amount,
+                reference: reference
+              });
+              return;
+            }
+          } catch (bgError) {
+            console.warn('⚠️ Background verification also failed:', bgError);
           }
         }
-      );
-
-    } catch (error: any) {
-      console.error(`❌ Payment callback error (Attempt ${attempt}):`, error);
-      
-      // Retry logic for transient errors
-      if (attempt < MAX_RETRIES && isRetryableError(error)) {
-        setRetryCount(attempt);
-        
-        setTimeout(() => {
-          processPaymentCallback(attempt + 1);
-        }, RETRY_DELAY * attempt); // Exponential backoff
         
         return;
       }
+      
+      // Extract reference from multiple sources with fallback chain (if not already extracted)
+      let fallbackReference = reference || searchParams.get('reference') || searchParams.get('trxref');
+      const fallbackOrderId = orderId || searchParams.get('order_id');
+      
+      // Fallback chain if reference not in URL
+      if (!fallbackReference) {
+        console.log('🔍 Reference not in URL, checking storage...');
+        try {
+          fallbackReference = sessionStorage.getItem('paystack_payment_reference') ||
+                     localStorage.getItem('paystack_last_reference') ||
+                     sessionStorage.getItem('paymentReference') ||
+                     localStorage.getItem('paymentReference');
+          
+          if (fallbackReference) {
+            console.log('✅ Reference recovered from storage:', fallbackReference.substring(0, 20) + '...');
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to access storage for reference recovery:', error);
+        }
+      }
+      
+      // Clean any legacy cache AFTER getting reference
+      cleanupPaymentCache();
+      
+      if (!fallbackReference) {
+        console.error('❌ No payment reference found in callback URL');
+        setVerificationStatus('failed');
+        setErrorMessage('Invalid payment callback - no reference found');
+        return;
+      }
+      
+      // Validate reference format
+      if (!validateStoredReference(fallbackReference)) {
+        console.error('🚨 Invalid reference format in callback:', fallbackReference);
+        setVerificationStatus('failed');
+        setErrorMessage('Invalid payment reference format');
+        return;
+      }
+      
+      console.log('✅ Valid reference found:', fallbackReference);
+      
+      try {
+        // Verify the payment
+        const result = await verifySecurePayment(fallbackReference, fallbackOrderId || undefined, { suppressToasts: true });
+        
+        if (result.success) {
+          console.log('✅ Payment verification successful');
+          setVerificationStatus('success');
+          setOrderDetails({
+            orderNumber: (result as any).order_id,
+            amount: (result as any).amount,
+            reference: (result as any).reference
+          });
+          
+          // Notify parent window (if opened from checkout dialog)
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ 
+              type: 'PAYMENT_SUCCESS', 
+              orderId: (result as any).order_id,
+              reference: fallbackReference
+            }, window.location.origin);
+          }
 
-      // Final error state
-      setVerificationStatus('error');
-      setErrorMessage(error.message || 'Payment processing failed');
-      setIsRetrying(false);
-    }
-  };
+          // Use payment completion coordinator for cart clearing with 15-second delay
+          paymentCompletionCoordinator.coordinatePaymentCompletion(
+            {
+              reference: fallbackReference,
+              orderNumber: (result as any).order_id,
+              amount: (result as any).amount
+            },
+            {
+              onClearCart: clearCart,
+              onNavigate: () => {
+                // Clean up payment storage after successful verification
+                try {
+                  sessionStorage.removeItem('paystack_payment_reference');
+                  sessionStorage.removeItem('payment_order_id');
+                  localStorage.removeItem('paystack_last_reference');
+                  console.log('🧹 Payment storage cleaned after success');
+                } catch (error) {
+                  console.warn('⚠️ Failed to clean payment storage:', error);
+                }
+                cleanupPaymentCache();
+              }
+            }
+          );
+          
+        } else {
+          console.error('❌ Payment verification failed:', (result as any).error);
+          setVerificationStatus('failed');
+          setErrorMessage((result as any).error || 'Payment verification failed');
+          
+          // DON'T clear cart on failure - user should be able to retry
+          console.log('🛒 Cart preserved for retry - not clearing on failure');
+          
+          // Notify parent window of failure (if opened from checkout dialog)
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ 
+              type: 'PAYMENT_FAILED', 
+              error: (result as any).error || 'Payment verification failed'
+            }, window.location.origin);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Payment verification error:', error);
+        setVerificationStatus('failed');
+        setErrorMessage(error instanceof Error ? error.message : 'Verification failed');
+        
+        // DON'T clear cart on error - user should be able to retry
+        console.log('🛒 Cart preserved for retry - not clearing on error');
+        
+        // Notify parent window of failure (if opened from checkout dialog)
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ 
+            type: 'PAYMENT_FAILED', 
+            error: error instanceof Error ? error.message : 'Verification failed'
+          }, window.location.origin);
+        }
+      }
+    };
 
-  // Check if error is retryable
-  const isRetryableError = (error: any) => {
-    const retryableMessages = [
-      'fetch',
-      'network',
-      'timeout',
-      'connection',
-      '500',
-      '502',
-      '503',
-      '504',
-      'verify-payment',
-      'edge function'
-    ];
-    
-    const errorMessage = error.message?.toLowerCase() || '';
-    return retryableMessages.some(msg => errorMessage.includes(msg));
-  };
+    handlePaymentCallback();
+  }, [searchParams, verifySecurePayment]);
 
-  // Clean payment storage
-  const cleanupPaymentStorage = () => {
-    try {
-      sessionStorage.removeItem('paystack_payment_reference');
-      sessionStorage.removeItem('payment_order_id');
-      localStorage.removeItem('paystack_last_reference');
-      console.log('🧹 Payment storage cleaned after success');
-    } catch (error) {
-      console.warn('⚠️ Failed to clean payment storage:', error);
-    }
-    cleanupPaymentCache();
-  };
+  // Only show loader if NOT immediate success and still processing
+  if ((isProcessing || verificationStatus === 'loading') && !isImmediateSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-3">
+        <Card className="w-full max-w-xs p-4 text-center bg-white shadow-lg">
+          <Loader2 className="h-10 w-10 animate-spin text-orange-500 mx-auto mb-3" />
+          <p className="text-foreground text-sm">Wait while we confirm your payment</p>
+        </Card>
+      </div>
+    );
+  }
 
-  // Manual retry function
-  const handleRetry = () => {
-    setVerificationStatus('processing');
-    setErrorMessage('');
-    setRetryCount(0);
-    setIsRetrying(false);
-    processPaymentCallback();
-  };
-
-  useEffect(() => {
-    processPaymentCallback();
-  }, []);
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-card py-8 px-4 shadow-lg border rounded-lg sm:px-10">
-          <div className="text-center">
-            {/* Logo */}
-            <div className="flex justify-center mb-6">
-              <img 
-                src={startersLogo} 
-                alt="Starters Logo" 
-                className="h-12 w-auto"
-              />
+  if (verificationStatus === 'success' || isImmediateSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
+        <div className="text-center space-y-6 max-w-md mx-auto">
+          {/* Success Icon */}
+          <div className="relative inline-block">
+            <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
+              <CheckCircle className="h-12 w-12 text-white" />
             </div>
-
-            {/* Processing State */}
-            {verificationStatus === 'processing' && (
-              <div className="mb-4">
-                <div className="flex justify-center mb-4">
-                  <Loader2 className="h-12 w-12 text-primary animate-spin" />
-                </div>
-                <h2 className="text-xl font-semibold text-foreground mb-2">
-                  Processing Your Payment
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {isRetrying 
-                    ? `Retrying payment verification... (${retryCount}/${MAX_RETRIES})`
-                    : 'Please wait while we confirm your payment...'
-                  }
-                </p>
-                {retryCount > 0 && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Attempt {retryCount} of {MAX_RETRIES}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Success State */}
-            {verificationStatus === 'success' && (
-              <div className="mb-4">
-                <div className="flex justify-center mb-4">
-                  <div className="relative">
-                    <CheckCircle className="h-12 w-12 text-green-600" />
-                    <PartyPopper className="h-6 w-6 text-yellow-500 absolute -top-1 -right-1 animate-bounce" />
-                  </div>
-                </div>
-                <h2 className="text-xl font-semibold text-green-600 mb-2">
-                  Payment Successful!
-                </h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Your payment has been confirmed successfully.
-                </p>
-                
-                {orderDetails && (
-                  <div className="bg-muted/50 rounded-lg p-4 mb-4 text-left">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Order:</span>
-                        <span className="font-medium text-foreground">
-                          {orderDetails.orderNumber}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Amount:</span>
-                        <span className="font-medium text-foreground">
-                          ₦{typeof orderDetails.amount === 'number' 
-                            ? orderDetails.amount.toLocaleString() 
-                            : orderDetails.amount}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Reference:</span>
-                        <span className="font-mono text-xs text-foreground break-all">
-                          {orderDetails.reference}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <p className="text-xs text-muted-foreground">
-                  Redirecting to your orders in a few seconds...
-                </p>
-              </div>
-            )}
-
-            {/* Error State */}
-            {verificationStatus === 'error' && (
-              <div className="mb-4">
-                <div className="flex justify-center mb-4">
-                  <XCircle className="h-12 w-12 text-red-600" />
-                </div>
-                <h2 className="text-xl font-semibold text-red-600 mb-2">
-                  Payment Processing Failed
-                </h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {errorMessage || 'There was an issue processing your payment. Please try again.'}
-                </p>
-                
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleRetry}
-                    className="w-full"
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Retrying...
-                      </>
-                    ) : (
-                      'Retry Payment Verification'
-                    )}
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate('/orders')}
-                    className="w-full"
-                  >
-                    Go to Orders
-                  </Button>
-                </div>
-
-                {/* Technical Details */}
-                <details className="mt-4 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer hover:text-foreground">
-                    Technical Details
-                  </summary>
-                  <div className="mt-2 bg-muted/50 p-3 rounded text-left">
-                    <p className="break-words">{errorMessage}</p>
-                    <p className="mt-1">
-                      Time: {new Date().toISOString()}
-                    </p>
-                    <p>
-                      Attempts: {retryCount}/{MAX_RETRIES}
-                    </p>
-                  </div>
-                </details>
-              </div>
-            )}
-
-            {/* Support Message */}
-            <p className="text-xs text-muted-foreground mt-6">
-              Need help? Contact our support team if this issue persists.
+            <div className="absolute -top-2 -right-2">
+              <PartyPopper className="h-8 w-8 text-yellow-500 animate-bounce" />
+            </div>
+          </div>
+          
+          {/* Success Message */}
+          <div>
+            <h1 className="text-3xl font-bold text-green-600 mb-2">
+              Payment Successful!
+            </h1>
+            <p className="text-gray-600 text-lg">
+              Your order has been confirmed
             </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3 pt-4">
+            <Button 
+              onClick={() => navigate('/customer-profile')} 
+              className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-semibold"
+            >
+              Track Your Order
+            </Button>
+            <Button 
+              onClick={() => navigate('/')} 
+              variant="outline" 
+              className="w-full h-12 text-base border-2 border-green-200 text-green-600 hover:bg-green-50 font-semibold"
+            >
+              Continue Shopping
+            </Button>
           </div>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-3">
+      <Card className="w-full max-w-sm p-6 text-center bg-white shadow-lg">
+        <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-foreground mb-2">Payment Failed</h2>
+        <p className="text-muted-foreground mb-4 text-sm">
+          {errorMessage || 'There was an issue processing your payment. Please try again.'}
+        </p>
+        
+          <div className="space-y-2">
+            <Button 
+              onClick={() => navigate('/')} 
+              className="w-full bg-red-500 hover:bg-red-600 h-10 text-sm"
+            >
+              Try Again
+            </Button>
+            <Button 
+              onClick={() => navigate('/customer-profile')} 
+              variant="outline" 
+              className="w-full h-10 text-sm"
+            >
+              View Orders
+            </Button>
+          </div>
+          
+          <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-xs text-orange-700">
+              <strong>Need help?</strong> Your items are still in your cart. You can try paying again or contact support.
+            </p>
+          </div>
+      </Card>
     </div>
   );
 };

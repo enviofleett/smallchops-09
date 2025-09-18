@@ -286,9 +286,9 @@ async function createAdminUser(supabase: any, body: any, createdBy: any) {
   // Send welcome email if requested and not using immediate access
   if (body.send_email && !hasImmediateAccess) {
     try {
-      await supabase.functions.invoke('unified-smtp-sender', {
+      await supabase.functions.invoke('supabase-auth-email-sender', {
         body: {
-          template_key: 'admin_welcome',
+          templateId: 'admin_welcome',
           to: body.email,
           variables: {
             role: body.role,

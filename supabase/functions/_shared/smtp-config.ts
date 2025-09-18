@@ -41,7 +41,7 @@ export function validateSMTPUser(user: string, host: string): SMTPUserValidation
     userType = 'username';
   }
 
-  // Host-based provider detection for validation  
+  // Host-based provider detection for validation
   const detectProviderFromHost = (hostname: string): string | undefined => {
     const h = hostname.toLowerCase();
     if (h.includes('gmail')) return 'gmail';
@@ -50,6 +50,7 @@ export function validateSMTPUser(user: string, host: string): SMTPUserValidation
     if (h.includes('mailgun')) return 'mailgun';
     if (h.includes('ses') || h.includes('amazonses')) return 'aws_ses';
     if (h.includes('postmark')) return 'postmark';
+    if (h.includes('mailersend')) return 'mailersend';
     if (h.includes('yahoo')) return 'yahoo';
     return undefined;
   };

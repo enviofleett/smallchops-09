@@ -13,8 +13,7 @@ import { getPaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-
 const PAYSTACK_IPS = [
   '52.31.139.75',
   '52.49.173.169', 
-  '52.214.14.220',
-  '13.248.121.73'  // Additional Paystack server
+  '52.214.14.220'
 ]
 
 // Verify webhook origin by IP
@@ -23,34 +22,15 @@ function verifyPaystackIP(request: Request): boolean {
   const realIP = request.headers.get('x-real-ip')
   const cfConnectingIP = request.headers.get('cf-connecting-ip')
   
-  // Extract all possible IPs (handle comma-separated lists)
-  const allIPs = []
-  if (cfConnectingIP) allIPs.push(cfConnectingIP.trim())
-  if (realIP) allIPs.push(realIP.trim())
-  if (forwardedFor) {
-    // Handle comma-separated IPs in x-forwarded-for
-    const forwardedIPs = forwardedFor.split(',').map(ip => ip.trim())
-    allIPs.push(...forwardedIPs)
-  }
+  const clientIP = cfConnectingIP || realIP || forwardedFor?.split(',')[0]?.trim()
   
-  if (allIPs.length === 0) {
-    console.warn('Could not determine client IP from headers')
+  if (!clientIP) {
+    console.warn('Could not determine client IP')
     return false
   }
   
-  console.log(`🔍 Webhook request from IPs: ${allIPs.join(', ')}`)
-  console.log(`📋 Checking against whitelist: ${PAYSTACK_IPS.join(', ')}`)
-  
-  // Check if any of the IPs match our whitelist
-  const validIP = allIPs.find(ip => PAYSTACK_IPS.includes(ip))
-  
-  if (validIP) {
-    console.log(`✅ Valid Paystack IP found: ${validIP}`)
-    return true
-  } else {
-    console.log(`🚫 No valid Paystack IPs found in: ${allIPs.join(', ')}`)
-    return false
-  }
+  console.log(`Webhook request from IP: ${clientIP}`)
+  return PAYSTACK_IPS.includes(clientIP)
 }
 
 // Verify signature using secret key

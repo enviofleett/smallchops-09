@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.0';
+import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,13 +29,15 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Starting price notification processing via native SMTP...');
+    console.log('Starting price notification processing...');
 
     // Get pending notifications
     const { data: notifications, error: fetchError } = await supabase
@@ -88,61 +91,52 @@ serve(async (req) => {
         const changeType = isIncrease ? 'increased' : 'decreased';
         const changeColor = isIncrease ? '#ef4444' : '#22c55e';
 
-        // Send email notification via native SMTP
-        const { data: emailResult, error: emailError } = await supabase.functions.invoke('unified-smtp-sender', {
-          body: {
-            to: authUser.user.email,
-            subject: `Price Alert: ${data.product_name} ${changeType}`,
-            emailType: 'transactional',
-            htmlContent: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">Price Alert!</h2>
-                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                  <h3 style="margin: 0 0 10px 0;">${data.product_name}</h3>
-                  <p style="margin: 5px 0;">
-                    <strong>Previous price:</strong> ₦${data.old_price.toLocaleString()}
-                  </p>
-                  <p style="margin: 5px 0;">
-                    <strong>New price:</strong> 
-                    <span style="color: ${changeColor}; font-weight: bold;">
-                      ₦${data.new_price.toLocaleString()}
-                    </span>
-                  </p>
-                  <p style="margin: 5px 0;">
-                    <strong>Change:</strong> 
-                    <span style="color: ${changeColor}; font-weight: bold;">
-                      ${Math.abs(priceChange)}% ${changeType}
-                    </span>
-                  </p>
-                </div>
-                <p>This is one of your favorite products. ${!isIncrease ? 'Great news - the price has dropped!' : 'The price has increased.'}</p>
-                <div style="margin: 30px 0;">
-                  <a href="https://startersmallchops.com/customer-portal" 
-                     style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                    View Product
-                  </a>
-                </div>
-                <p style="color: #666; font-size: 12px;">
-                  You can manage your notification preferences in your account settings.
+        // Send email notification
+        const emailResult = await resend.emails.send({
+          from: 'Restaurant Notifications <noreply@resend.dev>',
+          to: [authUser.user.email],
+          subject: `Price Alert: ${data.product_name} ${changeType}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Price Alert!</h2>
+              <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin: 0 0 10px 0;">${data.product_name}</h3>
+                <p style="margin: 5px 0;">
+                  <strong>Previous price:</strong> ₦${data.old_price.toLocaleString()}
+                </p>
+                <p style="margin: 5px 0;">
+                  <strong>New price:</strong> 
+                  <span style="color: ${changeColor}; font-weight: bold;">
+                    ₦${data.new_price.toLocaleString()}
+                  </span>
+                </p>
+                <p style="margin: 5px 0;">
+                  <strong>Change:</strong> 
+                  <span style="color: ${changeColor}; font-weight: bold;">
+                    ${Math.abs(priceChange)}% ${changeType}
+                  </span>
                 </p>
               </div>
-            `,
-            variables: {
-              product_name: data.product_name,
-              old_price: data.old_price,
-              new_price: data.new_price,
-              price_change: priceChange,
-              customer_name: notification.customer_accounts.name
-            }
-          }
+              <p>This is one of your favorite products. ${!isIncrease ? 'Great news - the price has dropped!' : 'The price has increased.'}</p>
+              <div style="margin: 30px 0;">
+                <a href="${Deno.env.get('SUPABASE_URL')?.replace('supabase.co', 'vercel.app') || 'https://your-app.com'}/customer-portal" 
+                   style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  View Product
+                </a>
+              </div>
+              <p style="color: #666; font-size: 12px;">
+                You can manage your notification preferences in your account settings.
+              </p>
+            </div>
+          `,
         });
 
-        if (emailError) {
-          console.error('Native SMTP email failed:', emailError);
-          await markNotificationFailed(notification.id, emailError.message);
+        if (emailResult.error) {
+          console.error('Email sending failed:', emailResult.error);
+          await markNotificationFailed(notification.id, emailResult.error.message);
           failed++;
         } else {
-          console.log('Email sent successfully via native SMTP:', emailResult?.messageId);
+          console.log('Email sent successfully:', emailResult.data?.id);
           await markNotificationProcessed(notification.id);
           processed++;
         }

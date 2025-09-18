@@ -190,7 +190,8 @@ async function checkEnvironmentVariables(): Promise<DeploymentCheck> {
   const requiredVars = [
     'SUPABASE_URL',
     'SUPABASE_SERVICE_ROLE_KEY',
-    'SUPABASE_ANON_KEY'
+    'SUPABASE_ANON_KEY',
+    'MAILERSEND_API_TOKEN'
   ];
 
   const missingVars = requiredVars.filter(envVar => !Deno.env.get(envVar));
@@ -260,7 +261,7 @@ async function checkEmailConfiguration(supabase: any): Promise<DeploymentCheck> 
   try {
     const { data: emailSettings, error } = await supabase
       .from('communication_settings')
-      .select('sender_email, smtp_host, smtp_user, use_smtp')
+      .select('sender_email, mailersend_domain_verified, mailersend_domain')
       .single();
 
     if (error) {
@@ -272,12 +273,12 @@ async function checkEmailConfiguration(supabase: any): Promise<DeploymentCheck> 
       };
     }
 
-    if (!emailSettings.use_smtp || !emailSettings.smtp_host) {
+    if (!emailSettings.mailersend_domain_verified) {
       return {
         category: 'Email Configuration',
         status: 'fail',
-        message: 'SMTP configuration not set up - emails will not be delivered',
-        details: { smtp_configured: false, smtp_host: emailSettings.smtp_host }
+        message: 'MailerSend domain not verified - emails will not be delivered',
+        details: { domain_verified: false, domain: emailSettings.mailersend_domain }
       };
     }
 
@@ -295,9 +296,9 @@ async function checkEmailConfiguration(supabase: any): Promise<DeploymentCheck> 
       status: 'pass',
       message: 'Email configuration is production-ready',
       details: {
-        smtp_configured: true,
+        domain_verified: true,
         sender_email_configured: true,
-        smtp_host: emailSettings.smtp_host
+        domain: emailSettings.mailersend_domain
       }
     };
 

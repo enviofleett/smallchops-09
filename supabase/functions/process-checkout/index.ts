@@ -243,9 +243,8 @@ serve(async (req) => {
 
     console.log("💰 Order details:", order);
 
-    // ✅ Build frontend callback URL (for user redirects after payment)
-    const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com";
-    const callbackUrl = `${FRONTEND_URL}/payment/callback?order_id=${order.id}`;
+    // ✅ Build payment callback URL
+    const callbackUrl = `${SUPABASE_URL}/functions/v1/payment-callback?order_id=${order.id}`;
     console.log("🔗 Payment callback URL:", callbackUrl);
 
     // ✅ Initialize payment with service role for internal authorization

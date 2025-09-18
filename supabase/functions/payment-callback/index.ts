@@ -1,510 +1,845 @@
-// SECURE PAYMENT CALLBACK: supabase/functions/payment-callback/index.ts
-// Streamlined security enhancements for payment webhooks
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts';
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const VERSION = "v2025-08-22-centralized-config";
 
-// Define valid order status mapping
-const VALID_ORDER_STATUSES = {
-  'success': 'confirmed',
-  'failed': 'failed',
-  'abandoned': 'cancelled', 
-  'pending': 'pending',
-  'processing': 'processing'
-} as const;
-
-type ValidOrderStatus = typeof VALID_ORDER_STATUSES[keyof typeof VALID_ORDER_STATUSES];
-
-interface PaystackWebhookData {
-  event: string;
-  data: {
-    status: string;
-    reference: string;
-    amount: number;
-    gateway_response?: string;
-    customer?: {
-      email?: string;
-    };
-    metadata?: Record<string, any>;
-    created_at?: string;
-    paid_at?: string;
-  };
-}
-
-// SECURITY: Simple rate limiting storage
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT = 100;
-const RATE_WINDOW = 60 * 60 * 1000; // 1 hour
-
-// SECURITY: Webhook signature verification using built-in crypto (PRODUCTION FIXED)
-async function verifyWebhookSignature(body: string, signature: string): Promise<boolean> {
-  const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
-  const isDevelopment = Deno.env.get('DENO_DEPLOYMENT_ID') === undefined;
+// Enhanced logging function
+function log(level: 'info' | 'warn' | 'error', message: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] [payment-callback ${VERSION}] ${level.toUpperCase()}: ${message}`;
   
-  // 🔍 PRODUCTION FIX: Enhanced environment validation
-  if (!webhookSecret) {
-    console.error('🚨 CRITICAL: PAYSTACK_WEBHOOK_SECRET not configured in production!');
-    if (isDevelopment) {
-      console.warn('🟡 Development mode: Bypassing webhook signature verification');
-      return true;
-    }
-    // In production, fail secure - do not bypass signature verification
-    return false;
-  }
-
-  if (!signature) {
-    console.error('🚫 Missing webhook signature header (x-paystack-signature)');
-    return false;
-  }
-
-  try {
-    // 🔍 PRODUCTION FIX: Handle signature format (remove sha512= prefix if present)
-    const cleanSignature = signature.replace(/^sha512=/, '').trim();
-    console.log('🔐 Enhanced signature processing:', {
-      originalSignature: signature.substring(0, 20) + '...',
-      cleanedSignature: cleanSignature.substring(0, 20) + '...',
-      originalLength: signature.length,
-      cleanedLength: cleanSignature.length,
-      hasPrefix: signature.startsWith('sha512='),
-      bodyLength: body.length,
-      bodyPreview: body.substring(0, 100) + '...',
-      webhookSecretLength: webhookSecret.length,
-      webhookSecretPreview: webhookSecret.substring(0, 10) + '...'
-    });
-
-    const encoder = new TextEncoder();
-    
-    // 🔍 PRODUCTION FIX: Use SHA-512 (Paystack standard) - reverted from SHA-256
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(webhookSecret),
-      { name: 'HMAC', hash: 'SHA-512' },  // ✅ FIXED: Reverted to SHA-512 (128-char signatures)
-      false,
-      ['sign']
-    );
-
-    const expectedSignature = await crypto.subtle.sign(
-      'HMAC',
-      key,
-      encoder.encode(body)
-    );
-
-    const expectedHex = Array.from(new Uint8Array(expectedSignature))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-
-    const isValid = cleanSignature.toLowerCase() === expectedHex.toLowerCase();
-    
-    // 🔍 PRODUCTION FIX: Enhanced debugging for signature verification
-    console.log('🔍 Detailed signature verification:', {
-      receivedSignature: cleanSignature.substring(0, 16) + '...',
-      expectedSignature: expectedHex.substring(0, 16) + '...',
-      receivedLength: cleanSignature.length,
-      expectedLength: expectedHex.length,
-      bodyLength: body.length,
-      algorithm: 'SHA-512',
-      isValid: isValid,
-      // Compare first and last 8 chars for debugging
-      receivedStart: cleanSignature.substring(0, 8),
-      expectedStart: expectedHex.substring(0, 8),
-      receivedEnd: cleanSignature.slice(-8),
-      expectedEnd: expectedHex.slice(-8),
-      // Additional debugging
-      secretMatchesExpected: webhookSecret.length > 0,
-      bodyIsNotEmpty: body.length > 0
-    });
-    
-    if (!isValid) {
-      console.error('🚫 Webhook signature verification FAILED - Enhanced debugging');
-      
-      // Try different approaches to see what might work
-      console.log('🔬 Additional signature analysis:', {
-        cleanSignatureFirst16: cleanSignature.substring(0, 16),
-        expectedHexFirst16: expectedHex.substring(0, 16),
-        signaturesDifferBy: cleanSignature === expectedHex ? 'exact match' : 'different',
-        caseInsensitiveMatch: cleanSignature.toLowerCase() === expectedHex.toLowerCase(),
-        bothLengthsCorrect: cleanSignature.length === 128 && expectedHex.length === 128
-      });
-      
-      // Test if it might work with a different prefix or no prefix
-      const signatureWithoutPrefix = signature.replace(/^sha256=|^sha512=/, '');
-      console.log('🧪 Testing alternate signature formats:', {
-        originalSignature: signature.substring(0, 20) + '...',
-        withoutAnyPrefix: signatureWithoutPrefix.substring(0, 20) + '...',
-        matchesWithoutPrefix: signatureWithoutPrefix.toLowerCase() === expectedHex.toLowerCase()
-      });
-    } else {
-      console.log('✅ Webhook signature verified successfully (SHA-512)');
-    }
-
-    return isValid;
-  } catch (error) {
-    console.error('❌ Signature verification error:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      algorithm: 'SHA-512',
-      signatureLength: signature?.length || 0,
-      bodyLength: body?.length || 0,
-      stack: error instanceof Error ? error.stack : 'No stack'
-    });
-    return false;
+  if (data) {
+    console.log(logMessage, data);
+  } else {
+    console.log(logMessage);
   }
 }
-
-// 🔍 PRODUCTION FIX: Environment validation at startup
-function validateProductionEnvironment(): void {
-  const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const isDevelopment = Deno.env.get('DENO_DEPLOYMENT_ID') === undefined;
-
-  console.log('🔧 Environment validation:', {
-    hasWebhookSecret: !!webhookSecret,
-    hasSupabaseUrl: !!supabaseUrl,
-    hasServiceRoleKey: !!serviceRoleKey,
-    isDevelopment,
-    secretLength: webhookSecret?.length || 0
-  });
-
-  if (!isDevelopment) {
-    const missingSecrets = [];
-    if (!webhookSecret) missingSecrets.push('PAYSTACK_WEBHOOK_SECRET');
-    if (!supabaseUrl) missingSecrets.push('SUPABASE_URL');
-    if (!serviceRoleKey) missingSecrets.push('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (missingSecrets.length > 0) {
-      console.error('🚨 CRITICAL PRODUCTION ERROR: Missing required environment variables:', missingSecrets);
-    }
-  }
-}
-
-// SECURITY: Simple rate limiting
-function checkRateLimit(clientIP: string): boolean {
-  const now = Date.now();
-  const existing = requestCounts.get(clientIP);
-  
-  if (!existing || now > existing.resetTime) {
-    requestCounts.set(clientIP, { count: 1, resetTime: now + RATE_WINDOW });
-    return true;
-  }
-  
-  if (existing.count >= RATE_LIMIT) {
-    console.warn(`🚫 Rate limit exceeded for IP: ${clientIP}`);
-    return false;
-  }
-  
-  existing.count++;
-  return true;
-}
-
-// SECURITY: Log security events
-async function logSecurityEvent(
-  supabase: any,
-  event: string, 
-  details: Record<string, any>
-) {
-  try {
-    await supabase.from('audit_logs').insert({
-      action: event,
-      category: 'webhook_security',
-      message: `Webhook security event: ${event}`,
-      new_values: details,
-      event_time: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Failed to log security event:', error);
-  }
-}
-
-// CORS headers
-const getCorsHeaders = () => ({
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-  'Vary': 'Origin',
-});
 
 serve(async (req: Request) => {
-  // 🔍 PRODUCTION FIX: Validate environment at startup
-  validateProductionEnvironment();
-
-  if (!req) {
-    console.error('❌ Null request object received');
-    return new Response(
-      JSON.stringify({ error: 'Invalid request' }),
-      { status: 400, headers: { ...getCorsHeaders(), 'Content-Type': 'application/json' } }
-    );
-  }
-
-  const corsHeaders = getCorsHeaders();
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  
+  log('info', '🔄 Payment callback function invoked', {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries())
+  });
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('✅ CORS preflight request handled');
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
-
   try {
-    // Get request info for security logging
-    const userAgent = req.headers?.get('user-agent') || 'Unknown';
-    const clientIP = req.headers?.get('x-forwarded-for') || req.headers?.get('cf-connecting-ip') || 'unknown';
-    const webhookSignature = req.headers?.get('x-paystack-signature') || '';
+    // Step 1: Extract reference with comprehensive debugging
+    const reference = await extractReference(req);
     
-    console.log('🔍 Processing request:', {
-      method: req.method,
-      clientIP: clientIP,
-      userAgent: userAgent.substring(0, 50) + '...',
-      hasSignature: !!webhookSignature
+    if (!reference) {
+      log('error', '❌ No payment reference found in request');
+      return createErrorRedirect('Missing payment reference - please ensure the payment was completed properly');
+    }
+
+    log('info', '📋 Processing payment reference', { reference });
+
+    // Step 2: Validate reference format
+    if (!isValidReference(reference)) {
+      log('error', '❌ Invalid reference format', { reference });
+      return createErrorRedirect(`Invalid payment reference format: ${reference}`);
+    }
+
+    // Step 3: Initialize Supabase client
+    const supabase = createSupabaseClient();
+    if (!supabase) {
+      log('error', '❌ Failed to initialize Supabase client');
+      return createErrorRedirect('Database connection failed');
+    }
+
+    // Step 4: Check if payment is already processed
+    const existingPayment = await checkExistingPayment(supabase, reference);
+    if (existingPayment?.processed) {
+      log('info', '✅ Payment already processed, redirecting to success', { reference });
+      return createSuccessRedirect(reference, existingPayment.order_id);
+    }
+
+    // Step 5: Verify payment with Paystack (with retries)
+    log('info', '🔍 Starting Paystack verification...');
+    const verificationResult = await verifyPaymentWithRetry(reference, 3, req);
+    
+    if (!verificationResult.success) {
+      log('error', '❌ Paystack verification failed', {
+        reference,
+        error: verificationResult.error,
+        attempts: verificationResult.attempts
+      });
+      return createErrorRedirect(`Payment verification failed: ${verificationResult.error}`);
+    }
+
+    log('info', '✅ Paystack verification successful', {
+      reference,
+      amount: verificationResult.data.amount,
+      status: verificationResult.data.status
     });
 
-    // Handle GET requests (user redirects from Paystack)
-    if (req.method === 'GET') {
-      console.log('🔄 GET request received - redirecting to frontend callback');
-      const url = new URL(req.url);
-      const orderId = url.searchParams.get('order_id');
-      
-      const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com";
-      const redirectUrl = orderId ? 
-        `${FRONTEND_URL}/payment/callback?order_id=${orderId}` : 
-        `${FRONTEND_URL}/payment/callback`;
-      
-      return new Response(null, {
-        status: 302,
-        headers: {
-          ...corsHeaders,
-          'Location': redirectUrl
-        }
-      });
+    // Step 6: Process the verified payment
+    const orderResult = await processVerifiedPayment(supabase, reference, verificationResult.data);
+    
+    if (!orderResult.success) {
+      log('error', '❌ Order processing failed', { reference, error: orderResult.error });
+      return createErrorRedirect(`Order processing failed: ${orderResult.error}`, reference);
     }
 
-    // Validate method (only POST for webhooks)
-    if (req.method !== 'POST') {
-      await logSecurityEvent(supabase, 'invalid_method', { 
-        method: req.method, 
-        clientIP,
-        userAgent 
-      });
+    log('info', '✅ Payment callback completed successfully', {
+      reference,
+      order_id: orderResult.order_id,
+      order_number: orderResult.order_number
+    });
+
+    // Step 7: Redirect to success page
+    return createSuccessRedirect(reference, orderResult.order_id);
+
+  } catch (error) {
+    log('error', '❌ Unexpected error in payment callback', {
+      error: error.message,
+      stack: error.stack
+    });
+    return createErrorRedirect(`Callback processing failed: ${error.message}`);
+  }
+});
+
+// Enhanced reference extraction with multiple fallbacks
+async function extractReference(req: Request): Promise<string | null> {
+  const url = new URL(req.url);
+  
+  // Check URL parameters first
+  let reference = url.searchParams.get('reference') || 
+                 url.searchParams.get('trxref') || 
+                 url.searchParams.get('txref') ||
+                 url.searchParams.get('tx_ref');
+
+  log('info', '🔍 Checking URL parameters for reference', {
+    urlParams: Object.fromEntries(url.searchParams.entries()),
+    foundReference: reference
+  });
+
+  // If not in URL, check request body
+  if (!reference && (req.method === 'POST' || req.method === 'PUT')) {
+    try {
+      const contentType = req.headers.get('content-type') || '';
       
-      console.error('❌ Invalid method:', req.method);
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (contentType.includes('application/json')) {
+        const body = await req.json();
+        reference = body.reference || body.trxref || body.txref || body.tx_ref;
+        log('info', '🔍 Checking JSON body for reference', { body, foundReference: reference });
+      } else if (contentType.includes('application/x-www-form-urlencoded')) {
+        const formData = await req.formData();
+        reference = formData.get('reference') || formData.get('trxref') || formData.get('txref');
+        log('info', '🔍 Checking form data for reference', { foundReference: reference });
+      }
+    } catch (e) {
+      log('warn', '⚠️ Could not parse request body', { error: e.message });
+    }
+  }
+
+  return reference;
+}
+
+// Enhanced reference validation with placeholder detection
+function isValidReference(reference: string): boolean {
+  if (!reference || typeof reference !== 'string') {
+    return false;
+  }
+  
+  // Check length (reasonable bounds)
+  if (reference.length < 5 || reference.length > 200) {
+    return false;
+  }
+  
+  // Guard against placeholder/test references
+  const placeholderPatterns = [
+    /^(test_|demo_|sample_|placeholder)/i,
+    /^txn_0+_/,
+    /^pay_0+_/,
+    /example/i,
+    /dummy/i
+  ];
+  
+  const isPlaceholder = placeholderPatterns.some(pattern => pattern.test(reference));
+  
+  if (isPlaceholder) {
+    log('error', '❌ Placeholder reference detected', { reference });
+    return false;
+  }
+  
+  // Check for valid characters (alphanumeric, underscore, hyphen)
+  const validFormat = /^[a-zA-Z0-9_-]+$/.test(reference);
+  
+  log('info', '🔍 Reference validation', {
+    reference,
+    length: reference.length,
+    validFormat,
+    isPlaceholder,
+    isValid: validFormat && !isPlaceholder
+  });
+  
+  return validFormat && !isPlaceholder;
+}
+
+// Initialize Supabase client with error handling
+function createSupabaseClient() {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      log('error', '❌ Missing Supabase configuration', {
+        hasUrl: !!supabaseUrl,
+        hasServiceKey: !!serviceRoleKey
+      });
+      return null;
     }
 
-    // Rate limiting
-    if (!checkRateLimit(clientIP)) {
-      await logSecurityEvent(supabase, 'rate_limit_exceeded', { 
-        clientIP,
-        userAgent 
-      });
-      
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
+    });
+  } catch (error) {
+    log('error', '❌ Failed to create Supabase client', { error: error.message });
+    return null;
+  }
+}
+
+// Check if payment is already processed
+async function checkExistingPayment(supabase: any, reference: string) {
+  try {
+    log('info', '🔍 Checking for existing payment', { reference });
+    
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, order_number, status, payment_status')
+      .eq('payment_reference', reference)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+      log('warn', '⚠️ Error checking existing payment', { reference, error });
+      return null;
     }
 
-    // Parse and verify webhook payload
-    let webhookData: PaystackWebhookData;
-    let rawBody: string;
+    if (data) {
+      const processed = data.status === 'confirmed' && data.payment_status === 'paid';
+      log('info', '🔍 Existing payment found', {
+        reference,
+        order_id: data.id,
+        status: data.status,
+        payment_status: data.payment_status,
+        processed
+      });
+      
+      return {
+        order_id: data.id,
+        order_number: data.order_number,
+        processed
+      };
+    }
+
+    return null;
+  } catch (error) {
+    log('error', '❌ Failed to check existing payment', { reference, error: error.message });
+    return null;
+  }
+}
+
+// Enhanced Paystack verification with retry logic
+async function verifyPaymentWithRetry(reference: string, maxAttempts: number = 3, req?: Request) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    log('info', `🔍 Paystack verification attempt ${attempt}/${maxAttempts}`, { reference });
     
     try {
-      rawBody = await req.text();
+      const result = await verifyPaymentWithPaystack(reference, req);
       
-      if (!rawBody || rawBody.trim() === '') {
-        throw new Error('Empty request body');
+      if (result.success) {
+        return { ...result, attempts: attempt };
       }
       
-      // Verify webhook signature
-      const signatureValid = await verifyWebhookSignature(rawBody, webhookSignature);
-      if (!signatureValid) {
-        // 🔍 FALLBACK: Check if request comes from valid Paystack IP
-        console.log('🔄 Signature verification failed, trying IP validation fallback...');
-        
-        const paystackIPs = [
-          '52.31.139.75',
-          '52.49.173.169', 
-          '52.214.14.220',
-          '13.248.121.73',
-          '13.248.121.74',
-          '13.248.121.78'
-        ];
-        
-        const requestIP = clientIP.split(',')[0]?.trim(); // Get first IP from forwarded list
-        const isValidIP = paystackIPs.includes(requestIP);
-        
-        console.log('🔍 IP validation check:', {
-          requestIP: requestIP,
-          isValidPaystackIP: isValidIP,
-          knownPaystackIPs: paystackIPs
+      lastError = result.error;
+      
+      // Enhanced retry logic: retry on 400 "Transaction reference not found" AND 404 errors
+      const isRetryableError = result.error.includes('not found') || 
+                               result.error.includes('Transaction reference not found') ||
+                               result.error.includes('400');
+      
+      if (isRetryableError && attempt < maxAttempts) {
+        const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+        log('info', `⏳ Retryable error detected, waiting ${delay}ms before retry...`, { 
+          reference, 
+          attempt, 
+          error: result.error,
+          isRetryableError 
         });
-        
-        if (!isValidIP) {
-          await logSecurityEvent(supabase, 'invalid_signature_and_ip', { 
-            clientIP,
-            userAgent,
-            bodyLength: rawBody.length,
-            webhookSignature: webhookSignature?.substring(0, 20) + '...'
-          });
-          
-          console.error('🚫 Both signature verification and IP validation failed');
-          return new Response(
-            JSON.stringify({ error: 'Invalid webhook signature and IP' }),
-            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        
-        console.log('✅ IP validation passed - proceeding with webhook processing');
-        await logSecurityEvent(supabase, 'webhook_processed_via_ip', { 
-          clientIP,
-          userAgent,
-          reference: JSON.parse(rawBody)?.data?.reference || 'unknown'
-        });
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
       }
       
-      console.log('📝 Request body preview:', rawBody.substring(0, 200) + '...');
-      webhookData = JSON.parse(rawBody);
+      // For non-retryable errors, break immediately
+      if (!isRetryableError) {
+        log('warn', '❌ Non-retryable error, stopping attempts', { 
+          reference, 
+          error: result.error,
+          attempt 
+        });
+        break;
+      }
+      
+    } catch (error) {
+      lastError = error.message;
+      log('error', `❌ Attempt ${attempt} failed`, { reference, error: error.message });
+      
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  }
+  
+  return {
+    success: false,
+    error: lastError || 'All verification attempts failed',
+    attempts: maxAttempts
+  };
+}
+
+// Enhanced Paystack verification function
+async function verifyPaymentWithPaystack(reference: string, req?: Request) {
+  try {
+    // Get centralized configuration
+    const paystackConfig = getPaystackConfiguration(req || new Request('https://example.com'));
+    if (!paystackConfig) {
+      return {
+        success: false,
+        error: 'Paystack configuration not available'
+      };
+    }
+
+    log('info', '🔍 Making Paystack API request', {
+      reference,
+      keyEnvironment: paystackConfig.isTestMode ? 'TEST' : 'LIVE',
+      keyPrefix: paystackConfig.secretKey.substring(0, 10) + '...'
+    });
+
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${paystackConfig.secretKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': `PaystackCallback/${VERSION}`
+      },
+      signal: AbortSignal.timeout(15000)
+    });
+
+    log('info', '🔍 Paystack API response received', {
+      reference,
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      log('error', '❌ Paystack API error response', {
+        reference,
+        status: response.status,
+        responseText
+      });
+      return {
+        success: false,
+        error: `Paystack API error: ${response.status} - ${responseText}`
+      };
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
     } catch (parseError) {
-      await logSecurityEvent(supabase, 'invalid_payload', { 
-        clientIP,
-        error: parseError instanceof Error ? parseError.message : 'Unknown parse error',
-        bodyLength: rawBody?.length || 0
+      log('error', '❌ Failed to parse Paystack response', {
+        reference,
+        responseText,
+        parseError: parseError.message
       });
-      
-      console.error('❌ Failed to parse webhook JSON:', parseError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid JSON payload',
-          details: parseError instanceof Error ? parseError.message : 'Unknown parse error'
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return {
+        success: false,
+        error: 'Invalid response format from Paystack'
+      };
     }
 
-    // Validate webhook structure
-    if (!webhookData || typeof webhookData !== 'object') {
-      console.error('❌ Invalid webhook data structure');
-      return new Response(
-        JSON.stringify({ error: 'Invalid webhook data structure' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    log('info', '🔍 Parsed Paystack response', {
+      reference,
+      dataStatus: data.status,
+      transactionStatus: data.data?.status,
+      amount: data.data?.amount,
+      currency: data.data?.currency
+    });
+
+    if (!data.status) {
+      return {
+        success: false,
+        error: data.message || 'Paystack verification failed'
+      };
     }
 
-    const { event, data } = webhookData;
+    if (data.data.status !== 'success') {
+      return {
+        success: false,
+        error: `Payment status is ${data.data.status}: ${data.data.gateway_response || 'Transaction not successful'}`
+      };
+    }
+
+    log('info', '✅ Paystack verification successful', {
+      reference,
+      amount: data.data.amount / 100,
+      currency: data.data.currency,
+      customer: data.data.customer?.email
+    });
+
+    return {
+      success: true,
+      data: data.data
+    };
+
+  } catch (error) {
+    log('error', '❌ Paystack verification exception', {
+      reference,
+      error: error.message,
+      stack: error.stack
+    });
+    return {
+      success: false,
+      error: `Verification failed: ${error.message}`
+    };
+  }
+}
+
+// Enhanced Paystack configuration using centralized config
+function getPaystackConfiguration(req: Request) {
+  try {
+    const config = getPaystackConfig(req);
+    const validation = validatePaystackConfig(config);
     
-    if (!data || !data.reference) {
-      await logSecurityEvent(supabase, 'missing_reference', { 
-        clientIP,
-        event,
-        hasData: !!data
-      });
-      
-      console.error('❌ Missing required data fields:', { event, data });
-      return new Response(
-        JSON.stringify({ error: 'Missing reference in webhook data' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!validation.isValid) {
+      log('error', '❌ Paystack configuration invalid', { errors: validation.errors });
+      return null;
     }
-
-    console.log('📝 Webhook event:', event);
-    console.log('📋 Payment reference:', data.reference);
-    console.log('📊 Payment status from Paystack:', data.status);
-
-    // Map status with null-safety
-    let orderStatus: ValidOrderStatus;
-    const paystackStatus = data.status?.toString().toLowerCase().trim();
-
-    if (!paystackStatus || paystackStatus === 'null' || paystackStatus === 'undefined' || paystackStatus === '') {
-      console.warn('⚠️ Empty or invalid status from Paystack:', data.status);
-      orderStatus = 'failed';
-    } else if (VALID_ORDER_STATUSES[paystackStatus as keyof typeof VALID_ORDER_STATUSES]) {
-      orderStatus = VALID_ORDER_STATUSES[paystackStatus as keyof typeof VALID_ORDER_STATUSES];
-    } else {
-      console.warn('⚠️ Unknown Paystack status:', paystackStatus, '- mapping to failed');
-      orderStatus = 'failed';
-    }
-
-    console.log('✅ Mapped order status:', paystackStatus, '->', orderStatus);
-
-    // Double-check we never pass null/undefined
-    if (!orderStatus) {
-      console.error('🚨 Order status is still null after mapping - forcing to failed');
-      orderStatus = 'failed';
-    }
-
-    // Call the database function
-    console.log('🔧 Calling update_order_status_safe RPC with validated status:', orderStatus);
     
-    const { data: rpcResult, error: rpcError } = await supabase.rpc('update_order_status_safe', {
-      p_reference: data.reference,
-      p_status: orderStatus,
-      p_amount: data.amount || null,
-      p_customer_email: data.customer?.email || null
+    logPaystackConfigStatus(config);
+    return config;
+  } catch (error) {
+    log('error', '❌ Failed to get Paystack configuration', { error: error.message });
+    return null;
+  }
+}
+
+// Process verified payment
+async function processVerifiedPayment(supabase: any, reference: string, paystackData: any) {
+  try {
+    const paystackAmount = paystackData.amount ? paystackData.amount / 100 : null;
+
+    log('info', '🔧 Processing verified payment via RPC', {
+      reference,
+      amount: paystackAmount,
+      currency: paystackData.currency
+    });
+
+    // Use secure RPC to verify and update payment status (avoids double trigger firing)
+    const { data: orderResult, error: rpcError } = await supabase.rpc('verify_and_update_payment_status', {
+      payment_ref: reference,
+      new_status: 'confirmed',
+      payment_amount: paystackAmount,
+      payment_gateway_response: paystackData
     });
 
     if (rpcError) {
-      console.error('❌ RPC returned error', {
-        reference: data.reference,
-        error: rpcError.message,
-        details: rpcError.details,
-        hint: rpcError.hint
-      });
-
-      return new Response(
-        JSON.stringify({ 
-          error: 'Database update failed', 
-          details: rpcError.message,
-          reference: data.reference
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Handle duplicate key constraint or payment confirmation duplicates as idempotent success
+      if (rpcError.message && (
+        rpcError.message.includes('duplicate key value violates unique constraint') ||
+        rpcError.message.includes('idx_communication_events_unique_payment_confirmation')
+      )) {
+        log('info', '✅ Payment confirmation already exists (idempotent success)', { 
+          reference, 
+          constraint_error: rpcError.message 
+        });
+        
+        // Fetch the existing order for success redirect
+        try {
+          const { data: existingOrder, error: fetchError } = await supabase
+            .from('orders')
+            .select('id, order_number, status, payment_status')
+            .eq('payment_reference', reference)
+            .maybeSingle();
+            
+          if (fetchError || !existingOrder) {
+            log('error', '❌ Could not fetch existing order after duplicate constraint', { 
+              reference, 
+              fetchError: fetchError?.message 
+            });
+            return {
+              success: false,
+              error: 'Payment processed but order details unavailable'
+            };
+          }
+          
+          log('info', '✅ Successfully fetched existing order after idempotent success', {
+            reference,
+            order_id: existingOrder.id,
+            order_number: existingOrder.order_number,
+            status: existingOrder.status,
+            payment_status: existingOrder.payment_status
+          });
+          
+          return {
+            success: true,
+            order_id: existingOrder.id,
+            order_number: existingOrder.order_number
+          };
+        } catch (fetchError) {
+          log('error', '❌ Exception fetching existing order after duplicate constraint', { 
+            reference, 
+            error: fetchError.message 
+          });
+          return {
+            success: false,
+            error: 'Payment processed but order verification failed'
+          };
+        }
+      }
+      
+      log('error', '❌ RPC verification failed', { reference, error: rpcError });
+      return {
+        success: false,
+        error: rpcError.message || 'Database operation failed'
+      };
     }
 
-    console.log('✅ RPC call successful:', rpcResult);
+    // Handle both array and object returns from RPC
+    let orderData;
+    if (Array.isArray(orderResult)) {
+      if (!orderResult || orderResult.length === 0) {
+        log('error', '❌ No order data returned from RPC (array empty)', { reference });
+        return {
+          success: false,
+          error: 'Order not found or already processed'
+        };
+      }
+      orderData = orderResult[0];
+    } else if (orderResult && typeof orderResult === 'object') {
+      orderData = orderResult;
+    } else {
+      log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
+      return {
+        success: false,
+        error: 'Order not found or already processed'
+      };
+    }
 
-    // Log successful payment processing
-    await logSecurityEvent(supabase, 'payment_processed', { 
-      clientIP,
-      reference: data.reference,
-      event,
-      mappedStatus: orderStatus,
-      amount: data.amount
+    // Check if RPC returned error result
+    if (orderData && orderData.success === false) {
+      log('error', '❌ RPC returned error', { reference, error: orderData.error });
+      return {
+        success: false,
+        error: orderData.error || 'Payment processing failed'
+      };
+    }
+
+    // Ensure we have required fields
+    if (!orderData || !orderData.order_id) {
+      log('error', '❌ Order data missing required fields', { reference, orderData });
+      return {
+        success: false,
+        error: 'Invalid order data returned'
+      };
+    }
+    log('info', '✅ RPC operation successful', {
+      reference,
+      order_id: orderData.order_id,
+      order_number: orderData.order_number
     });
 
-    // Return success response
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Webhook processed successfully',
-        reference: data.reference,
-        mapped_status: orderStatus,
-        timestamp: new Date().toISOString()
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // Update payment status and method explicitly (non-blocking)
+    try {
+      await supabase.from('orders').update({
+        payment_status: 'paid',
+        payment_method: 'Paystack'
+      }).eq('id', orderData.order_id);
+      
+      log('info', '✅ Payment status and method updated (paid, Paystack)');
+    } catch (paymentStatusError) {
+      log('warn', '⚠️ Payment status/method update failed (non-blocking)', {
+        error: paymentStatusError.message
+      });
+    }
+
+    // Update/create payment transaction record (non-blocking)
+    try {
+      await supabase.from('payment_transactions').upsert({
+        reference: reference,
+        provider_reference: reference,
+        amount: paystackAmount || orderData.amount,
+        currency: paystackData.currency || 'NGN',
+        status: 'completed',
+        gateway_response: JSON.stringify(paystackData),
+        verified_at: new Date().toISOString(),
+        order_id: orderData.order_id
+      }, {
+        onConflict: 'reference'
+      });
+      
+    log('info', '✅ Payment transaction record updated');
+
+    // P0 HOTFIX: Fetch customer_email if missing from RPC response
+    let customerEmail = orderData.customer_email;
+    let customerName = orderData.customer_name;
+    
+    if (!customerEmail && orderData.order_id) {
+      log('warn', '⚠️ Customer email missing from RPC, fetching from orders table', { 
+        order_id: orderData.order_id, 
+        reference 
+      });
+      
+      try {
+        const { data: orderDetails, error: fetchError } = await supabase
+          .from('orders')
+          .select('customer_email, customer_name')
+          .eq('id', orderData.order_id)
+          .maybeSingle();
+          
+        if (!fetchError && orderDetails) {
+          customerEmail = orderDetails.customer_email;
+          customerName = orderDetails.customer_name || customerName;
+          log('info', '✅ Customer email fetched successfully', { 
+            order_id: orderData.order_id, 
+            customer_email: customerEmail ? 'present' : 'still_missing',
+            reference 
+          });
+        } else {
+          log('warn', '⚠️ Could not fetch customer email from orders table', { 
+            order_id: orderData.order_id, 
+            error: fetchError?.message,
+            reference 
+          });
+        }
+      } catch (fetchException) {
+        log('warn', '⚠️ Exception fetching customer email', { 
+          order_id: orderData.order_id, 
+          error: fetchException.message,
+          reference 
+        });
+      }
+    }
+
+    // Enhanced immediate payment confirmation email with fallback queue
+    try {
+      // P0 HOTFIX: Only attempt email send if we have a valid recipient
+      if (!customerEmail || typeof customerEmail !== 'string' || !customerEmail.includes('@')) {
+        log('warn', '⚠️ No valid customer email - skipping immediate send, using queue fallback only', {
+          order_id: orderData.order_id,
+          customer_email: customerEmail ? 'invalid_format' : 'missing',
+          reference
+        });
+        
+        // Skip direct send, go straight to fallback queue
+        throw new Error('No valid customer email available for immediate send');
+      }
+
+      const confirmationEmailResult = await supabase.functions.invoke('unified-smtp-sender', {
+        body: {
+          to: customerEmail,
+          subject: 'Payment Confirmation - Order ' + orderData.order_number,
+          templateKey: 'payment_confirmation',
+          variables: {
+            customerName: customerName || 'Valued Customer',
+            orderNumber: orderData.order_number,
+            amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+            paymentMethod: 'Paystack',
+            orderType: orderData.order_type || 'order'
+          }
+        }
+      });
+
+      // Enhanced error logging with HTTP status and response details
+      if (confirmationEmailResult.error) {
+        const errorDetails = {
+          error: confirmationEmailResult.error.message || 'Unknown error',
+          httpStatus: confirmationEmailResult.status || 'unknown',
+          responseBody: confirmationEmailResult.data || null,
+          order_id: orderData.order_id,
+          customer_email: orderData.customer_email,
+          reference: reference
+        };
+        
+        log('warn', '⚠️ Immediate payment confirmation email failed - creating idempotent queue fallback', errorDetails);
+        
+        // Idempotent queue fallback: Use RPC function for safe insertion
+        try {
+          const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
+            p_reference: reference,
+            p_order_id: orderData.order_id,
+            p_recipient_email: customerEmail || orderData.customer_email,
+            p_template_variables: {
+              customerName: customerName || 'Valued Customer',
+              orderNumber: orderData.order_number,
+              amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+              paymentMethod: 'Paystack',
+              orderType: orderData.order_type || 'order',
+              fallback_reason: 'immediate_send_failed'
+            }
+          });
+          
+          if (rpcError) {
+            log('warn', '⚠️ Idempotent email event creation failed', {
+              order_id: orderData.order_id,
+              rpcError: rpcError.message,
+              reference
+            });
+          } else {
+            log('info', '✅ Payment confirmation queued for later delivery (idempotent)', {
+              order_id: orderData.order_id,
+              event_id: eventId,
+              fallback_used: true,
+              reference
+            });
+          }
+        } catch (queueError) {
+          log('error', '❌ Failed to queue payment confirmation fallback via RPC', {
+            order_id: orderData.order_id,
+            queueError: queueError.message,
+            reference
+          });
+        }
+      } else {
+        log('info', '✅ Payment confirmation email sent immediately', {
+          order_id: orderData.order_id,
+          customer_email: customerEmail,
+          messageId: confirmationEmailResult.data?.messageId,
+          provider: confirmationEmailResult.data?.provider,
+          reference
+        });
+      }
+    } catch (emailError) {
+      const errorDetails = {
+        error: emailError.message,
+        stack: emailError.stack,
+        order_id: orderData.order_id,
+        customer_email: customerEmail,
+        reference: reference
+      };
+      
+      log('warn', '⚠️ Exception sending immediate payment confirmation - creating idempotent queue fallback', errorDetails);
+      
+      // Idempotent queue fallback for exceptions too
+      try {
+        const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
+          p_reference: reference,
+          p_order_id: orderData.order_id,
+          p_recipient_email: customerEmail || orderData.customer_email,
+          p_template_variables: {
+            customerName: customerName || 'Valued Customer',
+            orderNumber: orderData.order_number,
+            amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+            paymentMethod: 'Paystack',
+            orderType: orderData.order_type || 'order',
+            fallback_reason: 'exception_during_send'
+          }
+        });
+        
+        if (rpcError) {
+          log('error', '❌ Critical: Failed both immediate send and idempotent queue fallback', {
+            order_id: orderData.order_id,
+            originalError: emailError.message,
+            rpcError: rpcError.message,
+            reference
+          });
+        } else {
+          log('info', '✅ Payment confirmation queued after exception (idempotent)', {
+            order_id: orderData.order_id,
+            event_id: eventId,
+            fallback_used: true,
+            reference
+          });
+        }
+      } catch (queueError) {
+        log('error', '❌ Critical: Exception during idempotent queue fallback', {
+          order_id: orderData.order_id,
+          originalError: emailError.message,
+          queueError: queueError.message,
+          reference
+        });
+      }
+    }
+    } catch (txnError) {
+      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
+        error: txnError.message
+      });
+    }
+
+    return {
+      success: true,
+      order_id: orderData.order_id,
+      order_number: orderData.order_number
+    };
 
   } catch (error) {
-    console.error('❌ Webhook processing error:', error);
-    
-    console.error('🔍 Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace',
-      name: error instanceof Error ? error.name : 'Unknown error type'
+    log('error', '❌ Payment processing failed', {
+      reference,
+      error: error.message
     });
-
-    return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }),
-      { status: 500, headers: corsHeaders }
-    );
+    return {
+      success: false,
+      error: error.message
+    };
   }
-});
+}
+
+// Create success redirect
+function createSuccessRedirect(reference: string, orderId: string) {
+  const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
+  const successUrl = `${frontendUrl}/payment/callback?reference=${encodeURIComponent(reference)}&status=success&order_id=${encodeURIComponent(orderId)}`;
+  
+  log('info', '✅ Creating success redirect', { successUrl });
+  
+  const corsHeaders = getCorsHeaders(null);
+  
+  return new Response(null, {
+    status: 302,
+    headers: {
+      ...corsHeaders,
+      'Location': successUrl
+    }
+  });
+}
+
+// Create error redirect
+function createErrorRedirect(message: string, reference?: string) {
+  const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
+  const errorParams = new URLSearchParams({
+    status: 'error',
+    message: message
+  });
+  
+  // Include reference if provided for better error handling
+  if (reference) {
+    errorParams.set('reference', reference);
+  }
+  
+  const errorUrl = `${frontendUrl}/payment/callback?${errorParams.toString()}`;
+  
+  log('error', '❌ Creating error redirect', { errorUrl, message, reference });
+  
+  const corsHeaders = getCorsHeaders(null);
+  
+  return new Response(null, {
+    status: 302,
+    headers: {
+      ...corsHeaders,
+      'Location': errorUrl
+    }
+  });
+}

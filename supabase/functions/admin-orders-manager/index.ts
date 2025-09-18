@@ -58,170 +58,6 @@ const supabaseClient = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
-// PRODUCTION: Background notification handler - completely isolated from order updates
-async function handleStatusChangeNotification(supabaseClient: any, orderId: string, order: any, newStatus: string) {
-  try {
-    // CRITICAL: Additional validation to prevent enum errors
-    const validStatuses = [
-      'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 
-      'delivered', 'cancelled', 'refunded', 'completed', 'returned'
-    ];
-    
-    if (!newStatus || typeof newStatus !== 'string' || !validStatuses.includes(newStatus.trim())) {
-      console.error(`❌ CRITICAL: Invalid status in notification handler: "${newStatus}"`);
-      return; // Abort notification for invalid status
-    }
-    
-    const sanitizedStatus = newStatus.trim();
-    console.log(`📱 Processing status change notification for order ${order.order_number} -> ${sanitizedStatus}`)
-    
-    // Try email first
-    if (order.customer_email) {
-      try {
-        console.log(`📧 Attempting email notification to ${order.customer_email}`)
-        
-        // Create a unique dedupe_key with timestamp to prevent duplicates
-        const templateKey = `order_${sanitizedStatus}`;
-        const dedupeKey = `${orderId}|order_status_update|${templateKey}|${order.customer_email}|${Date.now()}`;
-        
-        const communicationEvent = {
-          order_id: orderId,
-          event_type: 'order_status_update',
-          recipient_email: order.customer_email,
-          template_key: templateKey,
-          template_variables: {
-            customer_name: order.customer_name || 'Customer',
-            order_number: order.order_number,
-            status: sanitizedStatus,
-            status_display: sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            updated_at: new Date().toISOString()
-          },
-          variables: {
-            customer_name: order.customer_name || 'Customer',
-            order_number: order.order_number,
-            status: sanitizedStatus
-          },
-          status: 'queued',
-          dedupe_key: dedupeKey,
-          source: 'admin_update',
-          email_type: 'transactional',
-          priority: 'normal',
-          scheduled_at: new Date().toISOString()
-        };
-
-        // Use insert since keys are now guaranteed unique
-        const { data: eventResult, error: emailError } = await supabaseClient
-          .from('communication_events')
-          .insert(communicationEvent)
-          .select('id');
-
-        if (emailError) {
-          // Check for duplicate key error (edge case)
-          if (emailError.code === '23505') {
-            console.warn(`📧 Duplicate email event skipped (edge case): ${dedupeKey}`)
-            return; // Skip SMS fallback for duplicates
-          }
-          console.log(`⚠️ Email failed, trying SMS fallback: ${emailError.message}`)
-          throw new Error(`Email failed: ${emailError.message}`)
-        } else {
-          console.log(`✅ Email notification queued successfully`)
-          return; // Success - no need for SMS
-        }
-      } catch (emailError: any) {
-        // Handle duplicate key errors gracefully
-        if (emailError.code === '23505') {
-          console.warn(`📧 Duplicate email event skipped (edge case): ${dedupeKey}`)
-          return; // Skip SMS fallback for duplicates
-        }
-        console.log(`⚠️ Email exception, trying SMS fallback: ${emailError.message}`)
-        // Continue to SMS fallback
-      }
-    }
-    
-    // SMS Fallback - if email fails or no email available
-    if (order.customer_phone) {
-      try {
-        console.log(`📱 Attempting SMS notification to ${order.customer_phone}`)
-        
-        const smsMessage = `Hi ${order.customer_name || 'Customer'}! Your order ${order.order_number} status has been updated to: ${newStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}. Thank you for choosing us!`;
-        
-        // Create a unique dedupe_key for SMS with timestamp to prevent duplicates
-        const smsDedupeKey = `${orderId}|order_status_update|sms|${order.customer_phone}|${Date.now()}`;
-        
-        // Insert SMS communication event since keys are now guaranteed unique
-        const { error: smsError } = await supabaseClient
-          .from('communication_events')
-          .insert({
-            event_type: 'order_status_update',
-            channel: 'sms',
-            sms_phone: order.customer_phone,
-            template_variables: {
-              customer_name: order.customer_name || 'Customer',
-              order_number: order.order_number,
-              status: newStatus,
-              message: smsMessage
-            },
-            variables: {
-              customer_name: order.customer_name || 'Customer',
-              order_number: order.order_number,
-              status: sanitizedStatus
-            },
-            order_id: orderId,
-            status: 'queued',
-            priority: 'normal',
-            source: 'admin_update_fallback',
-            dedupe_key: smsDedupeKey,
-            email_type: 'transactional',
-            scheduled_at: new Date().toISOString()
-          });
-        
-        if (smsError) {
-          // Check for duplicate key error (edge case)
-          if (smsError.code === '23505') {
-            console.warn(`📱 Duplicate SMS event skipped (edge case): ${smsDedupeKey}`)
-          } else {
-            console.log(`⚠️ SMS fallback also failed: ${smsError.message}`)
-          }
-        } else {
-          console.log(`✅ SMS fallback notification queued successfully`)
-        }
-      } catch (smsError: any) {
-        // Handle duplicate key errors gracefully
-        if (smsError.code === '23505') {
-          console.warn(`📱 Duplicate SMS event skipped (edge case): ${smsDedupeKey}`)
-        } else {
-          console.log(`⚠️ SMS fallback exception: ${smsError.message}`)
-        }
-      }
-    }
-    
-    // Log notification attempt in audit trail
-    await supabaseClient
-      .from('audit_logs')
-      .insert({
-        action: 'status_change_notification_attempted',
-        category: 'Order Management',
-        message: `Notification attempted for order ${order.order_number} status change to ${newStatus}`,
-        entity_id: orderId,
-        new_values: {
-          old_status: order.status,
-          new_status: newStatus,
-          customer_email: order.customer_email,
-          customer_phone: order.customer_phone,
-          notification_channels_attempted: [
-            order.customer_email ? 'email' : null,
-            order.customer_phone ? 'sms' : null
-          ].filter(Boolean)
-        }
-      })
-      .single();
-      
-  } catch (error) {
-    console.error(`⚠️ Complete notification failure for order ${orderId}:`, error)
-    // Even complete failure should not throw - this is truly fire-and-forget
-  }
-}
-
 serve(async (req) => {
   const origin = req.headers.get('origin')
   
@@ -677,23 +513,69 @@ serve(async (req) => {
           })
         }
 
-        // PRODUCTION: Send status change notification (completely non-blocking)
-        if (sanitizedUpdates.status && sanitizedUpdates.status !== currentOrder.status) {
-          // Fire and forget - run notification in background without blocking order update
-          const notificationPromise = handleStatusChangeNotification(
-            supabaseClient,
-            orderId,
-            currentOrder,
-            sanitizedUpdates.status
-          );
-          
-          // Log that notification was triggered but don't await it
-          console.log(`🔔 Status change notification triggered: ${currentOrder.status} -> ${sanitizedUpdates.status}`)
-          
-          // Use background task pattern to ensure it runs but doesn't block
-          notificationPromise.catch(error => {
-            console.error('⚠️ Background notification failed (non-blocking):', error)
-          });
+        // Trigger status change email if status has changed and customer has email
+        if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
+          try {
+            console.log(`Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
+            
+            // Create HMAC signature for internal authentication
+            const timestamp = Math.floor(Date.now() / 1000).toString()
+            const message = `${timestamp}:user-journey-automation`
+            const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
+            
+            const encoder = new TextEncoder()
+            const keyData = await crypto.subtle.importKey(
+              'raw',
+              encoder.encode(secret),
+              { name: 'HMAC', hash: 'SHA-256' },
+              false,
+              ['sign']
+            )
+            
+            const signature = await crypto.subtle.sign(
+              'HMAC',
+              keyData,
+              encoder.encode(message)
+            )
+            
+            const signatureHex = Array.from(new Uint8Array(signature))
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('')
+            
+            const { error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
+              body: {
+                journey_type: 'order_status_change',
+                user_data: {
+                  email: currentOrder.customer_email,
+                  name: currentOrder.customer_name
+                },
+                order_data: {
+                  order_id: orderId,
+                  order_number: currentOrder.order_number,
+                  status: updates.status
+                },
+                metadata: {
+                  old_status: currentOrder.status,
+                  new_status: updates.status,
+                  updated_at: new Date().toISOString()
+                }
+              },
+              headers: {
+                'x-internal-secret': signatureHex,
+                'x-timestamp': timestamp
+              }
+            })
+
+            if (emailError) {
+              console.error('Failed to trigger status change email:', emailError)
+              // Don't fail the order update if email fails
+            } else {
+              console.log('✅ Status change email triggered successfully')
+            }
+          } catch (emailError) {
+            console.error('Error triggering status change email:', emailError)
+            // Don't fail the order update if email fails
+          }
         }
 
         return new Response(JSON.stringify({

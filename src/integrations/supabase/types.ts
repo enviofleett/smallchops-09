@@ -5842,50 +5842,6 @@ export type Database = {
           },
         ]
       }
-      payment_logs: {
-        Row: {
-          amount: number | null
-          created_at: string | null
-          customer_email: string | null
-          id: number
-          log_data: Json | null
-          order_id: string | null
-          processed_at: string | null
-          reference: string
-          status: string | null
-        }
-        Insert: {
-          amount?: number | null
-          created_at?: string | null
-          customer_email?: string | null
-          id?: number
-          log_data?: Json | null
-          order_id?: string | null
-          processed_at?: string | null
-          reference: string
-          status?: string | null
-        }
-        Update: {
-          amount?: number | null
-          created_at?: string | null
-          customer_email?: string | null
-          id?: number
-          log_data?: Json | null
-          order_id?: string | null
-          processed_at?: string | null
-          reference?: string
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_logs_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       payment_polling_state: {
         Row: {
           created_at: string
@@ -8903,42 +8859,6 @@ export type Database = {
         }
         Relationships: []
       }
-      security_monitor_view: {
-        Row: {
-          action: string | null
-          category: string | null
-          entity_id: string | null
-          event_time: string | null
-          id: string | null
-          message: string | null
-          new_values: Json | null
-          risk_level: string | null
-          user_id: string | null
-        }
-        Insert: {
-          action?: string | null
-          category?: string | null
-          entity_id?: string | null
-          event_time?: string | null
-          id?: string | null
-          message?: string | null
-          new_values?: Json | null
-          risk_level?: never
-          user_id?: string | null
-        }
-        Update: {
-          action?: string | null
-          category?: string | null
-          entity_id?: string | null
-          event_time?: string | null
-          id?: string | null
-          message?: string | null
-          new_values?: Json | null
-          risk_level?: never
-          user_id?: string | null
-        }
-        Relationships: []
-      }
     }
     Functions: {
       activate_admin_user: {
@@ -9248,9 +9168,9 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      cleanup_old_audit_logs: {
+      cleanup_old_communication_events: {
         Args: Record<PropertyKey, never>
-        Returns: number
+        Returns: undefined
       }
       cleanup_old_email_events: {
         Args: Record<PropertyKey, never>
@@ -9856,20 +9776,6 @@ export type Database = {
           template_variables: Json | null
           updated_at: string
           variables: Json | null
-        }[]
-      }
-      get_security_events: {
-        Args: { p_limit?: number; p_risk_level?: string }
-        Returns: {
-          action: string
-          category: string
-          entity_id: string
-          event_time: string
-          id: string
-          message: string
-          new_values: Json
-          risk_level: string
-          user_id: string
         }[]
       }
       get_smtp_config_with_fallback: {
@@ -10505,24 +10411,6 @@ export type Database = {
         Args: { p_assignment_id: string; p_notes?: string; p_status: string }
         Returns: Json
       }
-      update_order_status: {
-        Args: {
-          new_order_status: string
-          new_payment_status: string
-          order_id: string
-          payment_data?: Json
-        }
-        Returns: undefined
-      }
-      update_order_status_safe: {
-        Args: {
-          p_amount?: number
-          p_customer_email?: string
-          p_reference: string
-          p_status: string
-        }
-        Returns: Json
-      }
       update_order_with_payment_reference: {
         Args: {
           new_payment_reference: string
@@ -10568,17 +10456,6 @@ export type Database = {
           p_event_type: string
           p_order_id?: string
           p_recipient_email: string
-          p_template_key: string
-          p_template_variables?: Json
-        }
-        Returns: Json
-      }
-      upsert_communication_event_production: {
-        Args: {
-          p_event_type: string
-          p_order_id?: string
-          p_recipient_email: string
-          p_source?: string
           p_template_key: string
           p_template_variables?: Json
         }

@@ -130,12 +130,12 @@ const TRIGGER_HANDLERS = {
     };
 
     // Send payment confirmation
-    await supabase.functions.invoke('unified-smtp-sender', {
+    await supabase.functions.invoke('supabase-auth-email-sender', {
       body: {
-        template_key: 'payment_confirmation',
+        templateId: 'payment_confirmation',
         to: paymentData.customerEmail,
         variables: paymentData,
-        email_type: 'transactional'
+        emailType: 'transactional'
       }
     });
 
@@ -217,12 +217,12 @@ const TRIGGER_HANDLERS = {
     };
 
     // Send delivery confirmation and request feedback
-    await supabase.functions.invoke('unified-smtp-sender', {
+    await supabase.functions.invoke('supabase-auth-email-sender', {
       body: {
-        template_key: 'delivery_completed',
+        templateId: 'delivery_completed',
         to: deliveryData.customerEmail,
         variables: deliveryData,
-        email_type: 'transactional'
+        emailType: 'transactional'
       }
     });
 
@@ -259,15 +259,15 @@ const TRIGGER_HANDLERS = {
 
     // Send to all subscribed customers
     for (const customer of customers || []) {
-      await supabase.functions.invoke('unified-smtp-sender', {
+      await supabase.functions.invoke('supabase-auth-email-sender', {
         body: {
-          template_key: 'new_menu_item',
+          templateId: 'new_menu_item',
           to: customer.email,
           variables: {
             customerName: customer.name,
             ...menuData
           },
-          email_type: 'marketing'
+          emailType: 'marketing'
         }
       });
     }
@@ -303,15 +303,15 @@ const TRIGGER_HANDLERS = {
     const { data: targetCustomers } = await query;
 
     for (const customer of targetCustomers || []) {
-      await supabase.functions.invoke('unified-smtp-sender', {
+      await supabase.functions.invoke('supabase-auth-email-sender', {
         body: {
-          template_key: 'promotion_announcement',
+          templateId: 'promotion_announcement',
           to: customer.email,
           variables: {
             customerName: customer.name,
             ...promotionData
           },
-          email_type: 'marketing'
+          emailType: 'marketing'
         }
       });
     }

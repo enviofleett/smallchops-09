@@ -296,18 +296,18 @@ async function createInvitation(supabase: any, body: any, user: any) {
     }
   }
 
-  // Send invitation email using unified SMTP system (non-blocking)
+  // Send invitation email using Auth email system (non-blocking)
   try {
-    await supabase.functions.invoke('unified-smtp-sender', {
+    await supabase.functions.invoke('supabase-auth-email-sender', {
       body: {
-        template_key: 'admin_invitation',
+        templateId: 'admin_invitation',
         to: body.email,
         variables: {
           role: body.role,
           companyName: 'Starters Small Chops',
           invitation_url: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?token=${invitationToken}&type=signup&redirect_to=${encodeURIComponent('https://startersmallchops.com/admin')}`
         },
-        email_type: 'transactional'
+        emailType: 'transactional'
       }
     })
     console.log('[ADMIN-POST] Invitation email sent successfully')
@@ -494,9 +494,9 @@ async function resendInvitation(supabase: any, body: any, user: any) {
 
   // Send new invitation email
   try {
-    await supabase.functions.invoke('unified-smtp-sender', {
+    await supabase.functions.invoke('supabase-auth-email-sender', {
       body: {
-        template_key: 'admin_invitation',
+        templateId: 'admin_invitation',
         to: invitation.email,
         variables: {
           role: invitation.role,

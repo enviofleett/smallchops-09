@@ -58,10 +58,10 @@ serve(async (req) => {
     }
 
     if (paystackSignature) {
-      const secretBytes = new TextEncoder().encode(webhookSecret);
+      const crypto = new TextEncoder().encode(webhookSecret);
       const key = await crypto.subtle.importKey(
         'raw',
-        secretBytes,
+        crypto,
         { name: 'HMAC', hash: 'SHA-512' },
         false,
         ['sign']
@@ -168,55 +168,21 @@ serve(async (req) => {
         });
 
         // Trigger communication event for payment confirmation
-        if (processResult?.[0]?.order_id && event.data.customer?.email) {
-          try {
-            // Create unique dedupe_key with timestamp to prevent duplicates
-            const dedupeKey = `${processResult[0].order_id}|payment_confirmed_webhook|payment_confirmation|${event.data.customer.email}|${Date.now()}`;
-            
-            const communicationEvent = {
-              order_id: processResult[0].order_id,
-              event_type: 'payment_confirmed_webhook',
-              recipient_email: event.data.customer.email,
-              template_key: 'payment_confirmation',
-              template_variables: {
-                customerName: event.data.customer?.first_name || 'Customer',
-                orderNumber: processResult[0].order_number,
-                amount: (amountKobo / 100).toFixed(2),
-                paymentMethod: event.data.channel || 'Online Payment',
-                paidAt: event.data.paid_at
-              },
-              variables: {
-                customerName: event.data.customer?.first_name || 'Customer',
-                orderNumber: processResult[0].order_number,
-                amount: (amountKobo / 100).toFixed(2),
-                paymentMethod: event.data.channel || 'Online Payment',
-                paidAt: event.data.paid_at
-              },
-              status: 'queued',
-              dedupe_key: dedupeKey,
-              source: 'paystack_webhook',
-              email_type: 'transactional',
-              priority: 'high',
-              scheduled_at: new Date().toISOString()
-            };
-
-            const { error: commError } = await supabase
-              .from('communication_events')
-              .insert(communicationEvent);
-
-            if (commError) {
-              console.warn('⚠️ Communication event insert failed:', commError.message);
-            } else {
-              console.log('📧 Payment confirmation email queued:', dedupeKey);
+        if (processResult?.[0]?.order_id) {
+          await supabase.from('communication_events').insert({
+            order_id: processResult[0].order_id,
+            event_type: 'payment_confirmed_webhook',
+            recipient_email: event.data.customer?.email || null,
+            template_key: 'payment_confirmation',
+            status: 'queued',
+            variables: {
+              customerName: event.data.customer?.first_name || 'Customer',
+              orderNumber: processResult[0].order_number,
+              amount: (amountKobo / 100).toFixed(2),
+              paymentMethod: event.data.channel || 'Online Payment',
+              paidAt: event.data.paid_at
             }
-          } catch (err: any) {
-            if (err.code === '23505') {
-              console.warn('📧 Duplicate payment confirmation event skipped (edge case):', processResult[0].order_id);
-            } else {
-              console.error('❌ Communication event error:', err.message);
-            }
-            // Don't crash the webhook - payment was successful
-          }
+          });
         }
 
       } catch (error) {

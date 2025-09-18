@@ -94,6 +94,7 @@ function validateSMTPUser(user: string, host: string): SMTPUserValidation {
     if (h.includes('mailgun')) return 'mailgun';
     if (h.includes('ses') || h.includes('amazonses')) return 'aws_ses';
     if (h.includes('postmark')) return 'postmark';
+    if (h.includes('mailersend')) return 'mailersend';
     if (h.includes('yahoo')) return 'yahoo';
     return undefined;
   };
@@ -417,8 +418,12 @@ Never use placeholder, test, or hashed values in production.
     };
   }
 
-  // Database Configuration (Primary Source - Production & Development)  
-  console.log('📧 Using database SMTP configuration as primary source');
+  // Database Configuration (Development Fallback Only)  
+  if (isProduction) {
+    throw new Error('PRODUCTION MODE: Database fallback not allowed. Configure Function Secrets for production use.');
+  }
+  
+  console.log('📧 Falling back to database SMTP configuration (development mode)');
   
   const { data: config } = await supabase
     .from('communication_settings')

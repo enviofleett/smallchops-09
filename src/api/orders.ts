@@ -369,22 +369,48 @@ export const manuallyQueueCommunicationEvent = async (
   order: OrderWithItems,
   status: OrderStatus
 ): Promise<void> => {
-  const { error } = await supabase.from('communication_events').insert({
-    order_id: order.id,
-    event_type: 'order_status_update', // Re-using to leverage existing processor
-    payload: {
-      old_status: order.status,
-      new_status: status,
-      customer_name: order.customer_name,
-      customer_phone: order.customer_phone,
-      customer_email: order.customer_email,
-    },
-  });
+  try {
+    // Use the bulletproof RPC function to avoid duplicate key violations
+    const { data, error } = await supabase.rpc('upsert_communication_event_production', {
+      p_event_type: 'order_status_update',
+      p_recipient_email: order.customer_email || '',
+      p_template_key: `order_${status}`,
+      p_template_variables: {
+        old_status: order.status,
+        new_status: status,
+        customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        customer_email: order.customer_email,
+        order_number: order.order_number,
+        order_id: order.id
+      },
+      p_order_id: order.id,
+      p_source: 'manual_admin_action'
+    });
 
-  if (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error queueing manual communication event:', error);
+    if (error) {
+      console.error('RPC error in manual communication event:', error);
+      throw new Error(`Communication event failed: ${error.message}`);
     }
-    throw new Error(error.message);
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Manual communication event queued successfully:', data);
+    }
+
+  } catch (error: any) {
+    // Gracefully handle duplicate key errors (23505) - non-blocking
+    if (error.code === '23505' || error.message?.includes('duplicate key')) {
+      console.warn('Duplicate communication event detected (non-blocking):', {
+        order_id: order.id,
+        status,
+        error: error.message
+      });
+      // Return success - this is expected behavior for duplicate events
+      return;
+    }
+
+    // Re-throw other errors
+    console.error('Error queueing manual communication event:', error);
+    throw new Error(error.message || 'Failed to queue communication event');
   }
 };

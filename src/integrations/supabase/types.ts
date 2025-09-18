@@ -10020,6 +10020,10 @@ export type Database = {
         Args: { p_identifier: string; p_identifier_type?: string }
         Returns: Json
       }
+      insert_comm_event_on_conflict_do_nothing: {
+        Args: { event_data: Json }
+        Returns: string
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean

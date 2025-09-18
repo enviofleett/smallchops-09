@@ -107,9 +107,9 @@ export default function PaymentCallback() {
     return null;
   }, [searchParams]);
 
-  // FIXED: Single verification effect - NO MORE RACE CONDITIONS
+  // PRODUCTION FIX: Timeout-protected verification with better error handling
   useEffect(() => {
-    // Prevent double execution
+    // Prevent double execution and add timeout protection
     if (verificationRef.current || !mountedRef.current) {
       return;
     }
@@ -144,9 +144,32 @@ export default function PaymentCallback() {
       return;
     }
     
-    // Start verification - this prevents the race condition
+    // Start verification with timeout protection
     verificationRef.current = true;
-    verifyPaymentWithRetry(reference, orderIdParam);
+    
+    // CRITICAL: Add timeout protection to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (mountedRef.current && !navigationHandledRef.current) {
+        console.error('⏰ Verification timeout after 45 seconds');
+        setStatus('error');
+        setResult({
+          success: false,
+          error: 'Verification timeout',
+          message: 'Payment verification is taking too long. Please check your order status or contact support.',
+          retryable: true,
+          canRetry: true
+        });
+      }
+    }, 45000); // 45 second timeout
+    
+    verifyPaymentWithRetry(reference, orderIdParam).finally(() => {
+      clearTimeout(timeoutId);
+    });
+    
+    // Cleanup timeout on unmount
+    return () => {
+      clearTimeout(timeoutId);
+    };
     
   }, [searchParams, getPaymentReference]); // Dependencies properly managed
 

@@ -107,41 +107,135 @@ serve(async (req: Request) => {
   }
 });
 
-// Enhanced reference extraction with multiple fallbacks
+// PRODUCTION FIX: Enhanced reference extraction with comprehensive webhook support
 async function extractReference(req: Request): Promise<string | null> {
   const url = new URL(req.url);
   
-  // Check URL parameters first
-  let reference = url.searchParams.get('reference') || 
-                 url.searchParams.get('trxref') || 
-                 url.searchParams.get('txref') ||
-                 url.searchParams.get('tx_ref');
+  // Step 1: Check URL parameters first (for callback URLs)
+  const urlParams = ['reference', 'trxref', 'txref', 'tx_ref', 'transaction_id', 'payment_reference'];
+  let reference = null;
+  
+  for (const param of urlParams) {
+    const value = url.searchParams.get(param);
+    if (value && value.trim().length > 5) {
+      reference = value.trim();
+      break;
+    }
+  }
 
   log('info', '🔍 Checking URL parameters for reference', {
     urlParams: Object.fromEntries(url.searchParams.entries()),
     foundReference: reference
   });
 
-  // If not in URL, check request body
+  // Step 2: Check request body (for webhook data)
   if (!reference && (req.method === 'POST' || req.method === 'PUT')) {
     try {
       const contentType = req.headers.get('content-type') || '';
+      let body: any = null;
       
       if (contentType.includes('application/json')) {
-        const body = await req.json();
-        reference = body.reference || body.trxref || body.txref || body.tx_ref;
-        log('info', '🔍 Checking JSON body for reference', { body, foundReference: reference });
+        body = await req.json();
+        log('info', '📨 Received webhook body', { 
+          eventType: body.event,
+          hasData: !!body.data,
+          topLevelKeys: Object.keys(body || {})
+        });
       } else if (contentType.includes('application/x-www-form-urlencoded')) {
         const formData = await req.formData();
-        reference = formData.get('reference') || formData.get('trxref') || formData.get('txref');
-        log('info', '🔍 Checking form data for reference', { foundReference: reference });
+        body = Object.fromEntries(formData.entries());
+        log('info', '📝 Received form data', { keys: Object.keys(body || {}) });
+      }
+      
+      if (body) {
+        // CRITICAL FIX: Comprehensive reference extraction for multiple webhook formats
+        const candidates = [
+          // Direct reference fields
+          body.reference,
+          body.trxref,
+          body.txref,
+          body.tx_ref,
+          body.transaction_id,
+          body.payment_reference,
+          body.provider_reference,
+          
+          // Paystack webhook: data.reference (most common)
+          body.data?.reference,
+          body.data?.trxref,
+          body.data?.tx_ref,
+          body.data?.transaction_id,
+          
+          // Alternative webhook formats
+          body.transaction?.reference,
+          body.payment?.reference,
+          body.charge?.reference,
+          
+          // Deep search in nested objects
+          ...searchNestedReference(body, 'reference'),
+          ...searchNestedReference(body, 'trxref'),
+          ...searchNestedReference(body, 'tx_ref')
+        ];
+        
+        // Find first valid candidate
+        reference = candidates.find(candidate => 
+          candidate && 
+          typeof candidate === 'string' && 
+          candidate.trim().length > 5 &&
+          !candidate.includes('undefined') &&
+          !candidate.includes('null')
+        );
+        
+        log('info', '🔍 Webhook reference extraction', { 
+          candidatesFound: candidates.filter(c => c).length,
+          foundReference: reference,
+          webhookStructure: {
+            hasEvent: !!body.event,
+            hasData: !!body.data,
+            dataKeys: body.data ? Object.keys(body.data) : null
+          }
+        });
       }
     } catch (e) {
       log('warn', '⚠️ Could not parse request body', { error: e.message });
     }
   }
 
+  // Step 3: Final validation and cleanup
+  if (reference) {
+    reference = reference.trim();
+    log('info', '✅ Reference extracted successfully', { 
+      reference, 
+      length: reference.length,
+      source: url.searchParams.has('reference') ? 'URL' : 'webhook'
+    });
+  } else {
+    log('error', '❌ No payment reference found after comprehensive search', {
+      urlParamsCount: url.searchParams.size,
+      bodyParsed: req.method === 'POST' || req.method === 'PUT'
+    });
+  }
+
   return reference;
+}
+
+// Helper function to search for reference fields in nested objects
+function searchNestedReference(obj: any, fieldName: string, maxDepth: number = 3): string[] {
+  const results: string[] = [];
+  
+  function search(current: any, depth: number) {
+    if (depth > maxDepth || !current || typeof current !== 'object') return;
+    
+    for (const [key, value] of Object.entries(current)) {
+      if (key.toLowerCase().includes(fieldName.toLowerCase()) && typeof value === 'string' && value.length > 5) {
+        results.push(value);
+      } else if (typeof value === 'object' && value !== null) {
+        search(value, depth + 1);
+      }
+    }
+  }
+  
+  search(obj, 0);
+  return results;
 }
 
 // Enhanced reference validation with placeholder detection

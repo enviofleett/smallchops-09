@@ -8953,6 +8953,10 @@ export type Database = {
         Args: { p_order_id: string; p_status: string }
         Returns: undefined
       }
+      admin_queue_order_email_enhanced: {
+        Args: { p_order_id: string; p_status: string }
+        Returns: Json
+      }
       admin_safe_update_order_status: {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
         Returns: Json
@@ -8963,6 +8967,10 @@ export type Database = {
       }
       admin_safe_update_order_status_with_officer_tracking: {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
+      admin_update_order_status_production: {
+        Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
       admin_update_order_status_secure: {
@@ -9050,6 +9058,15 @@ export type Database = {
       check_admin_invitation_rate_limit: {
         Args: { user_id_param: string }
         Returns: boolean
+      }
+      check_admin_rate_limit: {
+        Args: {
+          p_admin_id: string
+          p_limit?: number
+          p_operation: string
+          p_window_minutes?: number
+        }
+        Returns: Json
       }
       check_api_rate_limit: {
         Args: {

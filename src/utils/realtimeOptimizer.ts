@@ -114,7 +114,7 @@ class RealtimeChannelManager {
 
 export const realtimeManager = new RealtimeChannelManager();
 
-// Optimized useRealtimeSubscription hook
+// Optimized realtime subscription with resilience and fallback
 export const useOptimizedRealtime = (
   subscriberId: string,
   config: {
@@ -124,26 +124,99 @@ export const useOptimizedRealtime = (
     enabled?: boolean;
   }
 ) => {
-  const { useEffect } = require('react');
+  const { useEffect, useRef } = require('react');
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
+  
+  const subscribe = () => {
+    if (!config.enabled || isSubscribedRef.current) return;
+    
+    console.log(`📡 Setting up optimized realtime subscription for ${subscriberId}`);
+    
+    try {
+      const channel = realtimeManager.subscribe(
+        `${config.table}-${config.event}`,
+        subscriberId,
+        {
+          ...config,
+          callback: (payload) => {
+            console.log(`📨 Realtime event received for ${config.table}:`, payload.eventType);
+            
+            // Enhanced error handling for callback
+            try {
+              config.callback(payload);
+            } catch (error) {
+              console.error(`❌ Error in realtime callback for ${subscriberId}:`, error);
+              // Don't break the subscription due to callback errors
+            }
+          }
+        }
+      );
+      
+      channelRef.current = channel;
+      isSubscribedRef.current = true;
+      
+      // Set up connection health monitoring
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Failed to set up realtime subscription for ${subscriberId}:`, error);
+      
+      // Retry subscription after delay
+      if (!reconnectTimeoutRef.current) {
+        reconnectTimeoutRef.current = setTimeout(() => {
+          console.log(`🔄 Retrying realtime subscription for ${subscriberId}`);
+          reconnectTimeoutRef.current = null;
+          isSubscribedRef.current = false;
+          subscribe();
+        }, 5000);
+      }
+    }
+  };
+  
+  const unsubscribe = () => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    
+    if (isSubscribedRef.current) {
+      console.log(`📡 Unsubscribing realtime for ${subscriberId}`);
+      realtimeManager.unsubscribe(subscriberId, `${config.table}-${config.event}`);
+      isSubscribedRef.current = false;
+      channelRef.current = null;
+    }
+  };
   
   useEffect(() => {
-    if (!config.enabled) return;
+    if (config.enabled) {
+      subscribe();
+    } else {
+      unsubscribe();
+    }
     
-    const channel = realtimeManager.subscribe(
-      `${config.table}-${config.event}`,
-      subscriberId,
-      config
-    );
-    
+    // Cleanup on config changes
     return () => {
-      realtimeManager.unsubscribe(subscriberId, `${config.table}-${config.event}`);
+      if (!config.enabled) {
+        unsubscribe();
+      }
     };
   }, [subscriberId, config.table, config.event, config.enabled]);
   
   useEffect(() => {
     // Cleanup on unmount
     return () => {
+      unsubscribe();
       realtimeManager.unsubscribe(subscriberId);
     };
   }, [subscriberId]);
+  
+  // Return subscription status for debugging
+  return {
+    isSubscribed: isSubscribedRef.current,
+    stats: realtimeManager.getStats()
+  };
 };

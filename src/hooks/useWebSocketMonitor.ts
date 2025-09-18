@@ -23,21 +23,35 @@ export const useWebSocketMonitor = (url?: string) => {
   const baseRetryDelay = 2000; // 2 seconds
 
   const connect = () => {
-    // Skip WebSocket connection in development or production without proper WebSocket server
+    // Enhanced connection validation and fallback logic
     const hostname = window.location.hostname;
     const skipDomains = ['startersmallchops.com', 'vercel.app'];
     const shouldSkip = !url || url.includes('localhost:8098') || skipDomains.some(domain => hostname.includes(domain));
     
     if (shouldSkip) {
-      console.log('Skipping WebSocket connection - no WebSocket server available');
+      console.log('⚠️ WebSocket connection skipped - using HTTP fallback mode');
       setStatus(prev => ({ 
         ...prev, 
         isConnected: false, 
-        lastError: 'WebSocket disabled - no server available',
+        lastError: 'WebSocket disabled - using HTTP polling fallback',
         isRetrying: false 
       }));
       return;
     }
+
+    // Connection timeout handling (30 seconds max)
+    const connectionTimeout = setTimeout(() => {
+      if (websocketRef.current && websocketRef.current.readyState === WebSocket.CONNECTING) {
+        console.log('⏰ WebSocket connection timeout - closing connection');
+        websocketRef.current.close();
+        setStatus(prev => ({
+          ...prev,
+          isConnected: false,
+          lastError: 'Connection timeout - server may be unavailable',
+          isRetrying: false
+        }));
+      }
+    }, 30000);
 
     setStatus(prev => ({ 
       ...prev, 
@@ -50,7 +64,8 @@ export const useWebSocketMonitor = (url?: string) => {
       websocketRef.current = ws;
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('✅ WebSocket connected successfully');
+        clearTimeout(connectionTimeout);
         setStatus(prev => ({
           ...prev,
           isConnected: true,
@@ -61,26 +76,36 @@ export const useWebSocketMonitor = (url?: string) => {
       };
 
       ws.onclose = (event) => {
-        console.log('WebSocket disconnected:', event.code, event.reason);
+        console.log('🔌 WebSocket disconnected:', event.code, event.reason);
+        clearTimeout(connectionTimeout);
         setStatus(prev => ({
           ...prev,
           isConnected: false,
-          lastError: `Connection closed: ${event.reason || 'Unknown reason'}`,
+          lastError: `Connection closed: ${event.reason || 'Server disconnected'}`,
           isRetrying: false
         }));
 
-        // Only retry if it wasn't a manual close and we haven't exceeded max retries
+        // Enhanced retry logic with exponential backoff
         if (event.code !== 1000 && status.retryCount < maxRetries) {
+          console.log(`🔄 Scheduling reconnection attempt ${status.retryCount + 1}/${maxRetries}`);
           scheduleReconnect();
+        } else if (status.retryCount >= maxRetries) {
+          console.log('❌ Max reconnection attempts reached - falling back to HTTP mode');
+          setStatus(prev => ({
+            ...prev,
+            lastError: 'Max reconnection attempts reached. Using HTTP fallback.',
+            isRetrying: false
+          }));
         }
       };
 
       ws.onerror = (error) => {
-        console.log('WebSocket error (handled gracefully):', error);
+        console.log('⚠️ WebSocket error (handled gracefully):', error);
+        clearTimeout(connectionTimeout);
         setStatus(prev => ({
           ...prev,
           isConnected: false,
-          lastError: 'Connection error',
+          lastError: 'Network connectivity issue detected',
           isRetrying: false
         }));
       };

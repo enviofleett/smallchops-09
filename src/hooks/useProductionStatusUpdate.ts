@@ -1,3 +1,4 @@
+import { retryWithBackoff, circuitBreakers, handleProductionError } from '@/utils/productionErrorResilience';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateOrder } from '@/api/orders';
 import { toast } from 'sonner';
@@ -19,17 +20,35 @@ export const useProductionStatusUpdate = () => {
 
       const validatedStatus = validateOrderStatus(status);
       
-      // Log admin action for audit trail
-      await supabase.functions.invoke('admin-orders-manager', {
-        body: {
-          action: 'log_admin_action',
-          orderId,
-          actionType: 'status_update',
-          details: { from_status: 'unknown', to_status: validatedStatus }
-        }
-      });
+      // Use production-grade error handling with circuit breaker
+      return await handleProductionError(
+        async () => {
+          const response = await supabase.functions.invoke('admin-orders-manager', {
+            body: {
+              action: 'update',
+              orderId,
+              updates: { status: validatedStatus }
+            }
+          });
 
-      return updateOrder(orderId, { status: validatedStatus });
+          if (response.error) {
+            throw new Error(response.error.message || 'Failed to update order status');
+          }
+
+          if (!response.data?.success) {
+            throw new Error(response.data?.error || 'Status update failed');
+          }
+
+          return response.data.order || response.data;
+        },
+        `order-status-update-${orderId}`,
+        circuitBreakers.adminOrders,
+        {
+          maxAttempts: 2,
+          baseDelay: 1500,
+          timeout: 15000
+        }
+      );
     },
     onSuccess: (data, variables) => {
       toast.success(`Order status updated to ${variables.status.replace('_', ' ')}`);
@@ -46,7 +65,9 @@ export const useProductionStatusUpdate = () => {
       let errorMessage = 'Failed to update order status';
       const errorMsg = error?.message || '';
       
-      if (errorMsg.includes('authentication') || errorMsg.includes('unauthorized')) {
+      if (errorMsg.includes('Rate limit exceeded')) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      } else if (errorMsg.includes('authentication') || errorMsg.includes('unauthorized')) {
         errorMessage = 'Authentication expired. Please refresh and try again.';
       } else if (errorMsg.includes('edge function') || errorMsg.includes('non-2xx status')) {
         errorMessage = 'Service temporarily unavailable. Please try again.';
@@ -60,7 +81,7 @@ export const useProductionStatusUpdate = () => {
       
       toast.error(errorMessage);
       
-      // Log error for monitoring with enhanced context
+      // Log error for monitoring (non-blocking)
       supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'log_admin_error',
@@ -68,7 +89,9 @@ export const useProductionStatusUpdate = () => {
           errorType: 'status_update_failed',
           error: error.message
         }
-      }).catch(console.warn);
+      }).catch(() => {
+        // Silently fail - error logging shouldn't block user workflow
+      });
     }
   });
 

@@ -270,6 +270,48 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
         </div>
       </div>
 
+      {/* Pickup Schedule Fulfillment (for pickup orders) */}
+      {order.order_type === 'pickup' && (
+        <div className="info-section" style={{ marginBottom: '6mm' }}>
+          <h2>Pickup Schedule Fulfillment</h2>
+          <div className="info-row">
+            <span className="info-label">Channel:</span>
+            <span className="info-value">Pickup</span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Order Status:</span>
+            <span className="info-value">{order.status.replace(/_/g, ' ').toUpperCase()}</span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Pickup Date:</span>
+            <span className="info-value">
+              {deliverySchedule?.scheduled_date ? 
+                format(new Date(deliverySchedule.scheduled_date), 'PPP') : 
+                'Today'
+              }
+            </span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Pickup Time Window:</span>
+            <span className="info-value">
+              {deliverySchedule?.scheduled_date ? 
+                `${format(new Date(deliverySchedule.scheduled_date), 'p')} – ${format(new Date(new Date(deliverySchedule.scheduled_date).getTime() + 60*60*1000), 'p')}` : 
+                '4:00 PM – 5:00 PM'
+              } ⏰ Upcoming window
+            </span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Business Day:</span>
+            <span className="info-value">
+              {deliverySchedule?.scheduled_date ? 
+                format(new Date(deliverySchedule.scheduled_date), 'EEEE') : 
+                format(new Date(), 'EEEE')
+              }
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Order Items */}
       <h2>Order Items</h2>
       <table className="items-table">

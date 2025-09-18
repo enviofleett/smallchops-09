@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar, Clock, MapPin, FileText, Truck, Package, CheckCircle, AlertTriangle, Info, XCircle, Calendar as CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, parseISO, setHours, setMinutes } from 'date-fns';
 import { DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { OrderStatus } from '@/types/orders';
 import { useEnhancedDeliverySchedule, ScheduleWarning } from '@/hooks/useEnhancedDeliverySchedule';
@@ -38,7 +38,10 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
     try {
-      return format(new Date(dateString), 'dd/MM/yyyy');
+      const date = parseISO(dateString);
+      if (isToday(date)) return 'Today';
+      if (isTomorrow(date)) return 'Tomorrow';
+      return format(date, 'dd/MM/yyyy');
     } catch {
       return dateString;
     }
@@ -47,7 +50,10 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
   const formatDateLong = (dateString: string) => {
     if (!dateString) return '';
     try {
-      return format(new Date(dateString), 'EEEE, MMM d, yyyy');
+      const date = parseISO(dateString);
+      if (isToday(date)) return 'Today';
+      if (isTomorrow(date)) return 'Tomorrow';
+      return format(date, 'EEEE, MMM d, yyyy');
     } catch {
       return dateString;
     }
@@ -195,7 +201,32 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
               <p className="text-sm text-blue-800 font-semibold">
                 {formatTime(schedule.delivery_time_start)} – {formatTime(schedule.delivery_time_end)}
               </p>
-              <p className="text-xs text-blue-600 mt-1">1-hour window</p>
+              {(() => {
+                // Show delivery status based on current time vs delivery window
+                if (!schedule.delivery_date || !schedule.delivery_time_start) {
+                  return <p className="text-xs text-blue-600 mt-1">1-hour window</p>;
+                }
+                
+                try {
+                  const scheduleDate = parseISO(schedule.delivery_date);
+                  const [startHours, startMinutes] = schedule.delivery_time_start.split(':').map(Number);
+                  const [endHours, endMinutes] = schedule.delivery_time_end?.split(':').map(Number) || [startHours + 1, startMinutes];
+                  
+                  const deliveryStart = setMinutes(setHours(scheduleDate, startHours), startMinutes);
+                  const deliveryEnd = setMinutes(setHours(scheduleDate, endHours), endMinutes);
+                  const now = new Date();
+                  
+                  if (now >= deliveryStart && now <= deliveryEnd) {
+                    return <p className="text-xs text-green-600 mt-1 font-medium">🟢 Active delivery window</p>;
+                  } else if (now < deliveryStart) {
+                    return <p className="text-xs text-blue-600 mt-1">⏰ Upcoming window</p>;
+                  } else {
+                    return <p className="text-xs text-gray-500 mt-1">⏳ Window closed</p>;
+                  }
+                } catch {
+                  return <p className="text-xs text-blue-600 mt-1">1-hour window</p>;
+                }
+              })()}
             </div>
           </div>
         </div>

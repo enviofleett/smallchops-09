@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getOrders, OrderWithItems } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
-import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
+import { EnhancedOrderCard } from '@/components/admin/EnhancedOrderCard';
 import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';

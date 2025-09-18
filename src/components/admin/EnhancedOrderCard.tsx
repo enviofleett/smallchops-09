@@ -22,7 +22,7 @@ import {
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 
-interface EnhancedOrderCardProps {
+export interface EnhancedOrderCardProps {
   order: OrderWithItems;
   deliverySchedule?: any;
   onOrderSelect?: (order: OrderWithItems) => void;
@@ -30,13 +30,13 @@ interface EnhancedOrderCardProps {
   showSecurityBadge?: boolean;
 }
 
-export const EnhancedOrderCard = ({ 
+export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({ 
   order, 
   deliverySchedule, 
   onOrderSelect,
   showAdvancedControls = false,
   showSecurityBadge = false
-}: EnhancedOrderCardProps) => {
+}) => {
   const isOverdue = deliverySchedule && 
     isOrderOverdue(deliverySchedule.delivery_date, deliverySchedule.delivery_time_end);
 

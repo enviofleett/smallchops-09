@@ -32,6 +32,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
 import { useDebounce } from '@/hooks/useDebounce';
 import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFilter';
+import { DeliveryDateFilter } from '@/components/admin/orders/DeliveryDateFilter';
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
 import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
 import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
@@ -668,25 +669,19 @@ function AdminOrdersContent() {
                 </div>
               </form>
               
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Delivery Schedule:</span>
-                </div>
-                <Select value={deliveryFilter} onValueChange={(value: DeliveryFilterType) => setDeliveryFilter(value)}>
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Orders</SelectItem>
-                    <SelectItem value="due_today">Due Today</SelectItem>
-                    <SelectItem value="past_due">Past Due</SelectItem>
-                    <SelectItem value="upcoming">Future Orders</SelectItem>
-                    <SelectItem value="this_week">This Week</SelectItem>
-                    <SelectItem value="next_week">Next Week</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <DeliveryDateFilter
+                value={deliveryFilter}
+                onChange={setDeliveryFilter}
+                orderCounts={useMemo(() => {
+                  const stats = getFilterStats(prioritySortedOrders, deliverySchedules);
+                  return {
+                    all: stats.all,
+                    today: stats.today,
+                    tomorrow: stats.tomorrow,
+                    future: stats.future
+                  };
+                }, [prioritySortedOrders, deliverySchedules])}
+              />
               
               {/* Enhanced Filter Statistics - Production Ready */}
               {deliveryFilter !== 'all' && (

@@ -1,7 +1,7 @@
 import { startOfDay, endOfDay, addDays, subDays, isWithinInterval } from 'date-fns';
 import { OrderWithItems } from '@/api/orders';
 
-export type DeliveryFilterType = 'all' | 'due_today' | 'upcoming' | 'past_due' | 'this_week' | 'next_week';
+export type DeliveryFilterType = 'all' | 'today' | 'tomorrow' | 'future' | 'due_today' | 'upcoming' | 'past_due' | 'this_week' | 'next_week';
 
 /**
  * Production-ready utility functions for date-based order filtering
@@ -40,6 +40,12 @@ export const getDateRangeForFilter = (filter: DeliveryFilterType, referenceDate:
   const nextWeekEnd = endOfDay(addDays(nextWeekStart, 6));
   
   switch (filter) {
+    case 'today':
+      return { start: today, end: today, label: 'Today' };
+    case 'tomorrow':
+      return { start: tomorrow, end: tomorrow, label: 'Tomorrow' };
+    case 'future':
+      return { start: addDays(today, 2), end: new Date(2100, 0, 1), label: 'Future' };
     case 'due_today':
       return { start: today, end: today, label: 'Due Today' };
     case 'past_due':
@@ -79,6 +85,12 @@ export const filterOrdersByDate = (
     const normalizedScheduleDate = startOfDay(scheduleDate);
     
     switch (filter) {
+      case 'today':
+        return normalizedScheduleDate.getTime() === dateRange.start.getTime();
+      case 'tomorrow':
+        return normalizedScheduleDate.getTime() === dateRange.start.getTime();
+      case 'future':
+        return normalizedScheduleDate.getTime() >= dateRange.start.getTime();
       case 'due_today':
         return normalizedScheduleDate.getTime() === dateRange.start.getTime();
       case 'past_due':
@@ -102,6 +114,12 @@ export const getFilterDescription = (
   const orderText = count === 1 ? 'order' : 'orders';
   
   switch (filter) {
+    case 'today':
+      return `Showing ${count} ${orderText} scheduled for today`;
+    case 'tomorrow':
+      return `Showing ${count} ${orderText} scheduled for tomorrow`;
+    case 'future':
+      return `Showing ${count} ${orderText} scheduled for future dates (day after tomorrow onwards)`;
     case 'due_today':
       return `Showing ${count} ${orderText} scheduled for today`;
     case 'past_due':
@@ -123,6 +141,9 @@ export const getFilterStats = (
 ) => {
   const stats = {
     all: orders.length,
+    today: 0,
+    tomorrow: 0,
+    future: 0,
     due_today: 0,
     past_due: 0,
     upcoming: 0,
@@ -131,6 +152,8 @@ export const getFilterStats = (
   };
   
   const today = startOfDay(new Date());
+  const tomorrow = startOfDay(addDays(new Date(), 1));
+  const dayAfterTomorrow = startOfDay(addDays(new Date(), 2));
   const dateRanges = {
     this_week: getDateRangeForFilter('this_week'),
     next_week: getDateRangeForFilter('next_week')
@@ -145,7 +168,12 @@ export const getFilterStats = (
     const normalizedDate = startOfDay(scheduleDate);
     
     if (normalizedDate.getTime() === today.getTime()) {
+      stats.today++;
       stats.due_today++;
+    } else if (normalizedDate.getTime() === tomorrow.getTime()) {
+      stats.tomorrow++;
+    } else if (normalizedDate.getTime() >= dayAfterTomorrow.getTime()) {
+      stats.future++;
     } else if (normalizedDate.getTime() < today.getTime()) {
       stats.past_due++;
     } else {

@@ -8993,6 +8993,10 @@ export type Database = {
         Args: { p_assigned_by?: string; p_order_id: string; p_rider_id: string }
         Returns: string
       }
+      audit_function_security: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       bulk_safe_delete_products: {
         Args: { product_ids: string[] }
         Returns: Json

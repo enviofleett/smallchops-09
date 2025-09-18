@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import React from 'react';
 
 // Centralized realtime channel manager to prevent duplicate subscriptions
 class RealtimeChannelManager {
@@ -124,10 +125,9 @@ export const useOptimizedRealtime = (
     enabled?: boolean;
   }
 ) => {
-  const { useEffect, useRef } = require('react');
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const channelRef = useRef<any>(null);
-  const isSubscribedRef = useRef(false);
+  const reconnectTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const channelRef = React.useRef<any>(null);
+  const isSubscribedRef = React.useRef<boolean>(false);
   
   const subscribe = () => {
     if (!config.enabled || isSubscribedRef.current) return;
@@ -191,7 +191,7 @@ export const useOptimizedRealtime = (
     }
   };
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (config.enabled) {
       subscribe();
     } else {
@@ -206,7 +206,7 @@ export const useOptimizedRealtime = (
     };
   }, [subscriberId, config.table, config.event, config.enabled]);
   
-  useEffect(() => {
+  React.useEffect(() => {
     // Cleanup on unmount
     return () => {
       unsubscribe();

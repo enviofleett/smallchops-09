@@ -10300,6 +10300,16 @@ export type Database = {
         Args: { batch_size?: number; priority_filter?: string }
         Returns: Json
       }
+      process_payment_atomically: {
+        Args: {
+          p_amount_kobo: number
+          p_gateway_response?: Json
+          p_paid_at?: string
+          p_reference: string
+          p_status: string
+        }
+        Returns: Json
+      }
       process_queued_communication_events: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -10677,7 +10687,7 @@ export type Database = {
       }
       verify_and_update_payment_status: {
         Args: {
-          new_status?: string
+          new_status: string
           payment_amount?: number
           payment_gateway_response?: Json
           payment_ref: string

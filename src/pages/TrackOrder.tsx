@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useSearchParams } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,9 +25,20 @@ import {
 import { format } from 'date-fns';
 
 export default function TrackOrder() {
+  const [searchParams] = useSearchParams();
   const [orderIdentifier, setOrderIdentifier] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const { tracking, loading, error, trackOrder } = useDeliveryTracking();
+
+  // Auto-populate search field from URL parameters
+  useEffect(() => {
+    const orderFromUrl = searchParams.get('order') || searchParams.get('id') || searchParams.get('reference');
+    if (orderFromUrl && !searchValue) {
+      setSearchValue(orderFromUrl);
+      setOrderIdentifier(orderFromUrl);
+      trackOrder(orderFromUrl);
+    }
+  }, [searchParams, trackOrder, searchValue]);
 
   // Get delivery schedule if order is found
   const { data: deliverySchedule } = useQuery({

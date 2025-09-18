@@ -161,22 +161,27 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
       }
     }
 
-    await supabaseClient.from('audit_logs').insert([{
-      action: 'status_change_notification_attempted',
-      category: 'Order Management',
-      message: `Notification attempted for order ${order.order_number} status change to ${sanitizedStatus}`,
-      entity_id: orderId,
-      new_values: {
-        old_status: order.status,
-        new_status: sanitizedStatus,
-        customer_email: order.customer_email,
-        customer_phone: order.customer_phone,
-        notification_channels_attempted: [
-          order.customer_email ? 'email' : null,
-          order.customer_phone ? 'sms' : null
-        ].filter(Boolean)
-      }
-    }]);
+    // CRITICAL FIX: Wrap audit log insertion in try-catch
+    try {
+      await supabaseClient.from('audit_logs').insert([{
+        action: 'status_change_notification_attempted',
+        category: 'Order Management',
+        message: `Notification attempted for order ${order.order_number} status change to ${sanitizedStatus}`,
+        entity_id: orderId,
+        new_values: {
+          old_status: order.status,
+          new_status: sanitizedStatus,
+          customer_email: order.customer_email,
+          customer_phone: order.customer_phone,
+          notification_channels_attempted: [
+            order.customer_email ? 'email' : null,
+            order.customer_phone ? 'sms' : null
+          ].filter(Boolean)
+        }
+      }]);
+    } catch (auditError) {
+      console.error('⚠️ Audit log insertion failed (non-blocking):', auditError.message);
+    }
   } catch (error) {
     console.error(`⚠️ Complete notification failure for order ${orderId}:`, error);
   }

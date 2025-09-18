@@ -51,7 +51,17 @@ export const useProductionStatusUpdate = () => {
       );
     },
     onSuccess: (data, variables) => {
-      toast.success(`Order status updated to ${variables.status.replace('_', ' ')}`);
+      const statusLabel = variables.status.replace('_', ' ');
+      toast.success(`✅ Order status updated to ${statusLabel}`);
+      
+      // Log bulletproof success metrics
+      if (data?.email_queued?.success) {
+        console.log('📧 Email notification queued successfully');
+      }
+      
+      if (data?.email_queued?.deduplicated) {
+        console.log('🔄 Email notification deduplicated (already queued)');
+      }
       
       // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
@@ -61,12 +71,14 @@ export const useProductionStatusUpdate = () => {
     onError: (error: any, variables) => {
       console.error('❌ Production status update failed:', error);
       
-      // Enhanced error messaging with specific error detection
+      // BULLETPROOF: Enhanced error messaging with specific error detection
       let errorMessage = 'Failed to update order status';
       const errorMsg = error?.message || '';
       
       if (errorMsg.includes('Rate limit exceeded')) {
         errorMessage = 'Too many requests. Please wait a moment and try again.';
+      } else if (errorMsg.includes('Order is currently being modified by another admin')) {
+        errorMessage = 'Order is being updated by another admin. Please try again in a moment.';
       } else if (errorMsg.includes('authentication') || errorMsg.includes('unauthorized')) {
         errorMessage = 'Authentication expired. Please refresh and try again.';
       } else if (errorMsg.includes('edge function') || errorMsg.includes('non-2xx status')) {
@@ -75,6 +87,8 @@ export const useProductionStatusUpdate = () => {
         errorMessage = 'Invalid status update. Please refresh the page and try again.';
       } else if (errorMsg.includes('Invalid status:') || errorMsg.includes('Invalid order status:')) {
         errorMessage = errorMsg; // Use the specific validation message
+      } else if (errorMsg.includes('duplicate key value violates unique constraint')) {
+        errorMessage = 'Update in progress by another session. Please try again.';
       } else if (errorMsg && errorMsg !== 'Failed to update order status') {
         errorMessage = errorMsg; // Use the actual error message if it's meaningful
       }

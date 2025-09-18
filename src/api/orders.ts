@@ -237,9 +237,10 @@ export const updateOrder = async (
     });
 
     if (error || !data.success) {
-      // Enhanced error parsing for better user feedback
+      // BULLETPROOF: Enhanced error parsing with better user feedback
       let errorMessage = 'Failed to update order';
       
+      // Handle bulletproof function responses
       if (data?.error) {
         if (typeof data.error === 'string') {
           errorMessage = data.error;
@@ -250,19 +251,38 @@ export const updateOrder = async (
         errorMessage = error.message;
       }
       
-      // Log detailed error for debugging
-      console.error('❌ Order update failed:', {
+      // Special handling for bulletproof function responses
+      if (data?.recovery_actions) {
+        console.log(`💡 Recovery actions suggested:`, data.recovery_actions);
+      }
+      
+      if (data?.retry_after_seconds) {
+        console.log(`⏱️ Retry suggested after ${data.retry_after_seconds} seconds`);
+      }
+      
+      // Enhanced logging for bulletproof diagnostics
+      console.error('❌ BULLETPROOF: Order update failed:', {
         orderId,
         updates: sanitizedUpdates,
         error: data?.error || error,
-        success: data?.success
+        success: data?.success,
+        bulletproof_response: data
       });
       
       throw new Error(errorMessage);
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Order updated successfully via admin function');
+      console.log('✅ BULLETPROOF: Order updated successfully via admin function');
+    }
+    
+    // Log bulletproof success metrics
+    if (data?.email_queued?.success) {
+      console.log('📧 Email notification queued successfully');
+    }
+    
+    if (data?.email_queued?.deduplicated) {
+      console.log('🔄 Email notification deduplicated (already queued)');
     }
     return data.order;
     

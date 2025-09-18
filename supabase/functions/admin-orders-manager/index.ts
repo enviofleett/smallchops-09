@@ -231,20 +231,29 @@ async function handleListOrders(supabase: any, params: any) {
 }
 
 async function handleUpdateOrder(supabase: any, orderId: string, updates: any, adminId: string) {
-  console.log(`📝 Updating order ${orderId}:`, updates);
+  console.log(`📝 BULLETPROOF: Updating order ${orderId}:`, updates);
 
-  // Use the enhanced production-safe update function
+  // Use the bulletproof production-safe update function with zero duplicate key violations
   if (updates.status) {
-    const { data, error } = await supabase.rpc('admin_update_order_status_production', {
+    console.log(`🔒 Using bulletproof status update for order ${orderId}: ${updates.status}`);
+    
+    const { data, error } = await supabase.rpc('admin_update_order_status_bulletproof', {
       p_order_id: orderId,
       p_new_status: updates.status,
       p_admin_id: adminId
     });
 
     if (error) {
+      console.error(`❌ Bulletproof status update failed:`, error);
       throw new Error(`Status update failed: ${error.message}`);
     }
 
+    if (!data || !data.success) {
+      console.error(`❌ Bulletproof status update returned unsuccessful:`, data);
+      throw new Error(data?.error || 'Status update failed');
+    }
+
+    console.log(`✅ Bulletproof status update successful for order ${orderId}`);
     return data;
   }
 

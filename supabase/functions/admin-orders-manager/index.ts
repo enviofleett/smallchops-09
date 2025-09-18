@@ -199,53 +199,222 @@ serve(async (req)=>{
   }
   const corsHeaders = getCorsHeaders(origin);
 
-  // Authentication
+  // Enhanced Authentication with Production Error Handling
   try {
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.warn('🔒 Authentication failed: Missing or invalid authorization header');
       return new Response(JSON.stringify({
         success: false,
-        error: 'Unauthorized: Missing authentication token'
+        error: 'Unauthorized: Missing authentication token',
+        errorCode: 'MISSING_AUTH_TOKEN'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
       });
     }
+
     const token = authHeader.replace('Bearer ', '');
+    
+    // Step 1: Verify JWT token
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    if (authError || !user) {
+    if (authError) {
+      console.warn('🔒 Authentication failed: JWT verification error:', authError.message);
       return new Response(JSON.stringify({
         success: false,
-        error: 'Unauthorized: Invalid authentication token'
+        error: 'Unauthorized: Invalid authentication token',
+        errorCode: 'INVALID_JWT_TOKEN'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
       });
     }
-    const { data: profile, error: profileError } = await supabaseClient.from('profiles').select('role, is_active').eq('id', user.id).single();
-    if (profileError || !profile || profile.role !== 'admin' || !profile.is_active) {
+
+    if (!user?.id) {
+      console.warn('🔒 Authentication failed: No user found in JWT token');
       return new Response(JSON.stringify({
         success: false,
-        error: 'Forbidden: Admin access required'
+        error: 'Unauthorized: User not found',
+        errorCode: 'USER_NOT_FOUND'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401
+      });
+    }
+
+    // Step 2: Check admin status with fallback authentication
+    let isAdmin = false;
+    let authMethod = 'unknown';
+
+    try {
+      // Primary: Check profiles table (using maybeSingle to handle missing profiles)
+      const { data: profile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('role, is_active')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn('⚠️ Profile lookup failed:', profileError.message);
+        // Continue to fallback authentication
+      } else if (profile) {
+        isAdmin = profile.role === 'admin' && profile.is_active;
+        authMethod = 'profiles_table';
+        console.log('✅ Profile authentication:', { userId: user.id, role: profile.role, isActive: profile.is_active });
+      } else {
+        console.warn('⚠️ No profile found for user:', user.id);
+        // Continue to fallback authentication
+      }
+
+      // Fallback: Use database function if profile lookup failed or returned null
+      if (!isAdmin) {
+        console.log('🔄 Attempting fallback authentication using is_admin() function');
+        const { data: adminCheck, error: adminError } = await supabaseClient.rpc('is_admin');
+        
+        if (adminError) {
+          console.error('❌ Fallback admin check failed:', adminError.message);
+        } else {
+          isAdmin = Boolean(adminCheck);
+          authMethod = 'is_admin_function';
+          console.log('✅ Fallback authentication result:', { userId: user.id, isAdmin, method: authMethod });
+        }
+      }
+
+    } catch (profileLookupError) {
+      console.error('❌ Critical error during admin verification:', profileLookupError.message);
+      // Log for monitoring but continue with final authorization check
+    }
+
+    // Step 3: Final authorization check
+    if (!isAdmin) {
+      console.warn('🚫 Admin access denied:', { 
+        userId: user.id, 
+        email: user.email,
+        authMethod,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Log security event
+      try {
+        await supabaseClient.from('audit_logs').insert([{
+          action: 'admin_access_denied',
+          category: 'Security Alert',
+          message: `Admin access denied for user ${user.id} via ${authMethod}`,
+          user_id: user.id,
+          new_values: { 
+            auth_method: authMethod, 
+            user_email: user.email,
+            timestamp: new Date().toISOString()
+          }
+        }]);
+      } catch (auditError) {
+        console.error('⚠️ Failed to log security event:', auditError.message);
+      }
+
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Forbidden: Admin access required',
+        errorCode: 'INSUFFICIENT_PRIVILEGES'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403
       });
     }
-    console.log('✅ Admin authentication successful for user:', user.id);
+
+    console.log('✅ Admin authentication successful:', { 
+      userId: user.id, 
+      email: user.email,
+      authMethod,
+      timestamp: new Date().toISOString()
+    });
+
+    // Log successful admin access
+    try {
+      await supabaseClient.from('audit_logs').insert([{
+        action: 'admin_access_granted',
+        category: 'Admin Activity',
+        message: `Admin access granted for user ${user.id} via ${authMethod}`,
+        user_id: user.id,
+        new_values: { 
+          auth_method: authMethod,
+          user_email: user.email,
+          timestamp: new Date().toISOString()
+        }
+      }]);
+    } catch (auditError) {
+      console.error('⚠️ Failed to log admin access:', auditError.message);
+    }
+
   } catch (authError) {
-    console.error('❌ Authentication error:', authError);
+    console.error('❌ Critical authentication error:', {
+      error: authError.message,
+      stack: authError.stack,
+      timestamp: new Date().toISOString()
+    });
+
+    // Log critical security event
+    try {
+      await supabaseClient.from('audit_logs').insert([{
+        action: 'authentication_system_error',
+        category: 'Critical Security Alert',
+        message: `Authentication system error: ${authError.message}`,
+        new_values: { 
+          error: authError.message,
+          stack: authError.stack,
+          timestamp: new Date().toISOString()
+        }
+      }]);
+    } catch (auditError) {
+      console.error('⚠️ Failed to log critical security event:', auditError.message);
+    }
+
     return new Response(JSON.stringify({
       success: false,
-      error: 'Authentication failed'
+      error: 'Authentication system error',
+      errorCode: 'AUTH_SYSTEM_ERROR'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500
     });
   }
 
+  // Request Processing with Enhanced Error Handling
   try {
-    let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (jsonError) {
+      console.error('❌ Invalid JSON in request body:', jsonError.message);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid JSON in request body',
+        errorCode: 'INVALID_JSON'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+
+    // Validate required fields based on action
+    const { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = requestBody;
+    
+    if (!action || typeof action !== 'string') {
+      console.error('❌ Missing or invalid action parameter:', action);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing or invalid action parameter',
+        errorCode: 'INVALID_ACTION'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+
+    console.log('📋 Processing admin request:', { 
+      action, 
+      orderId: orderId || 'N/A',
+      timestamp: new Date().toISOString()
+    });
 
     switch(action){
       case 'list': {
@@ -725,13 +894,91 @@ serve(async (req)=>{
         });
     }
   } catch (error) {
-    console.error('❌ Admin orders manager error:', error);
+    // Enhanced Error Handling and Logging
+    const errorId = `admin-orders-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const errorDetails = {
+      errorId,
+      message: error.message || 'Unknown error',
+      stack: error.stack || 'No stack trace',
+      timestamp: new Date().toISOString(),
+      requestMethod: req.method,
+      requestHeaders: Object.fromEntries(req.headers.entries()),
+      requestUrl: req.url
+    };
+
+    console.error('❌ Admin orders manager critical error:', {
+      ...errorDetails,
+      // Sanitize sensitive headers for logging
+      requestHeaders: {
+        ...errorDetails.requestHeaders,
+        authorization: errorDetails.requestHeaders.authorization ? '[REDACTED]' : undefined
+      }
+    });
+
+    // Categorize error types for better monitoring
+    let errorCategory = 'UNKNOWN_ERROR';
+    let httpStatus = 500;
+    let userMessage = 'An unexpected error occurred. Please try again.';
+
+    if (error.message?.includes('duplicate key')) {
+      errorCategory = 'DUPLICATE_KEY_ERROR';
+      userMessage = 'This operation conflicts with existing data. Please refresh and try again.';
+    } else if (error.message?.includes('foreign key')) {
+      errorCategory = 'FOREIGN_KEY_ERROR';
+      userMessage = 'Invalid reference to related data. Please check your input.';
+    } else if (error.message?.includes('not found') || error.message?.includes('does not exist')) {
+      errorCategory = 'NOT_FOUND_ERROR';
+      httpStatus = 404;
+      userMessage = 'The requested resource was not found.';
+    } else if (error.message?.includes('permission') || error.message?.includes('access')) {
+      errorCategory = 'PERMISSION_ERROR';
+      httpStatus = 403;
+      userMessage = 'You do not have permission to perform this action.';
+    } else if (error.message?.includes('network') || error.message?.includes('timeout')) {
+      errorCategory = 'NETWORK_ERROR';
+      httpStatus = 503;
+      userMessage = 'Service temporarily unavailable. Please try again in a moment.';
+    }
+
+    // Log to audit table for monitoring (non-blocking)
+    try {
+      await supabaseClient.from('audit_logs').insert([{
+        action: 'admin_orders_manager_error',
+        category: 'Critical System Error',
+        message: `Admin orders manager error: ${errorCategory}`,
+        new_values: {
+          errorId,
+          errorCategory,
+          message: error.message,
+          stack: error.stack?.substring(0, 1000), // Limit stack trace length
+          timestamp: new Date().toISOString()
+        }
+      }]);
+    } catch (auditError) {
+      console.error('⚠️ Failed to log error to audit table:', auditError.message);
+    }
+
     return new Response(JSON.stringify({
       success: false,
-      error: error.message || 'Internal server error'
+      error: userMessage,
+      errorCode: errorCategory,
+      errorId: errorId,
+      timestamp: new Date().toISOString(),
+      // Include more details in development/debugging
+      ...(Deno.env.get('ENVIRONMENT') === 'development' && {
+        details: {
+          originalError: error.message,
+          stack: error.stack
+        }
+      })
     }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      status: httpStatus,
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json',
+        'X-Error-ID': errorId,
+        'X-Error-Category': errorCategory
+      }
     });
   }
 });

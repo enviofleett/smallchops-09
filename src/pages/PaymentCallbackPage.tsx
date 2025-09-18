@@ -2,19 +2,20 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Loader2, PartyPopper } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, PartyPopper, User, Package } from 'lucide-react';
 import { useSecurePayment } from '@/hooks/useSecurePayment';
 import { cleanupPaymentCache, validateStoredReference } from '@/utils/paymentCacheCleanup';
 import { paymentCompletionCoordinator } from '@/utils/paymentCompletion';
 import { useCart } from '@/hooks/useCart';
+import { useUserContext } from '@/hooks/useUserContext';
 import { supabase } from '@/integrations/supabase/client';
-import startersLogo from '@/assets/starters-logo.png';
 
 export const PaymentCallbackPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { verifySecurePayment, isProcessing } = useSecurePayment();
   const { clearCart } = useCart();
+  const userContext = useUserContext();
   
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'failed'>('loading');
   const [orderDetails, setOrderDetails] = useState<any>(null);
@@ -304,19 +305,50 @@ export const PaymentCallbackPage: React.FC = () => {
 
           {/* Action Buttons */}
           <div className="space-y-3 pt-4">
-            <Button 
-              onClick={() => navigate('/customer-profile')} 
-              className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-semibold"
-            >
-              Track Your Order
-            </Button>
-            <Button 
-              onClick={() => navigate('/')} 
-              variant="outline" 
-              className="w-full h-12 text-base border-2 border-green-200 text-green-600 hover:bg-green-50 font-semibold"
-            >
-              Continue Shopping
-            </Button>
+            {userContext === 'customer' ? (
+              <>
+                <Button 
+                  onClick={() => navigate('/customer-profile')} 
+                  className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-semibold"
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  View My Orders
+                </Button>
+                <Button 
+                  onClick={() => navigate('/')} 
+                  variant="outline" 
+                  className="w-full h-12 text-base border-2 border-green-200 text-green-600 hover:bg-green-50 font-semibold"
+                >
+                  Continue Shopping
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  onClick={() => {
+                    const params = new URLSearchParams();
+                    if (orderDetails?.orderNumber) params.set('order', orderDetails.orderNumber);
+                    navigate(`/track-order?${params.toString()}`);
+                  }} 
+                  className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-semibold"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Track This Order
+                </Button>
+                <Button 
+                  onClick={() => navigate('/')} 
+                  variant="outline" 
+                  className="w-full h-12 text-base border-2 border-green-200 text-green-600 hover:bg-green-50 font-semibold"
+                >
+                  Continue Shopping
+                </Button>
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700 text-center">
+                    💡 <strong>Tip:</strong> Create an account to permanently save your order history
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

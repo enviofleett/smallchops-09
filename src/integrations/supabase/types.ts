@@ -1104,7 +1104,9 @@ export type Database = {
       }
       communication_events: {
         Row: {
+          admin_session_id: string | null
           channel: string | null
+          collision_detected_at: string | null
           created_at: string
           dedupe_key: string | null
           delivery_status: string | null
@@ -1139,7 +1141,9 @@ export type Database = {
           variables: Json | null
         }
         Insert: {
+          admin_session_id?: string | null
           channel?: string | null
+          collision_detected_at?: string | null
           created_at?: string
           dedupe_key?: string | null
           delivery_status?: string | null
@@ -1174,7 +1178,9 @@ export type Database = {
           variables?: Json | null
         }
         Update: {
+          admin_session_id?: string | null
           channel?: string | null
+          collision_detected_at?: string | null
           created_at?: string
           dedupe_key?: string | null
           delivery_status?: string | null
@@ -1299,6 +1305,42 @@ export type Database = {
           template_variables?: Json | null
           updated_at?: string
           variables?: Json | null
+        }
+        Relationships: []
+      }
+      communication_events_collision_log: {
+        Row: {
+          admin_session_ids: string[] | null
+          collision_count: number | null
+          event_type: string | null
+          first_collision_at: string | null
+          id: string
+          last_collision_at: string | null
+          order_id: string | null
+          original_dedupe_key: string
+          resolution_strategy: string | null
+        }
+        Insert: {
+          admin_session_ids?: string[] | null
+          collision_count?: number | null
+          event_type?: string | null
+          first_collision_at?: string | null
+          id?: string
+          last_collision_at?: string | null
+          order_id?: string | null
+          original_dedupe_key: string
+          resolution_strategy?: string | null
+        }
+        Update: {
+          admin_session_ids?: string[] | null
+          collision_count?: number | null
+          event_type?: string | null
+          first_collision_at?: string | null
+          id?: string
+          last_collision_at?: string | null
+          order_id?: string | null
+          original_dedupe_key?: string
+          resolution_strategy?: string | null
         }
         Relationships: []
       }
@@ -8899,6 +8941,17 @@ export type Database = {
       }
     }
     Views: {
+      communication_events_health: {
+        Row: {
+          avg_retry_count: number | null
+          collision_events: number | null
+          failed_events: number | null
+          hour: string | null
+          total_events: number | null
+          unique_sessions: number | null
+        }
+        Relationships: []
+      }
       email_queue_health: {
         Row: {
           failed_count: number | null
@@ -9888,7 +9941,9 @@ export type Database = {
       get_queued_communication_events: {
         Args: { batch_size?: number }
         Returns: {
+          admin_session_id: string | null
           channel: string | null
+          collision_detected_at: string | null
           created_at: string
           dedupe_key: string | null
           delivery_status: string | null

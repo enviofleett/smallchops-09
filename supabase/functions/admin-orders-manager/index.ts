@@ -229,6 +229,9 @@ serve(async (req)=>{
   }
   const corsHeaders = getCorsHeaders(origin);
 
+  // Declare user variable at function scope so it's accessible throughout
+  let user = null;
+
   // Enhanced Authentication with Production Error Handling
   try {
     const authHeader = req.headers.get('authorization');
@@ -247,7 +250,8 @@ serve(async (req)=>{
     const token = authHeader.replace('Bearer ', '');
     
     // Step 1: Verify JWT token
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    const { data: authData, error: authError } = await supabaseClient.auth.getUser(token);
+    user = authData?.user; // Assign to the function-scoped user variable
     if (authError) {
       console.warn('🔒 Authentication failed: JWT verification error:', authError.message);
       return new Response(JSON.stringify({

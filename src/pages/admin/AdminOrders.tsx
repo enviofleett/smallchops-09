@@ -88,7 +88,9 @@ function AdminOrdersContent() {
       const { data, error } = await supabase
         .from('business_settings')
         .select('name, admin_notification_email, whatsapp_support_number, logo_url')
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
       if (error) {
         console.warn('Could not fetch business info:', error);

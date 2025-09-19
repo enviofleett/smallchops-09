@@ -55,43 +55,51 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
           margin: 0 auto;
           padding: 20mm;
           background: white;
-          color: #1a1a1a;
-          font-size: 11pt;
-          line-height: 1.4;
-          font-weight: bold;
+          color: #000000;
+          font-size: 12pt;
+          line-height: 1.5;
+          font-weight: 900 !important;
+        }
+
+        .job-order-print * {
+          font-weight: 900 !important;
+          color: #000000 !important;
         }
 
         .job-order-print h1 {
-          font-size: 24pt;
-          font-weight: bold;
+          font-size: 28pt;
+          font-weight: 900 !important;
           text-align: center;
           margin: 0 0 10mm 0;
-          color: #2c3e50;
+          color: #000000 !important;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: 2px;
+          text-shadow: 1px 1px 0px rgba(0,0,0,0.3);
         }
 
         .job-order-print h2 {
-          font-size: 14pt;
-          font-weight: bold;
+          font-size: 16pt;
+          font-weight: 900 !important;
           margin: 8mm 0 4mm 0;
-          color: #34495e;
-          border-bottom: 2px solid #3498db;
+          color: #000000 !important;
+          border-bottom: 3px solid #000000;
           padding-bottom: 2mm;
+          text-transform: uppercase;
         }
 
         .job-order-print .header-info {
           text-align: center;
           margin-bottom: 8mm;
           padding-bottom: 4mm;
-          border-bottom: 1px solid #bdc3c7;
+          border-bottom: 2px solid #000000;
         }
 
         .job-order-print .order-meta {
           display: flex;
           justify-content: space-between;
           margin-bottom: 6mm;
-          font-weight: bold;
+          font-weight: 900 !important;
+          font-size: 14pt;
         }
 
         .job-order-print .info-grid {
@@ -102,108 +110,252 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
         }
 
         .job-order-print .info-section {
-          background: #f8f9fa;
-          padding: 4mm;
+          background: #f0f0f0;
+          padding: 5mm;
           border-radius: 2mm;
-          border-left: 4px solid #3498db;
+          border: 2px solid #000000;
         }
 
         .job-order-print .info-row {
-          margin-bottom: 2mm;
+          margin-bottom: 3mm;
+          font-size: 11pt;
         }
 
         .job-order-print .info-label {
-          font-weight: bold;
-          color: #2c3e50;
+          font-weight: 900 !important;
+          color: #000000 !important;
           display: inline-block;
-          width: 35%;
+          width: 40%;
           vertical-align: top;
         }
 
         .job-order-print .info-value {
-          color: #34495e;
+          color: #000000 !important;
           display: inline-block;
-          width: 65%;
+          width: 60%;
           vertical-align: top;
+          font-weight: 900 !important;
         }
 
         .job-order-print .items-table {
           width: 100%;
           border-collapse: collapse;
           margin: 4mm 0;
+          border: 2px solid #000000;
         }
 
         .job-order-print .items-table th {
-          background: #34495e;
-          color: white;
-          padding: 3mm;
+          background: #000000 !important;
+          color: #ffffff !important;
+          padding: 4mm;
           text-align: left;
-          font-weight: bold;
-          border-bottom: 2px solid #2c3e50;
+          font-weight: 900 !important;
+          border: 1px solid #000000;
+          font-size: 12pt;
         }
 
         .job-order-print .items-table td {
-          padding: 3mm;
-          border-bottom: 1px solid #bdc3c7;
+          padding: 4mm;
+          border: 1px solid #000000;
           vertical-align: top;
+          font-weight: 900 !important;
+          color: #000000 !important;
+          font-size: 11pt;
         }
 
         .job-order-print .items-table tr:nth-child(even) {
-          background: #f8f9fa;
+          background: #f0f0f0 !important;
         }
 
         .job-order-print .total-section {
-          background: #ecf0f1;
-          padding: 4mm;
+          background: #e0e0e0 !important;
+          padding: 5mm;
           border-radius: 2mm;
           margin: 6mm 0;
-          border: 2px solid #3498db;
+          border: 3px solid #000000;
         }
 
         .job-order-print .total-row {
           display: flex;
           justify-content: space-between;
-          margin-bottom: 1mm;
+          margin-bottom: 2mm;
+          font-size: 12pt;
+          font-weight: 900 !important;
         }
 
         .job-order-print .total-row.grand-total {
-          font-weight: bold;
-          font-size: 13pt;
-          color: #2c3e50;
-          padding-top: 2mm;
-          border-top: 2px solid #34495e;
-          margin-top: 2mm;
+          font-weight: 900 !important;
+          font-size: 16pt;
+          color: #000000 !important;
+          padding-top: 3mm;
+          border-top: 3px solid #000000;
+          margin-top: 3mm;
         }
 
         .job-order-print .instructions-section {
-          background: #fff3cd;
-          border: 1px solid #ffeaa7;
+          background: #f5f5f5 !important;
+          border: 2px solid #000000;
           border-radius: 2mm;
-          padding: 4mm;
+          padding: 5mm;
           margin: 4mm 0;
         }
 
         .job-order-print .status-badge {
           display: inline-block;
-          padding: 1mm 3mm;
+          padding: 2mm 4mm;
           border-radius: 2mm;
-          font-weight: bold;
+          font-weight: 900 !important;
           text-transform: uppercase;
-          font-size: 9pt;
+          font-size: 10pt;
+          border: 2px solid #000000;
         }
 
-        .job-order-print .status-paid { background: #d4edda; color: #155724; }
-        .job-order-print .status-pending { background: #fff3cd; color: #856404; }
-        .job-order-print .status-delivery { background: #cce5ff; color: #004085; }
-        .job-order-print .status-pickup { background: #e2e6ea; color: #383d41; }
+        .job-order-print .status-paid { 
+          background: #ffffff !important; 
+          color: #000000 !important; 
+        }
+        .job-order-print .status-pending { 
+          background: #ffffff !important; 
+          color: #000000 !important; 
+        }
+        .job-order-print .status-delivery { 
+          background: #ffffff !important; 
+          color: #000000 !important; 
+        }
+        .job-order-print .status-pickup { 
+          background: #ffffff !important; 
+          color: #000000 !important; 
+        }
 
+        /* Standard Print Media Query */
         @media print {
           .job-order-print {
-            padding: 15mm;
+            padding: 10mm;
             margin: 0;
             box-shadow: none;
             border: none;
-            font-size: 10pt;
+            font-size: 11pt;
+            font-weight: 900 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          .job-order-print * {
+            font-weight: 900 !important;
+            color: #000000 !important;
+          }
+        }
+
+        /* 80mm Thermal Printer Support */
+        @media print and (max-width: 80mm) {
+          .job-order-print {
+            width: 72mm !important;
+            max-width: 72mm !important;
+            padding: 2mm !important;
+            margin: 0 !important;
+            font-size: 9pt !important;
+            font-weight: 900 !important;
+          }
+
+          .job-order-print h1 {
+            font-size: 14pt !important;
+            margin: 0 0 3mm 0 !important;
+            letter-spacing: 1px !important;
+          }
+
+          .job-order-print h2 {
+            font-size: 11pt !important;
+            margin: 3mm 0 2mm 0 !important;
+          }
+
+          .job-order-print .info-grid {
+            grid-template-columns: 1fr !important;
+            gap: 2mm !important;
+          }
+
+          .job-order-print .info-section {
+            padding: 2mm !important;
+            margin-bottom: 2mm !important;
+          }
+
+          .job-order-print .info-label {
+            width: 100% !important;
+            display: block !important;
+            margin-bottom: 1mm !important;
+          }
+
+          .job-order-print .info-value {
+            width: 100% !important;
+            display: block !important;
+            margin-left: 2mm !important;
+          }
+
+          .job-order-print .order-meta {
+            flex-direction: column !important;
+            gap: 1mm !important;
+            font-size: 10pt !important;
+          }
+
+          .job-order-print .items-table {
+            font-size: 8pt !important;
+          }
+
+          .job-order-print .items-table th,
+          .job-order-print .items-table td {
+            padding: 1mm !important;
+            font-size: 8pt !important;
+          }
+
+          .job-order-print .total-section {
+            padding: 2mm !important;
+            font-size: 9pt !important;
+          }
+
+          .job-order-print .total-row.grand-total {
+            font-size: 11pt !important;
+          }
+        }
+
+        /* Small thermal printer (58mm) */
+        @media print and (max-width: 58mm) {
+          .job-order-print {
+            width: 54mm !important;
+            max-width: 54mm !important;
+            font-size: 8pt !important;
+          }
+
+          .job-order-print h1 {
+            font-size: 12pt !important;
+          }
+
+          .job-order-print h2 {
+            font-size: 10pt !important;
+          }
+
+          .job-order-print .items-table th,
+          .job-order-print .items-table td {
+            font-size: 7pt !important;
+          }
+        }
+
+        /* Large format (A4) enhancement */
+        @media print and (min-width: 200mm) {
+          .job-order-print {
+            font-size: 12pt !important;
+          }
+
+          .job-order-print h1 {
+            font-size: 32pt !important;
+          }
+
+          .job-order-print h2 {
+            font-size: 18pt !important;
+          }
+
+          .job-order-print .items-table th,
+          .job-order-print .items-table td {
+            font-size: 12pt !important;
+            padding: 5mm !important;
           }
         }
       `}</style>

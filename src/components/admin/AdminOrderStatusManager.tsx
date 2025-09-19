@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
@@ -27,6 +27,11 @@ export const AdminOrderStatusManager = ({
 }: AdminOrderStatusManagerProps) => {
   const queryClient = useQueryClient();
   const { updateStatus, isUpdating, error } = useProductionStatusUpdate();
+  
+  // PRODUCTION FIX: Add debouncing to prevent rapid status updates
+  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const DEBOUNCE_DELAY = 500; // 500ms minimum between updates
 
   // Secure email notification mutation using edge function
   const sendDeliveryEmailMutation = useMutation({
@@ -47,10 +52,31 @@ export const AdminOrderStatusManager = ({
     }
   });
 
-  const handleStatusUpdate = (newStatus: OrderStatus) => {
+  // PRODUCTION FIX: Debounced status update to prevent rapid clicks
+  const handleStatusUpdate = useCallback((newStatus: OrderStatus) => {
+    const now = Date.now();
+    
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    // Check if enough time has passed since last update
+    if (now - lastUpdateTime < DEBOUNCE_DELAY) {
+      toast.info('Please wait before making another update');
+      return;
+    }
+    
+    // Update immediately and set debounce
+    setLastUpdateTime(now);
     updateStatus({ orderId, status: newStatus });
     onStatusUpdate?.(newStatus);
-  };
+    
+    // Set debounce timeout to prevent rapid subsequent updates
+    debounceTimeoutRef.current = setTimeout(() => {
+      debounceTimeoutRef.current = null;
+    }, DEBOUNCE_DELAY);
+  }, [orderId, updateStatus, onStatusUpdate, lastUpdateTime]);
 
   const handleSendDeliveryEmail = () => {
     sendDeliveryEmailMutation.mutate(orderId);

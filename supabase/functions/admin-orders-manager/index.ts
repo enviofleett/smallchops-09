@@ -65,8 +65,12 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
       return;
     }
     const sanitizedStatus = newStatus.trim();
-    // ENHANCED: Collision-resistant dedupe key with timestamp and random component
-    const dedupeKey = `${orderId}_${sanitizedStatus}_order_status_update_${Date.now()}_${Math.floor(Math.random()*10000)}`;
+    // PRODUCTION FIX: Enhanced collision-resistant dedupe key with microsecond precision + entropy
+    const timestamp = Date.now();
+    const microseconds = performance.now() * 1000;
+    const entropy = Math.random().toString(36).substring(2, 10);
+    const sessionId = 'admin_session'; // Will be enhanced with actual session tracking
+    const dedupeKey = `${orderId}_${sanitizedStatus}_${timestamp}_${Math.floor(microseconds)}_${entropy}_${sessionId}`;
 
     let notificationInserted = false;
     if (order.customer_email) {
@@ -93,6 +97,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
           updated_at: new Date().toISOString()
         };
 
+        // PRODUCTION FIX: Enhanced upsert with collision tracking
         const { error: upsertError } = await supabaseClient
           .from('communication_events')
           .upsert([{
@@ -106,20 +111,34 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
             template_variables: templateVars,
             source: 'admin_update',
             priority: 'high',
+            admin_session_id: sessionId,
+            retry_count: 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          }], { onConflict: 'dedupe_key' });
+          }], { onConflict: 'dedupe_key,order_id,event_type', ignoreDuplicates: true });
 
         if (upsertError) {
-          if (upsertError.message.includes('duplicate key')) {
-            console.log('⚠️ Duplicate notification event, skipping email insert.');
+          if (upsertError.message.includes('duplicate key') || upsertError.message.includes('violates unique constraint')) {
+            console.log('⚠️ Collision detected, logging for monitoring and continuing.');
+            // Log collision for production monitoring
+            try {
+              await supabaseClient.from('communication_events_collision_log').insert({
+                original_dedupe_key: dedupeKey,
+                order_id: orderId,
+                event_type: 'order_status_update',
+                admin_session_ids: [sessionId],
+                resolution_strategy: 'ignore_duplicate'
+              });
+            } catch (logError) {
+              console.warn('⚠️ Failed to log collision:', logError.message);
+            }
             notificationInserted = false;
           } else {
             throw upsertError;
           }
         } else {
           notificationInserted = true;
-          console.log('✅ Email notification queued (dedupe handled).');
+          console.log('✅ Email notification queued successfully with enhanced dedupe.');
         }
       } catch (emailError) {
         console.log(`⚠️ Email notification upsert/insert failed: ${emailError.message}`);

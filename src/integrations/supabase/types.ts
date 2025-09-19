@@ -9172,6 +9172,18 @@ export type Database = {
         }
         Returns: Json
       }
+      cache_idempotent_request_enhanced: {
+        Args: {
+          p_admin_id?: string
+          p_bypass_cache?: boolean
+          p_idempotency_key: string
+          p_order_id?: string
+          p_request_data: Json
+          p_response_data?: Json
+          p_status?: string
+        }
+        Returns: Json
+      }
       calculate_bogo_discount: {
         Args: { p_cart_items: Json; p_promotion_id: string }
         Returns: Json
@@ -9469,6 +9481,10 @@ export type Database = {
         Returns: number
       }
       cleanup_stuck_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      cleanup_stuck_request_cache: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
@@ -10206,6 +10222,10 @@ export type Database = {
       }
       is_email_suppressed: {
         Args: { email_address: string }
+        Returns: boolean
+      }
+      is_lock_holder_for_order: {
+        Args: { p_admin_id: string; p_order_id: string }
         Returns: boolean
       }
       is_phone_suppressed: {

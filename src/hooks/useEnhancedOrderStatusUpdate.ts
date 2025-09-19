@@ -85,7 +85,17 @@ export const useEnhancedOrderStatusUpdate = () => {
       const errorMessage = error?.message || 'Unknown error occurred';
       
       if (errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS') || errorMessage.includes('Another admin session is currently updating') || errorMessage.includes('409')) {
-        toast.error('Another admin is currently updating this order. Please wait and try again.');
+        // Check if this admin might be a lock holder experiencing a false positive
+        const getTimeSinceLastUpdate = (orderId: string) => {
+          const lastUpdate = lastUpdateTimes.get(orderId);
+          return lastUpdate ? Date.now() - lastUpdate : Infinity;
+        };
+        const timeSinceLastUpdate = getTimeSinceLastUpdate(variables.orderId);
+        if (timeSinceLastUpdate < 35000) { // Active within 35 seconds (lock duration + buffer)
+          toast.error('Session conflict detected. Please refresh the page and try again.');
+        } else {
+          toast.error('Another admin is currently updating this order. Please wait and try again.');
+        }
       } else if (errorMessage.includes('ORDER_MODIFIED_CONCURRENTLY')) {
         toast.error('Order was modified by another user. Please refresh and try again.');
       } else if (errorMessage.includes('rate limit')) {
@@ -123,8 +133,9 @@ export const useEnhancedOrderStatusUpdate = () => {
       return pendingUpdates.get(orderId);
     }
 
-    // Generate client-side idempotency key
-    const idempotencyKey = `${adminUserId}_${orderId}_${newStatus}_${now}`;
+    // Generate client-side idempotency key with enhanced collision resistance
+    const entropy = Math.random().toString(36).substring(2, 8);
+    const idempotencyKey = `${adminUserId}_${orderId}_${newStatus}_${now}_${entropy}`;
 
     const updatePromise = updateMutation.mutateAsync({
       orderId,
@@ -144,6 +155,23 @@ export const useEnhancedOrderStatusUpdate = () => {
       const result = await updatePromise;
       return result;
     } catch (error) {
+      // Enhanced error handling for lock holders
+      const errorMessage = error?.message || 'Unknown error occurred';
+      
+      // If this is a 409 but user is a lock holder, suggest refresh instead of retry
+      if (errorMessage.includes('409') || errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
+        // Check if user might be lock holder and suggest different action
+        const getTimeSinceLastUpdate = (orderId: string) => {
+          const lastUpdate = lastUpdateTimes.get(orderId);
+          return lastUpdate ? Date.now() - lastUpdate : Infinity;
+        };
+        const isLikelyLockHolder = getTimeSinceLastUpdate(orderId) < 30000; // Active within 30 seconds
+        if (isLikelyLockHolder) {
+          console.log('🔒 Potential lock holder experiencing 409 - suggesting refresh');
+          throw new Error('Your session may have expired. Please refresh the page and try again.');
+        }
+      }
+      
       // The error is already handled in onError, just re-throw for caller
       throw error;
     }

@@ -235,14 +235,21 @@ serve(async (req)=>{
   
   const corsHeaders = getCorsHeaders(origin);
 
-  // Cleanup expired locks on function startup for better reliability
+  // Enhanced cleanup on function startup for better reliability
   try {
-    const { data: cleanupResult } = await supabaseClient.rpc('cleanup_expired_locks');
-    if (cleanupResult > 0) {
-      console.log(`🧹 Cleaned up ${cleanupResult} expired locks [${correlationId}]`);
+    // Clean up expired locks
+    const { data: lockCleanupResult } = await supabaseClient.rpc('cleanup_expired_locks');
+    if (lockCleanupResult > 0) {
+      console.log(`🧹 Cleaned up ${lockCleanupResult} expired locks [${correlationId}]`);
+    }
+    
+    // Clean up stuck cache entries
+    const { data: cacheCleanupResult } = await supabaseClient.rpc('cleanup_stuck_request_cache');
+    if (cacheCleanupResult?.expired_cleaned > 0 || cacheCleanupResult?.stuck_processing_fixed > 0) {
+      console.log(`🧹 Cache cleanup: ${cacheCleanupResult.expired_cleaned} expired, ${cacheCleanupResult.stuck_processing_fixed} stuck entries [${correlationId}]`);
     }
   } catch (cleanupError) {
-    console.warn(`⚠️ Lock cleanup failed (non-blocking): ${cleanupError.message} [${correlationId}]`);
+    console.warn(`⚠️ Startup cleanup failed (non-blocking): ${cleanupError.message} [${correlationId}]`);
   }
 
   // Declare user variable at function scope so it's accessible throughout
@@ -979,12 +986,16 @@ serve(async (req)=>{
         const adminUserId = user.id;
         const idempotencyKey = `order_update_${orderId}_${JSON.stringify(sanitizedUpdates)}_${adminUserId}_${Date.now()}`;
 
-        // Check idempotency cache first
-        const { data: cacheResult } = await supabaseClient.rpc('cache_idempotent_request', {
+        // Check idempotency cache with enhanced lock holder bypass
+        const { data: cacheResult } = await supabaseClient.rpc('cache_idempotent_request_enhanced', {
           p_idempotency_key: idempotencyKey,
-          p_request_data: { orderId, updates: sanitizedUpdates, adminUserId, timestamp: new Date().toISOString() }
+          p_request_data: { orderId, updates: sanitizedUpdates, adminUserId, timestamp: new Date().toISOString() },
+          p_order_id: orderId,
+          p_admin_id: adminUserId,
+          p_bypass_cache: false
         });
 
+        // Enhanced cache result handling
         if (cacheResult?.cached) {
           console.log('🔄 Returning cached result for idempotent request');
           return new Response(JSON.stringify({
@@ -994,6 +1005,32 @@ serve(async (req)=>{
           }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Handle lock holder bypass
+        if (cacheResult?.lock_holder_bypass) {
+          console.log('🚀 Lock holder bypass - proceeding without cache check');
+        }
+
+        // Handle concurrent processing detection
+        if (cacheResult?.concurrent_processing) {
+          console.log('⚠️ Concurrent processing detected via enhanced cache');
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Another admin session is currently updating this order. Please wait and try again.',
+            errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS',
+            correlationId,
+            retryAfter: 3,
+            userMessage: 'Another admin is updating this order. Please wait a moment and try again.'
+          }), {
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'X-Correlation-ID': correlationId,
+              'Retry-After': '3'
+            },
+            status: 409
           });
         }
 
@@ -1255,12 +1292,14 @@ serve(async (req)=>{
           timestamp: new Date().toISOString()
         };
 
-        // Cache successful result
+        // Cache successful result with enhanced function
         try {
-          await supabaseClient.rpc('cache_idempotent_request', {
+          await supabaseClient.rpc('cache_idempotent_request_enhanced', {
             p_idempotency_key: idempotencyKey,
             p_request_data: { orderId, updates: sanitizedUpdates, adminUserId, correlationId },
             p_response_data: result,
+            p_status: 'success'
+          });
             p_status: 'success'
           });
         } catch (cacheError) {

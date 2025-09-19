@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -8,23 +8,34 @@ interface IdempotentUpdateRequest {
   orderId: string;
   newStatus: OrderStatus;
   idempotencyKey: string;
-  sessionId: string;
+  adminUserId: string;
 }
 
 export const useEnhancedOrderStatusUpdate = () => {
-  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random()}`);
+  const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Map<string, Promise<any>>>(new Map());
   const [lastUpdateTimes, setLastUpdateTimes] = useState<Map<string, number>>(new Map());
   const queryClient = useQueryClient();
 
+  // Get current admin user ID on mount
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) {
+        setAdminUserId(user.id);
+      }
+    };
+    getCurrentUser();
+  }, []);
+
   const updateMutation = useMutation({
-    mutationFn: async ({ orderId, newStatus, idempotencyKey }: IdempotentUpdateRequest) => {
+    mutationFn: async ({ orderId, newStatus, idempotencyKey, adminUserId }: IdempotentUpdateRequest) => {
       const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'update',
           orderId,
           updates: { status: newStatus },
-          admin_session_id: sessionId,
+          admin_user_id: adminUserId,
           idempotency_key: idempotencyKey
         }
       });
@@ -91,13 +102,17 @@ export const useEnhancedOrderStatusUpdate = () => {
     }
   });
 
-  const updateOrderStatus = useCallback(async (orderId: string, newStatus: OrderStatus): Promise<any> => {
+  const updateOrderStatus = useCallback(async (orderId: string, newStatus: OrderStatus, skipDebounce = false): Promise<any> => {
+    if (!adminUserId) {
+      throw new Error('Admin user not authenticated');
+    }
+
     const now = Date.now();
     const lastUpdate = lastUpdateTimes.get(orderId) || 0;
     const timeSinceLastUpdate = now - lastUpdate;
 
-    // Enhanced debouncing: Prevent updates within 2 seconds
-    if (timeSinceLastUpdate < 2000) {
+    // Enhanced debouncing: Skip timing restrictions if specified (for lock holders)
+    if (!skipDebounce && timeSinceLastUpdate < 2000) {
       const remainingTime = 2000 - timeSinceLastUpdate;
       await new Promise(resolve => setTimeout(resolve, remainingTime));
     }
@@ -109,13 +124,13 @@ export const useEnhancedOrderStatusUpdate = () => {
     }
 
     // Generate client-side idempotency key
-    const idempotencyKey = `${sessionId}_${orderId}_${newStatus}_${now}`;
+    const idempotencyKey = `${adminUserId}_${orderId}_${newStatus}_${now}`;
 
     const updatePromise = updateMutation.mutateAsync({
       orderId,
       newStatus,
       idempotencyKey,
-      sessionId
+      adminUserId
     });
 
     // Track pending update
@@ -132,13 +147,13 @@ export const useEnhancedOrderStatusUpdate = () => {
       // The error is already handled in onError, just re-throw for caller
       throw error;
     }
-  }, [updateMutation, sessionId, pendingUpdates, lastUpdateTimes]);
+  }, [updateMutation, adminUserId, pendingUpdates, lastUpdateTimes]);
 
   return {
     updateOrderStatus,
     isUpdating: updateMutation.isPending,
     error: updateMutation.error,
-    sessionId,
+    adminUserId,
     isPending: (orderId: string) => pendingUpdates.has(orderId),
     getTimeSinceLastUpdate: (orderId: string) => {
       const lastUpdate = lastUpdateTimes.get(orderId);

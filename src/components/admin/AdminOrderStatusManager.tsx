@@ -45,7 +45,7 @@ export const AdminOrderStatusManager = ({
     updateOrderStatus, 
     isUpdating, 
     error,
-    sessionId,
+    adminUserId,
     isPending,
     getTimeSinceLastUpdate 
   } = useEnhancedOrderStatusUpdate();
@@ -54,7 +54,14 @@ export const AdminOrderStatusManager = ({
   const isLockedByOther = Boolean(
     lockInfo?.is_locked && 
     lockInfo?.locking_admin_id && 
-    lockInfo?.locking_admin_id !== sessionId // Compare with current session
+    lockInfo?.locking_admin_id !== adminUserId // Compare with current admin user ID
+  );
+  
+  // Check if current admin is the lock holder
+  const isLockHolder = Boolean(
+    lockInfo?.is_locked && 
+    lockInfo?.locking_admin_id && 
+    lockInfo?.locking_admin_id === adminUserId
   );
   
   const [showProcessing, setShowProcessing] = useState(false);
@@ -101,17 +108,19 @@ export const AdminOrderStatusManager = ({
       return;
     }
 
-    if (timeSinceLastUpdate < 2000) {
+    // Skip timing restrictions for lock holders
+    if (!isLockHolder && timeSinceLastUpdate < 2000) {
       const remainingSeconds = Math.ceil((2000 - timeSinceLastUpdate) / 1000);
       toast.info(`Please wait ${remainingSeconds} seconds before updating again`);
       return;
     }
 
-    // Implement 2-second debouncing for rapid status changes
+    // Implement timing logic based on lock status
+    const debounceTime = isLockHolder ? 0 : 2000; // No delay for lock holders
     const timeoutId = setTimeout(async () => {
       setShowProcessing(true);
       try {
-        await updateOrderStatus(orderId, newStatus);
+        await updateOrderStatus(orderId, newStatus, isLockHolder); // Skip debounce for lock holders
         onStatusUpdate?.(newStatus);
         toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
       } catch (error: any) {
@@ -131,12 +140,17 @@ export const AdminOrderStatusManager = ({
         setShowProcessing(false);
         setDebounceTimeout(null);
       }
-    }, 2000);
+    }, debounceTime);
 
     setDebounceTimeout(timeoutId);
     setShowProcessing(true);
-    toast.info(`Scheduling status change to ${newStatus.replace('_', ' ')}...`);
-  }, [updateOrderStatus, orderId, onStatusUpdate, isPending, getTimeSinceLastUpdate, debounceTimeout]);
+    
+    if (isLockHolder) {
+      toast.info(`Updating status to ${newStatus.replace('_', ' ')}...`);
+    } else {
+      toast.info(`Scheduling status change to ${newStatus.replace('_', ' ')}...`);
+    }
+  }, [updateOrderStatus, orderId, onStatusUpdate, isPending, getTimeSinceLastUpdate, debounceTimeout, isLockHolder]);
 
   const handleSendDeliveryEmail = useCallback(() => {
     sendDeliveryEmailMutation.mutate(orderId);
@@ -196,7 +210,7 @@ export const AdminOrderStatusManager = ({
     const isProcessing = isUpdating || sendDeliveryEmailMutation.isPending || showProcessing;
     const isOrderPending = isPending(orderId);
     const timeSinceLastUpdate = getTimeSinceLastUpdate(orderId);
-    const isInDebounceWindow = timeSinceLastUpdate < 2000;
+    const isInDebounceWindow = !isLockHolder && timeSinceLastUpdate < 2000; // Skip debounce window for lock holders
     const isDisabled = isProcessing || isOrderPending || isInDebounceWindow;
     const remainingSeconds = isInDebounceWindow ? Math.ceil((2000 - timeSinceLastUpdate) / 1000) : 0;
     

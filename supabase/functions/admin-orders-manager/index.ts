@@ -122,7 +122,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
             template_variables: templateVars,
             source: 'admin_update',
             priority: 'high',
-            admin_session_id: sessionId,
+            admin_session_id: adminUserId,
             retry_count: 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -137,7 +137,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
                 original_dedupe_key: dedupeKey,
                 order_id: orderId,
                 event_type: 'order_status_update',
-                admin_session_ids: [sessionId],
+                admin_session_ids: [adminUserId],
                 resolution_strategy: 'ignore_duplicate'
               });
             } catch (logError) {
@@ -977,7 +977,6 @@ serve(async (req)=>{
 
         // Generate idempotency key for this request
         const adminUserId = user.id;
-        const adminSessionId = `session_${adminUserId}_${Date.now()}`;
         const idempotencyKey = `order_update_${orderId}_${JSON.stringify(sanitizedUpdates)}_${adminUserId}_${Date.now()}`;
 
         // Check idempotency cache first
@@ -1006,7 +1005,7 @@ serve(async (req)=>{
           try {
             const { data: lockResult, error: lockAcquisitionError } = await supabaseClient.rpc('acquire_order_lock', {
               p_order_id: orderId,
-              p_admin_session_id: adminSessionId,
+              p_admin_user_id: adminUserId,
               p_timeout_seconds: 30
             });
 
@@ -1167,13 +1166,13 @@ serve(async (req)=>{
             try {
               const { data: releaseResult, error: releaseError } = await supabaseClient.rpc('release_order_lock', {
                 p_order_id: orderId,
-                p_admin_session_id: adminSessionId
+                p_admin_user_id: adminUserId
               });
               
               if (releaseError) {
                 console.error(`❌ Failed to release lock [${correlationId}]:`, {
                   orderId,
-                  adminSessionId,
+                  adminUserId,
                   error: releaseError.message
                 });
               } else if (releaseResult) {
@@ -1221,7 +1220,7 @@ serve(async (req)=>{
             const { data: commResult } = await supabaseClient.rpc('upsert_communication_event_with_business_logic', {
               p_order_id: orderId,
               p_event_type: 'order_status_update',
-              p_admin_session_id: adminSessionId,
+              p_admin_session_id: adminUserId,
               p_template_key: getTemplateKey(sanitizedUpdates.status),
               p_template_variables: {
                 customer_name: currentOrder.customer_name || 'Customer',

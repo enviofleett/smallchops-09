@@ -9078,11 +9078,17 @@ export type Database = {
     }
     Functions: {
       acquire_order_lock: {
-        Args: {
-          p_admin_session_id: string
-          p_order_id: string
-          p_timeout_seconds?: number
-        }
+        Args:
+          | {
+              p_admin_session_id: string
+              p_order_id: string
+              p_timeout_seconds?: number
+            }
+          | {
+              p_admin_user_id: string
+              p_order_id: string
+              p_timeout_seconds?: number
+            }
         Returns: boolean
       }
       activate_admin_user: {
@@ -10649,7 +10655,9 @@ export type Database = {
         Returns: Json
       }
       release_order_lock: {
-        Args: { p_admin_session_id: string; p_order_id: string }
+        Args:
+          | { p_admin_session_id: string; p_order_id: string }
+          | { p_admin_user_id: string; p_order_id: string }
         Returns: boolean
       }
       requeue_failed_welcome_emails: {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpdate';
@@ -38,6 +38,16 @@ export const AdminOrderStatusManager = ({
   } = useEnhancedOrderStatusUpdate();
   
   const [showProcessing, setShowProcessing] = useState(false);
+  const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Clean up debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+      }
+    };
+  }, [debounceTimeout]);
 
   // Secure email notification mutation
   const sendDeliveryEmailMutation = useMutation({
@@ -58,10 +68,16 @@ export const AdminOrderStatusManager = ({
   });
 
   const handleStatusUpdate = useCallback(async (newStatus: OrderStatus) => {
+    // Clear any existing debounce timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+      setDebounceTimeout(null);
+    }
+
     const timeSinceLastUpdate = getTimeSinceLastUpdate(orderId);
     
     if (isPending(orderId)) {
-      toast.info('Update already in progress for this order');
+      toast.info('Another admin is currently updating this order. Please wait...');
       return;
     }
 
@@ -71,18 +87,58 @@ export const AdminOrderStatusManager = ({
       return;
     }
 
+    // Implement 2-second debouncing for rapid status changes
+    const timeoutId = setTimeout(async () => {
+      setShowProcessing(true);
+      try {
+        await updateOrderStatus(orderId, newStatus);
+        onStatusUpdate?.(newStatus);
+        toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
+      } catch (error: any) {
+        // Enhanced error messages for different error types
+        if (error.message?.includes('409') || error.message?.includes('conflict')) {
+          toast.error('Another admin is updating this order. Please try again in a moment.');
+        } else if (error.message?.includes('401') || error.message?.includes('unauthorized')) {
+          toast.error('Session expired. Please refresh and try again.');
+        } else if (error.message?.includes('Network')) {
+          toast.error('Network error. Retrying in 3 seconds...');
+          // Auto-retry for network errors
+          setTimeout(() => handleStatusUpdate(newStatus), 3000);
+        } else {
+          toast.error(`Failed to update status: ${error.message || 'Unknown error'}`);
+        }
+      } finally {
+        setShowProcessing(false);
+        setDebounceTimeout(null);
+      }
+    }, 2000);
+
+    setDebounceTimeout(timeoutId);
     setShowProcessing(true);
-    try {
-      await updateOrderStatus(orderId, newStatus);
-      onStatusUpdate?.(newStatus);
-    } finally {
-      setShowProcessing(false);
-    }
-  }, [updateOrderStatus, orderId, onStatusUpdate, isPending, getTimeSinceLastUpdate]);
+    toast.info(`Scheduling status change to ${newStatus.replace('_', ' ')}...`);
+  }, [updateOrderStatus, orderId, onStatusUpdate, isPending, getTimeSinceLastUpdate, debounceTimeout]);
 
   const handleSendDeliveryEmail = useCallback(() => {
     sendDeliveryEmailMutation.mutate(orderId);
   }, [sendDeliveryEmailMutation, orderId]);
+
+  // Status transition validation
+  const isValidTransition = (from: OrderStatus, to: OrderStatus): boolean => {
+    const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+      pending: ['confirmed', 'cancelled'],
+      confirmed: ['preparing', 'cancelled'],
+      preparing: ['ready', 'cancelled'],
+      ready: ['out_for_delivery', 'cancelled'],
+      out_for_delivery: ['delivered', 'cancelled'],
+      delivered: ['completed', 'returned'],
+      cancelled: ['pending'],
+      refunded: [],
+      completed: [],
+      returned: ['refunded']
+    };
+    
+    return validTransitions[from]?.includes(to) || false;
+  };
 
   const getStatusColor = (status: OrderStatus): string => {
     const colorMap: Record<OrderStatus, string> = {
@@ -114,75 +170,75 @@ export const AdminOrderStatusManager = ({
     const isDisabled = isProcessing || isOrderPending || isInDebounceWindow;
     const remainingSeconds = isInDebounceWindow ? Math.ceil((2000 - timeSinceLastUpdate) / 1000) : 0;
     
+    const getNextValidStatuses = (): OrderStatus[] => {
+      const validNext: Record<OrderStatus, OrderStatus[]> = {
+        pending: ['confirmed'],
+        confirmed: ['preparing'],
+        preparing: ['ready'],
+        ready: ['out_for_delivery'],
+        out_for_delivery: ['delivered'],
+        delivered: ['completed'],
+        cancelled: [],
+        refunded: [],
+        completed: [],
+        returned: ['refunded']
+      };
+      return validNext[currentStatus] || [];
+    };
+
+    const validNextStatuses = getNextValidStatuses();
+    
     return (
       <div className={`flex gap-1 ${className}`}>
-        {currentStatus === 'confirmed' && (
-          <Button
-            size={size}
-            variant="outline"
-            onClick={() => handleStatusUpdate('preparing')}
-            disabled={isDisabled}
-          >
-            {isProcessing ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin mr-1" />
-                Processing...
-              </>
-            ) : isInDebounceWindow ? (
-              <>
-                <Clock className="w-4 h-4 mr-1" />
-                Wait {remainingSeconds}s
-              </>
-            ) : (
-              'Start Preparing'
-            )}
-          </Button>
-        )}
-        
-        {currentStatus === 'preparing' && (
-          <>
+        {validNextStatuses.map(nextStatus => {
+          const isValidNext = isValidTransition(currentStatus, nextStatus);
+          
+          return (
             <Button
+              key={nextStatus}
               size={size}
               variant="outline"
-              onClick={() => handleStatusUpdate('ready')}
-              disabled={isDisabled}
+              onClick={() => handleStatusUpdate(nextStatus)}
+              disabled={isDisabled || !isValidNext}
+              className={!isValidNext ? 'opacity-50 cursor-not-allowed' : ''}
             >
               {isProcessing ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin mr-1" />
-                  Processing...
+                  {debounceTimeout ? 'Scheduling...' : 'Processing...'}
                 </>
               ) : isInDebounceWindow ? (
                 <>
                   <Clock className="w-4 h-4 mr-1" />
                   Wait {remainingSeconds}s
                 </>
+              ) : error ? (
+                <>
+                  <AlertTriangle className="w-4 h-4 mr-1" />
+                  Retry
+                </>
               ) : (
-                'Mark Ready'
+                `Mark ${nextStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`
               )}
             </Button>
-          </>
-        )}
+          );
+        })}
         
-        {currentStatus === 'out_for_delivery' && (
+        {/* Cancel button for most statuses */}
+        {!['delivered', 'completed', 'cancelled', 'refunded'].includes(currentStatus) && (
           <Button
             size={size}
-            variant="outline"
-            onClick={() => handleStatusUpdate('delivered')}
+            variant="destructive"
+            onClick={() => handleStatusUpdate('cancelled')}
             disabled={isDisabled}
           >
             {isProcessing ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin mr-1" />
-                Processing...
-              </>
-            ) : isInDebounceWindow ? (
-              <>
-                <Clock className="w-4 h-4 mr-1" />
-                Wait {remainingSeconds}s
+                Cancelling...
               </>
             ) : (
-              'Mark Delivered'
+              'Cancel Order'
             )}
           </Button>
         )}

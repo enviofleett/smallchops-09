@@ -70,13 +70,23 @@ export const useEnhancedOrderStatusUpdate = () => {
 
       console.error('❌ Enhanced order status update failed:', error);
       
-      // Handle different error types
-      if (error.message?.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
-        toast.error('Another admin is updating this order. Please wait and try again.');
-      } else if (error.message?.includes('ORDER_MODIFIED_CONCURRENTLY')) {
+      // Enhanced error handling with specific messages for different error types
+      const errorMessage = error?.message || 'Unknown error occurred';
+      
+      if (errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS') || errorMessage.includes('Another admin session is currently updating') || errorMessage.includes('409')) {
+        toast.error('Another admin is currently updating this order. Please wait and try again.');
+      } else if (errorMessage.includes('ORDER_MODIFIED_CONCURRENTLY')) {
         toast.error('Order was modified by another user. Please refresh and try again.');
+      } else if (errorMessage.includes('rate limit')) {
+        toast.error('Too many requests. Please wait before trying again.');
+      } else if (errorMessage.includes('timeout')) {
+        toast.error('Request timed out. Please check your connection and try again.');
+      } else if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
+        toast.error('Session expired. Please refresh the page and log in again.');
+      } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+        toast.error('Network error. Please check your connection and try again.');
       } else {
-        toast.error(`Failed to update order: ${error.message || 'Unknown error'}`);
+        toast.error(`Failed to update order status: ${errorMessage}`);
       }
     }
   });

@@ -53,7 +53,18 @@ try {
 
 const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
-// Notification handler - with dedupe key and upsert fallback
+// Template key mapping helper function
+function getTemplateKey(status: string): string {
+  const templateKeyMap: Record<string, string> = {
+    'confirmed': 'order_confirmed',
+    'preparing': 'order_preparing', 
+    'ready': 'order_ready',
+    'out_for_delivery': 'order_out_for_delivery',
+    'delivered': 'order_delivered',
+    'cancelled': 'order_cancelled'
+  };
+  return templateKeyMap[status] || 'order_status_update';
+}
 async function handleStatusChangeNotification(supabaseClient, orderId, order, newStatus) {
   try {
     const validStatuses = [
@@ -167,7 +178,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
           source: 'admin_update_sms',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }], { onConflict: 'order_id,event_type,dedupe_key' });
+        }]);
 
         if (smsInsertError) {
           if (smsInsertError.message.includes('duplicate key')) {
@@ -843,6 +854,52 @@ serve(async (req)=>{
         }
         sanitizedUpdates.updated_at = new Date().toISOString();
 
+        // Generate idempotency key for this request
+        const adminUserId = user.id;
+        const adminSessionId = `session_${adminUserId}_${Date.now()}`;
+        const idempotencyKey = `order_update_${orderId}_${JSON.stringify(sanitizedUpdates)}_${adminUserId}_${Date.now()}`;
+
+        // Check idempotency cache first
+        const { data: cacheResult } = await supabaseClient.rpc('cache_idempotent_request', {
+          p_idempotency_key: idempotencyKey,
+          p_request_data: { orderId, updates: sanitizedUpdates, adminUserId, timestamp: new Date().toISOString() }
+        });
+
+        if (cacheResult?.cached) {
+          console.log('🔄 Returning cached result for idempotent request');
+          return new Response(JSON.stringify({
+            success: true,
+            cached: true,
+            ...cacheResult.result
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Acquire distributed lock for this order if status is being updated
+        let lockAcquired = false;
+        if (sanitizedUpdates.status) {
+          const { data: lockResult } = await supabaseClient.rpc('acquire_order_lock', {
+            p_order_id: orderId,
+            p_admin_session_id: adminSessionId,
+            p_timeout_seconds: 30
+          });
+
+          lockAcquired = lockResult;
+          if (!lockAcquired) {
+            console.log('🔒 Failed to acquire lock - concurrent update in progress');
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Another admin is currently updating this order. Please wait and try again.',
+              errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 409
+            });
+          }
+        }
+
         // PRODUCTION FIX: Split complex query into two operations for reliability
         let updatedOrder, orderError;
         
@@ -919,15 +976,26 @@ serve(async (req)=>{
           });
         }
         
-        // Background notification for status change - trigger instant processing
+        // Background notification for status change using enhanced business logic
         if (sanitizedUpdates.status && sanitizedUpdates.status !== currentOrder.status) {
           try {
-            // Queue notifications (fire-and-forget with enhanced error handling)
-            handleStatusChangeNotification(supabaseClient, orderId, currentOrder, sanitizedUpdates.status).catch(error => {
-              console.error('⚠️ Notification queuing failed (non-blocking):', error);
+            // Use enhanced communication event function with business logic deduplication
+            const { data: commResult } = await supabaseClient.rpc('upsert_communication_event_with_business_logic', {
+              p_order_id: orderId,
+              p_event_type: 'order_status_update',
+              p_admin_session_id: adminSessionId,
+              p_template_key: getTemplateKey(sanitizedUpdates.status),
+              p_template_variables: {
+                customer_name: currentOrder.customer_name || 'Customer',
+                order_number: currentOrder.order_number,
+                status: sanitizedUpdates.status,
+                order_id: orderId
+              }
             });
             
-            // Process notifications instantly (fire-and-forget with enhanced error handling)
+            console.log('📧 Enhanced communication event result:', commResult);
+            
+            // Process notifications instantly (fire-and-forget)
             supabaseClient.functions.invoke('instant-email-processor', {
               body: { priority: 'high', limit: 5 }
             }).then(result => {
@@ -936,21 +1004,52 @@ serve(async (req)=>{
               console.error('⚠️ Instant email processing failed (non-blocking):', error);
             });
           } catch (error) {
-            console.error('⚠️ Background notification setup failed (non-blocking):', error);
+            console.error('⚠️ Enhanced notification setup failed (non-blocking):', error);
+          }
+        }
+
+        const result = {
+          success: true,
+          order: updatedOrder,
+          message: 'Order updated successfully',
+          idempotency_key: idempotencyKey,
+          locked_processing: lockAcquired
+        };
+
+        // Cache successful result
+        if (lockAcquired) {
+          try {
+            await supabaseClient.rpc('cache_idempotent_request', {
+              p_idempotency_key: idempotencyKey,
+              p_request_data: { orderId, updates: sanitizedUpdates, adminUserId },
+              p_response_data: result,
+              p_status: 'success'
+            });
+          } catch (cacheError) {
+            console.error('⚠️ Failed to cache result (non-blocking):', cacheError);
           }
         }
 
         console.log('✅ Order update completed successfully:', { 
           orderId, 
           statusChanged: sanitizedUpdates.status !== currentOrder.status,
-          newStatus: sanitizedUpdates.status 
+          newStatus: sanitizedUpdates.status,
+          lockUsed: lockAcquired
         });
 
-        return new Response(JSON.stringify({
-          success: true,
-          order: updatedOrder,
-          message: 'Order updated successfully'
-        }), {
+        // Release lock before returning
+        if (lockAcquired) {
+          try {
+            await supabaseClient.rpc('release_order_lock', {
+              p_order_id: orderId,
+              p_admin_session_id: adminSessionId
+            });
+          } catch (lockError) {
+            console.error('⚠️ Failed to release lock (non-blocking):', lockError);
+          }
+        }
+
+        return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }

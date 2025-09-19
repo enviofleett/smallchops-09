@@ -1,13 +1,12 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
+import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpdate';
 import { OrderStatus } from '@/types/orders';
-import { RefreshCw, Send } from 'lucide-react';
+import { RefreshCw, Send, Clock, AlertTriangle } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { debounce } from 'lodash';
 
 interface AdminOrderStatusManagerProps {
   orderId: string;
@@ -27,20 +26,25 @@ export const AdminOrderStatusManager = ({
   onStatusUpdate
 }: AdminOrderStatusManagerProps) => {
   const queryClient = useQueryClient();
-  const { updateStatus, isUpdating, error } = useProductionStatusUpdate();
   
-  // PRODUCTION FIX: Add debouncing to prevent rapid status updates
-  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const DEBOUNCE_DELAY = 500; // 500ms minimum between updates
+  // Use enhanced hook with idempotency and distributed locking
+  const { 
+    updateOrderStatus, 
+    isUpdating, 
+    error,
+    sessionId,
+    isPending,
+    getTimeSinceLastUpdate 
+  } = useEnhancedOrderStatusUpdate();
+  
+  const [showProcessing, setShowProcessing] = useState(false);
 
-  // Secure email notification mutation using edge function
+  // Secure email notification mutation
   const sendDeliveryEmailMutation = useMutation({
     mutationFn: async (orderId: string) => {
       const { data, error } = await supabase.functions.invoke('send-out-for-delivery-email', {
         body: { order_id: orderId }
       });
-      
       if (error) throw error;
       return data;
     },
@@ -53,142 +57,133 @@ export const AdminOrderStatusManager = ({
     }
   });
 
-  // Enhanced debounce to prevent rapid status changes and add session tracking
-  const debouncedStatusUpdate = useCallback(
-    debounce((orderId: string, status: string) => {
-      // Add admin session tracking header
-      const sessionId = localStorage.getItem('admin_session_id') || 
-                       `admin_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      
-      // Store session in localStorage for tracking
-      localStorage.setItem('admin_session_id', sessionId);
-      
-      console.log(`🎯 Admin updating order ${orderNumber} to ${status} (session: ${sessionId})`);
-      
-      // Call the status update function
-      updateStatus({ orderId, status });
-      onStatusUpdate?.(status as OrderStatus);
-    }, 500), // 500ms debounce for production stability
-    [updateStatus, orderNumber, onStatusUpdate]
-  );
-
-  // Handler wrapper to use the debounced function
-  const handleStatusUpdate = useCallback((newStatus: OrderStatus) => {
-    setLastUpdateTime(Date.now());
-    debouncedStatusUpdate(orderId, newStatus);
-  }, [debouncedStatusUpdate, orderId]);
-
-  const handleSendDeliveryEmail = () => {
-    sendDeliveryEmailMutation.mutate(orderId);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
-      case 'out_for_delivery': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'preparing': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'confirmed': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'pending': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  const handleStatusUpdate = useCallback(async (newStatus: OrderStatus) => {
+    const timeSinceLastUpdate = getTimeSinceLastUpdate(orderId);
+    
+    if (isPending(orderId)) {
+      toast.info('Update already in progress for this order');
+      return;
     }
+
+    if (timeSinceLastUpdate < 2000) {
+      const remainingSeconds = Math.ceil((2000 - timeSinceLastUpdate) / 1000);
+      toast.info(`Please wait ${remainingSeconds} seconds before updating again`);
+      return;
+    }
+
+    setShowProcessing(true);
+    try {
+      await updateOrderStatus(orderId, newStatus);
+      onStatusUpdate?.(newStatus);
+    } finally {
+      setShowProcessing(false);
+    }
+  }, [updateOrderStatus, orderId, onStatusUpdate, isPending, getTimeSinceLastUpdate]);
+
+  const handleSendDeliveryEmail = useCallback(() => {
+    sendDeliveryEmailMutation.mutate(orderId);
+  }, [sendDeliveryEmailMutation, orderId]);
+
+  const getStatusColor = (status: OrderStatus): string => {
+    const colorMap: Record<OrderStatus, string> = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      preparing: 'bg-orange-100 text-orange-800',
+      ready: 'bg-green-100 text-green-800',
+      out_for_delivery: 'bg-purple-100 text-purple-800',
+      delivered: 'bg-green-500 text-white',
+      cancelled: 'bg-red-100 text-red-800',
+      refunded: 'bg-gray-100 text-gray-800',
+      completed: 'bg-green-600 text-white',
+      returned: 'bg-red-200 text-red-900'
+    };
+    return colorMap[status] || 'bg-gray-100 text-gray-800';
   };
 
   const renderStatusBadge = () => (
-    <Badge 
-      variant="outline" 
-      className={`${getStatusColor(currentStatus)} capitalize font-medium`}
-    >
-      {currentStatus.replace('_', ' ')}
+    <Badge className={getStatusColor(currentStatus)}>
+      {currentStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
     </Badge>
   );
 
   const renderActionButtons = () => {
-    const isProcessing = isUpdating || sendDeliveryEmailMutation.isPending;
-    const now = Date.now();
-    const timeSinceLastUpdate = now - lastUpdateTime;
-    const isDebouncePeriod = timeSinceLastUpdate < DEBOUNCE_DELAY;
+    const isProcessing = isUpdating || sendDeliveryEmailMutation.isPending || showProcessing;
+    const isOrderPending = isPending(orderId);
+    const timeSinceLastUpdate = getTimeSinceLastUpdate(orderId);
+    const isInDebounceWindow = timeSinceLastUpdate < 2000;
+    const isDisabled = isProcessing || isOrderPending || isInDebounceWindow;
+    const remainingSeconds = isInDebounceWindow ? Math.ceil((2000 - timeSinceLastUpdate) / 1000) : 0;
     
     return (
       <div className={`flex gap-1 ${className}`}>
-        {/* Confirmed -> Preparing */}
         {currentStatus === 'confirmed' && (
           <Button
             size={size}
             variant="outline"
             onClick={() => handleStatusUpdate('preparing')}
-            disabled={isProcessing || isDebouncePeriod}
+            disabled={isDisabled}
           >
-            {isUpdating ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : isDebouncePeriod ? (
-              'Processing...'
+            {isProcessing ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin mr-1" />
+                Processing...
+              </>
+            ) : isInDebounceWindow ? (
+              <>
+                <Clock className="w-4 h-4 mr-1" />
+                Wait {remainingSeconds}s
+              </>
             ) : (
               'Start Preparing'
             )}
           </Button>
         )}
-
-        {/* Preparing -> Ready + Send Email */}
+        
         {currentStatus === 'preparing' && (
           <>
             <Button
               size={size}
               variant="outline"
               onClick={() => handleStatusUpdate('ready')}
-              disabled={isProcessing || isDebouncePeriod}
+              disabled={isDisabled}
             >
-              {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : isDebouncePeriod ? 'Processing...' : 'Mark Ready'}
-            </Button>
-            <Button
-              size={size}
-              variant="outline"
-              onClick={handleSendDeliveryEmail}
-              disabled={isProcessing || isDebouncePeriod}
-              title="Send out-for-delivery email"
-            >
-              {sendDeliveryEmailMutation.isPending ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
+              {isProcessing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin mr-1" />
+                  Processing...
+                </>
+              ) : isInDebounceWindow ? (
+                <>
+                  <Clock className="w-4 h-4 mr-1" />
+                  Wait {remainingSeconds}s
+                </>
               ) : (
-                <Send className="w-4 h-4" />
+                'Mark Ready'
               )}
             </Button>
           </>
         )}
-
-        {/* Ready -> Out for Delivery */}
-        {currentStatus === 'ready' && (
-          <Button
-            size={size}
-            variant="outline"
-            onClick={() => {
-              handleStatusUpdate('out_for_delivery');
-              handleSendDeliveryEmail();
-            }}
-            disabled={isProcessing || isDebouncePeriod}
-          >
-            {isProcessing ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : isDebouncePeriod ? (
-              'Processing...'
-            ) : (
-              <>
-                <Send className="w-4 h-4 mr-1" />
-                Out for Delivery
-              </>
-            )}
-          </Button>
-        )}
-
-        {/* Out for Delivery -> Delivered */}
+        
         {currentStatus === 'out_for_delivery' && (
           <Button
             size={size}
             variant="outline"
             onClick={() => handleStatusUpdate('delivered')}
-            disabled={isProcessing || isDebouncePeriod}
+            disabled={isDisabled}
           >
-            {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : isDebouncePeriod ? 'Processing...' : 'Mark Delivered'}
+            {isProcessing ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin mr-1" />
+                Processing...
+              </>
+            ) : isInDebounceWindow ? (
+              <>
+                <Clock className="w-4 h-4 mr-1" />
+                Wait {remainingSeconds}s
+              </>
+            ) : (
+              'Mark Delivered'
+            )}
           </Button>
         )}
       </div>

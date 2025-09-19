@@ -9077,6 +9077,14 @@ export type Database = {
       }
     }
     Functions: {
+      acquire_order_lock: {
+        Args: {
+          p_admin_session_id: string
+          p_order_id: string
+          p_timeout_seconds?: number
+        }
+        Returns: boolean
+      }
       activate_admin_user: {
         Args: { p_user_id: string }
         Returns: Json
@@ -9147,6 +9155,15 @@ export type Database = {
       }
       bulk_update_payment_status_to_success: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      cache_idempotent_request: {
+        Args: {
+          p_idempotency_key: string
+          p_request_data: Json
+          p_response_data?: Json
+          p_status?: string
+        }
         Returns: Json
       }
       calculate_bogo_discount: {
@@ -10610,6 +10627,10 @@ export type Database = {
         Args: { p_order_id?: string; p_slot_id: string }
         Returns: Json
       }
+      release_order_lock: {
+        Args: { p_admin_session_id: string; p_order_id: string }
+        Returns: boolean
+      }
       requeue_failed_welcome_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -10799,6 +10820,16 @@ export type Database = {
           p_recipient_email: string
           p_source?: string
           p_template_key: string
+          p_template_variables?: Json
+        }
+        Returns: Json
+      }
+      upsert_communication_event_with_business_logic: {
+        Args: {
+          p_admin_session_id: string
+          p_event_type: string
+          p_order_id: string
+          p_template_key?: string
           p_template_variables?: Json
         }
         Returns: Json

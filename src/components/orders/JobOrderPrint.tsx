@@ -56,6 +56,7 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
           color: #1a1a1a;
           font-size: 11pt;
           line-height: 1.4;
+          font-weight: bold;
         }
 
         .job-order-print h1 {

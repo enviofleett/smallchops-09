@@ -7,13 +7,15 @@ interface JobOrderPrintProps {
   items?: any[];
   deliverySchedule?: any;
   pickupPoint?: any;
+  adminName?: string;
 }
 
 export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
   order,
   items = [],
   deliverySchedule,
-  pickupPoint
+  pickupPoint,
+  adminName
 }) => {
   const orderItems = items.length > 0 ? items : order.order_items || [];
   
@@ -404,6 +406,11 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
         color: '#6c757d'
       }}>
         <p>Generated on {format(new Date(), 'PPP p')}</p>
+        {adminName && (
+          <p style={{ fontWeight: 'bold', color: '#2c3e50', marginTop: '2mm' }}>
+            Job order printed by: {adminName}
+          </p>
+        )}
       </div>
     </div>
   );

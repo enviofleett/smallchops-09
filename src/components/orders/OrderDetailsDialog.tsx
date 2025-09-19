@@ -18,6 +18,7 @@ import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Import our new components
 import { StatCard } from './details/StatCard';
@@ -56,6 +57,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
   // Job order print hook
   const { printJobOrder } = useJobOrderPrint();
+  const { user } = useAuth();
 
   // Use detailed order data to get product features and full information
   const {
@@ -318,7 +320,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
     const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
     
-    printJobOrder(order, items, schedule, pickupPoint);
+    printJobOrder(order, items, schedule, pickupPoint, user?.name || 'Unknown Admin');
   };
 
   // Safe print handler using react-to-print (for detailed receipt)

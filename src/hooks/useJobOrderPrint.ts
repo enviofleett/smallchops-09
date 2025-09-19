@@ -11,7 +11,8 @@ export const useJobOrderPrint = () => {
     order: OrderWithItems,
     items?: any[],
     deliverySchedule?: any,
-    pickupPoint?: any
+    pickupPoint?: any,
+    adminName?: string
   ) => {
     try {
       // Create a temporary container
@@ -28,7 +29,8 @@ export const useJobOrderPrint = () => {
         order,
         items,
         deliverySchedule,
-        pickupPoint
+        pickupPoint,
+        adminName
       });
 
       root.render(jobOrderElement);

@@ -43,6 +43,7 @@ import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBoundary';
 import ProductionOrderErrorBoundary from '@/components/admin/ProductionOrderErrorBoundary';
 import OrderErrorBoundary from '@/components/orders/OrderErrorBoundary';
+import { ProductionHealthDashboard } from '@/components/admin/ProductionHealthDashboard';
 
 function AdminOrdersContent() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -537,6 +538,9 @@ function AdminOrdersContent() {
             </Button>
           </div>
         </div>
+
+        {/* PRODUCTION HEALTH MONITORING */}
+        <ProductionHealthDashboard />
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

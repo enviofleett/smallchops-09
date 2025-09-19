@@ -7,6 +7,7 @@ import { RefreshCw, Send } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { debounce } from 'lodash';
 
 interface AdminOrderStatusManagerProps {
   orderId: string;
@@ -52,31 +53,29 @@ export const AdminOrderStatusManager = ({
     }
   });
 
-  // PRODUCTION FIX: Debounced status update to prevent rapid clicks
+  // Enhanced debounce to prevent rapid status changes and add session tracking
+  const debouncedStatusUpdate = useCallback(
+    debounce((orderId: string, status: string) => {
+      // Add admin session tracking header
+      const sessionId = localStorage.getItem('admin_session_id') || 
+                       `admin_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      
+      // Store session in localStorage for tracking
+      localStorage.setItem('admin_session_id', sessionId);
+      
+      console.log(`🎯 Admin updating order ${orderNumber} to ${status} (session: ${sessionId})`);
+      
+      // Call the status update function
+      updateStatus({ orderId, status });
+      onStatusUpdate?.(status as OrderStatus);
+    }, 500), // 500ms debounce for production stability
+    [updateStatus, orderNumber, onStatusUpdate]
+  );
+
+  // Handler wrapper to use the debounced function
   const handleStatusUpdate = useCallback((newStatus: OrderStatus) => {
-    const now = Date.now();
-    
-    // Clear existing timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    
-    // Check if enough time has passed since last update
-    if (now - lastUpdateTime < DEBOUNCE_DELAY) {
-      toast.info('Please wait before making another update');
-      return;
-    }
-    
-    // Update immediately and set debounce
-    setLastUpdateTime(now);
-    updateStatus({ orderId, status: newStatus });
-    onStatusUpdate?.(newStatus);
-    
-    // Set debounce timeout to prevent rapid subsequent updates
-    debounceTimeoutRef.current = setTimeout(() => {
-      debounceTimeoutRef.current = null;
-    }, DEBOUNCE_DELAY);
-  }, [orderId, updateStatus, onStatusUpdate, lastUpdateTime]);
+    debouncedStatusUpdate(orderId, newStatus);
+  }, [debouncedStatusUpdate, orderId]);
 
   const handleSendDeliveryEmail = () => {
     sendDeliveryEmailMutation.mutate(orderId);

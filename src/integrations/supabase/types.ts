@@ -5201,6 +5201,39 @@ export type Database = {
         }
         Relationships: []
       }
+      order_update_locks: {
+        Row: {
+          acquired_at: string
+          acquired_by: string
+          created_at: string
+          expires_at: string
+          id: string
+          lock_key: string
+          order_id: string
+          released_at: string | null
+        }
+        Insert: {
+          acquired_at?: string
+          acquired_by: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          lock_key: string
+          order_id: string
+          released_at?: string | null
+        }
+        Update: {
+          acquired_at?: string
+          acquired_by?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          lock_key?: string
+          order_id?: string
+          released_at?: string | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           admin_notes: string | null
@@ -7354,6 +7387,39 @@ export type Database = {
           status?: string
           user_agent?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      request_cache: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          idempotency_key: string
+          request_data: Json
+          response_data: Json | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          idempotency_key: string
+          request_data: Json
+          response_data?: Json | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          idempotency_key?: string
+          request_data?: Json
+          response_data?: Json | null
+          status?: string
         }
         Relationships: []
       }

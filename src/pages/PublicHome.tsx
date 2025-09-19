@@ -93,17 +93,17 @@ const PublicHome = () => {
   // Preload critical images (reduced for performance)
   useImagePreloader(['/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png']);
 
-  // Fetch products with discounts - PRODUCTION OPTIMIZED (Fresh Data)
+  // Fetch products with discounts - PRODUCTION OPTIMIZED (Always Fresh Data)
   const {
     data: products = [],
     isLoading: isLoadingProducts,
     error: productsError,
     refetch: refetchProducts
   } = useQuery({
-    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
+    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory, Date.now()], // Force fresh fetch
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
-    staleTime: 30 * 1000, // 30 seconds only - fresh data priority
-    gcTime: 2 * 60 * 1000, // 2 minutes cache - reduced for freshness
+    staleTime: 0, // No stale time - always fresh
+    gcTime: 0, // No cache - always fetch fresh
     retry: 2,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 3000),
     refetchOnMount: true, // Always refetch on mount
@@ -128,10 +128,10 @@ const PublicHome = () => {
   const {
     data: categories = []
   } = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', Date.now()], // Force fresh fetch
     queryFn: getCategories,
-    staleTime: 60 * 1000, // 1 minute - fresh categories
-    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 0, // No stale time - always fresh
+    gcTime: 0, // No cache - always fetch fresh
     refetchOnMount: true,
     refetchOnWindowFocus: true
   });

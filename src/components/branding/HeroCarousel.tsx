@@ -24,9 +24,9 @@ export const HeroCarousel = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
 
-  // Fetch hero images
+  // Fetch hero images with optimized loading
   const { data: heroImages = [] } = useQuery({
-    queryKey: ['hero-images-public'],
+    queryKey: ['hero-images-public', Date.now()], // Force fresh fetch
     queryFn: async () => {
       const { data, error } = await supabase
         .from('hero_carousel_images')
@@ -40,7 +40,25 @@ export const HeroCarousel = ({
       }
       return data as HeroImage[];
     },
+    staleTime: 0, // No stale time - always fresh
+    gcTime: 0, // No cache
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
   });
+
+  // Preload all hero images for instant loading
+  useEffect(() => {
+    if (heroImages.length > 0) {
+      heroImages.forEach((image, index) => {
+        const img = new Image();
+        img.src = image.image_url;
+        if (index === 0) {
+          // Highest priority for first image
+          img.fetchPriority = 'high';
+        }
+      });
+    }
+  }, [heroImages]);
 
   // Only show uploaded images - no hardcoded fallbacks
   const imagesToShow = heroImages.length > 0 ? heroImages : [];
@@ -95,6 +113,8 @@ export const HeroCarousel = ({
           isVisible ? 'opacity-100' : 'opacity-0'
         }`}
         loading="eager"
+        fetchPriority="high"
+        decoding="async"
         onError={(e) => {
           console.error('Failed to load hero image:', currentImage.image_url);
           // Don't fallback to any hardcoded image

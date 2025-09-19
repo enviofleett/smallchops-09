@@ -47,32 +47,32 @@ export const SystemHealthIndicator = () => {
       const responseTime = performance.now() - startTime;
 
       // Get concurrent operations count
-      const { data: concurrentOps } = await supabase
+      const { data: concurrentOps, count: lockCount } = await supabase
         .from('order_update_locks')
-        .select('count')
+        .select('*', { count: 'exact', head: true })
         .is('released_at', null);
 
       // Calculate error rates from recent audit logs
-      const { data: recentErrors } = await supabase
+      const { data: recentErrors, count: errorCount } = await supabase
         .from('audit_logs')
-        .select('count')
+        .select('*', { count: 'exact', head: true })
         .gte('event_time', new Date(Date.now() - 3600000).toISOString()) // Last hour
         .ilike('message', '%error%');
 
-      const { data: totalOperations } = await supabase
+      const { data: totalOperations, count: totalCount } = await supabase
         .from('audit_logs')
-        .select('count')
+        .select('*', { count: 'exact', head: true })
         .gte('event_time', new Date(Date.now() - 3600000).toISOString());
 
-      const errorRate = totalOperations?.[0]?.count 
-        ? ((recentErrors?.[0]?.count || 0) / totalOperations[0].count) * 100
+      const errorRate = totalCount 
+        ? ((errorCount || 0) / totalCount) * 100
         : 0;
 
       setHealth({
         database_status: dbError ? 'error' : 'healthy',
         lock_system_status: lockError ? 'error' : 'healthy',
         cache_system_status: cacheError ? 'error' : 'healthy', 
-        concurrent_operations: concurrentOps?.[0]?.count || 0,
+        concurrent_operations: lockCount || 0,
         avg_response_time: Math.round(responseTime),
         error_rate: Math.round(errorRate * 100) / 100,
         last_check: new Date().toISOString()

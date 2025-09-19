@@ -95,7 +95,13 @@ export const OrderUpdateMonitor = () => {
 
   const cleanupExpiredLocks = async () => {
     try {
-      const { data, error } = await supabase.rpc('cleanup_expired_locks');
+      // Update expired locks directly
+      const { error } = await supabase
+        .from('order_update_locks')
+        .update({ released_at: new Date().toISOString() })
+        .is('released_at', null)
+        .lt('expires_at', new Date().toISOString());
+      
       if (error) throw error;
       toast.success('Expired locks cleaned up successfully');
       fetchMetrics();

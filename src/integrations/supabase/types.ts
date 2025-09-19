@@ -9414,6 +9414,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_expired_locks: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       cleanup_expired_otp_codes: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -10076,6 +10080,10 @@ export type Database = {
         }[]
       }
       get_smtp_config_with_fallback: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_system_health_metrics: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }

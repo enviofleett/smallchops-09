@@ -44,9 +44,10 @@ export const useProductionStatusUpdate = () => {
         `order-status-update-${orderId}`,
         circuitBreakers.adminOrders,
         {
-          maxAttempts: 2,
-          baseDelay: 1500,
-          timeout: 15000
+          maxAttempts: 3,
+          baseDelay: 2000,
+          timeout: 20000,
+          exponentialBackoff: true
         }
       );
     },
@@ -88,7 +89,7 @@ export const useProductionStatusUpdate = () => {
       } else if (errorMsg.includes('Invalid status:') || errorMsg.includes('Invalid order status:')) {
         errorMessage = errorMsg; // Use the specific validation message
       } else if (errorMsg.includes('duplicate key value violates unique constraint')) {
-        errorMessage = 'Update in progress by another session. Please try again.';
+        errorMessage = 'Status update conflict detected. Retrying automatically...';
       } else if (errorMsg && errorMsg !== 'Failed to update order status') {
         errorMessage = errorMsg; // Use the actual error message if it's meaningful
       }

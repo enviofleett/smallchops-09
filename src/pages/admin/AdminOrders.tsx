@@ -516,27 +516,31 @@ function AdminOrdersContent() {
         <meta name="description" content="Manage all orders, track deliveries, and monitor order status in real-time." />
       </Helmet>
 
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {/* Header - Mobile Responsive */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Order Management</h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">Order Management</h1>
+            <p className="text-muted-foreground text-xs sm:text-sm md:text-base mt-1">
               Monitor and manage all customer orders and deliveries
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col xs:flex-row gap-2 xs:gap-3 shrink-0">
             <Button 
               variant="outline" 
-              className="w-full sm:w-auto"
+              size="sm"
+              className="w-full xs:w-auto text-xs sm:text-sm"
               onClick={() => setShowDeliveryReport(!showDeliveryReport)}
             >
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Delivery Report
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+              <span className="hidden sm:inline">Delivery </span>Report
             </Button>
-            <Button className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Order
+            <Button 
+              size="sm"
+              className="w-full xs:w-auto text-xs sm:text-sm"
+            >
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+              <span className="hidden sm:inline">Create </span>Order
             </Button>
           </div>
         </div>
@@ -544,31 +548,31 @@ function AdminOrdersContent() {
         {/* PRODUCTION HEALTH MONITORING */}
         <ProductionHealthDashboard />
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
-                  <Clock className="w-5 h-5" />
+        {/* Quick Stats - Enhanced Mobile Layout */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-orange-100 text-orange-600 rounded-lg shrink-0">
+                  <Clock className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Ready Orders</p>
-                  <p className="text-2xl font-bold">{orderCounts.ready}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Ready Orders</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold">{orderCounts.ready}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                  <Package className="w-5 h-5" />
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-blue-100 text-blue-600 rounded-lg shrink-0">
+                  <Package className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">In Progress</p>
-                  <p className="text-2xl font-bold">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">In Progress</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold">
                     {orderCounts.preparing + orderCounts.out_for_delivery}
                   </p>
                 </div>
@@ -576,70 +580,70 @@ function AdminOrdersContent() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                  <CheckCircle className="w-5 h-5" />
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-green-100 text-green-600 rounded-lg shrink-0">
+                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Delivered</p>
-                  <p className="text-2xl font-bold">{orderCounts.delivered}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Delivered</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold">{orderCounts.delivered}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
-                  <TrendingUp className="w-5 h-5" />
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-purple-100 text-purple-600 rounded-lg shrink-0">
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Orders</p>
-                  <p className="text-2xl font-bold">{orderCounts.all}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Orders</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold">{orderCounts.all}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Delivery Report Section */}
+        {/* Delivery Report Section - Mobile Optimized */}
         {showDeliveryReport && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
                 Daily Delivery Summary
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                <div className="text-center p-3 sm:p-4 bg-blue-50 rounded-lg">
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600">
                     {filteredOrders.filter(o => o.status === 'out_for_delivery').length}
                   </p>
-                  <p className="text-sm text-blue-600">Out for Delivery</p>
+                  <p className="text-xs sm:text-sm text-blue-600 mt-1">Out for Delivery</p>
                 </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">
+                <div className="text-center p-3 sm:p-4 bg-green-50 rounded-lg">
+                  <p className="text-xl sm:text-2xl font-bold text-green-600">
                     {filteredOrders.filter(o => o.status === 'delivered').length}
                   </p>
-                  <p className="text-sm text-green-600">Delivered Today</p>
+                  <p className="text-xs sm:text-sm text-green-600 mt-1">Delivered Today</p>
                 </div>
-                <div className="text-center p-4 bg-orange-50 rounded-lg">
-                  <p className="text-2xl font-bold text-orange-600">
+                <div className="text-center p-3 sm:p-4 bg-orange-50 rounded-lg">
+                  <p className="text-xl sm:text-2xl font-bold text-orange-600">
                     {filteredOrders.filter(o => {
                       const schedule = deliverySchedules[o.id];
                       return schedule && isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end);
                     }).length}
                   </p>
-                  <p className="text-sm text-orange-600">Overdue Deliveries</p>
+                  <p className="text-xs sm:text-sm text-orange-600 mt-1">Overdue Deliveries</p>
                 </div>
               </div>
-              <div className="mt-4 p-4 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
+              <div className="mt-4 p-3 sm:p-4 bg-muted rounded-lg">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   <strong>Upcoming deliveries:</strong> {filteredOrders.filter(o => 
                     o.status === 'confirmed' || o.status === 'preparing'
                   ).length} orders ready for dispatch
@@ -649,28 +653,37 @@ function AdminOrdersContent() {
           </Card>
         )}
 
-        {/* Filters - Mobile Responsive */}
+        {/* Filters - Enhanced Mobile Responsive */}
         <Card>
-          <CardContent className="p-4">
-            <div className="space-y-4">
-              <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                <div className="flex-1">
+          <CardContent className="p-3 sm:p-4">
+            <div className="space-y-3 sm:space-y-4">
+              <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+                <div className="flex-1 min-w-0">
                   <Input 
                     type="text" 
-                    placeholder="Search by order number, customer name, or email..." 
+                    placeholder="Search orders..." 
                     value={searchQuery} 
                     onChange={e => setSearchQuery(e.target.value)} 
-                    className="w-full" 
+                    className="w-full text-sm"
                   />
                 </div>
-                <div className="flex gap-2">
-                  <Button type="submit" variant="outline" className="flex-1 sm:flex-none">
-                    <Search className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Search</span>
+                <div className="flex gap-2 shrink-0">
+                  <Button 
+                    type="submit" 
+                    variant="outline" 
+                    size="sm"
+                    className="flex-1 sm:flex-none min-w-0"
+                  >
+                    <Search className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    <span className="hidden xs:inline text-xs sm:text-sm">Search</span>
                   </Button>
-                  <Button variant="outline" className="flex-1 sm:flex-none">
-                    <Download className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Export</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="flex-1 sm:flex-none min-w-0"
+                  >
+                    <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    <span className="hidden xs:inline text-xs sm:text-sm">Export</span>
                   </Button>
                 </div>
               </form>
@@ -716,14 +729,14 @@ function AdminOrdersContent() {
                       
                       {/* Quick Stats for Current Filter */}
                       {filteredOrders.length > 0 && (
-                        <div className="mt-2 flex items-center gap-4 text-xs">
-                          <span className="text-muted-foreground">
+                        <div className="mt-2 flex flex-wrap items-center gap-3 sm:gap-4 text-xs">
+                          <span className="text-muted-foreground whitespace-nowrap">
                             Pickup: {filteredOrders.filter(o => o.order_type === 'pickup').length}
                           </span>
-                          <span className="text-muted-foreground">
+                          <span className="text-muted-foreground whitespace-nowrap">
                             Delivery: {filteredOrders.filter(o => o.order_type === 'delivery').length}
                           </span>
-                          <span className="text-muted-foreground">
+                          <span className="text-muted-foreground whitespace-nowrap">
                             Paid: {filteredOrders.filter(o => o.payment_status === 'paid').length}
                           </span>
                         </div>
@@ -740,48 +753,49 @@ function AdminOrdersContent() {
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <div className="relative">
             {/* Mobile & Tablet: Dropdown */}
-            <div className="block md:hidden mb-4">
+            <div className="block lg:hidden mb-4">
               <OrderTabDropdown
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 orderCounts={orderCounts}
-        />
-
-        {/* Thermal Receipt Preview Modal */}
-        <ThermalReceiptPreview
-          isOpen={isPreviewOpen}
-          onClose={closePreview}
-          onPrint={printFromPreview}
-          order={previewOrder}
-          deliverySchedule={previewDeliverySchedule}
-          businessInfo={previewBusinessInfo}
-          isPrinting={isPrinting}
-        />
-      </div>
+              />
+            </div>
             
-            {/* Desktop: Full grid layout */}
-            <div className="hidden md:block">
+            {/* Desktop: Full grid layout - Responsive breakpoints */}
+            <div className="hidden lg:block">
               <TabsList className="grid w-full grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
-                <TabsTrigger value="all" className="text-sm px-2 py-2 data-[state=active]:bg-background">
-                  All Orders ({orderCounts.all})
+                <TabsTrigger value="all" className="text-xs xl:text-sm px-1 xl:px-2 py-2 data-[state=active]:bg-background">
+                  <span className="hidden xl:inline">All Orders </span>
+                  <span className="xl:hidden">All </span>
+                  ({orderCounts.all})
                 </TabsTrigger>
-                <TabsTrigger value="confirmed" className="text-sm px-2 py-2 data-[state=active]:bg-background">
-                  Confirmed ({orderCounts.confirmed})
+                <TabsTrigger value="confirmed" className="text-xs xl:text-sm px-1 xl:px-2 py-2 data-[state=active]:bg-background">
+                  <span className="hidden xl:inline">Confirmed </span>
+                  <span className="xl:hidden">Conf </span>
+                  ({orderCounts.confirmed})
                 </TabsTrigger>
-                <TabsTrigger value="preparing" className="text-sm px-2 py-2 data-[state=active]:bg-background">
-                  Preparing ({orderCounts.preparing})
+                <TabsTrigger value="preparing" className="text-xs xl:text-sm px-1 xl:px-2 py-2 data-[state=active]:bg-background">
+                  <span className="hidden xl:inline">Preparing </span>
+                  <span className="xl:hidden">Prep </span>
+                  ({orderCounts.preparing})
                 </TabsTrigger>
-                <TabsTrigger value="ready" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                <TabsTrigger value="ready" className="text-xs xl:text-sm px-1 xl:px-2 py-2 data-[state=active]:bg-background">
                   Ready ({orderCounts.ready})
                 </TabsTrigger>
-                <TabsTrigger value="out_for_delivery" className="text-sm px-2 py-2 data-[state=active]:bg-background">
-                  Out for Delivery ({orderCounts.out_for_delivery})
+                <TabsTrigger value="out_for_delivery" className="text-xs xl:text-sm px-1 xl:px-2 py-2 data-[state=active]:bg-background">
+                  <span className="hidden xl:inline">Out for Delivery </span>
+                  <span className="xl:hidden">Delivery </span>
+                  ({orderCounts.out_for_delivery})
                 </TabsTrigger>
-                <TabsTrigger value="delivered" className="text-sm px-2 py-2 data-[state=active]:bg-background">
-                  Delivered ({orderCounts.delivered})
+                <TabsTrigger value="delivered" className="text-xs xl:text-sm px-1 xl:px-2 py-2 data-[state=active]:bg-background">
+                  <span className="hidden xl:inline">Delivered </span>
+                  <span className="xl:hidden">Done </span>
+                  ({orderCounts.delivered})
                 </TabsTrigger>
-                <TabsTrigger value="overdue" className="text-sm px-2 py-2 text-destructive data-[state=active]:bg-background">
-                  Overdue ({orderCounts.overdue})
+                <TabsTrigger value="overdue" className="text-xs xl:text-sm px-1 xl:px-2 py-2 text-destructive data-[state=active]:bg-background">
+                  <span className="hidden xl:inline">Overdue </span>
+                  <span className="xl:hidden">Late </span>
+                  ({orderCounts.overdue})
                 </TabsTrigger>
               </TabsList>
             </div>

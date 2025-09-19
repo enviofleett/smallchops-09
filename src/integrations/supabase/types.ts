@@ -9945,6 +9945,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_order_lock_info: {
+        Args: { p_order_id: string }
+        Returns: {
+          acquired_at: string
+          is_locked: boolean
+          lock_expires_at: string
+          locking_admin_avatar: string
+          locking_admin_email: string
+          locking_admin_id: string
+          locking_admin_name: string
+          seconds_remaining: number
+        }[]
+      }
       get_order_payment_status: {
         Args: { p_order_id: string }
         Returns: {

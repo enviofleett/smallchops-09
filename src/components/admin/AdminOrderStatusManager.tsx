@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpdate';
+import { OrderLockStatus } from './OrderLockStatus';
 import { OrderStatus } from '@/types/orders';
 import { RefreshCw, Send, Clock, AlertTriangle } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +16,16 @@ interface AdminOrderStatusManagerProps {
   className?: string;
   size?: 'sm' | 'default' | 'lg';
   onStatusUpdate?: (newStatus: OrderStatus) => void;
+  lockInfo?: {
+    is_locked: boolean;
+    locking_admin_id?: string;
+    locking_admin_name?: string;
+    locking_admin_avatar?: string;
+    locking_admin_email?: string;
+    lock_expires_at?: string;
+    seconds_remaining?: number;
+    acquired_at?: string;
+  };
 }
 
 export const AdminOrderStatusManager = ({ 
@@ -23,9 +34,11 @@ export const AdminOrderStatusManager = ({
   orderNumber,
   className = '',
   size = 'sm',
-  onStatusUpdate
+  onStatusUpdate,
+  lockInfo
 }: AdminOrderStatusManagerProps) => {
   const queryClient = useQueryClient();
+  
   
   // Use enhanced hook with idempotency and distributed locking
   const { 
@@ -36,6 +49,13 @@ export const AdminOrderStatusManager = ({
     isPending,
     getTimeSinceLastUpdate 
   } = useEnhancedOrderStatusUpdate();
+  
+  // Check if order is locked by another admin
+  const isLockedByOther = Boolean(
+    lockInfo?.is_locked && 
+    lockInfo?.locking_admin_id && 
+    lockInfo?.locking_admin_id !== sessionId // Compare with current session
+  );
   
   const [showProcessing, setShowProcessing] = useState(false);
   const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -163,6 +183,16 @@ export const AdminOrderStatusManager = ({
   );
 
   const renderActionButtons = () => {
+    // Show lock status message if locked by another admin
+    if (isLockedByOther) {
+      return (
+        <div className="text-sm text-muted-foreground italic flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          Order is being updated by {lockInfo?.locking_admin_name || 'another admin'}
+        </div>
+      );
+    }
+
     const isProcessing = isUpdating || sendDeliveryEmailMutation.isPending || showProcessing;
     const isOrderPending = isPending(orderId);
     const timeSinceLastUpdate = getTimeSinceLastUpdate(orderId);
@@ -247,9 +277,23 @@ export const AdminOrderStatusManager = ({
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {renderStatusBadge()}
-      {renderActionButtons()}
+    <div className="flex flex-col gap-2">
+      {/* Lock Status Display */}
+      {lockInfo?.is_locked && (
+        <div className="bg-muted/30 rounded-lg p-2">
+          <OrderLockStatus
+            orderId={orderId}
+            lockInfo={lockInfo}
+            size="sm"
+          />
+        </div>
+      )}
+      
+      {/* Status and Actions */}
+      <div className="flex items-center gap-2">
+        {renderStatusBadge()}
+        {renderActionButtons()}
+      </div>
     </div>
   );
 };

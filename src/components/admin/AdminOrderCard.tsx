@@ -8,9 +8,21 @@ import { format } from 'date-fns';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 import { AdminOrderStatusBadge } from './AdminOrderStatusBadge';
+import { OrderLockStatus } from './OrderLockStatus';
 
 interface AdminOrderCardProps {
-  order: OrderWithItems;
+  order: OrderWithItems & {
+    lock_info?: {
+      is_locked: boolean;
+      locking_admin_id?: string;
+      locking_admin_name?: string;
+      locking_admin_avatar?: string;
+      locking_admin_email?: string;
+      lock_expires_at?: string;
+      seconds_remaining?: number;
+      acquired_at?: string;
+    };
+  };
   deliverySchedule?: any;
 }
 
@@ -160,30 +172,46 @@ export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps)
           </div>
         )}
 
+        {/* Lock Status Display */}
+        {order.lock_info && (
+          <div className="bg-muted/30 rounded-lg p-3 mb-4">
+            <OrderLockStatus
+              orderId={order.id}
+              lockInfo={order.lock_info}
+              size="sm"
+            />
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-2 pt-2 border-t">
           <Button variant="outline" size="sm">
             View Details
           </Button>
-          {order.status === 'pending' && (
+          {order.status === 'pending' && !order.lock_info?.is_locked && (
             <Button size="sm">
               Confirm Order
             </Button>
           )}
-          {order.status === 'confirmed' && (
+          {order.status === 'confirmed' && !order.lock_info?.is_locked && (
             <Button size="sm">
               Start Preparing
             </Button>
           )}
-          {order.status === 'preparing' && (
+          {order.status === 'preparing' && !order.lock_info?.is_locked && (
             <Button size="sm">
               Mark Ready
             </Button>
           )}
-          {order.status === 'ready' && order.order_type === 'delivery' && (
+          {order.status === 'ready' && order.order_type === 'delivery' && !order.lock_info?.is_locked && (
             <Button size="sm">
               Assign Driver
             </Button>
+          )}
+          {order.lock_info?.is_locked && (
+            <div className="text-sm text-muted-foreground italic">
+              Order is being updated by another admin
+            </div>
           )}
         </div>
       </CardContent>

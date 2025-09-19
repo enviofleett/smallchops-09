@@ -468,7 +468,11 @@ serve(async (req)=>{
 
     switch(action){
       case 'list': {
+        const startTime = Date.now();
+        
         console.log('Admin function: Listing orders', { page, pageSize, status, searchQuery, startDate, endDate });
+        
+        // Get orders with enhanced error handling and lock status
         let query = supabaseClient.from('orders').select(`
           *,
           order_items (*),
@@ -536,18 +540,110 @@ serve(async (req)=>{
             order_delivery_schedule: schedulesResult.data?.filter(schedule=>schedule.order_id === order.id) || [],
             delivery_zones: zonesResult.data?.find(zone=>zone.id === order.delivery_zone_id) || null
           }));
+
+          // Get lock information for fallback orders
+          const ordersWithLockInfo = await Promise.all(
+            enrichedOrders?.map(async (order) => {
+              try {
+                const { data: lockInfo } = await supabaseClient
+                  .rpc('get_order_lock_info', { p_order_id: order.id });
+                
+                const lockData = lockInfo && lockInfo.length > 0 ? lockInfo[0] : {
+                  is_locked: false,
+                  locking_admin_id: null,
+                  locking_admin_name: null,
+                  locking_admin_avatar: null,
+                  locking_admin_email: null,
+                  lock_expires_at: null,
+                  seconds_remaining: 0,
+                  acquired_at: null
+                };
+
+                return {
+                  ...order,
+                  lock_info: lockData
+                };
+              } catch (error) {
+                console.warn(`Failed to get lock info for order ${order.id}:`, error);
+                return {
+                  ...order,
+                  lock_info: {
+                    is_locked: false,
+                    locking_admin_id: null,
+                    locking_admin_name: null,
+                    locking_admin_avatar: null,
+                    locking_admin_email: null,
+                    lock_expires_at: null,
+                    seconds_remaining: 0,
+                    acquired_at: null
+                  }
+                };
+              }
+            }) || []
+          );
+
           return new Response(JSON.stringify({
             success: true,
-            orders: enrichedOrders,
-            count: fallbackCount || 0
+            orders: ordersWithLockInfo,
+            count: fallbackCount || 0,
+            metadata: {
+              request_time: Date.now() - startTime,
+              correlation_id: correlationId
+            }
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
+
+        // Get lock information for successful orders
+        const ordersWithLockInfo = await Promise.all(
+          data?.map(async (order) => {
+            try {
+              const { data: lockInfo } = await supabaseClient
+                .rpc('get_order_lock_info', { p_order_id: order.id });
+              
+              const lockData = lockInfo && lockInfo.length > 0 ? lockInfo[0] : {
+                is_locked: false,
+                locking_admin_id: null,
+                locking_admin_name: null,
+                locking_admin_avatar: null,
+                locking_admin_email: null,
+                lock_expires_at: null,
+                seconds_remaining: 0,
+                acquired_at: null
+              };
+
+              return {
+                ...order,
+                lock_info: lockData
+              };
+            } catch (error) {
+              console.warn(`Failed to get lock info for order ${order.id}:`, error);
+              return {
+                ...order,
+                lock_info: {
+                  is_locked: false,
+                  locking_admin_id: null,
+                  locking_admin_name: null,
+                  locking_admin_avatar: null,
+                  locking_admin_email: null,
+                  lock_expires_at: null,
+                  seconds_remaining: 0,
+                  acquired_at: null
+                }
+              };
+            }
+          }) || []
+        );
+
         return new Response(JSON.stringify({
           success: true,
-          orders: data,
-          count: count || 0
+          orders: ordersWithLockInfo,
+          count: count || 0,
+          metadata: {
+            request_time: Date.now() - startTime,
+            correlation_id: correlationId
+          }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

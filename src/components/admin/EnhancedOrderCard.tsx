@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { OrderWithItems } from '@/api/orders';
 import { AdminOrderStatusManager } from './AdminOrderStatusManager';
 import { SecureOrderStatusUpdater } from './SecureOrderStatusUpdater';
+import { OrderLockStatus } from './OrderLockStatus';
 import ProductionOrderErrorBoundary from './ProductionOrderErrorBoundary';
 import { format } from 'date-fns';
 import { 
@@ -23,7 +24,18 @@ import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 
 export interface EnhancedOrderCardProps {
-  order: OrderWithItems;
+  order: OrderWithItems & {
+    lock_info?: {
+      is_locked: boolean;
+      locking_admin_id?: string;
+      locking_admin_name?: string;
+      locking_admin_avatar?: string;
+      locking_admin_email?: string;
+      lock_expires_at?: string;
+      seconds_remaining?: number;
+      acquired_at?: string;
+    };
+  };
   deliverySchedule?: any;
   onOrderSelect?: (order: OrderWithItems) => void;
   showAdvancedControls?: boolean;
@@ -206,6 +218,17 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
                   }
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Lock Status Display */}
+          {order.lock_info && (
+            <div className="bg-muted/30 rounded-lg p-3">
+              <OrderLockStatus
+                orderId={order.id}
+                lockInfo={order.lock_info}
+                size="sm"
+              />
             </div>
           )}
 

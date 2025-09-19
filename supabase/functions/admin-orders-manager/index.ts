@@ -222,12 +222,28 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
 
 serve(async (req)=>{
   const origin = req.headers.get('origin');
-  console.log(`🚀 Admin Orders Manager: ${req.method} request from origin: ${origin}`);
+  
+  // Generate correlation ID for request tracing
+  const correlationId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  console.log(`🚀 Admin Orders Manager: ${req.method} request from origin: ${origin} [${correlationId}]`);
+  
   if (req.method === 'OPTIONS') {
     console.log('🔄 Handling CORS preflight request');
     return handleCorsPreflightResponse(origin);
   }
+  
   const corsHeaders = getCorsHeaders(origin);
+
+  // Cleanup expired locks on function startup for better reliability
+  try {
+    const { data: cleanupResult } = await supabaseClient.rpc('cleanup_expired_locks');
+    if (cleanupResult > 0) {
+      console.log(`🧹 Cleaned up ${cleanupResult} expired locks [${correlationId}]`);
+    }
+  } catch (cleanupError) {
+    console.warn(`⚠️ Lock cleanup failed (non-blocking): ${cleanupError.message} [${correlationId}]`);
+  }
 
   // Declare user variable at function scope so it's accessible throughout
   let user = null;
@@ -779,6 +795,11 @@ serve(async (req)=>{
       }
 
       case 'update': {
+        console.log(`📋 Processing admin request: {
+  action: "update",
+  orderId: "${orderId}",
+  timestamp: "${new Date().toISOString()}"
+} [${correlationId}]`);
         console.log('Admin function: Updating order', orderId, 'with updates:', JSON.stringify(updates));
         
         // PRODUCTION FIX: Use maybeSingle() to prevent errors when no records found
@@ -883,28 +904,63 @@ serve(async (req)=>{
 
         // Acquire distributed lock for this order if status is being updated
         let lockAcquired = false;
+        let lockError = null;
+        
         if (sanitizedUpdates.status) {
-          const { data: lockResult } = await supabaseClient.rpc('acquire_order_lock', {
-            p_order_id: orderId,
-            p_admin_session_id: adminSessionId,
-            p_timeout_seconds: 30
-          });
+          try {
+            const { data: lockResult, error: lockAcquisitionError } = await supabaseClient.rpc('acquire_order_lock', {
+              p_order_id: orderId,
+              p_admin_session_id: adminSessionId,
+              p_timeout_seconds: 30
+            });
 
-          lockAcquired = lockResult;
-          if (!lockAcquired) {
-            console.log('🔒 Failed to acquire lock - concurrent update in progress');
+            if (lockAcquisitionError) {
+              console.error(`❌ Lock acquisition failed: ${lockAcquisitionError.message} [${correlationId}]`);
+              lockError = lockAcquisitionError;
+            } else {
+              lockAcquired = lockResult;
+            }
+
+            if (!lockAcquired) {
+              console.log(`🔒 Failed to acquire lock - concurrent update in progress [${correlationId}]`);
+              return new Response(JSON.stringify({
+                success: false,
+                error: 'Another admin is currently updating this order. Please wait and try again.',
+                errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS',
+                correlationId,
+                retryAfter: 5,
+                userMessage: 'Another admin is updating this order. Please wait a moment and try again.'
+              }), {
+                headers: { 
+                  ...corsHeaders, 
+                  'Content-Type': 'application/json',
+                  'X-Correlation-ID': correlationId,
+                  'Retry-After': '5'
+                },
+                status: 409
+              });
+            }
+            
+            console.log(`✅ Lock acquired successfully for order ${orderId} [${correlationId}]`);
+          } catch (error) {
+            console.error(`❌ Critical error during lock acquisition: ${error.message} [${correlationId}]`);
             return new Response(JSON.stringify({
               success: false,
-              error: 'Another admin is currently updating this order. Please wait and try again.',
-              errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS'
+              error: 'Failed to acquire order lock. Please try again.',
+              errorCode: 'LOCK_ACQUISITION_FAILED',
+              correlationId
             }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 409
+              headers: { 
+                ...corsHeaders, 
+                'Content-Type': 'application/json',
+                'X-Correlation-ID': correlationId
+              },
+              status: 500
             });
           }
         }
 
-        // PRODUCTION FIX: Split complex query into two operations for reliability
+        // PRODUCTION FIX: Guaranteed lock cleanup with try-finally pattern
         let updatedOrder, orderError;
         
         try {
@@ -917,27 +973,41 @@ serve(async (req)=>{
             .maybeSingle();
 
           if (updateError) {
-            console.error('❌ Order update failed:', { orderId, error: updateError.message });
-            return new Response(JSON.stringify({
+            console.error(`❌ Order update failed: ${updateError.message} [${correlationId}]`, { orderId });
+            
+            // Determine specific error type for better user feedback
+            let errorCode = 'ORDER_UPDATE_FAILED';
+            let userMessage = 'Failed to update order. Please try again.';
+            let httpStatus = 500;
+            
+            if (updateError.message?.includes('violates check constraint')) {
+              errorCode = 'INVALID_DATA';
+              userMessage = 'Invalid data provided. Please check your input and try again.';
+              httpStatus = 400;
+            } else if (updateError.message?.includes('duplicate key')) {
+              errorCode = 'DUPLICATE_DATA';
+              userMessage = 'This change conflicts with existing data. Please refresh and try again.';
+              httpStatus = 409;
+            }
+            
+            throw new Error(JSON.stringify({
               success: false,
-              error: `Order update failed: ${updateError.message}`,
-              errorCode: 'ORDER_UPDATE_FAILED'
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 500
-            });
+              error: userMessage,
+              errorCode,
+              correlationId,
+              httpStatus
+            }));
           }
 
           if (!basicOrder) {
-            console.error('❌ Order not found after update:', { orderId });
-            return new Response(JSON.stringify({
+            console.error(`❌ Order not found after update: ${orderId} [${correlationId}]`);
+            throw new Error(JSON.stringify({
               success: false,
               error: `Order not found after update: ${orderId}`,
-              errorCode: 'ORDER_NOT_FOUND_AFTER_UPDATE'
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 404
-            });
+              errorCode: 'ORDER_NOT_FOUND_AFTER_UPDATE',
+              correlationId,
+              httpStatus: 404
+            }));
           }
 
           // Step 2: Fetch relations separately with NULL-safe LEFT JOINs
@@ -954,7 +1024,7 @@ serve(async (req)=>{
 
           // Use fallback if relations fetch fails
           if (fetchRelationsError) {
-            console.warn('⚠️ Failed to fetch order relations, using basic order:', { 
+            console.warn(`⚠️ Failed to fetch order relations, using basic order [${correlationId}]:`, { 
               orderId, 
               error: fetchRelationsError.message 
             });
@@ -964,20 +1034,88 @@ serve(async (req)=>{
           }
 
         } catch (error) {
-          console.error('❌ Critical error during order update:', { 
+          // Parse structured errors from above
+          if (error.message.startsWith('{')) {
+            try {
+              const errorData = JSON.parse(error.message);
+              return new Response(JSON.stringify(errorData), {
+                headers: { 
+                  ...corsHeaders, 
+                  'Content-Type': 'application/json',
+                  'X-Correlation-ID': correlationId
+                },
+                status: errorData.httpStatus || 500
+              });
+            } catch (parseError) {
+              // Fall through to generic error handling
+            }
+          }
+          
+          // Generic error handling
+          console.error(`❌ Critical error during order update [${correlationId}]:`, { 
             orderId, 
             error: error.message,
             stack: error.stack 
           });
           
-          return new Response(JSON.stringify({
+          throw new Error(JSON.stringify({
             success: false,
             error: `Database operation failed: ${error.message}`,
-            errorCode: 'DATABASE_OPERATION_FAILED'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          });
+            errorCode: 'DATABASE_OPERATION_FAILED',
+            correlationId,
+            httpStatus: 500
+          }));
+        } finally {
+          // GUARANTEED LOCK CLEANUP - This will always execute
+          if (lockAcquired) {
+            try {
+              const { data: releaseResult, error: releaseError } = await supabaseClient.rpc('release_order_lock', {
+                p_order_id: orderId,
+                p_admin_session_id: adminSessionId
+              });
+              
+              if (releaseError) {
+                console.error(`❌ Failed to release lock [${correlationId}]:`, {
+                  orderId,
+                  adminSessionId,
+                  error: releaseError.message
+                });
+              } else if (releaseResult) {
+                console.log(`✅ Lock released successfully for order ${orderId} [${correlationId}]`);
+              } else {
+                console.warn(`⚠️ Lock release returned false - may have expired [${correlationId}]:`, {
+                  orderId,
+                  adminSessionId
+                });
+              }
+            } catch (lockReleaseError) {
+              console.error(`❌ Critical error during lock release [${correlationId}]:`, {
+                orderId,
+                adminSessionId,
+                error: lockReleaseError.message,
+                stack: lockReleaseError.stack
+              });
+              
+              // Log critical lock cleanup failure for monitoring
+              try {
+                await supabaseClient.from('audit_logs').insert([{
+                  action: 'critical_lock_release_failure',
+                  category: 'Critical System Error',
+                  message: `Failed to release order lock: ${lockReleaseError.message}`,
+                  entity_id: orderId,
+                  new_values: {
+                    orderId,
+                    adminSessionId,
+                    correlationId,
+                    error: lockReleaseError.message,
+                    timestamp: new Date().toISOString()
+                  }
+                }]);
+              } catch (auditError) {
+                console.error(`❌ Failed to log critical lock failure [${correlationId}]:`, auditError.message);
+              }
+            }
+          }
         }
         
         // Background notification for status change using enhanced business logic
@@ -997,18 +1135,18 @@ serve(async (req)=>{
               }
             });
             
-            console.log('📧 Enhanced communication event result:', commResult);
+            console.log(`📧 Enhanced communication event result [${correlationId}]:`, commResult);
             
             // Process notifications instantly (fire-and-forget)
             supabaseClient.functions.invoke('instant-email-processor', {
               body: { priority: 'high', limit: 5 }
             }).then(result => {
-              console.log('📧 Instant email processing result:', result.data);
+              console.log(`📧 Instant email processing result [${correlationId}]:`, result.data);
             }).catch(error => {
-              console.error('⚠️ Instant email processing failed (non-blocking):', error);
+              console.error(`⚠️ Instant email processing failed (non-blocking) [${correlationId}]:`, error);
             });
           } catch (error) {
-            console.error('⚠️ Enhanced notification setup failed (non-blocking):', error);
+            console.error(`⚠️ Enhanced notification setup failed (non-blocking) [${correlationId}]:`, error);
           }
         }
 
@@ -1016,45 +1154,37 @@ serve(async (req)=>{
           success: true,
           order: updatedOrder,
           message: 'Order updated successfully',
+          correlationId,
           idempotency_key: idempotencyKey,
-          locked_processing: lockAcquired
+          locked_processing: lockAcquired,
+          timestamp: new Date().toISOString()
         };
 
         // Cache successful result
-        if (lockAcquired) {
-          try {
-            await supabaseClient.rpc('cache_idempotent_request', {
-              p_idempotency_key: idempotencyKey,
-              p_request_data: { orderId, updates: sanitizedUpdates, adminUserId },
-              p_response_data: result,
-              p_status: 'success'
-            });
-          } catch (cacheError) {
-            console.error('⚠️ Failed to cache result (non-blocking):', cacheError);
-          }
+        try {
+          await supabaseClient.rpc('cache_idempotent_request', {
+            p_idempotency_key: idempotencyKey,
+            p_request_data: { orderId, updates: sanitizedUpdates, adminUserId, correlationId },
+            p_response_data: result,
+            p_status: 'success'
+          });
+        } catch (cacheError) {
+          console.error(`⚠️ Failed to cache result (non-blocking) [${correlationId}]:`, cacheError);
         }
 
-        console.log('✅ Order update completed successfully:', { 
+        console.log(`✅ Order update completed successfully [${correlationId}]:`, { 
           orderId, 
           statusChanged: sanitizedUpdates.status !== currentOrder.status,
           newStatus: sanitizedUpdates.status,
           lockUsed: lockAcquired
         });
 
-        // Release lock before returning
-        if (lockAcquired) {
-          try {
-            await supabaseClient.rpc('release_order_lock', {
-              p_order_id: orderId,
-              p_admin_session_id: adminSessionId
-            });
-          } catch (lockError) {
-            console.error('⚠️ Failed to release lock (non-blocking):', lockError);
-          }
-        }
-
         return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'X-Correlation-ID': correlationId
+          }
         });
       }
 
@@ -1108,10 +1238,11 @@ serve(async (req)=>{
         });
     }
   } catch (error) {
-    // Enhanced Error Handling and Logging
+    // Enhanced Error Handling and Logging with Correlation ID
     const errorId = `admin-orders-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const errorDetails = {
       errorId,
+      correlationId: correlationId || 'unknown',
       message: error.message || 'Unknown error',
       stack: error.stack || 'No stack trace',
       timestamp: new Date().toISOString(),
@@ -1120,7 +1251,7 @@ serve(async (req)=>{
       requestUrl: req.url
     };
 
-    console.error('❌ Admin orders manager critical error:', {
+    console.error(`❌ Admin orders manager critical error [${correlationId || 'unknown'}]:`, {
       ...errorDetails,
       // Sanitize sensitive headers for logging
       requestHeaders: {
@@ -1129,17 +1260,21 @@ serve(async (req)=>{
       }
     });
 
-    // Categorize error types for better monitoring
+    // Categorize error types for better monitoring and user feedback
     let errorCategory = 'UNKNOWN_ERROR';
     let httpStatus = 500;
     let userMessage = 'An unexpected error occurred. Please try again.';
+    let retryAfter = null;
 
     if (error.message?.includes('duplicate key')) {
       errorCategory = 'DUPLICATE_KEY_ERROR';
       userMessage = 'This operation conflicts with existing data. Please refresh and try again.';
+      httpStatus = 409;
+      retryAfter = 3;
     } else if (error.message?.includes('foreign key')) {
       errorCategory = 'FOREIGN_KEY_ERROR';
       userMessage = 'Invalid reference to related data. Please check your input.';
+      httpStatus = 400;
     } else if (error.message?.includes('not found') || error.message?.includes('does not exist')) {
       errorCategory = 'NOT_FOUND_ERROR';
       httpStatus = 404;
@@ -1152,6 +1287,12 @@ serve(async (req)=>{
       errorCategory = 'NETWORK_ERROR';
       httpStatus = 503;
       userMessage = 'Service temporarily unavailable. Please try again in a moment.';
+      retryAfter = 10;
+    } else if (error.message?.includes('lock') || error.message?.includes('concurrent')) {
+      errorCategory = 'CONCURRENT_UPDATE_ERROR';
+      httpStatus = 409;
+      userMessage = 'Another admin is currently updating this order. Please wait and try again.';
+      retryAfter = 5;
     }
 
     // Log to audit table for monitoring (non-blocking)
@@ -1162,14 +1303,29 @@ serve(async (req)=>{
         message: `Admin orders manager error: ${errorCategory}`,
         new_values: {
           errorId,
+          correlationId: correlationId || 'unknown',
           errorCategory,
           message: error.message,
           stack: error.stack?.substring(0, 1000), // Limit stack trace length
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          httpStatus,
+          userMessage
         }
       }]);
     } catch (auditError) {
-      console.error('⚠️ Failed to log error to audit table:', auditError.message);
+      console.error(`⚠️ Failed to log error to audit table [${correlationId || 'unknown'}]:`, auditError.message);
+    }
+
+    const responseHeaders = { 
+      ...corsHeaders, 
+      'Content-Type': 'application/json',
+      'X-Error-ID': errorId,
+      'X-Error-Category': errorCategory,
+      'X-Correlation-ID': correlationId || 'unknown'
+    };
+
+    if (retryAfter) {
+      responseHeaders['Retry-After'] = retryAfter.toString();
     }
 
     return new Response(JSON.stringify({
@@ -1177,7 +1333,9 @@ serve(async (req)=>{
       error: userMessage,
       errorCode: errorCategory,
       errorId: errorId,
+      correlationId: correlationId || 'unknown',
       timestamp: new Date().toISOString(),
+      ...(retryAfter && { retryAfter }),
       // Include more details in development/debugging
       ...(Deno.env.get('ENVIRONMENT') === 'development' && {
         details: {
@@ -1187,12 +1345,7 @@ serve(async (req)=>{
       })
     }), {
       status: httpStatus,
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'application/json',
-        'X-Error-ID': errorId,
-        'X-Error-Category': errorCategory
-      }
+      headers: responseHeaders
     });
   }
 });

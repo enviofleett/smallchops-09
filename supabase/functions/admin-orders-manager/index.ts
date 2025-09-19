@@ -115,7 +115,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
             retry_count: 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          }], { onConflict: 'dedupe_key,order_id,event_type', ignoreDuplicates: true });
+          }], { onConflict: 'order_id,event_type,dedupe_key', ignoreDuplicates: true });
 
         if (upsertError) {
           if (upsertError.message.includes('duplicate key') || upsertError.message.includes('violates unique constraint')) {
@@ -167,7 +167,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
           source: 'admin_update_sms',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }], { onConflict: 'dedupe_key,order_id,event_type' });
+        }], { onConflict: 'order_id,event_type,dedupe_key' });
 
         if (smsInsertError) {
           if (smsInsertError.message.includes('duplicate key')) {

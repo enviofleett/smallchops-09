@@ -74,6 +74,7 @@ export const AdminOrderStatusManager = ({
 
   // Handler wrapper to use the debounced function
   const handleStatusUpdate = useCallback((newStatus: OrderStatus) => {
+    setLastUpdateTime(Date.now());
     debouncedStatusUpdate(orderId, newStatus);
   }, [debouncedStatusUpdate, orderId]);
 
@@ -104,6 +105,9 @@ export const AdminOrderStatusManager = ({
 
   const renderActionButtons = () => {
     const isProcessing = isUpdating || sendDeliveryEmailMutation.isPending;
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastUpdateTime;
+    const isDebouncePeriod = timeSinceLastUpdate < DEBOUNCE_DELAY;
     
     return (
       <div className={`flex gap-1 ${className}`}>
@@ -113,10 +117,12 @@ export const AdminOrderStatusManager = ({
             size={size}
             variant="outline"
             onClick={() => handleStatusUpdate('preparing')}
-            disabled={isProcessing}
+            disabled={isProcessing || isDebouncePeriod}
           >
             {isUpdating ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : isDebouncePeriod ? (
+              'Processing...'
             ) : (
               'Start Preparing'
             )}
@@ -130,15 +136,15 @@ export const AdminOrderStatusManager = ({
               size={size}
               variant="outline"
               onClick={() => handleStatusUpdate('ready')}
-              disabled={isProcessing}
+              disabled={isProcessing || isDebouncePeriod}
             >
-              {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Mark Ready'}
+              {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : isDebouncePeriod ? 'Processing...' : 'Mark Ready'}
             </Button>
             <Button
               size={size}
               variant="outline"
               onClick={handleSendDeliveryEmail}
-              disabled={isProcessing}
+              disabled={isProcessing || isDebouncePeriod}
               title="Send out-for-delivery email"
             >
               {sendDeliveryEmailMutation.isPending ? (
@@ -159,10 +165,12 @@ export const AdminOrderStatusManager = ({
               handleStatusUpdate('out_for_delivery');
               handleSendDeliveryEmail();
             }}
-            disabled={isProcessing}
+            disabled={isProcessing || isDebouncePeriod}
           >
             {isProcessing ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : isDebouncePeriod ? (
+              'Processing...'
             ) : (
               <>
                 <Send className="w-4 h-4 mr-1" />
@@ -178,9 +186,9 @@ export const AdminOrderStatusManager = ({
             size={size}
             variant="outline"
             onClick={() => handleStatusUpdate('delivered')}
-            disabled={isProcessing}
+            disabled={isProcessing || isDebouncePeriod}
           >
-            {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Mark Delivered'}
+            {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : isDebouncePeriod ? 'Processing...' : 'Mark Delivered'}
           </Button>
         )}
       </div>

@@ -9044,7 +9044,7 @@ export type Database = {
       }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
-        Returns: undefined
+        Returns: Json
       }
       calculate_delivery_metrics: {
         Args: { p_date: string }
@@ -10072,7 +10072,7 @@ export type Database = {
               p_entity_type?: string
             }
           | { p_action_type: string; p_details?: Json; p_order_id: string }
-        Returns: undefined
+        Returns: string
       }
       log_admin_management_action: {
         Args: {
@@ -10202,7 +10202,7 @@ export type Database = {
               user_agent?: string
             }
           | { p_details?: Json; p_event_type: string; p_severity?: string }
-        Returns: undefined
+        Returns: string
       }
       log_payment_verification_attempt: {
         Args: {

@@ -58,13 +58,35 @@ const CategoryProductsContent = () => {
   const currentCategory = categories.find(cat => cat.id === categoryId);
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
-  // Filter and sort products by price (lowest to highest by default) - Production Ready
+  // Helper function to extract weekday from product name
+  const getWeekdayFromProductName = (productName: string): number => {
+    const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const lowerName = productName.toLowerCase();
+    
+    for (let i = 0; i < weekdays.length; i++) {
+      if (lowerName.includes(weekdays[i])) {
+        return i;
+      }
+    }
+    return 999; // Non-weekday products go last
+  };
+
+  // Filter and sort products with weekday lunchbox priority
   const filteredAndSortedProducts = products
     .filter(product => 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
+      // First, sort by weekday for lunchbox products
+      const weekdayA = getWeekdayFromProductName(a.name);
+      const weekdayB = getWeekdayFromProductName(b.name);
+      
+      if (weekdayA !== weekdayB) {
+        return weekdayA - weekdayB;
+      }
+      
+      // If same weekday or both non-weekday, sort by price
       const priceA = a.discounted_price || a.price;
       const priceB = b.discounted_price || b.price;
       return priceA - priceB;

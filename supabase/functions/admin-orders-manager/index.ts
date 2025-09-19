@@ -167,7 +167,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
           source: 'admin_update_sms',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }], { onConflict: 'dedupe_key' });
+        }], { onConflict: 'dedupe_key,order_id,event_type' });
 
         if (smsInsertError) {
           if (smsInsertError.message.includes('duplicate key')) {

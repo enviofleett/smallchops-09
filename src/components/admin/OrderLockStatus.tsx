@@ -73,43 +73,84 @@ export const OrderLockStatus: React.FC<OrderLockStatusProps> = ({
       <Tooltip>
         <TooltipTrigger asChild>
           <div className={`flex items-center ${sizeClasses[size]} ${className}`}>
-            <div className="flex items-center gap-2">
-              <Avatar className={avatarSizes[size]}>
-                <AvatarImage src={lockInfo.locking_admin_avatar || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary">
-                  {lockInfo.locking_admin_name?.charAt(0)?.toUpperCase() || <User className={iconSizes[size]} />}
-                </AvatarFallback>
-              </Avatar>
-              
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1">
-                  <Lock className={`${iconSizes[size]} text-warning`} />
-                  <span className="font-medium text-warning">
-                    Locked by {lockInfo.locking_admin_name || 'Admin'}
-                  </span>
-                </div>
+            <div className="flex items-center gap-2 w-full">
+              <div className="flex items-center gap-2">
+                <Avatar className={avatarSizes[size]}>
+                  <AvatarImage src={lockInfo.locking_admin_avatar || undefined} />
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    {lockInfo.locking_admin_name?.charAt(0)?.toUpperCase() || <User className={iconSizes[size]} />}
+                  </AvatarFallback>
+                </Avatar>
                 
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Clock className={iconSizes[size]} />
-                  <span className="tabular-nums">
-                    {formatTimeRemaining(timeRemaining)}
-                  </span>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    <Lock className={`${iconSizes[size]} text-warning animate-pulse`} />
+                    <span className="font-semibold text-warning truncate">
+                      {lockInfo.locking_admin_name || 'Admin'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    <Clock className={`${iconSizes[size]} text-muted-foreground`} />
+                    <span className={`tabular-nums font-mono text-sm ${
+                      timeRemaining <= 10 ? 'text-destructive font-bold animate-pulse' : 
+                      timeRemaining <= 30 ? 'text-warning font-semibold' : 
+                      'text-muted-foreground'
+                    }`}>
+                      {formatTimeRemaining(timeRemaining)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">left</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Progress indicator */}
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant={timeRemaining <= 10 ? 'destructive' : 'secondary'} className="text-xs">
+                  Locked
+                </Badge>
+                <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-1000 ease-linear ${
+                      timeRemaining <= 10 ? 'bg-destructive' :
+                      timeRemaining <= 30 ? 'bg-warning' : 
+                      'bg-primary'
+                    }`}
+                    style={{ 
+                      width: `${Math.max(5, (timeRemaining / 300) * 100)}%` // Assuming 5-minute max lock
+                    }}
+                  />
                 </div>
               </div>
             </div>
           </div>
         </TooltipTrigger>
         
-        <TooltipContent>
+        <TooltipContent side="top" className="max-w-xs">
           <div className="space-y-2">
-            <div className="font-medium">Order Lock Details</div>
+            <div className="font-semibold text-primary">🔒 Order Lock Details</div>
             <div className="space-y-1 text-sm">
-              <div>Admin: {lockInfo.locking_admin_name}</div>
-              <div>Email: {lockInfo.locking_admin_email}</div>
-              <div>Time remaining: {formatTimeRemaining(timeRemaining)}</div>
+              <div className="flex items-center gap-2">
+                <User className="h-3 w-3" />
+                <span className="font-medium">{lockInfo.locking_admin_name}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span>📧</span>
+                <span>{lockInfo.locking_admin_email}</span>
+              </div>
+              <div className="flex items-center gap-2 font-mono">
+                <Clock className="h-3 w-3" />
+                <span>⏱️ {formatTimeRemaining(timeRemaining)} remaining</span>
+              </div>
               {lockInfo.acquired_at && (
-                <div>Acquired: {new Date(lockInfo.acquired_at).toLocaleTimeString()}</div>
+                <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                  <span>🕐</span>
+                  <span>Locked at {new Date(lockInfo.acquired_at).toLocaleTimeString()}</span>
+                </div>
               )}
+              <div className="pt-1 text-xs text-muted-foreground border-t">
+                This order is currently being edited by another admin
+              </div>
             </div>
           </div>
         </TooltipContent>

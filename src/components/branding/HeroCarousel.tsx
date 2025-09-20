@@ -64,7 +64,7 @@ export const HeroCarousel = ({
   // Only show uploaded images - no hardcoded fallbacks
   const imagesToShow = heroImages.length > 0 ? heroImages : [];
 
-  // Auto-rotate images every 20 seconds with fade effect
+  // Auto-rotate images every 8 seconds with smooth fade effect
   useEffect(() => {
     if (imagesToShow.length <= 1) return;
 
@@ -78,8 +78,8 @@ export const HeroCarousel = ({
           (prevIndex + 1) % imagesToShow.length
         );
         setIsVisible(true);
-      }, 500); // 500ms fade out duration
-    }, 20000); // 20 seconds
+      }, 300); // 300ms fade out duration
+    }, 8000); // 8 seconds
 
     return () => clearInterval(interval);
   }, [imagesToShow.length]);
@@ -112,8 +112,8 @@ export const HeroCarousel = ({
       <img 
         src={currentImage.image_url} 
         alt={currentImage.alt_text || 'Uploaded product image'} 
-        className={`w-full h-full object-cover rounded-2xl transition-opacity duration-500 ease-in-out ${
-          isVisible ? 'opacity-100' : 'opacity-0'
+        className={`w-full h-full object-cover rounded-2xl transition-all duration-300 ease-in-out ${
+          isVisible ? 'opacity-100 animate-fade-in' : 'opacity-0 animate-fade-out'
         }`}
         loading="eager"
         fetchPriority="high"

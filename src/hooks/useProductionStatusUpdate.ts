@@ -5,6 +5,12 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { validateOrderStatus, isValidOrderStatus } from '@/utils/orderValidation';
 
+// Define enhanced error type
+interface EnhancedError extends Error {
+  conflictInfo?: any;
+  isRetriable?: boolean;
+}
+
 /**
  * Production-hardened status update hook with comprehensive error handling
  */
@@ -20,56 +26,48 @@ export const useProductionStatusUpdate = () => {
 
       const validatedStatus = validateOrderStatus(status);
       
-      // PRODUCTION FIX: Enhanced error handling with automatic retry for specific errors
-      return await handleProductionError(
+      // Enhanced error handling with retry logic for production resilience
+      const result = await handleProductionError(
         async () => {
-          const response = await supabase.functions.invoke('admin-orders-manager', {
+          const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
             body: {
-              action: 'update',
+              action: 'update_status',
               orderId,
-              updates: { status: validatedStatus }
+              newStatus: validatedStatus
             }
           });
 
-          if (response.error) {
-            // Enhanced error classification for better user experience
-            const errorMsg = response.error.message || 'Failed to update order status';
-            
-            if (errorMsg.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
-              throw new Error('CONCURRENT_UPDATE_IN_PROGRESS: Another admin is updating this order');
-            } else if (errorMsg.includes('INVALID_STATUS_TRANSITION')) {
-              throw new Error('INVALID_STATUS_TRANSITION: Invalid status change for current order state');
-            } else if (errorMsg.includes('DATABASE_ERROR')) {
-              throw new Error('DATABASE_ERROR: Server error occurred');
-            }
-            
-            throw new Error(errorMsg);
+          if (error) {
+            throw new Error(`Network error: ${error.message}`);
           }
 
-          if (!response.data?.success) {
-            const errorMsg = response.data?.error || 'Status update failed';
+          if (!data?.success) {
+            // Handle structured conflict responses
+            const conflictInfo = data?.conflict_info || {};
+            const errorMessage = data?.error || 'Status update failed';
             
-            // Handle specific error codes from edge function
-            if (response.data?.errorCode === 'CONCURRENT_UPDATE_IN_PROGRESS') {
-              throw new Error('CONCURRENT_UPDATE_IN_PROGRESS: Another admin is updating this order');
-            } else if (response.data?.errorCode === 'INVALID_STATUS_TRANSITION') {
-              throw new Error('INVALID_STATUS_TRANSITION: Invalid status change');
-            }
+            // Create enhanced error with conflict details
+            const enhancedError = new Error(errorMessage) as EnhancedError;
+            enhancedError.name = 'StatusUpdateError';
+            enhancedError.conflictInfo = conflictInfo;
+            enhancedError.isRetriable = conflictInfo.reason === 'max_retries_exceeded';
             
-            throw new Error(errorMsg);
+            throw enhancedError;
           }
 
-          return response.data.order || response.data;
+          return data;
         },
         `order-status-update-${orderId}`,
         circuitBreakers.adminOrders,
         {
           maxAttempts: 3,
           baseDelay: 2000,
-          timeout: 25000, // Increased timeout for database operations
+          timeout: 25000,
           exponentialBackoff: true
         }
       );
+
+      return result;
     },
     onSuccess: (data, variables) => {
       const statusLabel = variables.status.replace('_', ' ');
@@ -89,44 +87,44 @@ export const useProductionStatusUpdate = () => {
       queryClient.invalidateQueries({ queryKey: ['unified-orders'] });
       queryClient.invalidateQueries({ queryKey: ['detailed-order', variables.orderId] });
     },
-    onError: (error: any, variables) => {
+    onError: (error: EnhancedError, variables) => {
       console.error('❌ Production status update failed:', error);
       
-      // PRODUCTION FIX: Enhanced error classification and user messaging
-      let errorMessage = 'Failed to update order status';
-      const errorMsg = error?.message || '';
+      // Handle enhanced error responses with conflict information
+      let errorMessage = 'Failed to update order status. Please try again.';
+      const conflictInfo = error.conflictInfo || {};
       
-      if (errorMsg.includes('CONCURRENT_UPDATE_IN_PROGRESS') || errorMsg.includes('Order is currently being modified')) {
-        errorMessage = 'Another admin is updating this order. Please wait and try again in a moment.';
-      } else if (errorMsg.includes('Rate limit exceeded')) {
-        errorMessage = 'Too many requests. Please wait a moment and try again.';
-      } else if (errorMsg.includes('authentication') || errorMsg.includes('unauthorized')) {
-        errorMessage = 'Authentication expired. Please refresh and try again.';
-      } else if (errorMsg.includes('INVALID_STATUS_TRANSITION') || errorMsg.includes('Invalid status')) {
-        errorMessage = 'Invalid status transition. Please refresh the page and check current order status.';
-      } else if (errorMsg.includes('DATABASE_ERROR') || errorMsg.includes('edge function') || errorMsg.includes('non-2xx status')) {
-        errorMessage = 'Service temporarily unavailable. Please try again in a moment.';
-      } else if (errorMsg.includes('validation') || errorMsg.includes('invalid input value for enum')) {
-        errorMessage = 'Invalid status update. Please refresh the page and try again.';
-      } else if (errorMsg.includes('Invalid order status:')) {
-        errorMessage = errorMsg; // Use the specific validation message
-      } else if (errorMsg.includes('duplicate key value violates unique constraint')) {
-        errorMessage = 'Status update conflict detected. Retrying automatically...';
-      } else if (errorMsg.includes('timeout') || errorMsg.includes('TIMEOUT')) {
-        errorMessage = 'Request timed out. Please try again.';
-      } else if (errorMsg && errorMsg !== 'Failed to update order status') {
-        errorMessage = errorMsg; // Use the actual error message if it's meaningful
+      if (error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message?.includes('unauthorized')) {
+        errorMessage = 'You are not authorized to perform this action.';
+      } else if (error.message?.includes('not found')) {
+        errorMessage = 'Order not found. Please refresh the page.';
+      } else if (conflictInfo.reason === 'max_retries_exceeded') {
+        errorMessage = 'Order is being updated by another admin. Please wait and try again.';
+      } else if (conflictInfo.reason === 'invalid_transition') {
+        errorMessage = `Cannot change status from ${conflictInfo.current_status} to ${conflictInfo.requested_status}.`;
+      } else if (conflictInfo.reason === 'no_change_needed') {
+        errorMessage = 'Order status is already set to the requested value.';
+      } else if (conflictInfo.reason === 'order_not_found') {
+        errorMessage = 'Order not found. Please refresh the page.';
+      } else if (conflictInfo.reason === 'database_error') {
+        errorMessage = 'Database error occurred. Please try again.';
       }
       
       toast.error(errorMessage);
       
-      // Log error for monitoring (non-blocking)
+      // Log the enhanced error for monitoring (non-blocking)
       supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'log_admin_error',
           orderId: variables.orderId,
           errorType: 'status_update_failed',
-          error: error.message
+          error: {
+            message: error.message,
+            conflictInfo: conflictInfo,
+            isRetriable: error.isRetriable || false
+          }
         }
       }).catch(() => {
         // Silently fail - error logging shouldn't block user workflow

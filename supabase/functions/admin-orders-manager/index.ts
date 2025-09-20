@@ -978,6 +978,107 @@ serve(async (req)=>{
         });
       }
 
+      case 'update_status': {
+        console.log(`📋 Processing admin request: {
+  action: "update_status",
+  orderId: "${orderId}",
+  newStatus: "${newStatus}",
+  timestamp: "${new Date().toISOString()}"
+} [${correlationId}]`);
+        
+        // Validate status
+        const validStatuses = [
+          'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery',
+          'delivered', 'cancelled', 'refunded', 'completed', 'returned'
+        ];
+        
+        if (!newStatus || !validStatuses.includes(newStatus)) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Invalid status: ${newStatus}. Valid statuses: ${validStatuses.join(', ')}`,
+            errorCode: 'INVALID_STATUS'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        // Call the enhanced order status update function
+        const { data: updateResult, error: updateError } = await supabaseClient.rpc(
+          'admin_update_order_status_lock_first',
+          {
+            p_order_id: orderId,
+            p_new_status: newStatus,
+            p_admin_user_id: user.id,
+            p_notes: `Status updated by admin ${user.email || user.id}`
+          }
+        );
+
+        if (updateError) {
+          console.error('❌ RPC call failed:', updateError);
+          
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Database error occurred',
+              details: updateError,
+              conflict_info: { reason: 'rpc_error' }
+            }),
+            { 
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+
+        // Handle structured response from new RPC function
+        const result = updateResult?.[0];
+        if (!result?.success) {
+          console.error('❌ Order status update failed:', result);
+          
+          // Determine HTTP status based on conflict type
+          const conflictReason = result?.conflict_info?.reason;
+          const httpStatus = conflictReason === 'max_retries_exceeded' || conflictReason === 'invalid_transition' ? 409 : 400;
+          
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: result?.message || 'Failed to update order status',
+              conflict_info: result?.conflict_info || { reason: 'unknown' },
+              details: result
+            }),
+            { 
+              status: httpStatus,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+
+        // Log successful update with enhanced details
+        console.log('✅ Order status updated successfully:', result);
+
+        // Extract order data from the structured response
+        const orderData = result.order_data;
+
+        // Queue notification for valid status changes  
+        if (orderData && ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'].includes(newStatus)) {
+          await handleStatusChangeNotification(supabaseClient, orderId, orderData, newStatus, user.id);
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: result.message,
+            order: orderData,
+            conflict_info: result.conflict_info
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
       case 'update': {
         console.log(`📋 Processing admin request: {
   action: "update",
@@ -1079,8 +1180,8 @@ serve(async (req)=>{
             const result = await supabaseClient.rpc('admin_update_order_status_lock_first', {
               p_order_id: orderId,
               p_new_status: sanitizedUpdates.status,
-              p_admin_id: adminUserId,
-              p_idempotency_key: idempotencyKey
+              p_admin_user_id: adminUserId,
+              p_notes: `Status updated by admin ${user.email || user.id}`
             });
             
             lockFirstResult = result.data;
@@ -1178,26 +1279,70 @@ serve(async (req)=>{
           }
         }
 
+        // Handle structured response from new RPC function
         if (!lockFirstResult?.success) {
-          // Handle concurrent update error
-          if (lockFirstResult?.error === 'CONCURRENT_UPDATE_IN_PROGRESS') {
-            console.log(`⚠️ Concurrent update detected for order ${orderId} [${correlationId}]`);
-            
+          const conflictInfo = lockFirstResult?.conflict_info || {};
+          const conflictReason = conflictInfo.reason;
+          
+          // Handle specific conflict scenarios
+          if (conflictReason === 'max_retries_exceeded') {
             return new Response(JSON.stringify({
               success: false,
-              error: 'Another admin session is currently updating this order. Please wait and try again.',
+              error: 'Order is being updated by another admin. Please wait and try again.',
               errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS',
-              lockHolder: lockFirstResult?.lock_holder,
+              conflict_info: conflictInfo,
               correlationId,
-              retryAfter: 5 // seconds
+              retryAfter: 5
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 409
             });
+          } else if (conflictReason === 'invalid_transition') {
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Cannot change status from ${conflictInfo.current_status} to ${conflictInfo.requested_status}`,
+              errorCode: 'INVALID_STATUS_TRANSITION',
+              conflict_info: conflictInfo,
+              correlationId
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            });
+          } else if (conflictReason === 'order_not_found') {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Order not found',
+              errorCode: 'ORDER_NOT_FOUND',
+              conflict_info: conflictInfo,
+              correlationId
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 404
+            });
+          } else if (conflictReason === 'no_change_needed') {
+            return new Response(JSON.stringify({
+              success: true,
+              message: lockFirstResult.message,
+              order: lockFirstResult.order_data,
+              conflict_info: conflictInfo,
+              correlationId
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200
+            });
+          } else {
+            return new Response(JSON.stringify({
+              success: false,
+              error: lockFirstResult?.message || 'Database error during order update',
+              errorCode: 'DATABASE_ERROR',
+              conflict_info: conflictInfo,
+              correlationId
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500
+            });
           }
-
-          // Handle other errors
-          console.error(`❌ Order update failed for ${orderId} [${correlationId}]:`, lockFirstResult?.error);
+        }
           return new Response(JSON.stringify({
             success: false,
             error: lockFirstResult?.error || 'Order update failed',

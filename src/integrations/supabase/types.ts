@@ -5201,6 +5201,47 @@ export type Database = {
         }
         Relationships: []
       }
+      order_status_history: {
+        Row: {
+          changed_at: string | null
+          changed_by: string | null
+          created_at: string | null
+          id: string
+          new_status: Database["public"]["Enums"]["order_status"] | null
+          notes: string | null
+          old_status: Database["public"]["Enums"]["order_status"] | null
+          order_id: string | null
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          new_status?: Database["public"]["Enums"]["order_status"] | null
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["order_status"] | null
+          order_id?: string | null
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          new_status?: Database["public"]["Enums"]["order_status"] | null
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["order_status"] | null
+          order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_update_locks: {
         Row: {
           acquired_at: string
@@ -5266,6 +5307,7 @@ export type Database = {
           guest_session_id: string | null
           id: string
           idempotency_key: string | null
+          last_modified_by: string | null
           order_number: string
           order_time: string
           order_type: Database["public"]["Enums"]["order_type"]
@@ -5317,6 +5359,7 @@ export type Database = {
           guest_session_id?: string | null
           id?: string
           idempotency_key?: string | null
+          last_modified_by?: string | null
           order_number: string
           order_time?: string
           order_type?: Database["public"]["Enums"]["order_type"]
@@ -5368,6 +5411,7 @@ export type Database = {
           guest_session_id?: string | null
           id?: string
           idempotency_key?: string | null
+          last_modified_by?: string | null
           order_number?: string
           order_time?: string
           order_type?: Database["public"]["Enums"]["order_type"]
@@ -9143,12 +9187,17 @@ export type Database = {
       }
       admin_update_order_status_lock_first: {
         Args: {
-          p_admin_id: string
-          p_idempotency_key: string
+          p_admin_user_id?: string
           p_new_status: string
+          p_notes?: string
           p_order_id: string
         }
-        Returns: Json
+        Returns: {
+          conflict_info: Json
+          message: string
+          order_data: Json
+          success: boolean
+        }[]
       }
       admin_update_order_status_production: {
         Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
@@ -9544,6 +9593,10 @@ export type Database = {
       cleanup_old_health_checks: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      cleanup_order_locks: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       cleanup_promotion_rate_limits: {
         Args: Record<PropertyKey, never>

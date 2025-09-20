@@ -66,7 +66,13 @@ export const useEnhancedOrderStatusUpdate = () => {
       if (data.cached) {
         toast.success('Status update (cached result)');
       } else {
-        toast.success(`Order status updated to ${variables.newStatus}`);
+        // Use admin-friendly success message
+        import('@/utils/adminToastMessages').then(({ showAdminToast }) => {
+          showAdminToast(toast, 'orderUpdated', {
+            orderId: variables.orderId,
+            orderNumber: `for ${variables.newStatus}`
+          });
+        });
       }
 
       // Invalidate relevant queries
@@ -90,29 +96,21 @@ export const useEnhancedOrderStatusUpdate = () => {
         // Set 409 error state to show bypass button
         setShow409Error(variables.orderId);
         
-        // Check if this admin might be a lock holder experiencing a false positive
-        const getTimeSinceLastUpdate = (orderId: string) => {
-          const lastUpdate = lastUpdateTimes.get(orderId);
-          return lastUpdate ? Date.now() - lastUpdate : Infinity;
-        };
-        const timeSinceLastUpdate = getTimeSinceLastUpdate(variables.orderId);
-        if (timeSinceLastUpdate < 35000) { // Active within 35 seconds (lock duration + buffer)
-          toast.error('Cache conflict detected. Use the "Bypass Cache" button to force the update.');
-        } else {
-          toast.error('Another admin is updating this order or cache is stuck. Use "Bypass Cache" to force update.');
-        }
-      } else if (errorMessage.includes('ORDER_MODIFIED_CONCURRENTLY')) {
-        toast.error('Order was modified by another user. Please refresh and try again.');
-      } else if (errorMessage.includes('rate limit')) {
-        toast.error('Too many requests. Please wait before trying again.');
-      } else if (errorMessage.includes('timeout')) {
-        toast.error('Request timed out. Please check your connection and try again.');
-      } else if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
-        toast.error('Session expired. Please refresh the page and log in again.');
-      } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
-        toast.error('Network error. Please check your connection and try again.');
+        // Use admin-friendly toast message
+        import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
+          showAdminErrorToast(toast, error, {
+            orderId: variables.orderId,
+            onRetry: () => updateOrderStatus(variables.orderId, variables.newStatus)
+          });
+        });
       } else {
-        toast.error(`Failed to update order status: ${errorMessage}`);
+        // Use admin-friendly error messages for other errors
+        import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
+          showAdminErrorToast(toast, error, {
+            orderId: variables.orderId,
+            onRetry: () => updateOrderStatus(variables.orderId, variables.newStatus)
+          });
+        });
       }
     }
   });
@@ -205,7 +203,12 @@ export const useEnhancedOrderStatusUpdate = () => {
       if (!data?.success) throw new Error(data?.error || 'Bypass failed');
 
       // Show success message
-      toast.success(`✅ Cache bypassed! Order status updated to ${newStatus}`);
+      import('@/utils/adminToastMessages').then(({ showAdminToast }) => {
+        showAdminToast(toast, 'cacheBypassSuccess', {
+          orderId,
+          orderNumber: newStatus
+        });
+      });
       
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -215,7 +218,15 @@ export const useEnhancedOrderStatusUpdate = () => {
     } catch (error: any) {
       console.error('❌ Cache bypass failed:', error);
       const errorMessage = error?.message || 'Bypass operation failed';
-      toast.error(`Failed to bypass cache: ${errorMessage}`);
+      
+      // Use admin-friendly error message
+      import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
+        showAdminErrorToast(toast, error, {
+          orderId,
+          onRetry: () => bypassCacheAndUpdate(orderId, newStatus)
+        });
+      });
+      
       throw error;
     } finally {
       setIsBypassing(false);

@@ -132,7 +132,16 @@ export const AdminOrderStatusManager = ({
         // Enhanced error messages for different error types
         if (error.message?.includes('409') || error.message?.includes('conflict') || error.message?.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
           setSelectedStatusForBypass(newStatus); // Store the status for bypass
-          toast.error('Cache conflict detected. Use the bypass button to force the update.');
+          
+          // Use admin-friendly toast message
+          import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
+            showAdminErrorToast(toast, error, {
+              orderId,
+              orderNumber: orderNumber,
+              onBypassCache: () => handleBypassCacheAndUpdate(),
+              onRetry: () => handleStatusUpdate(newStatus)
+            });
+          });
         } else if (error.message?.includes('401') || error.message?.includes('unauthorized')) {
           toast.error('Session expired. Please refresh and try again.');
         } else if (error.message?.includes('Network')) {
@@ -140,7 +149,14 @@ export const AdminOrderStatusManager = ({
           // Auto-retry for network errors
           setTimeout(() => handleStatusUpdate(newStatus), 3000);
         } else {
-          toast.error(`Failed to update status: ${error.message || 'Unknown error'}`);
+          // Use admin-friendly error message for other errors
+          import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
+            showAdminErrorToast(toast, error, {
+              orderId,
+              orderNumber: orderNumber,
+              onRetry: () => handleStatusUpdate(newStatus)
+            });
+          });
         }
       } finally {
         setShowProcessing(false);
@@ -166,8 +182,17 @@ export const AdminOrderStatusManager = ({
       onStatusUpdate?.(selectedStatusForBypass);
       setSelectedStatusForBypass(null);
       clearBypassError();
+      
+      // Show success message
+      import('@/utils/adminToastMessages').then(({ showAdminToast }) => {
+        showAdminToast(toast, 'cacheBypassSuccess', {
+          orderId,
+          orderNumber: orderNumber
+        });
+      });
     } catch (error: any) {
       console.error('Bypass failed:', error);
+      // Error handling is already done in the hook
     }
   }, [bypassCacheAndUpdate, orderId, selectedStatusForBypass, onStatusUpdate, clearBypassError]);
 

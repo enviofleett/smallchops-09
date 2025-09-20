@@ -53,6 +53,127 @@ try {
 
 const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
+// Enhanced system health check function
+async function checkSystemHealth() {
+  const checks = [];
+  let overallHealth = true;
+  
+  // Database connectivity check
+  try {
+    const start = Date.now();
+    const { data, error } = await supabaseClient
+      .from('orders')
+      .select('count')
+      .limit(1);
+    
+    checks.push({
+      name: 'database_connectivity',
+      status: error ? 'fail' : 'pass',
+      responseTime: Date.now() - start,
+      error: error?.message
+    });
+    
+    if (error) overallHealth = false;
+  } catch (e) {
+    checks.push({
+      name: 'database_connectivity',
+      status: 'fail',
+      error: e.message
+    });
+    overallHealth = false;
+  }
+  
+  // Enhanced system health metrics including 409 conflicts
+  try {
+    const { data: healthMetrics, error } = await supabaseClient.rpc('get_enhanced_system_health_metrics');
+    
+    if (error) throw error;
+    
+    const metrics = healthMetrics || {};
+    const conflictData = metrics.conflict_resolution || {};
+    const conflictRate = conflictData.conflict_rate_percent || 0;
+    const avgResolutionTime = conflictData.avg_resolution_time_ms || 0;
+    
+    checks.push({
+      name: 'conflict_resolution_health',
+      status: conflictRate > 15 ? 'fail' : conflictRate > 5 ? 'warn' : 'pass',
+      conflictRate: `${conflictRate}%`,
+      avgResolutionTime: `${avgResolutionTime}ms`,
+      details: conflictData
+    });
+    
+    if (conflictRate > 15) overallHealth = false;
+  } catch (e) {
+    checks.push({
+      name: 'conflict_resolution_health',
+      status: 'fail',
+      error: e.message
+    });
+  }
+  
+  // Recent error rate check from order_update_metrics
+  try {
+    const { data: recentMetrics, error } = await supabaseClient
+      .from('order_update_metrics')
+      .select('*')
+      .gte('timestamp', new Date(Date.now() - 300000).toISOString()) // 5 minutes
+      .eq('status', 'error');
+    
+    const errorCount = recentMetrics?.length || 0;
+    const errorRate = errorCount > 10 ? 'fail' : errorCount > 5 ? 'warn' : 'pass';
+    
+    checks.push({
+      name: 'recent_error_rate',
+      status: errorRate,
+      recentErrors: errorCount,
+      threshold: '10 errors per 5min'
+    });
+    
+    if (errorRate === 'fail') overallHealth = false;
+  } catch (e) {
+    checks.push({
+      name: 'recent_error_rate',
+      status: 'fail',
+      error: e.message
+    });
+  }
+
+  // Lock contention health check
+  try {
+    const { data: activeLocks, error } = await supabaseClient
+      .from('order_update_locks')
+      .select('*')
+      .is('released_at', null)
+      .gt('expires_at', new Date().toISOString());
+    
+    const lockCount = activeLocks?.length || 0;
+    const lockStatus = lockCount > 20 ? 'fail' : lockCount > 10 ? 'warn' : 'pass';
+    
+    checks.push({
+      name: 'lock_contention',
+      status: lockStatus,
+      activeLocks: lockCount,
+      threshold: '20 active locks'
+    });
+    
+    if (lockStatus === 'fail') overallHealth = false;
+  } catch (e) {
+    checks.push({
+      name: 'lock_contention', 
+      status: 'fail',
+      error: e.message
+    });
+  }
+  
+  return {
+    healthy: overallHealth,
+    timestamp: new Date().toISOString(),
+    checks,
+    version: '2.0.0',
+    uptime: process.uptime?.() || 0
+  };
+}
+
 // Template key mapping helper function
 function getTemplateKey(status: string): string {
   const templateKeyMap: Record<string, string> = {
@@ -439,6 +560,29 @@ serve(async (req)=>{
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500
     });
+  }
+
+  // Phase 2: Enhanced Health Endpoint
+  if (req.method === 'GET' && req.url.includes('/health')) {
+    console.log(`🏥 Health check requested [${correlationId}]`);
+    try {
+      const healthData = await checkSystemHealth();
+      
+      return new Response(JSON.stringify(healthData), {
+        status: healthData.healthy ? 200 : 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    } catch (healthError) {
+      console.error('❌ Health check failed:', healthError.message);
+      return new Response(JSON.stringify({
+        healthy: false,
+        error: 'Health check system error',
+        timestamp: new Date().toISOString()
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
   }
 
   // Request Processing with Enhanced Error Handling

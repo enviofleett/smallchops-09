@@ -5284,6 +5284,72 @@ export type Database = {
         }
         Relationships: []
       }
+      order_update_metrics: {
+        Row: {
+          admin_user_id: string | null
+          cache_cleared: boolean | null
+          cache_hit: boolean | null
+          concurrent_admin_sessions: Json | null
+          conflict_resolution_method: string | null
+          correlation_id: string | null
+          database_query_time_ms: number | null
+          duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          id: number
+          lock_acquired: boolean | null
+          lock_wait_time_ms: number | null
+          operation: string
+          order_id: string | null
+          retry_attempts: number | null
+          status: string
+          timestamp: string | null
+          total_processing_time_ms: number | null
+        }
+        Insert: {
+          admin_user_id?: string | null
+          cache_cleared?: boolean | null
+          cache_hit?: boolean | null
+          concurrent_admin_sessions?: Json | null
+          conflict_resolution_method?: string | null
+          correlation_id?: string | null
+          database_query_time_ms?: number | null
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: number
+          lock_acquired?: boolean | null
+          lock_wait_time_ms?: number | null
+          operation: string
+          order_id?: string | null
+          retry_attempts?: number | null
+          status: string
+          timestamp?: string | null
+          total_processing_time_ms?: number | null
+        }
+        Update: {
+          admin_user_id?: string | null
+          cache_cleared?: boolean | null
+          cache_hit?: boolean | null
+          concurrent_admin_sessions?: Json | null
+          conflict_resolution_method?: string | null
+          correlation_id?: string | null
+          database_query_time_ms?: number | null
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: number
+          lock_acquired?: boolean | null
+          lock_wait_time_ms?: number | null
+          operation?: string
+          order_id?: string | null
+          retry_attempts?: number | null
+          status?: string
+          timestamp?: string | null
+          total_processing_time_ms?: number | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           admin_notes: string | null
@@ -9071,6 +9137,21 @@ export type Database = {
         }
         Relationships: []
       }
+      conflict_resolution_metrics: {
+        Row: {
+          avg_duration_ms: number | null
+          avg_lock_wait_ms: number | null
+          avg_retry_attempts: number | null
+          conflict_count: number | null
+          conflict_rate_percent: number | null
+          error_count: number | null
+          error_rate_percent: number | null
+          minute: string | null
+          success_count: number | null
+          total_operations: number | null
+        }
+        Relationships: []
+      }
       email_queue_health: {
         Row: {
           failed_count: number | null
@@ -10069,6 +10150,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_enhanced_system_health_metrics: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_environment_config: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -10481,6 +10566,28 @@ export type Database = {
           p_order_id: string
         }
         Returns: undefined
+      }
+      log_order_update_metric: {
+        Args: {
+          p_admin_user_id: string
+          p_cache_cleared?: boolean
+          p_cache_hit?: boolean
+          p_concurrent_admin_sessions?: Json
+          p_conflict_resolution_method?: string
+          p_correlation_id?: string
+          p_database_query_time_ms?: number
+          p_duration_ms: number
+          p_error_code?: string
+          p_error_message?: string
+          p_lock_acquired?: boolean
+          p_lock_wait_time_ms?: number
+          p_operation: string
+          p_order_id: string
+          p_retry_attempts?: number
+          p_status: string
+          p_total_processing_time_ms?: number
+        }
+        Returns: string
       }
       log_payment_access: {
         Args: {

@@ -35,6 +35,15 @@ export interface PerformanceMetrics {
   systemHealth: 'healthy' | 'degraded' | 'critical';
 }
 
+export interface ConflictResolutionMetrics {
+  conflictRate: number;
+  avgConflictResolutionTime: number;
+  retrySuccessRate: number;
+  cacheBypassRate: number;
+  lockWaitTimes: number[];
+  concurrentSessionConflicts: number;
+}
+
 export interface AlertRule {
   id: string;
   name: string;
@@ -48,6 +57,7 @@ export const useRealTimeMonitoring = () => {
   const [cacheHealth, setCacheHealth] = useState<CacheHealthMetrics | null>(null);
   const [lockMetrics, setLockMetrics] = useState<LockContentionMetrics | null>(null);
   const [performance, setPerformance] = useState<PerformanceMetrics | null>(null);
+  const [conflictMetrics, setConflictMetrics] = useState<ConflictResolutionMetrics | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   
@@ -82,6 +92,22 @@ export const useRealTimeMonitoring = () => {
       name: 'Slow Response Time',
       condition: 'avg_response_time > threshold',
       threshold: 2000, // 2 seconds
+      severity: 'medium',
+      enabled: true
+    },
+    {
+      id: 'high_conflict_rate',
+      name: 'High 409 Conflict Rate',
+      condition: 'conflict_rate > threshold',
+      threshold: 0.1, // 10%
+      severity: 'high',
+      enabled: true
+    },
+    {
+      id: 'slow_conflict_resolution',
+      name: 'Slow Conflict Resolution',
+      condition: 'avg_conflict_resolution_time > threshold',
+      threshold: 3000, // 3 seconds
       severity: 'medium',
       enabled: true
     }
@@ -198,38 +224,33 @@ export const useRealTimeMonitoring = () => {
     }
   }, []);
 
-  // Fetch performance metrics
+  // Fetch performance metrics from enhanced order_update_metrics
   const fetchPerformanceMetrics = useCallback(async (): Promise<PerformanceMetrics> => {
     try {
-      // Get audit logs for performance analysis
-      const { data: auditLogs, error } = await supabase
-        .from('audit_logs')
-        .select('action, category, message, new_values, event_time')
-        .in('action', [
-          'admin_order_status_updated_production',
-          'admin_order_status_update_failed_production'
-        ])
-        .gte('event_time', new Date(Date.now() - 3600000).toISOString()); // Last hour
+      const { data: metrics, error } = await supabase
+        .from('order_update_metrics')
+        .select('*')
+        .gte('timestamp', new Date(Date.now() - 3600000).toISOString()); // Last hour
 
       if (error) throw error;
 
-      const total = auditLogs?.length || 0;
-      const successful = auditLogs?.filter(log => 
-        log.action === 'admin_order_status_updated_production'
-      ).length || 0;
-      const failed = auditLogs?.filter(log => 
-        log.action === 'admin_order_status_update_failed_production'
-      ).length || 0;
+      const total = metrics?.length || 0;
+      const successful = metrics?.filter(m => m.status === 'success').length || 0;
+      const failed = metrics?.filter(m => m.status === 'error').length || 0;
 
       // Error breakdown
-      const errorsByType = (auditLogs || [])
-        .filter(log => log.action.includes('failed'))
-        .reduce((acc, log) => {
-          const errorValue = log.new_values as any;
-          const errorType = errorValue?.error || 'unknown';
+      const errorsByType = (metrics || [])
+        .filter(m => m.status === 'error')
+        .reduce((acc, metric) => {
+          const errorType = metric.error_code || 'unknown';
           acc[errorType] = (acc[errorType] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
+
+      // Calculate average latency from duration_ms
+      const avgLatency = total > 0 
+        ? (metrics || []).reduce((sum, m) => sum + (m.duration_ms || 0), 0) / total
+        : 0;
 
       // Calculate throughput (operations per minute)
       const throughput = total > 0 ? (total / 60) : 0;
@@ -242,11 +263,11 @@ export const useRealTimeMonitoring = () => {
       else if (errorRate > 0.05) systemHealth = 'degraded';
 
       return {
-        orderUpdateLatency: 0, // Could be calculated from processing times
+        orderUpdateLatency: avgLatency,
         successRate: total > 0 ? successful / total : 1,
         errorsByType,
         throughput,
-        peakLoad: throughput, // Simplified - could track actual peak
+        peakLoad: throughput,
         systemHealth
       };
     } catch (error) {
@@ -262,11 +283,78 @@ export const useRealTimeMonitoring = () => {
     }
   }, []);
 
+  // Fetch 409 conflict resolution metrics
+  const fetchConflictMetrics = useCallback(async (): Promise<ConflictResolutionMetrics> => {
+    try {
+      const { data: metrics, error } = await supabase
+        .from('order_update_metrics')
+        .select('*')
+        .gte('timestamp', new Date(Date.now() - 3600000).toISOString()) // Last hour
+        .in('status', ['conflict', 'success', 'error']);
+
+      if (error) throw error;
+
+      const total = metrics?.length || 0;
+      const conflicts = metrics?.filter(m => m.status === 'conflict') || [];
+      const conflictResolutions = metrics?.filter(m => 
+        m.conflict_resolution_method && m.status === 'success'
+      ) || [];
+
+      // Calculate conflict rate
+      const conflictRate = total > 0 ? conflicts.length / total : 0;
+
+      // Calculate average conflict resolution time
+      const avgConflictResolutionTime = conflictResolutions.length > 0
+        ? conflictResolutions.reduce((sum, m) => sum + (m.duration_ms || 0), 0) / conflictResolutions.length
+        : 0;
+
+      // Calculate retry success rate
+      const retries = metrics?.filter(m => m.retry_attempts && m.retry_attempts > 0) || [];
+      const successfulRetries = retries.filter(m => m.status === 'success');
+      const retrySuccessRate = retries.length > 0 ? successfulRetries.length / retries.length : 1;
+
+      // Calculate cache bypass rate
+      const bypasses = metrics?.filter(m => m.cache_cleared === true) || [];
+      const cacheBypassRate = total > 0 ? bypasses.length / total : 0;
+
+      // Extract lock wait times
+      const lockWaitTimes = (metrics || [])
+        .map(m => m.lock_wait_time_ms)
+        .filter(time => time !== null && time !== undefined);
+
+      // Count concurrent session conflicts
+      const concurrentConflicts = (metrics || [])
+        .filter(m => m.concurrent_admin_sessions && 
+          Object.keys(m.concurrent_admin_sessions).length > 1
+        ).length;
+
+      return {
+        conflictRate,
+        avgConflictResolutionTime,
+        retrySuccessRate,
+        cacheBypassRate,
+        lockWaitTimes,
+        concurrentSessionConflicts: concurrentConflicts
+      };
+    } catch (error) {
+      console.error('Error fetching conflict metrics:', error);
+      return {
+        conflictRate: 0,
+        avgConflictResolutionTime: 0,
+        retrySuccessRate: 1,
+        cacheBypassRate: 0,
+        lockWaitTimes: [],
+        concurrentSessionConflicts: 0
+      };
+    }
+  }, []);
+
   // Check alert conditions
   const checkAlerts = useCallback((
     cache: CacheHealthMetrics,
     locks: LockContentionMetrics,
-    perf: PerformanceMetrics
+    perf: PerformanceMetrics,
+    conflicts: ConflictResolutionMetrics
   ) => {
     const newAlerts: string[] = [];
 
@@ -288,6 +376,12 @@ export const useRealTimeMonitoring = () => {
         case 'slow_response_time':
           triggered = cache.avgResponseTime > rule.threshold;
           break;
+        case 'high_conflict_rate':
+          triggered = conflicts.conflictRate > rule.threshold;
+          break;
+        case 'slow_conflict_resolution':
+          triggered = conflicts.avgConflictResolutionTime > rule.threshold;
+          break;
       }
 
       if (triggered) {
@@ -301,23 +395,25 @@ export const useRealTimeMonitoring = () => {
   // Main monitoring function
   const updateMetrics = useCallback(async () => {
     try {
-      const [cacheMetrics, lockStats, perfMetrics] = await Promise.all([
+      const [cacheMetrics, lockStats, perfMetrics, conflictStats] = await Promise.all([
         fetchCacheHealth(),
         fetchLockMetrics(),
-        fetchPerformanceMetrics()
+        fetchPerformanceMetrics(),
+        fetchConflictMetrics()
       ]);
 
       setCacheHealth(cacheMetrics);
       setLockMetrics(lockStats);
       setPerformance(perfMetrics);
+      setConflictMetrics(conflictStats);
 
       // Check for alerts
-      checkAlerts(cacheMetrics, lockStats, perfMetrics);
+      checkAlerts(cacheMetrics, lockStats, perfMetrics, conflictStats);
 
     } catch (error) {
       console.error('Error updating monitoring metrics:', error);
     }
-  }, [fetchCacheHealth, fetchLockMetrics, fetchPerformanceMetrics, checkAlerts]);
+  }, [fetchCacheHealth, fetchLockMetrics, fetchPerformanceMetrics, fetchConflictMetrics, checkAlerts]);
 
   // Start/stop monitoring
   const startMonitoring = useCallback((interval: number = 10000) => {
@@ -358,6 +454,7 @@ export const useRealTimeMonitoring = () => {
     cacheHealth,
     lockMetrics,
     performance,
+    conflictMetrics,
     alerts,
     isMonitoring,
     

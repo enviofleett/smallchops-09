@@ -1245,6 +1245,9 @@ serve(async (req)=>{
       case 'bypass_and_update': {
         console.log(`🚨 Admin function: BYPASS cache and update order ${orderId} [${correlationId}]`);
         
+        // CRITICAL FIX: Define adminUserId from authenticated user
+        const adminUserId = user.id;
+        
         // Enhanced parameter validation for bypass
         if (!orderId) {
           return new Response(JSON.stringify({

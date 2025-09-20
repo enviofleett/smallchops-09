@@ -365,14 +365,16 @@ export function AdminOrdersContent() {
       )}
 
       {/* Order Details Modal */}
-      <OrderDetailsDialog
-        order={selectedOrder}
-        isOpen={isDialogOpen}
-        onClose={() => {
-          setIsDialogOpen(false);
-          setSelectedOrder(null);
-        }}
-      />
+      {selectedOrder && (
+        <OrderDetailsDialog
+          order={selectedOrder}
+          isOpen={isDialogOpen}
+          onClose={() => {
+            setIsDialogOpen(false);
+            setSelectedOrder(null);
+          }}
+        />
+      )}
     </>
   );
 }

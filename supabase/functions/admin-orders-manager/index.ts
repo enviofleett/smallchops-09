@@ -1343,15 +1343,6 @@ serve(async (req)=>{
             });
           }
         }
-          return new Response(JSON.stringify({
-            success: false,
-            error: lockFirstResult?.error || 'Order update failed',
-            correlationId
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          });
-        }
 
         // CRITICAL FIX: Lock-first approach completed successfully
         console.log(`✅ Order ${orderId} updated successfully via lock-first approach [${correlationId}]`);

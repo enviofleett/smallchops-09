@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import heroPlaceholder from '@/assets/hero-placeholder.jpg';
 
 interface HeroImage {
   id: string;
@@ -89,15 +90,17 @@ export const HeroCarousel = ({
     setCurrentIndex(0);
   }, [imagesToShow]);
 
-  // Don't render anything if no uploaded images available
+  // Show professional placeholder image if no uploaded images available
   if (imagesToShow.length === 0) {
     return (
-      <div className={`${className} flex items-center justify-center bg-gray-100 rounded-2xl`}>
-        <div className="text-center p-6">
-          <div className="text-gray-400 text-sm font-medium">
-            Upload images to showcase your products
-          </div>
-        </div>
+      <div className={className}>
+        <img 
+          src={heroPlaceholder} 
+          alt="Professional product showcase" 
+          className="w-full h-full object-cover rounded-2xl"
+          loading="eager"
+          fetchPriority="high"
+        />
       </div>
     );
   }

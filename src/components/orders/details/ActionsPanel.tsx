@@ -250,25 +250,41 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
           </div>
         </div>
 
-        {/* Cache Bypass Section - Only show when 409 error detected */}
-        {show409Error && onBypassCacheAndUpdate && (
+        {/* Cache Bypass Section - Always available for admins */}
+        {onBypassCacheAndUpdate && (
           <div className="space-y-2">
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                    Cache Conflict Detected
-                  </p>
-                  <p className="text-amber-700 dark:text-amber-300 text-xs">
-                    {selectedStatus === 'preparing' && (orderId && orderId.length > 0) 
-                      ? 'This transition is prone to cache issues. Use recovery or bypass options below.'
-                      : 'The system cache is preventing the update. Use the bypass button to force the update and clear the cache.'
-                    }
-                  </p>
+            {show409Error ? (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                      Cache Conflict Detected
+                    </p>
+                    <p className="text-amber-700 dark:text-amber-300 text-xs">
+                      {selectedStatus === 'preparing' && (orderId && orderId.length > 0) 
+                        ? 'This transition is prone to cache issues. Use recovery or bypass options below.'
+                        : 'The system cache is preventing the update. Use the bypass button to force the update and clear the cache.'
+                      }
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">
+                      Advanced Update Options
+                    </p>
+                    <p className="text-blue-700 dark:text-blue-300 text-xs">
+                      Use these options if the regular update fails or for troubleshooting cache issues.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="flex gap-2">
               {selectedStatus === 'preparing' && orderId && (
@@ -322,13 +338,12 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
         )}
 
         {/* Update Button */}
-        <div className={`${show409Error ? 'pt-2' : 'pt-4'} ${!show409Error ? 'border-t border-border' : ''}`}>
+        <div className="pt-4 border-t border-border space-y-2">
           <Button 
             onClick={onUpdate} 
-            disabled={isUpdating || (show409Error && !isBypassing)} 
+            disabled={isUpdating} 
             className="w-full"
             size="lg"
-            variant={show409Error ? "secondary" : "default"}
           >
             {isUpdating ? (
               <>
@@ -336,9 +351,15 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
                 Updating...
               </>
             ) : (
-              show409Error ? 'Try Normal Update Again' : 'Update Order'
+              'Update Order'
             )}
           </Button>
+          
+          {show409Error && (
+            <p className="text-xs text-center text-muted-foreground">
+              Regular update failed. Use bypass option above.
+            </p>
+          )}
         </div>
 
       </CardContent>

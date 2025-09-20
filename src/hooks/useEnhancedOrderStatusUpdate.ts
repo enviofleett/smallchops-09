@@ -108,14 +108,17 @@ export const useEnhancedOrderStatusUpdate = () => {
         import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
           showAdminErrorToast(toast, error, {
             orderId: variables.orderId,
-            onRetry: () => updateOrderStatus(variables.orderId, variables.newStatus)
+            onRetry: () => updateOrderStatus(variables.orderId, variables.newStatus),
+            onBypassCache: () => {
+              setShow409Error(variables.orderId);
+            }
           });
         });
       }
     }
   });
 
-  const updateOrderStatus = useCallback(async (orderId: string, newStatus: OrderStatus, skipDebounce = false): Promise<any> => {
+  const updateOrderStatus = useCallback(async (orderId: string, newStatus: OrderStatus, skipDebounce = false, autoBypassOn409 = true): Promise<any> => {
     if (!adminUserId) {
       throw new Error('Admin user not authenticated');
     }
@@ -158,12 +161,26 @@ export const useEnhancedOrderStatusUpdate = () => {
       const result = await updatePromise;
       return result;
     } catch (error) {
-      // Enhanced error handling for lock holders
+      // Enhanced error handling with automatic bypass option
       const errorMessage = error?.message || 'Unknown error occurred';
+      
+      // Auto-bypass on 409 errors if enabled
+      if (autoBypassOn409 && (errorMessage.includes('409') || errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS'))) {
+        console.log('🔄 409 error detected, attempting automatic bypass...');
+        
+        try {
+          const bypassResult = await bypassCacheAndUpdate(orderId, newStatus);
+          console.log('✅ Automatic bypass successful');
+          return bypassResult;
+        } catch (bypassError) {
+          console.error('❌ Automatic bypass failed, showing manual bypass option');
+          setShow409Error(orderId);
+          throw bypassError;
+        }
+      }
       
       // If this is a 409 but user is a lock holder, suggest refresh instead of retry
       if (errorMessage.includes('409') || errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
-        // Check if user might be lock holder and suggest different action
         const getTimeSinceLastUpdate = (orderId: string) => {
           const lastUpdate = lastUpdateTimes.get(orderId);
           return lastUpdate ? Date.now() - lastUpdate : Infinity;

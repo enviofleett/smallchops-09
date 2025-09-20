@@ -108,8 +108,6 @@ export const useRealTimeMonitoring = () => {
 
       const avgResponseTime = 1000; // Placeholder - calculate from actual data
 
-      const avgResponseTime = 1000; // Placeholder
-
       return {
         hitRate: total > 0 ? successful / total : 1,
         missRate: total > 0 ? (total - successful) / total : 0,

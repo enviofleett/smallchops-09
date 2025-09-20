@@ -798,7 +798,23 @@ serve(async (req)=>{
     }
 
     // Validate required fields based on action
-    const { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = requestBody;
+    const { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds, admin_user_id } = requestBody;
+    
+    // CRITICAL FIX: Create consistent adminUserId variable for all cases
+    const adminUserId = admin_user_id || user.id;
+    
+    // Validate adminUserId is available
+    if (!adminUserId) {
+      console.error('❌ Missing admin user ID: admin_user_id not provided and user.id not available');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing admin user identification',
+        errorCode: 'MISSING_ADMIN_USER_ID'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
     
     if (!action || typeof action !== 'string') {
       console.error('❌ Missing or invalid action parameter:', action);
@@ -1244,9 +1260,7 @@ serve(async (req)=>{
 
       case 'bypass_and_update': {
         console.log(`🚨 Admin function: BYPASS cache and update order ${orderId} [${correlationId}]`);
-        
-        // CRITICAL FIX: Define adminUserId from authenticated user
-        const adminUserId = user.id;
+        console.log(`🔍 Using admin user ID: ${adminUserId} (source: ${admin_user_id ? 'request_body' : 'auth_user'})`);
         
         // Enhanced parameter validation for bypass
         if (!orderId) {
@@ -1270,6 +1284,13 @@ serve(async (req)=>{
         }
 
         // Call the manual bypass function directly
+        console.log(`🔧 Calling manual_cache_bypass_and_update RPC with params:`, {
+          p_order_id: orderId,
+          p_new_status: updates.status,
+          p_admin_user_id: adminUserId,
+          p_bypass_reason: 'admin_409_conflict_resolution'
+        });
+        
         const { data: bypassResult, error: bypassError } = await supabaseClient.rpc('manual_cache_bypass_and_update', {
           p_order_id: orderId,
           p_new_status: updates.status,
@@ -1278,7 +1299,16 @@ serve(async (req)=>{
         });
 
         if (bypassError) {
-          console.error(`❌ Manual bypass failed [${correlationId}]:`, bypassError);
+          console.error(`❌ Manual bypass RPC failed [${correlationId}]:`, {
+            error: bypassError,
+            params: {
+              p_order_id: orderId,
+              p_new_status: updates.status,
+              p_admin_user_id: adminUserId,
+              adminUserIdSource: admin_user_id ? 'request_body' : 'auth_user'
+            },
+            correlationId
+          });
           return new Response(JSON.stringify({
             success: false,
             error: `Bypass operation failed: ${bypassError.message}`,
@@ -1507,7 +1537,6 @@ serve(async (req)=>{
         sanitizedUpdates.updated_at = new Date().toISOString();
 
         // CRITICAL FIX: Generate deterministic idempotency key WITHOUT timestamp for true idempotency
-        const adminUserId = user.id;
         const idempotencyKey = `order_update_${orderId}_${sanitizedUpdates.status}_${adminUserId}`;
 
         // CRITICAL FIX: Use lock-first approach - this will acquire lock BEFORE cache operations
@@ -1519,6 +1548,14 @@ serve(async (req)=>{
 
         while (retryCount < maxRetries) {
           try {
+            console.log(`🔧 Calling admin_update_order_status_lock_first RPC (attempt ${retryCount + 1}/${maxRetries}) with params:`, {
+              p_order_id: orderId,
+              p_new_status: sanitizedUpdates.status,
+              p_admin_user_id: adminUserId,
+              adminUserIdSource: admin_user_id ? 'request_body' : 'auth_user',
+              p_notes: `Status updated by admin ${user.email || user.id}`
+            });
+            
             const result = await supabaseClient.rpc('admin_update_order_status_lock_first', {
               p_order_id: orderId,
               p_new_status: sanitizedUpdates.status,
@@ -1730,8 +1767,6 @@ serve(async (req)=>{
             status: 400
           });
         }
-
-        const adminUserId = user.id;
 
         try {
           // Step 1: Force cleanup order-specific cache entries

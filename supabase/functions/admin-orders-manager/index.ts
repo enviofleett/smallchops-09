@@ -1068,24 +1068,114 @@ serve(async (req)=>{
         const idempotencyKey = `order_update_${orderId}_${sanitizedUpdates.status}_${adminUserId}`;
 
         // CRITICAL FIX: Use lock-first approach - this will acquire lock BEFORE cache operations
-        const { data: lockFirstResult, error: lockFirstError } = await supabaseClient.rpc('admin_update_order_status_lock_first', {
-          p_order_id: orderId,
-          p_new_status: sanitizedUpdates.status,
-          p_admin_id: adminUserId,
-          p_idempotency_key: idempotencyKey
-        });
+        // PRODUCTION FIX: Enhanced error handling and retry logic
+        let lockFirstResult = null;
+        let lockFirstError = null;
+        let retryCount = 0;
+        const maxRetries = 3;
 
-        // CRITICAL FIX: Handle lock-first result directly
+        while (retryCount < maxRetries) {
+          try {
+            const result = await supabaseClient.rpc('admin_update_order_status_lock_first', {
+              p_order_id: orderId,
+              p_new_status: sanitizedUpdates.status,
+              p_admin_id: adminUserId,
+              p_idempotency_key: idempotencyKey
+            });
+            
+            lockFirstResult = result.data;
+            lockFirstError = result.error;
+            
+            if (!lockFirstError) {
+              break; // Success, exit retry loop
+            }
+            
+            // Check if it's a retryable error
+            const errorMessage = lockFirstError?.message?.toLowerCase() || '';
+            if (errorMessage.includes('concurrent') || errorMessage.includes('lock') || errorMessage.includes('timeout')) {
+              retryCount++;
+              if (retryCount < maxRetries) {
+                const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+                console.log(`⏱️ Retrying order update in ${delay}ms (attempt ${retryCount + 1}/${maxRetries}) [${correlationId}]`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+              }
+            }
+            break; // Non-retryable error, exit loop
+            
+          } catch (rpcError) {
+            lockFirstError = rpcError;
+            retryCount++;
+            if (retryCount >= maxRetries) break;
+            
+            const delay = Math.pow(2, retryCount) * 1000;
+            console.log(`⏱️ RPC error, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries}) [${correlationId}]`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+
+        // CRITICAL FIX: Enhanced error handling with detailed logging
         if (lockFirstError) {
-          console.error(`❌ Lock-first update failed for order ${orderId} [${correlationId}]:`, lockFirstError);
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Database error during order update',
-            correlationId
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          });
+          const errorDetails = {
+            orderId,
+            adminUserId,
+            newStatus: sanitizedUpdates.status,
+            error: lockFirstError?.message || 'Unknown error',
+            correlationId,
+            retryCount,
+            timestamp: new Date().toISOString()
+          };
+          
+          console.error(`❌ Lock-first update failed after ${retryCount} retries [${correlationId}]:`, errorDetails);
+          
+          // Log error for monitoring
+          try {
+            await supabaseClient.from('audit_logs').insert([{
+              action: 'admin_order_update_edge_function_error',
+              category: 'Critical Error',
+              message: `Edge function order update failed: ${lockFirstError.message}`,
+              user_id: adminUserId,
+              entity_id: orderId,
+              new_values: errorDetails
+            }]);
+          } catch (auditError) {
+            console.error('⚠️ Failed to log error audit:', auditError.message);
+          }
+          
+          // Return appropriate error response based on error type
+          const errorMessage = lockFirstError?.message?.toLowerCase() || '';
+          if (errorMessage.includes('concurrent')) {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Another admin is currently updating this order. Please wait and try again.',
+              errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS',
+              correlationId,
+              retryAfter: 5
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 409
+            });
+          } else if (errorMessage.includes('invalid status')) {
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Invalid status transition: ${sanitizedUpdates.status}`,
+              errorCode: 'INVALID_STATUS_TRANSITION',
+              correlationId
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            });
+          } else {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Database error during order update. Please try again.',
+              errorCode: 'DATABASE_ERROR',
+              correlationId
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500
+            });
+          }
         }
 
         if (!lockFirstResult?.success) {

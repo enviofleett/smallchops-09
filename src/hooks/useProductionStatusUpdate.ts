@@ -20,7 +20,7 @@ export const useProductionStatusUpdate = () => {
 
       const validatedStatus = validateOrderStatus(status);
       
-      // Use production-grade error handling with circuit breaker
+      // PRODUCTION FIX: Enhanced error handling with automatic retry for specific errors
       return await handleProductionError(
         async () => {
           const response = await supabase.functions.invoke('admin-orders-manager', {
@@ -32,11 +32,31 @@ export const useProductionStatusUpdate = () => {
           });
 
           if (response.error) {
-            throw new Error(response.error.message || 'Failed to update order status');
+            // Enhanced error classification for better user experience
+            const errorMsg = response.error.message || 'Failed to update order status';
+            
+            if (errorMsg.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
+              throw new Error('CONCURRENT_UPDATE_IN_PROGRESS: Another admin is updating this order');
+            } else if (errorMsg.includes('INVALID_STATUS_TRANSITION')) {
+              throw new Error('INVALID_STATUS_TRANSITION: Invalid status change for current order state');
+            } else if (errorMsg.includes('DATABASE_ERROR')) {
+              throw new Error('DATABASE_ERROR: Server error occurred');
+            }
+            
+            throw new Error(errorMsg);
           }
 
           if (!response.data?.success) {
-            throw new Error(response.data?.error || 'Status update failed');
+            const errorMsg = response.data?.error || 'Status update failed';
+            
+            // Handle specific error codes from edge function
+            if (response.data?.errorCode === 'CONCURRENT_UPDATE_IN_PROGRESS') {
+              throw new Error('CONCURRENT_UPDATE_IN_PROGRESS: Another admin is updating this order');
+            } else if (response.data?.errorCode === 'INVALID_STATUS_TRANSITION') {
+              throw new Error('INVALID_STATUS_TRANSITION: Invalid status change');
+            }
+            
+            throw new Error(errorMsg);
           }
 
           return response.data.order || response.data;
@@ -46,7 +66,7 @@ export const useProductionStatusUpdate = () => {
         {
           maxAttempts: 3,
           baseDelay: 2000,
-          timeout: 20000,
+          timeout: 25000, // Increased timeout for database operations
           exponentialBackoff: true
         }
       );
@@ -72,24 +92,28 @@ export const useProductionStatusUpdate = () => {
     onError: (error: any, variables) => {
       console.error('❌ Production status update failed:', error);
       
-      // BULLETPROOF: Enhanced error messaging with specific error detection
+      // PRODUCTION FIX: Enhanced error classification and user messaging
       let errorMessage = 'Failed to update order status';
       const errorMsg = error?.message || '';
       
-      if (errorMsg.includes('Rate limit exceeded')) {
+      if (errorMsg.includes('CONCURRENT_UPDATE_IN_PROGRESS') || errorMsg.includes('Order is currently being modified')) {
+        errorMessage = 'Another admin is updating this order. Please wait and try again in a moment.';
+      } else if (errorMsg.includes('Rate limit exceeded')) {
         errorMessage = 'Too many requests. Please wait a moment and try again.';
-      } else if (errorMsg.includes('Order is currently being modified by another admin')) {
-        errorMessage = 'Order is being updated by another admin. Please try again in a moment.';
       } else if (errorMsg.includes('authentication') || errorMsg.includes('unauthorized')) {
         errorMessage = 'Authentication expired. Please refresh and try again.';
-      } else if (errorMsg.includes('edge function') || errorMsg.includes('non-2xx status')) {
-        errorMessage = 'Service temporarily unavailable. Please try again.';
+      } else if (errorMsg.includes('INVALID_STATUS_TRANSITION') || errorMsg.includes('Invalid status')) {
+        errorMessage = 'Invalid status transition. Please refresh the page and check current order status.';
+      } else if (errorMsg.includes('DATABASE_ERROR') || errorMsg.includes('edge function') || errorMsg.includes('non-2xx status')) {
+        errorMessage = 'Service temporarily unavailable. Please try again in a moment.';
       } else if (errorMsg.includes('validation') || errorMsg.includes('invalid input value for enum')) {
         errorMessage = 'Invalid status update. Please refresh the page and try again.';
-      } else if (errorMsg.includes('Invalid status:') || errorMsg.includes('Invalid order status:')) {
+      } else if (errorMsg.includes('Invalid order status:')) {
         errorMessage = errorMsg; // Use the specific validation message
       } else if (errorMsg.includes('duplicate key value violates unique constraint')) {
         errorMessage = 'Status update conflict detected. Retrying automatically...';
+      } else if (errorMsg.includes('timeout') || errorMsg.includes('TIMEOUT')) {
+        errorMessage = 'Request timed out. Please try again.';
       } else if (errorMsg && errorMsg !== 'Failed to update order status') {
         errorMessage = errorMsg; // Use the actual error message if it's meaningful
       }

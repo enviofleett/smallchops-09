@@ -34,21 +34,26 @@ export const useDeliveryTracking = (orderIdOrNumber?: string) => {
     try {
       console.log(`🔍 [TRACK] Starting order tracking for: ${orderIdentifier}`);
       
-      // Step 1: Get basic order details first (production-safe query)
+      // Enhanced tracking for both authenticated and guest users
       const { data: order, error: orderError } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          customer_accounts(name, email)
+        `)
         .or(`id.eq.${orderIdentifier},order_number.eq.${orderIdentifier}`)
-        .maybeSingle(); // Use maybeSingle() for production safety
+        .maybeSingle();
 
       if (orderError) {
         console.error(`❌ [TRACK] Database error:`, orderError);
-        throw orderError;
+        // More helpful error message for guests
+        throw new Error('Unable to connect to tracking service. Please try again or contact support.');
       }
 
       if (!order) {
         console.warn(`⚠️ [TRACK] Order not found: ${orderIdentifier}`);
-        throw new Error('Order not found. Please check your order number and try again.');
+        // Better error message with suggestions
+        throw new Error(`Order not found. Please check your order number and try again. If you just placed this order, please wait a few minutes and try again.`);
       }
 
       console.log(`✅ [TRACK] Order found:`, order.order_number);

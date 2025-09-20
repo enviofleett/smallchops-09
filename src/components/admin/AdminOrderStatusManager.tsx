@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpdate';
 import { OrderLockStatus } from './OrderLockStatus';
 import { OrderStatus } from '@/types/orders';
-import { RefreshCw, Send, Clock, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Send, Clock, AlertTriangle, Zap } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -43,9 +43,13 @@ export const AdminOrderStatusManager = ({
   // Use enhanced hook with idempotency and distributed locking
   const { 
     updateOrderStatus, 
-    isUpdating, 
+    bypassCacheAndUpdate,
+    isUpdating,
+    isBypassing, 
     error,
     adminUserId,
+    show409Error,
+    clearBypassError,
     isPending,
     getTimeSinceLastUpdate 
   } = useEnhancedOrderStatusUpdate();
@@ -66,6 +70,7 @@ export const AdminOrderStatusManager = ({
   
   const [showProcessing, setShowProcessing] = useState(false);
   const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [selectedStatusForBypass, setSelectedStatusForBypass] = useState<OrderStatus | null>(null);
 
   // Clean up debounce timeout on unmount
   useEffect(() => {
@@ -125,8 +130,9 @@ export const AdminOrderStatusManager = ({
         toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
       } catch (error: any) {
         // Enhanced error messages for different error types
-        if (error.message?.includes('409') || error.message?.includes('conflict')) {
-          toast.error('Another admin is updating this order. Please try again in a moment.');
+        if (error.message?.includes('409') || error.message?.includes('conflict') || error.message?.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
+          setSelectedStatusForBypass(newStatus); // Store the status for bypass
+          toast.error('Cache conflict detected. Use the bypass button to force the update.');
         } else if (error.message?.includes('401') || error.message?.includes('unauthorized')) {
           toast.error('Session expired. Please refresh and try again.');
         } else if (error.message?.includes('Network')) {
@@ -151,6 +157,19 @@ export const AdminOrderStatusManager = ({
       toast.info(`Scheduling status change to ${newStatus.replace('_', ' ')}...`);
     }
   }, [updateOrderStatus, orderId, onStatusUpdate, isPending, getTimeSinceLastUpdate, debounceTimeout, isLockHolder]);
+
+  const handleBypassCacheAndUpdate = useCallback(async () => {
+    if (!selectedStatusForBypass) return;
+
+    try {
+      await bypassCacheAndUpdate(orderId, selectedStatusForBypass);
+      onStatusUpdate?.(selectedStatusForBypass);
+      setSelectedStatusForBypass(null);
+      clearBypassError();
+    } catch (error: any) {
+      console.error('Bypass failed:', error);
+    }
+  }, [bypassCacheAndUpdate, orderId, selectedStatusForBypass, onStatusUpdate, clearBypassError]);
 
   const handleSendDeliveryEmail = useCallback(() => {
     sendDeliveryEmailMutation.mutate(orderId);
@@ -232,9 +251,64 @@ export const AdminOrderStatusManager = ({
 
     const validNextStatuses = getNextValidStatuses();
     
+    // Show bypass section if 409 error is detected
+    const show409 = Boolean((show409Error === orderId) || selectedStatusForBypass);
+    
     return (
-      <div className={`flex gap-1 ${className}`}>
-        {validNextStatuses.map(nextStatus => {
+      <div className={`flex flex-col gap-2 ${className}`}>
+        {/* Bypass Cache Section */}
+        {show409 && selectedStatusForBypass && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
+            <div className="flex items-start gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                  Cache Conflict Detected
+                </p>
+                <p className="text-amber-700 dark:text-amber-300 text-xs">
+                  Status update to "{selectedStatusForBypass.replace('_', ' ')}" blocked by cache. Use bypass to force update.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleBypassCacheAndUpdate}
+                disabled={isBypassing}
+                variant="outline"
+                size="sm"
+                className="border-orange-200 dark:border-orange-800 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 text-orange-700 dark:text-orange-300"
+              >
+                {isBypassing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                    Bypassing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-1" />
+                    Bypass Cache
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                onClick={() => {
+                  setSelectedStatusForBypass(null);
+                  clearBypassError();
+                }}
+                variant="outline"
+                size="sm"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        {/* Normal Action Buttons */}
+        <div className="flex gap-1">
+          {validNextStatuses.map(nextStatus => {
           const isValidNext = isValidTransition(currentStatus, nextStatus);
           
           return (
@@ -243,7 +317,7 @@ export const AdminOrderStatusManager = ({
               size={size}
               variant="outline"
               onClick={() => handleStatusUpdate(nextStatus)}
-              disabled={isDisabled || !isValidNext}
+              disabled={isDisabled || !isValidNext || show409}
               className={!isValidNext ? 'opacity-50 cursor-not-allowed' : ''}
             >
               {isProcessing ? (
@@ -274,7 +348,7 @@ export const AdminOrderStatusManager = ({
             size={size}
             variant="destructive"
             onClick={() => handleStatusUpdate('cancelled')}
-            disabled={isDisabled}
+            disabled={isDisabled || show409}
           >
             {isProcessing ? (
               <>
@@ -286,6 +360,7 @@ export const AdminOrderStatusManager = ({
             )}
           </Button>
         )}
+        </div>
       </div>
     );
   };

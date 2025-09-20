@@ -897,6 +897,81 @@ serve(async (req)=>{
         }
       }
 
+      case 'bypass_and_update': {
+        console.log(`🚨 Admin function: BYPASS cache and update order ${orderId} [${correlationId}]`);
+        
+        // Enhanced parameter validation for bypass
+        if (!orderId) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Order ID is required for bypass update'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        if (!updates || typeof updates !== 'object' || !updates.status) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Status update is required for bypass operation'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        // Call the manual bypass function directly
+        const { data: bypassResult, error: bypassError } = await supabaseClient.rpc('manual_cache_bypass_and_update', {
+          p_order_id: orderId,
+          p_new_status: updates.status,
+          p_admin_user_id: adminUserId,
+          p_bypass_reason: 'admin_409_conflict_resolution'
+        });
+
+        if (bypassError) {
+          console.error(`❌ Manual bypass failed [${correlationId}]:`, bypassError);
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Bypass operation failed: ${bypassError.message}`,
+            bypassed: false
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          });
+        }
+
+        if (!bypassResult?.success) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: bypassResult?.error || 'Bypass operation failed',
+            bypassed: false
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          });
+        }
+
+        console.log(`✅ Manual cache bypass successful [${correlationId}]:`, {
+          orderId,
+          cacheCleared: bypassResult.cache_cleared,
+          statusChange: `${bypassResult.old_status} → ${bypassResult.new_status}`
+        });
+
+        return new Response(JSON.stringify({
+          ...bypassResult,
+          correlationId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'X-Correlation-ID': correlationId,
+            'X-Cache-Bypassed': 'true'
+          }
+        });
+      }
+
       case 'update': {
         console.log(`📋 Processing admin request: {
   action: "update",

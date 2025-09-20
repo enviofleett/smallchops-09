@@ -10524,6 +10524,15 @@ export type Database = {
         }
         Returns: string
       }
+      manual_cache_bypass_and_update: {
+        Args: {
+          p_admin_user_id: string
+          p_bypass_reason?: string
+          p_new_status: string
+          p_order_id: string
+        }
+        Returns: Json
+      }
       manual_payment_verification: {
         Args: { p_payment_reference: string }
         Returns: Json

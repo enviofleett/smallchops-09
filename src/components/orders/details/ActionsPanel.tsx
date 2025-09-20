@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, ShieldCheck, Send, RefreshCw, Info } from 'lucide-react';
+import { Settings, ShieldCheck, Send, RefreshCw, Info, Zap, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,6 +40,10 @@ interface ActionsDrawerProps {
   orderId?: string;
   customerEmail?: string;
   orderNumber?: string;
+  // Bypass functionality
+  show409Error?: boolean;
+  onBypassCacheAndUpdate?: () => void;
+  isBypassing?: boolean;
 }
 
 export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
@@ -62,7 +66,10 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
   verifyMessage,
   orderId,
   customerEmail,
-  orderNumber
+  orderNumber,
+  show409Error,
+  onBypassCacheAndUpdate,
+  isBypassing
 }) => {
   return (
     <Card>
@@ -240,13 +247,53 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
           </div>
         </div>
 
+        {/* Cache Bypass Section - Only show when 409 error detected */}
+        {show409Error && onBypassCacheAndUpdate && (
+          <div className="space-y-2">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                    Cache Conflict Detected
+                  </p>
+                  <p className="text-amber-700 dark:text-amber-300 text-xs">
+                    The system cache is preventing the update. Use the bypass button to force the update and clear the cache.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <Button 
+              onClick={onBypassCacheAndUpdate}
+              disabled={isBypassing}
+              variant="outline"
+              className="w-full border-orange-200 dark:border-orange-800 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 text-orange-700 dark:text-orange-300 hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-900/30 dark:hover:to-amber-900/30"
+              size="lg"
+            >
+              {isBypassing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Bypassing Cache...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Bypass Cache & Update
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         {/* Update Button */}
-        <div className="pt-4 border-t border-border">
+        <div className={`${show409Error ? 'pt-2' : 'pt-4'} ${!show409Error ? 'border-t border-border' : ''}`}>
           <Button 
             onClick={onUpdate} 
-            disabled={isUpdating} 
+            disabled={isUpdating || (show409Error && !isBypassing)} 
             className="w-full"
             size="lg"
+            variant={show409Error ? "secondary" : "default"}
           >
             {isUpdating ? (
               <>
@@ -254,7 +301,7 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
                 Updating...
               </>
             ) : (
-              'Update Order'
+              show409Error ? 'Try Normal Update Again' : 'Update Order'
             )}
           </Button>
         </div>

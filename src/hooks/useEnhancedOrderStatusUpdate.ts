@@ -15,6 +15,8 @@ export const useEnhancedOrderStatusUpdate = () => {
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Map<string, Promise<any>>>(new Map());
   const [lastUpdateTimes, setLastUpdateTimes] = useState<Map<string, number>>(new Map());
+  const [show409Error, setShow409Error] = useState<string | null>(null);
+  const [isBypassing, setIsBypassing] = useState<boolean>(false);
   const queryClient = useQueryClient();
 
   // Get current admin user ID on mount
@@ -85,6 +87,9 @@ export const useEnhancedOrderStatusUpdate = () => {
       const errorMessage = error?.message || 'Unknown error occurred';
       
       if (errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS') || errorMessage.includes('Another admin session is currently updating') || errorMessage.includes('409')) {
+        // Set 409 error state to show bypass button
+        setShow409Error(variables.orderId);
+        
         // Check if this admin might be a lock holder experiencing a false positive
         const getTimeSinceLastUpdate = (orderId: string) => {
           const lastUpdate = lastUpdateTimes.get(orderId);
@@ -92,9 +97,9 @@ export const useEnhancedOrderStatusUpdate = () => {
         };
         const timeSinceLastUpdate = getTimeSinceLastUpdate(variables.orderId);
         if (timeSinceLastUpdate < 35000) { // Active within 35 seconds (lock duration + buffer)
-          toast.error('Session conflict detected. Please refresh the page and try again.');
+          toast.error('Cache conflict detected. Use the "Bypass Cache" button to force the update.');
         } else {
-          toast.error('Another admin is currently updating this order. Please wait and try again.');
+          toast.error('Another admin is updating this order or cache is stuck. Use "Bypass Cache" to force update.');
         }
       } else if (errorMessage.includes('ORDER_MODIFIED_CONCURRENTLY')) {
         toast.error('Order was modified by another user. Please refresh and try again.');
@@ -177,11 +182,55 @@ export const useEnhancedOrderStatusUpdate = () => {
     }
   }, [updateMutation, adminUserId, pendingUpdates, lastUpdateTimes]);
 
+  // Bypass cache and update function
+  const bypassCacheAndUpdate = useCallback(async (orderId: string, newStatus: OrderStatus): Promise<any> => {
+    if (!adminUserId) {
+      throw new Error('Admin user not authenticated');
+    }
+
+    setIsBypassing(true);
+    setShow409Error(null); // Clear the error state
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'bypass_and_update',
+          orderId,
+          updates: { status: newStatus },
+          admin_user_id: adminUserId
+        }
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Bypass failed');
+
+      // Show success message
+      toast.success(`✅ Cache bypassed! Order status updated to ${newStatus}`);
+      
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+
+      return data;
+    } catch (error: any) {
+      console.error('❌ Cache bypass failed:', error);
+      const errorMessage = error?.message || 'Bypass operation failed';
+      toast.error(`Failed to bypass cache: ${errorMessage}`);
+      throw error;
+    } finally {
+      setIsBypassing(false);
+    }
+  }, [adminUserId, queryClient]);
+
   return {
     updateOrderStatus,
+    bypassCacheAndUpdate,
     isUpdating: updateMutation.isPending,
+    isBypassing,
     error: updateMutation.error,
     adminUserId,
+    show409Error,
+    clearBypassError: () => setShow409Error(null),
     isPending: (orderId: string) => pendingUpdates.has(orderId),
     getTimeSinceLastUpdate: (orderId: string) => {
       const lastUpdate = lastUpdateTimes.get(orderId);

@@ -1395,6 +1395,160 @@ serve(async (req)=>{
         });
       }
 
+      case 'check_lock_status': {
+        console.log('🔍 Admin function: Checking lock status for order', orderId);
+        
+        if (!orderId) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Order ID is required for lock status check',
+            errorCode: 'MISSING_ORDER_ID'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        try {
+          // Get lock information using the database function
+          const { data: lockInfo, error: lockError } = await supabaseClient
+            .rpc('get_order_lock_info', { p_order_id: orderId });
+
+          if (lockError) {
+            console.error('❌ Failed to get lock info:', lockError);
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Failed to retrieve lock information',
+              errorCode: 'LOCK_INFO_ERROR'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500
+            });
+          }
+
+          const lockData = lockInfo && lockInfo.length > 0 ? lockInfo[0] : {
+            is_locked: false,
+            locking_admin_id: null,
+            locking_admin_name: null,
+            locking_admin_avatar: null,
+            locking_admin_email: null,
+            lock_expires_at: null,
+            seconds_remaining: 0,
+            acquired_at: null
+          };
+
+          // Determine if current user is the lock holder
+          const isLockHolder = lockData.is_locked && lockData.locking_admin_id === user.id;
+
+          const result = {
+            success: true,
+            is_locked: lockData.is_locked,
+            is_lock_holder: isLockHolder,
+            lock_info: lockData,
+            current_admin_id: user.id
+          };
+
+          console.log('✅ Lock status check completed:', result);
+
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('❌ Error checking lock status:', error);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Internal error while checking lock status',
+            errorCode: 'INTERNAL_ERROR'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          });
+        }
+      }
+
+      case 'proactive_cleanup': {
+        const { reason } = requestBody;
+        console.log('🧹 Admin function: Proactive cleanup for order', orderId, 'reason:', reason);
+        
+        if (!orderId) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Order ID is required for proactive cleanup',
+            errorCode: 'MISSING_ORDER_ID'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        try {
+          // Step 1: Force clear order-specific cache entries
+          const { data: cacheResult, error: cacheError } = await supabaseClient
+            .rpc('force_clear_order_cache', { p_order_id: orderId });
+
+          if (cacheError) {
+            console.error('❌ Failed to clear order cache:', cacheError);
+          }
+
+          // Step 2: Cleanup stuck processing states
+          const { data: stuckResult, error: stuckError } = await supabaseClient
+            .rpc('cleanup_stuck_request_cache', { p_minutes_threshold: 2 });
+
+          if (stuckError) {
+            console.error('❌ Failed to cleanup stuck cache:', stuckError);
+          }
+
+          // Step 3: Release any expired locks for this order
+          const { data: lockResult, error: lockError } = await supabaseClient
+            .rpc('cleanup_expired_locks');
+
+          if (lockError) {
+            console.error('❌ Failed to cleanup expired locks:', lockError);
+          }
+
+          const result = {
+            success: true,
+            cleanup_performed: {
+              order_cache_cleared: cacheResult?.entries_cleared || 0,
+              stuck_cache_cleaned: stuckResult?.total_cleaned || 0,
+              expired_locks_cleaned: lockResult || 0
+            },
+            reason: reason || 'proactive_cleanup',
+            timestamp: new Date().toISOString()
+          };
+
+          // Log the proactive cleanup for monitoring
+          try {
+            await supabaseClient.from('audit_logs').insert([{
+              action: 'proactive_cleanup_performed',
+              category: 'Cache Management',
+              message: `Proactive cleanup performed for order ${orderId}`,
+              entity_id: orderId,
+              user_id: user.id,
+              new_values: result
+            }]);
+          } catch (auditError) {
+            console.warn('⚠️ Failed to log proactive cleanup:', auditError);
+          }
+
+          console.log('✅ Proactive cleanup completed:', result);
+
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('❌ Error during proactive cleanup:', error);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Internal error during proactive cleanup',
+            errorCode: 'CLEANUP_ERROR'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          });
+        }
+      }
+
       default:
         return new Response(JSON.stringify({
           success: false,

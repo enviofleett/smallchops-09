@@ -118,85 +118,75 @@ export const useEnhancedOrderStatusUpdate = () => {
     }
   });
 
-  const updateOrderStatus = useCallback(async (orderId: string, newStatus: OrderStatus, skipDebounce = false, autoBypassOn409 = true): Promise<any> => {
-    if (!adminUserId) {
-      throw new Error('Admin user not authenticated');
-    }
-
-    const now = Date.now();
-    const lastUpdate = lastUpdateTimes.get(orderId) || 0;
-    const timeSinceLastUpdate = now - lastUpdate;
-
-    // Enhanced debouncing: Skip timing restrictions if specified (for lock holders)
-    if (!skipDebounce && timeSinceLastUpdate < 2000) {
-      const remainingTime = 2000 - timeSinceLastUpdate;
-      await new Promise(resolve => setTimeout(resolve, remainingTime));
-    }
-
-    // Check if there's already a pending update for this order
-    if (pendingUpdates.has(orderId)) {
-      console.log('🔄 Returning existing pending update for order:', orderId);
-      return pendingUpdates.get(orderId);
-    }
-
-    // CRITICAL FIX: Generate deterministic idempotency key WITHOUT timestamp for true idempotency
-    const idempotencyKey = `${adminUserId}_${orderId}_${newStatus}`;
-
-    const updatePromise = updateMutation.mutateAsync({
-      orderId,
-      newStatus,
-      idempotencyKey,
-      adminUserId
-    });
-
-    // Track pending update
-    setPendingUpdates(prev => {
-      const next = new Map(prev);
-      next.set(orderId, updatePromise);
-      return next;
-    });
-
+  // Enhanced lock holder detection with real-time status checking
+  const checkLockStatus = useCallback(async (orderId: string) => {
     try {
-      const result = await updatePromise;
-      return result;
-    } catch (error) {
-      // Enhanced error handling with automatic bypass option
-      const errorMessage = error?.message || 'Unknown error occurred';
-      
-      // Auto-bypass on 409 errors if enabled
-      if (autoBypassOn409 && (errorMessage.includes('409') || errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS'))) {
-        console.log('🔄 409 error detected, attempting automatic bypass...');
-        
-        try {
-          const bypassResult = await bypassCacheAndUpdate(orderId, newStatus);
-          console.log('✅ Automatic bypass successful');
-          return bypassResult;
-        } catch (bypassError) {
-          console.error('❌ Automatic bypass failed, showing manual bypass option');
-          setShow409Error(orderId);
-          throw bypassError;
+      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'check_lock_status',
+          orderId,
+          admin_user_id: adminUserId
         }
-      }
-      
-      // If this is a 409 but user is a lock holder, suggest refresh instead of retry
-      if (errorMessage.includes('409') || errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
-        const getTimeSinceLastUpdate = (orderId: string) => {
-          const lastUpdate = lastUpdateTimes.get(orderId);
-          return lastUpdate ? Date.now() - lastUpdate : Infinity;
-        };
-        const isLikelyLockHolder = getTimeSinceLastUpdate(orderId) < 30000; // Active within 30 seconds
-        if (isLikelyLockHolder) {
-          console.log('🔒 Potential lock holder experiencing 409 - suggesting refresh');
-          throw new Error('Your session may have expired. Please refresh the page and try again.');
-        }
-      }
-      
-      // The error is already handled in onError, just re-throw for caller
-      throw error;
-    }
-  }, [updateMutation, adminUserId, pendingUpdates, lastUpdateTimes]);
+      });
 
-  // Bypass cache and update function
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Lock status check failed:', error);
+      return { is_locked: false, is_lock_holder: false };
+    }
+  }, [adminUserId]);
+
+  // Proactive cache cleanup for problematic transitions
+  const proactiveCleanup = useCallback(async (orderId: string, reason: string) => {
+    try {
+      console.log(`🧹 Proactive cleanup for order ${orderId}, reason: ${reason}`);
+      
+      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'proactive_cleanup',
+          orderId,
+          reason,
+          admin_user_id: adminUserId
+        }
+      });
+
+      if (error) throw error;
+      console.log('✅ Proactive cleanup completed:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Proactive cleanup failed:', error);
+      return { success: false };
+    }
+  }, [adminUserId]);
+
+  // Enhanced stuck state detection
+  const detectStuckState = useCallback(async (orderId: string): Promise<boolean> => {
+    const lastUpdate = lastUpdateTimes.get(orderId);
+    const timeSinceLastUpdate = lastUpdate ? Date.now() - lastUpdate : Infinity;
+    
+    // Consider stuck if:
+    // 1. Has pending update for more than 30 seconds
+    // 2. Last update was more than 2 minutes ago and still in processing state
+    const hasPendingTooLong = pendingUpdates.has(orderId) && timeSinceLastUpdate > 30000;
+    const staleProcessing = timeSinceLastUpdate > 120000;
+    
+    if (hasPendingTooLong || staleProcessing) {
+      console.log(`🚨 Stuck state detected for order ${orderId}:`, {
+        hasPendingTooLong,
+        staleProcessing,
+        timeSinceLastUpdate
+      });
+      
+      // Proactive cleanup for stuck states
+      await proactiveCleanup(orderId, `stuck_state_detection_${hasPendingTooLong ? 'pending' : 'stale'}`);
+      return true;
+    }
+    
+    return false;
+  }, [pendingUpdates, lastUpdateTimes, proactiveCleanup]);
+
+  // Bypass cache and update function (moved here to fix dependency order)
   const bypassCacheAndUpdate = useCallback(async (orderId: string, newStatus: OrderStatus): Promise<any> => {
     if (!adminUserId) {
       throw new Error('Admin user not authenticated');
@@ -249,6 +239,129 @@ export const useEnhancedOrderStatusUpdate = () => {
     }
   }, [adminUserId, queryClient]);
 
+  // Smart cache bypass with lock holder detection
+  const smartCacheBypass = useCallback(async (orderId: string, newStatus: OrderStatus): Promise<any> => {
+    console.log('🧠 Smart cache bypass initiated for order:', orderId);
+    
+    // Check current lock status
+    const lockStatus = await checkLockStatus(orderId);
+    
+    if (lockStatus.is_lock_holder) {
+      console.log('🔓 Current user is lock holder, performing direct bypass');
+      return bypassCacheAndUpdate(orderId, newStatus);
+    }
+    
+    if (lockStatus.is_locked && !lockStatus.is_lock_holder) {
+      console.log('🔒 Order locked by another admin, cannot bypass');
+      throw new Error('Order is currently being updated by another admin. Please wait and try again.');
+    }
+    
+    // Not locked, perform bypass with acquisition
+    console.log('🆓 Order not locked, performing bypass with lock acquisition');
+    return bypassCacheAndUpdate(orderId, newStatus);
+  }, [checkLockStatus, bypassCacheAndUpdate]);
+
+  const updateOrderStatus = useCallback(async (orderId: string, newStatus: OrderStatus, skipDebounce = false, autoBypassOn409 = true): Promise<any> => {
+    if (!adminUserId) {
+      throw new Error('Admin user not authenticated');
+    }
+
+    const now = Date.now();
+    const lastUpdate = lastUpdateTimes.get(orderId) || 0;
+    const timeSinceLastUpdate = now - lastUpdate;
+
+    // Enhanced debouncing with grace period for lock acquisition timing
+    const gracePeriod = 5000; // 5 second grace period for lock holders
+    const standardDebounce = 2000;
+    
+    const isRecentLockHolder = timeSinceLastUpdate < gracePeriod;
+    const debounceTime = isRecentLockHolder ? 500 : standardDebounce; // Reduced debounce for recent lock holders
+
+    if (!skipDebounce && timeSinceLastUpdate < debounceTime) {
+      const remainingTime = debounceTime - timeSinceLastUpdate;
+      console.log(`⏳ Debouncing for ${remainingTime}ms (${isRecentLockHolder ? 'lock holder' : 'standard'})`);
+      await new Promise(resolve => setTimeout(resolve, remainingTime));
+    }
+
+    // Enhanced stuck state detection before proceeding
+    const isStuck = await detectStuckState(orderId);
+    if (isStuck) {
+      console.log('🚨 Stuck state detected, clearing pending updates');
+      setPendingUpdates(prev => {
+        const next = new Map(prev);
+        next.delete(orderId);
+        return next;
+      });
+    }
+
+    // Check if there's already a pending update for this order (with enhanced logic)
+    if (pendingUpdates.has(orderId) && !isStuck) {
+      console.log('🔄 Returning existing pending update for order:', orderId);
+      return pendingUpdates.get(orderId);
+    }
+
+    // CRITICAL FIX: Generate deterministic idempotency key WITHOUT timestamp for true idempotency
+    const idempotencyKey = `${adminUserId}_${orderId}_${newStatus}`;
+
+    const updatePromise = updateMutation.mutateAsync({
+      orderId,
+      newStatus,
+      idempotencyKey,
+      adminUserId
+    });
+
+    // Track pending update
+    setPendingUpdates(prev => {
+      const next = new Map(prev);
+      next.set(orderId, updatePromise);
+      return next;
+    });
+
+    try {
+      const result = await updatePromise;
+      return result;
+    } catch (error) {
+      // Enhanced error handling with smart bypass logic
+      const errorMessage = error?.message || 'Unknown error occurred';
+      
+      // Smart auto-bypass on 409 errors if enabled
+      if (autoBypassOn409 && (errorMessage.includes('409') || errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS'))) {
+        console.log('🔄 409 error detected, attempting smart bypass...');
+        
+        try {
+          const bypassResult = await smartCacheBypass(orderId, newStatus);
+          console.log('✅ Smart bypass successful');
+          return bypassResult;
+        } catch (bypassError) {
+          console.error('❌ Smart bypass failed, showing manual bypass option');
+          setShow409Error(orderId);
+          throw bypassError;
+        }
+      }
+      
+      // Enhanced lock holder detection with real-time checking
+      if (errorMessage.includes('409') || errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
+        const lockStatus = await checkLockStatus(orderId);
+        
+        if (lockStatus.is_lock_holder) {
+          console.log('🔒 Confirmed lock holder experiencing 409 - performing automatic bypass');
+          try {
+            const result = await smartCacheBypass(orderId, newStatus);
+            return result;
+          } catch (bypassError) {
+            console.error('❌ Lock holder bypass failed');
+            throw new Error('Your session may have expired. Please refresh the page and try again.');
+          }
+        } else if (lockStatus.is_locked) {
+          throw new Error('Another admin is currently updating this order. Please wait a moment and try again.');
+        }
+      }
+      
+      // The error is already handled in onError, just re-throw for caller
+      throw error;
+    }
+  }, [updateMutation, adminUserId, pendingUpdates, lastUpdateTimes, detectStuckState, smartCacheBypass, checkLockStatus]);
+
   return {
     updateOrderStatus,
     bypassCacheAndUpdate,
@@ -262,6 +375,11 @@ export const useEnhancedOrderStatusUpdate = () => {
     getTimeSinceLastUpdate: (orderId: string) => {
       const lastUpdate = lastUpdateTimes.get(orderId);
       return lastUpdate ? Date.now() - lastUpdate : Infinity;
-    }
+    },
+    // Phase 2 enhancements
+    checkLockStatus,
+    proactiveCleanup,
+    detectStuckState,
+    smartCacheBypass
   };
 };

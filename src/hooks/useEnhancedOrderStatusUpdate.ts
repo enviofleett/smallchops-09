@@ -3,6 +3,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { OrderStatus } from '@/types/orders';
+import { useErrorRecovery } from './useErrorRecovery';
+import { useAdminErrorStore } from '@/stores/adminErrorStore';
+import { safeAdminToast, safeAdminErrorToast } from '@/utils/errorSafeImports';
 
 interface IdempotentUpdateRequest {
   orderId: string;
@@ -18,6 +21,21 @@ export const useEnhancedOrderStatusUpdate = () => {
   const [show409Error, setShow409Error] = useState<string | null>(null);
   const [isBypassing, setIsBypassing] = useState<boolean>(false);
   const queryClient = useQueryClient();
+  
+  // Enhanced error recovery integration
+  const { retry, reset, canRetry, isRetrying } = useErrorRecovery({
+    maxRetries: 5,
+    retryDelay: 1000,
+    onMaxRetriesExceeded: (error) => {
+      safeAdminErrorToast(toast, error, {
+        orderId: 'multiple',
+        onRetry: () => reset()
+      });
+    }
+  });
+  
+  // Error state management
+  const { addError, resolveError, shouldAutoRetry, isRecoveryMode, enableRecoveryMode } = useAdminErrorStore();
 
   // Get current admin user ID on mount
   useEffect(() => {
@@ -66,12 +84,10 @@ export const useEnhancedOrderStatusUpdate = () => {
       if (data.cached) {
         toast.success('Status update (cached result)');
       } else {
-        // Use admin-friendly success message
-        import('@/utils/adminToastMessages').then(({ showAdminToast }) => {
-          showAdminToast(toast, 'orderUpdated', {
-            orderId: variables.orderId,
-            orderNumber: `for ${variables.newStatus}`
-          });
+        // Use error-safe admin toast message
+        safeAdminToast(toast, 'orderUpdated', {
+          orderId: variables.orderId,
+          orderNumber: `for ${variables.newStatus}`
         });
       }
 
@@ -89,31 +105,76 @@ export const useEnhancedOrderStatusUpdate = () => {
 
       console.error('❌ Enhanced order status update failed:', error);
       
-      // Enhanced error handling with specific messages for different error types
+      // Enhanced error handling with error store integration
       const errorMessage = error?.message || 'Unknown error occurred';
+      let errorType: 'network' | 'conflict' | 'timeout' | 'auth' | 'server' | 'unknown' = 'unknown';
       
-      if (errorMessage.includes('CONCURRENT_UPDATE_IN_PROGRESS') || errorMessage.includes('Another admin session is currently updating') || errorMessage.includes('409')) {
+      // Categorize error types
+      if (errorMessage.includes('CONCURRENT_UPDATE') || errorMessage.includes('409')) {
+        errorType = 'conflict';
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        errorType = 'network';
+      } else if (errorMessage.includes('timeout')) {
+        errorType = 'timeout';
+      } else if (errorMessage.includes('auth') || errorMessage.includes('unauthorized')) {
+        errorType = 'auth';
+      } else if (errorMessage.includes('server') || errorMessage.includes('internal')) {
+        errorType = 'server';
+      }
+      
+      // Add error to store
+      const errorId = addError({
+        orderId: variables.orderId,
+        error: errorMessage,
+        retryCount: 0,
+        errorType,
+        adminUserId: adminUserId || 'unknown',
+        context: 'order_status_update'
+      });
+      
+      if (errorType === 'conflict') {
         // Set 409 error state to show bypass button
         setShow409Error(variables.orderId);
         
-        // Use admin-friendly toast message
-        import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
-          showAdminErrorToast(toast, error, {
-            orderId: variables.orderId,
-            onRetry: () => updateOrderStatus(variables.orderId, variables.newStatus)
-          });
+        // Enable recovery mode for persistent conflicts
+        if (!isRecoveryMode) {
+          enableRecoveryMode();
+        }
+        
+        // Use error-safe admin toast message
+        safeAdminErrorToast(toast, error, {
+          orderId: variables.orderId,
+          onRetry: () => updateOrderStatus(variables.orderId, variables.newStatus)
         });
       } else {
-        // Use admin-friendly error messages for other errors
-        import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
-          showAdminErrorToast(toast, error, {
+        // Check if we should auto-retry
+        if (shouldAutoRetry(variables.orderId, errorType)) {
+          console.log('🔄 Auto-retry triggered for:', errorType);
+          
+          retry(async () => {
+            return updateOrderStatus(variables.orderId, variables.newStatus, true, false);
+          }).then(() => {
+            resolveError(errorId);
+          }).catch(() => {
+            // Auto-retry failed, show manual options
+            safeAdminErrorToast(toast, error, {
+              orderId: variables.orderId,
+              onRetry: () => updateOrderStatus(variables.orderId, variables.newStatus),
+              onBypassCache: () => {
+                setShow409Error(variables.orderId);
+              }
+            });
+          });
+        } else {
+          // Use error-safe admin error messages
+          safeAdminErrorToast(toast, error, {
             orderId: variables.orderId,
             onRetry: () => updateOrderStatus(variables.orderId, variables.newStatus),
             onBypassCache: () => {
               setShow409Error(variables.orderId);
             }
           });
-        });
+        }
       }
     }
   });
@@ -209,28 +270,29 @@ export const useEnhancedOrderStatusUpdate = () => {
       if (!data?.success) throw new Error(data?.error || 'Bypass failed');
 
       // Show success message
-      import('@/utils/adminToastMessages').then(({ showAdminToast }) => {
-        showAdminToast(toast, 'cacheBypassSuccess', {
+      if (data.cached) {
+        toast.success('Status update (cached result)');
+      } else {
+        // Use error-safe admin toast message
+        safeAdminToast(toast, 'cacheBypassSuccess', {
           orderId,
           orderNumber: newStatus
         });
-      });
+      }
       
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+        // Invalidate relevant queries
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
 
-      return data;
+        return data;
     } catch (error: any) {
       console.error('❌ Cache bypass failed:', error);
       const errorMessage = error?.message || 'Bypass operation failed';
       
-      // Use admin-friendly error message
-      import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
-        showAdminErrorToast(toast, error, {
-          orderId,
-          onRetry: () => bypassCacheAndUpdate(orderId, newStatus)
-        });
+      // Use error-safe admin error message
+      safeAdminErrorToast(toast, error, {
+        orderId,
+        onRetry: () => bypassCacheAndUpdate(orderId, newStatus)
       });
       
       throw error;

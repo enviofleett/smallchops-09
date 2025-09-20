@@ -65,8 +65,14 @@ function getTemplateKey(status: string): string {
   };
   return templateKeyMap[status] || 'order_status_update';
 }
-async function handleStatusChangeNotification(supabaseClient, orderId, order, newStatus) {
+async function handleStatusChangeNotification(supabaseClient, orderId, order, newStatus, adminUserId = null) {
   try {
+    // Add debugging for production issue tracking
+    console.log(`📧 Notification handler called for order ${orderId}:`, {
+      newStatus,
+      adminUserId: adminUserId ? 'present' : 'null',
+      customerEmail: order?.customer_email ? 'present' : 'missing'
+    });
     const validStatuses = [
       'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery',
       'delivered', 'cancelled', 'refunded', 'completed', 'returned'
@@ -80,7 +86,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
     const timestamp = Date.now();
     const microseconds = performance.now() * 1000;
     const entropy = Math.random().toString(36).substring(2, 10);
-    const sessionId = 'admin_session'; // Will be enhanced with actual session tracking
+    const sessionId = adminUserId || 'system_admin'; // Enhanced with proper session tracking
     const dedupeKey = `${orderId}_${sanitizedStatus}_${timestamp}_${Math.floor(microseconds)}_${entropy}_${sessionId}`;
 
     let notificationInserted = false;
@@ -122,7 +128,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
             template_variables: templateVars,
             source: 'admin_update',
             priority: 'high',
-            admin_session_id: adminUserId,
+            admin_session_id: adminUserId || 'system_admin',
             retry_count: 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -137,7 +143,7 @@ async function handleStatusChangeNotification(supabaseClient, orderId, order, ne
                 original_dedupe_key: dedupeKey,
                 order_id: orderId,
                 event_type: 'order_status_update',
-                admin_session_ids: [adminUserId],
+                admin_session_ids: [adminUserId || 'system_admin'],
                 resolution_strategy: 'ignore_duplicate'
               });
             } catch (logError) {

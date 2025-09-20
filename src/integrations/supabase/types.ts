@@ -9173,15 +9173,24 @@ export type Database = {
         Returns: Json
       }
       cache_idempotent_request_enhanced: {
-        Args: {
-          p_admin_id?: string
-          p_bypass_cache?: boolean
-          p_idempotency_key: string
-          p_order_id?: string
-          p_request_data: Json
-          p_response_data?: Json
-          p_status?: string
-        }
+        Args:
+          | {
+              p_admin_id?: string
+              p_bypass_cache?: boolean
+              p_idempotency_key: string
+              p_order_id?: string
+              p_request_data: Json
+              p_response_data?: Json
+              p_status?: string
+            }
+          | {
+              p_admin_user_id?: string
+              p_idempotency_key: string
+              p_order_id?: string
+              p_request_data: Json
+              p_response_data?: Json
+              p_status?: string
+            }
         Returns: Json
       }
       calculate_bogo_discount: {
@@ -10225,7 +10234,7 @@ export type Database = {
         Returns: boolean
       }
       is_lock_holder_for_order: {
-        Args: { p_admin_id: string; p_order_id: string }
+        Args: { p_admin_user_id: string; p_order_id: string }
         Returns: boolean
       }
       is_phone_suppressed: {

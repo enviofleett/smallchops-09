@@ -990,9 +990,10 @@ serve(async (req)=>{
         const { data: cacheResult } = await supabaseClient.rpc('cache_idempotent_request_enhanced', {
           p_idempotency_key: idempotencyKey,
           p_request_data: { orderId, updates: sanitizedUpdates, adminUserId, timestamp: new Date().toISOString() },
+          p_response_data: null,
+          p_status: 'processing',
           p_order_id: orderId,
-          p_admin_id: adminUserId,
-          p_bypass_cache: false
+          p_admin_user_id: adminUserId
         });
 
         // Enhanced cache result handling
@@ -1298,9 +1299,9 @@ serve(async (req)=>{
             p_idempotency_key: idempotencyKey,
             p_request_data: { orderId, updates: sanitizedUpdates, adminUserId, correlationId },
             p_response_data: result,
-            p_status: 'success'
-          });
-            p_status: 'success'
+            p_status: 'success',
+            p_order_id: orderId,
+            p_admin_user_id: adminUserId
           });
         } catch (cacheError) {
           console.error(`⚠️ Failed to cache result (non-blocking) [${correlationId}]:`, cacheError);

@@ -93,47 +93,31 @@ const PublicHome = () => {
   // Preload critical images (reduced for performance)
   useImagePreloader(['/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png']);
 
-  // Fetch products with discounts - PRODUCTION OPTIMIZED (Always Fresh Data)
+  // Fetch products with discounts - STABLE VERSION
   const {
     data: products = [],
     isLoading: isLoadingProducts,
     error: productsError,
     refetch: refetchProducts
   } = useQuery({
-    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory, Date.now()], // Force fresh fetch
+    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
-    staleTime: 0, // No stale time - always fresh
-    gcTime: 0, // No cache - always fetch fresh
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
     retry: 2,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 3000),
-    refetchOnMount: true, // Always refetch on mount
-    refetchOnWindowFocus: true, // Refetch when user returns
-    refetchOnReconnect: true // Refetch on network reconnect
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 3000),
+    refetchOnWindowFocus: false
   });
 
-  // Debug logging for production troubleshooting
-  console.log('🏠 PublicHome Debug:', {
-    productsCount: products?.length || 0,
-    isLoading: isLoadingProducts,
-    hasError: !!productsError,
-    activeCategory,
-    searchTerm,
-    productsPreview: products?.slice(0, 2)?.map(p => ({
-      id: p.id,
-      name: p.name
-    }))
-  });
-
-  // Fetch categories (PRODUCTION FRESH DATA)
+  // Fetch categories - STABLE VERSION
   const {
     data: categories = []
   } = useQuery({
-    queryKey: ['categories', Date.now()], // Force fresh fetch
+    queryKey: ['categories'],
     queryFn: getCategories,
-    staleTime: 0, // No stale time - always fresh
-    gcTime: 0, // No cache - always fetch fresh
-    refetchOnMount: true,
-    refetchOnWindowFocus: true
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false
   });
 
   // Calculate price range from products for filters
@@ -197,18 +181,15 @@ const PublicHome = () => {
   // Filter and sort products by price (lowest to highest by default) - Production Ready
   const filteredAndSortedProducts = useMemo(() => {
     if (!Array.isArray(products)) {
-      console.warn('🚨 Products is not an array:', products);
       return [];
     }
     if (products.length === 0) {
-      console.log('📦 No products available');
       return [];
     }
 
     // Apply all filters
     const filtered = products.filter(product => {
       if (!product?.name) {
-        console.warn('🚨 Product missing name:', product);
         return false;
       }
 
@@ -234,13 +215,7 @@ const PublicHome = () => {
       return priceA - priceB;
     });
 
-    console.log('🔍 Filtered and sorted products:', {
-      total: products.length,
-      filtered: filtered.length,
-      searchTerm,
-      filtersActive: filters.onlyPromotions || filters.priceRange[0] > priceRange[0] || filters.priceRange[1] < priceRange[1] || filters.minRating > 0,
-      sortedByPrice: 'lowest to highest'
-    });
+    // Removed debug logging for production stability
     return sorted;
   }, [products, searchTerm, filters, priceRange]);
 

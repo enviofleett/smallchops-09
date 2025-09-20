@@ -25,9 +25,9 @@ export const HeroCarousel = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
 
-  // Fetch hero images with optimized loading
+  // Fetch hero images with stable caching
   const { data: heroImages = [] } = useQuery({
-    queryKey: ['hero-images-public', Date.now()], // Force fresh fetch
+    queryKey: ['hero-images-public'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('hero_carousel_images')
@@ -41,10 +41,9 @@ export const HeroCarousel = ({
       }
       return data as HeroImage[];
     },
-    staleTime: 0, // No stale time - always fresh
-    gcTime: 0, // No cache
-    refetchOnMount: true,
-    refetchOnWindowFocus: true
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false
   });
 
   // Preload all hero images for instant loading

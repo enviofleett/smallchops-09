@@ -9123,6 +9123,15 @@ export type Database = {
         Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
+      admin_update_order_status_lock_first: {
+        Args: {
+          p_admin_id: string
+          p_idempotency_key: string
+          p_new_status: string
+          p_order_id: string
+        }
+        Returns: Json
+      }
       admin_update_order_status_production: {
         Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
         Returns: Json
@@ -9191,6 +9200,17 @@ export type Database = {
               p_response_data?: Json
               p_status?: string
             }
+        Returns: Json
+      }
+      cache_idempotent_request_lock_first: {
+        Args: {
+          p_admin_user_id?: string
+          p_idempotency_key: string
+          p_order_id?: string
+          p_request_data: Json
+          p_response_data?: Json
+          p_status?: string
+        }
         Returns: Json
       }
       calculate_bogo_discount: {

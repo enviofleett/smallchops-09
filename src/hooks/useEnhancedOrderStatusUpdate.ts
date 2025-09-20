@@ -139,9 +139,8 @@ export const useEnhancedOrderStatusUpdate = () => {
       return pendingUpdates.get(orderId);
     }
 
-    // Generate client-side idempotency key with enhanced collision resistance
-    const entropy = Math.random().toString(36).substring(2, 8);
-    const idempotencyKey = `${adminUserId}_${orderId}_${newStatus}_${now}_${entropy}`;
+    // CRITICAL FIX: Generate deterministic idempotency key WITHOUT timestamp for true idempotency
+    const idempotencyKey = `${adminUserId}_${orderId}_${newStatus}`;
 
     const updatePromise = updateMutation.mutateAsync({
       orderId,

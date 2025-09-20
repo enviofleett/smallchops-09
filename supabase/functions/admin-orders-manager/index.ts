@@ -1057,138 +1057,82 @@ serve(async (req)=>{
         }
         sanitizedUpdates.updated_at = new Date().toISOString();
 
-        // Generate idempotency key for this request
+        // CRITICAL FIX: Generate deterministic idempotency key WITHOUT timestamp for true idempotency
         const adminUserId = user.id;
-        const idempotencyKey = `order_update_${orderId}_${JSON.stringify(sanitizedUpdates)}_${adminUserId}_${Date.now()}`;
+        const idempotencyKey = `order_update_${orderId}_${sanitizedUpdates.status}_${adminUserId}`;
 
-        // Check idempotency cache with enhanced lock holder bypass
-        const { data: cacheResult } = await supabaseClient.rpc('cache_idempotent_request_enhanced', {
-          p_idempotency_key: idempotencyKey,
-          p_request_data: { orderId, updates: sanitizedUpdates, adminUserId, timestamp: new Date().toISOString() },
-          p_response_data: null,
-          p_status: 'processing',
+        // CRITICAL FIX: Use lock-first approach - this will acquire lock BEFORE cache operations
+        const { data: lockFirstResult, error: lockFirstError } = await supabaseClient.rpc('admin_update_order_status_lock_first', {
           p_order_id: orderId,
-          p_admin_user_id: adminUserId
+          p_new_status: sanitizedUpdates.status,
+          p_admin_id: adminUserId,
+          p_idempotency_key: idempotencyKey
         });
 
-        // Enhanced cache result handling
-        if (cacheResult?.cached) {
-          console.log('🔄 Returning cached result for idempotent request');
-          return new Response(JSON.stringify({
-            success: true,
-            cached: true,
-            ...cacheResult.result
-          }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-
-        // Handle lock holder bypass
-        if (cacheResult?.lock_holder_bypass) {
-          console.log('🚀 Lock holder bypass - proceeding without cache check');
-        }
-
-        // Handle concurrent processing detection
-        if (cacheResult?.concurrent_processing) {
-          console.log('⚠️ Concurrent processing detected via enhanced cache');
+        // CRITICAL FIX: Handle lock-first result directly
+        if (lockFirstError) {
+          console.error(`❌ Lock-first update failed for order ${orderId} [${correlationId}]:`, lockFirstError);
           return new Response(JSON.stringify({
             success: false,
-            error: 'Another admin session is currently updating this order. Please wait and try again.',
-            errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS',
-            correlationId,
-            retryAfter: 3,
-            userMessage: 'Another admin is updating this order. Please wait a moment and try again.'
+            error: 'Database error during order update',
+            correlationId
           }), {
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json',
-              'X-Correlation-ID': correlationId,
-              'Retry-After': '3'
-            },
-            status: 409
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
           });
         }
 
-        // Enhanced cache cleanup before lock acquisition, especially for "ready" transitions
-        if (sanitizedUpdates.status) {
-          try {
-            const cleanupThreshold = sanitizedUpdates.status === 'ready' ? 1 : 5; // More aggressive for "ready" status
-            const { data: cleanupResult } = await supabaseClient.rpc('cleanup_stuck_request_cache', { 
-              p_minutes_threshold: cleanupThreshold 
-            });
-            console.log(`🧹 Pre-lock cache cleanup (${sanitizedUpdates.status}):`, cleanupResult?.expired_cleaned || 0, 'expired,', cleanupResult?.stuck_cleaned || 0, 'stuck entries', `[${correlationId}]`);
-          } catch (cleanupError) {
-            console.warn(`⚠️ Pre-lock cache cleanup failed (non-blocking): ${cleanupError.message} [${correlationId}]`);
-          }
-        }
-
-        // Acquire distributed lock for this order if status is being updated
-        let lockAcquired = false;
-        let lockError = null;
-        
-        if (sanitizedUpdates.status) {
-          try {
-            const { data: lockResult, error: lockAcquisitionError } = await supabaseClient.rpc('acquire_order_lock', {
-              p_order_id: orderId,
-              p_admin_user_id: adminUserId,
-              p_timeout_seconds: 30
-            });
-
-            if (lockAcquisitionError) {
-              console.error(`❌ Lock acquisition failed: ${lockAcquisitionError.message} [${correlationId}]`);
-              lockError = lockAcquisitionError;
-            } else {
-              lockAcquired = lockResult;
-            }
-
-            if (!lockAcquired) {
-              console.log(`🔒 Failed to acquire lock - concurrent update in progress [${correlationId}]`);
-              return new Response(JSON.stringify({
-                success: false,
-                error: 'Another admin is currently updating this order. Please wait and try again.',
-                errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS',
-                correlationId,
-                retryAfter: 5,
-                userMessage: 'Another admin is updating this order. Please wait a moment and try again.'
-              }), {
-                headers: { 
-                  ...corsHeaders, 
-                  'Content-Type': 'application/json',
-                  'X-Correlation-ID': correlationId,
-                  'Retry-After': '5'
-                },
-                status: 409
-              });
-            }
+        if (!lockFirstResult?.success) {
+          // Handle concurrent update error
+          if (lockFirstResult?.error === 'CONCURRENT_UPDATE_IN_PROGRESS') {
+            console.log(`⚠️ Concurrent update detected for order ${orderId} [${correlationId}]`);
             
-            console.log(`✅ Lock acquired successfully for order ${orderId} [${correlationId}]`);
-          } catch (error) {
-            console.error(`❌ Critical error during lock acquisition: ${error.message} [${correlationId}]`);
             return new Response(JSON.stringify({
               success: false,
-              error: 'Failed to acquire order lock. Please try again.',
-              errorCode: 'LOCK_ACQUISITION_FAILED',
-              correlationId
+              error: 'Another admin session is currently updating this order. Please wait and try again.',
+              errorCode: 'CONCURRENT_UPDATE_IN_PROGRESS',
+              lockHolder: lockFirstResult?.lock_holder,
+              correlationId,
+              retryAfter: 5 // seconds
             }), {
-              headers: { 
-                ...corsHeaders, 
-                'Content-Type': 'application/json',
-                'X-Correlation-ID': correlationId
-              },
-              status: 500
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 409
             });
           }
+
+          // Handle other errors
+          console.error(`❌ Order update failed for ${orderId} [${correlationId}]:`, lockFirstResult?.error);
+          return new Response(JSON.stringify({
+            success: false,
+            error: lockFirstResult?.error || 'Order update failed',
+            correlationId
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
         }
 
-        // PRODUCTION FIX: Guaranteed lock cleanup with try-finally pattern
-        let updatedOrder, orderError;
+        // CRITICAL FIX: Lock-first approach completed successfully
+        console.log(`✅ Order ${orderId} updated successfully via lock-first approach [${correlationId}]`);
         
-        try {
-          // Step 1: Simple update operation
-          const { data: basicOrder, error: updateError } = await supabaseClient
-            .from('orders')
-            .update(sanitizedUpdates)
+        const result = {
+          success: true,
+          message: lockFirstResult.message,
+          order: lockFirstResult.order,
+          oldStatus: lockFirstResult.old_status,
+          newStatus: lockFirstResult.new_status,
+          correlationId,
+          idempotency_key: idempotencyKey,
+          lock_first_approach: true,
+          timestamp: new Date().toISOString()
+        };
+
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      case 'bypass_and_update': {
             .eq('id', orderId)
             .select('*')
             .maybeSingle();

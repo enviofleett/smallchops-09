@@ -124,9 +124,8 @@ export function AdminOrdersList({
             <EnhancedOrderCard
               key={order.id}
               order={order}
-              onOrderClick={handleOrderSelect}
+              onOrderSelect={handleOrderSelect}
               deliverySchedule={deliverySchedules[order.id]}
-              onPrintReceipt={(order) => showPreview(order, deliverySchedules[order.id])}
             />
           ))}
         </div>

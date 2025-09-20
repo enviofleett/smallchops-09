@@ -141,7 +141,12 @@ export function AdminOrdersFilters({
         <OverdueDateFilter
           selectedDateFilter={selectedOverdueDateFilter}
           onDateFilterChange={setSelectedOverdueDateFilter}
-          overdueOrderCounts={{}}
+          overdueOrderCounts={{
+            today: 0,
+            yesterday: 0,
+            lastWeek: 0,
+            older: 0
+          }}
         />
       )}
     </div>

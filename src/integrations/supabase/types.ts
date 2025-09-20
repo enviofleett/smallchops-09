@@ -5210,7 +5210,10 @@ export type Database = {
           id: string
           lock_key: string
           order_id: string
+          release_reason: string | null
           released_at: string | null
+          renewal_count: number | null
+          renewed_at: string | null
         }
         Insert: {
           acquired_at?: string
@@ -5220,7 +5223,10 @@ export type Database = {
           id?: string
           lock_key: string
           order_id: string
+          release_reason?: string | null
           released_at?: string | null
+          renewal_count?: number | null
+          renewed_at?: string | null
         }
         Update: {
           acquired_at?: string
@@ -5230,7 +5236,10 @@ export type Database = {
           id?: string
           lock_key?: string
           order_id?: string
+          release_reason?: string | null
           released_at?: string | null
+          renewal_count?: number | null
+          renewed_at?: string | null
         }
         Relationships: []
       }
@@ -9091,6 +9100,15 @@ export type Database = {
             }
         Returns: boolean
       }
+      acquire_order_lock_enhanced: {
+        Args: {
+          p_admin_user_id: string
+          p_allow_renewal?: boolean
+          p_order_id: string
+          p_timeout_seconds?: number
+        }
+        Returns: boolean
+      }
       activate_admin_user: {
         Args: { p_user_id: string }
         Returns: Json
@@ -9199,6 +9217,15 @@ export type Database = {
               p_request_data: Json
               p_response_data?: Json
               p_status?: string
+            }
+          | {
+              p_admin_user_id?: string
+              p_idempotency_key: string
+              p_order_id?: string
+              p_request_data: Json
+              p_response_data?: Json
+              p_status?: string
+              p_timeout_seconds?: number
             }
         Returns: Json
       }
@@ -9449,6 +9476,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_cache_batch_optimized: {
+        Args: {
+          p_batch_size?: number
+          p_cleanup_type?: string
+          p_minutes_threshold?: number
+          p_order_ids?: string[]
+        }
+        Returns: Json
+      }
       cleanup_email_processing_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -9476,6 +9512,10 @@ export type Database = {
       cleanup_expired_rate_limits: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      cleanup_locks_optimized: {
+        Args: { p_force_cleanup_older_than_minutes?: number }
+        Returns: Json
       }
       cleanup_monitoring_data: {
         Args: Record<PropertyKey, never>
@@ -10720,6 +10760,14 @@ export type Database = {
         Args:
           | { p_admin_session_id: string; p_order_id: string }
           | { p_admin_user_id: string; p_order_id: string }
+        Returns: boolean
+      }
+      release_order_lock_enhanced: {
+        Args: {
+          p_admin_user_id: string
+          p_force_release?: boolean
+          p_order_id: string
+        }
         Returns: boolean
       }
       requeue_failed_welcome_emails: {

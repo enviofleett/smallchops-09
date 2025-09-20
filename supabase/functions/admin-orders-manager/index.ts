@@ -1110,6 +1110,19 @@ serve(async (req)=>{
           });
         }
 
+        // Enhanced cache cleanup before lock acquisition, especially for "ready" transitions
+        if (sanitizedUpdates.status) {
+          try {
+            const cleanupThreshold = sanitizedUpdates.status === 'ready' ? 1 : 5; // More aggressive for "ready" status
+            const { data: cleanupResult } = await supabaseClient.rpc('cleanup_stuck_request_cache', { 
+              p_minutes_threshold: cleanupThreshold 
+            });
+            console.log(`🧹 Pre-lock cache cleanup (${sanitizedUpdates.status}):`, cleanupResult?.expired_cleaned || 0, 'expired,', cleanupResult?.stuck_cleaned || 0, 'stuck entries', `[${correlationId}]`);
+          } catch (cleanupError) {
+            console.warn(`⚠️ Pre-lock cache cleanup failed (non-blocking): ${cleanupError.message} [${correlationId}]`);
+          }
+        }
+
         // Acquire distributed lock for this order if status is being updated
         let lockAcquired = false;
         let lockError = null;

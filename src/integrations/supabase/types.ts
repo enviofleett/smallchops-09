@@ -9494,7 +9494,7 @@ export type Database = {
         Returns: Json
       }
       cleanup_stuck_request_cache: {
-        Args: Record<PropertyKey, never>
+        Args: Record<PropertyKey, never> | { p_minutes_threshold?: number }
         Returns: Json
       }
       clear_production_data: {
@@ -9689,6 +9689,10 @@ export type Database = {
       }
       fix_user_linking: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      force_clear_order_cache: {
+        Args: { p_order_id: string }
         Returns: Json
       }
       generate_atomic_dedupe_key: {

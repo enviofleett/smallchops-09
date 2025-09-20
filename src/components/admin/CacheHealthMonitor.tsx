@@ -64,18 +64,25 @@ export const CacheHealthMonitor: React.FC = () => {
   });
 
   const handleCleanup = async () => {
+    setIsCleaningUp(true);
     try {
-      setIsCleaningUp(true);
-      const { data, error } = await supabase.rpc('cleanup_stuck_request_cache');
+      // Use enhanced cleanup with aggressive threshold
+      const { data: result, error } = await supabase.rpc('cleanup_stuck_request_cache', {
+        p_minutes_threshold: 2 // More aggressive cleanup
+      });
       
-      if (error) throw error;
-      
-      const cleanupResult = data as unknown as CleanupResult;
-      toast.success(`Cache cleanup completed: ${cleanupResult.expired_cleaned} expired, ${cleanupResult.stuck_processing_fixed} stuck entries fixed`);
-      refetch();
+      if (error) {
+        toast.error('Failed to cleanup cache');
+        console.error('Cleanup error:', error);
+      } else {
+        const totalCleaned = ((result as any)?.expired_cleaned || 0) + ((result as any)?.stuck_cleaned || 0);
+        toast.success(`Cache cleanup completed: ${totalCleaned} entries removed`);
+        // Refetch data to show updated counts
+        refetch();
+      }
     } catch (error) {
-      console.error('Cache cleanup failed:', error);
-      toast.error('Cache cleanup failed');
+      toast.error('An error occurred during cleanup');
+      console.error('Cleanup error:', error);
     } finally {
       setIsCleaningUp(false);
     }

@@ -9,6 +9,7 @@ import { OrderStatus } from '@/types/orders';
 import { Constants } from '@/integrations/supabase/types';
 import { EmailStatusGuide } from '../EmailStatusGuide';
 import { EmailTestButton } from '../EmailTestButton';
+import { recoverReadyStatusTransition } from '@/utils/cacheRecoveryUtils';
 
 interface DispatchRider {
   id: string;
@@ -44,6 +45,7 @@ interface ActionsDrawerProps {
   show409Error?: boolean;
   onBypassCacheAndUpdate?: () => void;
   isBypassing?: boolean;
+  clearBypassError?: () => void;
 }
 
 export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
@@ -69,7 +71,8 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
   orderNumber,
   show409Error,
   onBypassCacheAndUpdate,
-  isBypassing
+  isBypassing,
+  clearBypassError
 }) => {
   return (
     <Card>
@@ -258,31 +261,63 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
                     Cache Conflict Detected
                   </p>
                   <p className="text-amber-700 dark:text-amber-300 text-xs">
-                    The system cache is preventing the update. Use the bypass button to force the update and clear the cache.
+                    {selectedStatus === 'preparing' && (orderId && orderId.length > 0) 
+                      ? 'This transition is prone to cache issues. Use recovery or bypass options below.'
+                      : 'The system cache is preventing the update. Use the bypass button to force the update and clear the cache.'
+                    }
                   </p>
                 </div>
               </div>
             </div>
             
-            <Button 
-              onClick={onBypassCacheAndUpdate}
-              disabled={isBypassing}
-              variant="outline"
-              className="w-full border-orange-200 dark:border-orange-800 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 text-orange-700 dark:text-orange-300 hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-900/30 dark:hover:to-amber-900/30"
-              size="lg"
-            >
-              {isBypassing ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Bypassing Cache...
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 mr-2" />
-                  Bypass Cache & Update
-                </>
+            <div className="flex gap-2">
+              {selectedStatus === 'preparing' && orderId && (
+                <Button
+                  onClick={async () => {
+                    if (orderId) {
+                      const result = await recoverReadyStatusTransition(orderId);
+                      if (result.success && clearBypassError) {
+                        clearBypassError();
+                      }
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Recover Cache
+                </Button>
               )}
-            </Button>
+              <Button 
+                onClick={onBypassCacheAndUpdate}
+                disabled={isBypassing}
+                variant="outline"
+                className={`${selectedStatus === 'preparing' && orderId ? 'flex-1' : 'w-full'} border-orange-200 dark:border-orange-800 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 text-orange-700 dark:text-orange-300 hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-900/30 dark:hover:to-amber-900/30`}
+                size="lg"
+              >
+                {isBypassing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Bypassing Cache...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Bypass Cache & Update
+                  </>
+                )}
+              </Button>
+              {clearBypassError && (
+                <Button
+                  onClick={clearBypassError}
+                  variant="ghost"
+                  size="sm"
+                >
+                  Dismiss
+                </Button>
+              )}
+            </div>
           </div>
         )}
 

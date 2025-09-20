@@ -1,6 +1,117 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 
+// Circuit Breaker and Alert Infrastructure
+class CircuitBreaker {
+  private state = 'closed'; // closed, open, half-open
+  private failureCount = 0;
+  private lastFailureTime?: number;
+  private serviceName: string;
+  private failureThreshold: number;
+  private timeoutMs: number;
+
+  constructor(serviceName: string, failureThreshold = 5, timeoutMs = 60000) {
+    this.serviceName = serviceName;
+    this.failureThreshold = failureThreshold;
+    this.timeoutMs = timeoutMs;
+  }
+
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      if (this.shouldAttemptReset()) {
+        this.state = 'half-open';
+      } else {
+        throw new Error(`Circuit breaker is OPEN for ${this.serviceName}`);
+      }
+    }
+
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+
+  private shouldAttemptReset(): boolean {
+    if (!this.lastFailureTime) return true;
+    return Date.now() - this.lastFailureTime > this.timeoutMs;
+  }
+
+  private onSuccess() {
+    this.failureCount = 0;
+    this.state = 'closed';
+  }
+
+  private onFailure() {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = 'open';
+      console.error(`🚨 Circuit breaker OPENED for ${this.serviceName}`);
+    }
+  }
+
+  getStatus() {
+    return {
+      state: this.state,
+      failureCount: this.failureCount,
+      serviceName: this.serviceName
+    };
+  }
+}
+
+// Alert System
+async function sendAlert(alertType: string, message: string, severity = 'warning') {
+  const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL') || Deno.env.get('DISCORD_WEBHOOK_URL');
+  if (!webhookUrl) {
+    console.log(`📢 ALERT [${severity.toUpperCase()}] ${alertType}: ${message}`);
+    return;
+  }
+  
+  const colors = {
+    'critical': '#FF0000',
+    'warning': '#FFA500', 
+    'info': '#00FF00'
+  };
+  
+  const payload = {
+    username: 'Order System Monitor',
+    icon_emoji: ':rotating_light:',
+    attachments: [{
+      color: colors[severity] || '#FFA500',
+      title: `🚨 ${alertType}`,
+      text: message,
+      fields: [
+        {
+          title: 'Severity',
+          value: severity.toUpperCase(),
+          short: true
+        },
+        {
+          title: 'Timestamp',
+          value: new Date().toISOString(),
+          short: true
+        }
+      ]
+    }]
+  };
+  
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    console.log(`✅ Alert sent: ${alertType}`);
+  } catch (error) {
+    console.error('Failed to send alert:', error.message);
+  }
+}
+
 // Import shared CORS with inline fallback for production stability
 let getCorsHeaders;
 let handleCorsPreflightResponse;
@@ -53,6 +164,13 @@ try {
 
 const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
+// Initialize circuit breakers for different services
+const circuitBreakers = {
+  database: new CircuitBreaker('database_operations', 3, 30000),
+  orderUpdate: new CircuitBreaker('order_update_operations', 5, 10000),
+  webhooks: new CircuitBreaker('webhook_delivery', 2, 5000)
+};
+
 // Enhanced system health check function
 async function checkSystemHealth() {
   const checks = [];
@@ -102,7 +220,15 @@ async function checkSystemHealth() {
       details: conflictData
     });
     
-    if (conflictRate > 15) overallHealth = false;
+    if (conflictRate > 15) {
+      overallHealth = false;
+      // Send critical alert for high conflict rate
+      await sendAlert(
+        'High 409 Conflict Rate', 
+        `Conflict resolution rate at ${conflictRate}% exceeds critical threshold of 15%`, 
+        'critical'
+      );
+    }
   } catch (e) {
     checks.push({
       name: 'conflict_resolution_health',
@@ -129,7 +255,15 @@ async function checkSystemHealth() {
       threshold: '10 errors per 5min'
     });
     
-    if (errorRate === 'fail') overallHealth = false;
+    if (errorRate === 'fail') {
+      overallHealth = false;
+      // Send alert for high error rate
+      await sendAlert(
+        'High Error Rate', 
+        `${errorCount} errors in last 5 minutes exceeds threshold of 10`, 
+        'critical'
+      );
+    }
   } catch (e) {
     checks.push({
       name: 'recent_error_rate',
@@ -156,7 +290,15 @@ async function checkSystemHealth() {
       threshold: '20 active locks'
     });
     
-    if (lockStatus === 'fail') overallHealth = false;
+    if (lockStatus === 'fail') {
+      overallHealth = false;
+      // Send alert for high lock contention
+      await sendAlert(
+        'High Lock Contention', 
+        `${lockCount} active locks exceeds threshold of 20`, 
+        'warning'
+      );
+    }
   } catch (e) {
     checks.push({
       name: 'lock_contention', 
@@ -165,11 +307,18 @@ async function checkSystemHealth() {
     });
   }
   
+  // Include circuit breaker status
+  const circuitBreakerStatus = Object.entries(circuitBreakers).map(([name, breaker]) => ({
+    name,
+    ...breaker.getStatus()
+  }));
+  
   return {
     healthy: overallHealth,
     timestamp: new Date().toISOString(),
     checks,
-    version: '2.0.0',
+    circuitBreakers: circuitBreakerStatus,
+    version: '2.1.0',
     uptime: process.uptime?.() || 0
   };
 }
@@ -362,7 +511,53 @@ serve(async (req)=>{
   
   const corsHeaders = getCorsHeaders(origin);
 
-  // Enhanced cleanup on function startup for better reliability
+  // Health endpoint with circuit breaker status and alert checking
+  if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
+    try {
+      const healthData = await circuitBreakers.database.execute(async () => {
+        return await checkSystemHealth();
+      });
+      
+      // Check alert rules in background
+      EdgeRuntime.waitUntil(
+        supabaseClient.rpc('check_alert_rules').then(result => {
+          console.log('Alert rules checked:', result.data);
+        }).catch(err => {
+          console.error('Failed to check alert rules:', err);
+        })
+      );
+      
+      return new Response(JSON.stringify(healthData), {
+        status: healthData.healthy ? 200 : 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      await sendAlert('Health Check Failed', `Health endpoint error: ${error.message}`, 'critical');
+      return new Response(JSON.stringify({
+        healthy: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }), {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  // Circuit breaker status endpoint
+  if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/circuit-breaker-status')) {
+    const status = Object.entries(circuitBreakers).map(([name, breaker]) => ({
+      name,
+      ...breaker.getStatus()
+    }));
+    
+    return new Response(JSON.stringify({
+      circuitBreakers: status,
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
   try {
     // Clean up expired locks
     const { data: lockCleanupResult } = await supabaseClient.rpc('cleanup_expired_locks');

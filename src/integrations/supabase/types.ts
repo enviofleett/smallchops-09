@@ -243,6 +243,104 @@ export type Database = {
         }
         Relationships: []
       }
+      alert_notifications: {
+        Row: {
+          alert_rule_id: string | null
+          created_at: string | null
+          delivered_at: string | null
+          delivery_status: string | null
+          id: string
+          message: string
+          response_body: string | null
+          response_code: number | null
+          retry_count: number | null
+          severity: string
+          webhook_url: string | null
+        }
+        Insert: {
+          alert_rule_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
+          id?: string
+          message: string
+          response_body?: string | null
+          response_code?: number | null
+          retry_count?: number | null
+          severity: string
+          webhook_url?: string | null
+        }
+        Update: {
+          alert_rule_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
+          id?: string
+          message?: string
+          response_body?: string | null
+          response_code?: number | null
+          retry_count?: number | null
+          severity?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_notifications_alert_rule_id_fkey"
+            columns: ["alert_rule_id"]
+            isOneToOne: false
+            referencedRelation: "alert_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alert_rules: {
+        Row: {
+          check_interval_seconds: number | null
+          condition_sql: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          rule_name: string
+          severity: string | null
+          threshold_value: number | null
+          trigger_count: number | null
+          updated_at: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          check_interval_seconds?: number | null
+          condition_sql: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          rule_name: string
+          severity?: string | null
+          threshold_value?: number | null
+          trigger_count?: number | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          check_interval_seconds?: number | null
+          condition_sql?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          rule_name?: string
+          severity?: string | null
+          threshold_value?: number | null
+          trigger_count?: number | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       api_metrics: {
         Row: {
           dimensions: Json | null
@@ -1063,6 +1161,48 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      circuit_breaker_state: {
+        Row: {
+          created_at: string | null
+          failure_count: number | null
+          failure_threshold: number | null
+          id: string
+          last_failure_time: string | null
+          last_success_time: string | null
+          next_retry_time: string | null
+          service_name: string
+          state: string
+          timeout_seconds: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          failure_count?: number | null
+          failure_threshold?: number | null
+          id?: string
+          last_failure_time?: string | null
+          last_success_time?: string | null
+          next_retry_time?: string | null
+          service_name: string
+          state?: string
+          timeout_seconds?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          failure_count?: number | null
+          failure_threshold?: number | null
+          id?: string
+          last_failure_time?: string | null
+          last_success_time?: string | null
+          next_retry_time?: string | null
+          service_name?: string
+          state?: string
+          timeout_seconds?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -8936,6 +9076,48 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_deliveries: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          delivery_attempts: number | null
+          id: string
+          last_attempt_at: string | null
+          payload: Json
+          response_body: string | null
+          response_code: number | null
+          status: string | null
+          throttled_until: string | null
+          webhook_url: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          delivery_attempts?: number | null
+          id?: string
+          last_attempt_at?: string | null
+          payload: Json
+          response_body?: string | null
+          response_code?: number | null
+          status?: string | null
+          throttled_until?: string | null
+          webhook_url: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          delivery_attempts?: number | null
+          id?: string
+          last_attempt_at?: string | null
+          payload?: Json
+          response_body?: string | null
+          response_code?: number | null
+          status?: string | null
+          throttled_until?: string | null
+          webhook_url?: string
+        }
+        Relationships: []
+      }
       webhook_events: {
         Row: {
           created_at: string | null
@@ -9435,6 +9617,10 @@ export type Database = {
           p_operation: string
           p_window_minutes?: number
         }
+        Returns: Json
+      }
+      check_alert_rules: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       check_api_rate_limit: {

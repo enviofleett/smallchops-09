@@ -1133,11 +1133,109 @@ serve(async (req)=>{
       }
 
       case 'bypass_and_update': {
-            .eq('id', orderId)
-            .select('*')
-            .maybeSingle();
+        console.log('🔧 Admin function: Bypass and update order', orderId);
+        
+        if (!orderId) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Order ID is required for bypass and update',
+            errorCode: 'MISSING_ORDER_ID'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
 
-          if (updateError) {
+        if (!updates || typeof updates !== 'object') {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Updates object is required',
+            errorCode: 'MISSING_UPDATES'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        const adminUserId = user.id;
+
+        try {
+          // Step 1: Force cleanup order-specific cache entries
+          console.log('🧹 Clearing order cache before bypass update');
+          const { data: cacheCleanup } = await supabaseClient
+            .rpc('force_clear_order_cache', { p_order_id: orderId });
+
+          // Step 2: Use manual bypass database function
+          console.log('🚀 Executing manual bypass update');
+          const { data: bypassResult, error: bypassError } = await supabaseClient
+            .rpc('manual_cache_bypass_and_update', {
+              p_order_id: orderId,
+              p_new_status: updates.status,
+              p_admin_user_id: adminUserId,
+              p_bypass_reason: 'admin_manual_bypass'
+            });
+
+          if (bypassError) {
+            console.error(`❌ Bypass update failed: ${bypassError.message} [${correlationId}]`);
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Bypass update failed: ' + bypassError.message,
+              errorCode: 'BYPASS_UPDATE_FAILED'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500
+            });
+          }
+
+          if (!bypassResult?.success) {
+            console.error(`❌ Bypass update unsuccessful: ${bypassResult?.error} [${correlationId}]`);
+            return new Response(JSON.stringify({
+              success: false,
+              error: bypassResult?.error || 'Bypass update unsuccessful',
+              errorCode: 'BYPASS_UPDATE_UNSUCCESSFUL'
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            });
+          }
+
+          console.log(`✅ Bypass update completed successfully [${correlationId}]:`, {
+            orderId,
+            cacheCleared: cacheCleanup?.entries_cleared || 0,
+            bypassed: bypassResult.bypassed,
+            oldStatus: bypassResult.old_status,
+            newStatus: bypassResult.new_status
+          });
+
+          const result = {
+            success: true,
+            message: 'Order updated successfully via cache bypass',
+            order: bypassResult.order,
+            bypassed: true,
+            cache_cleared: cacheCleanup?.entries_cleared || 0,
+            old_status: bypassResult.old_status,
+            new_status: bypassResult.new_status,
+            correlationId,
+            timestamp: new Date().toISOString()
+          };
+
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          console.error(`❌ Critical error during bypass update [${correlationId}]:`, error);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Internal error during bypass update: ' + error.message,
+            errorCode: 'BYPASS_INTERNAL_ERROR',
+            correlationId
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          });
+        }
+      }
             console.error(`❌ Order update failed: ${updateError.message} [${correlationId}]`, { orderId });
             
             // Determine specific error type for better user feedback

@@ -90,13 +90,13 @@ export const HeroCarousel = ({
     setCurrentIndex(0);
   }, [imagesToShow]);
 
-  // Show professional placeholder image if no uploaded images available
+  // Use first available hero image as fallback
   if (imagesToShow.length === 0) {
     return (
       <div className={className}>
         <img 
-          src={heroPlaceholder} 
-          alt="Professional product showcase" 
+          src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/hero-images/hero-1757891367984-6626d388.jpg"
+          alt="Hero showcase" 
           className="w-full h-full object-cover rounded-2xl"
           loading="eager"
           fetchPriority="high"

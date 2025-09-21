@@ -6,6 +6,8 @@ import { OrdersList } from './OrdersList';
 import { OrderFilters } from './OrderFilters';
 import { OrderStats } from './OrderStats';
 import { ConflictDialog } from './ConflictDialog';
+import { EmailQueueStatus } from './EmailQueueStatus';
+import { Separator } from "@/components/ui/separator";
 
 interface ConflictInfo {
   orderId: string;
@@ -90,6 +92,11 @@ export function OrdersPageNew() {
       </Helmet>
       
       <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Email Queue Status */}
+        <EmailQueueStatus />
+        
+        <Separator />
+        
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
@@ -97,7 +104,7 @@ export function OrdersPageNew() {
               Order Management
             </h1>
             <p className="text-gray-600 dark:text-gray-300">
-              Track, manage, and process customer orders
+              Track, manage, and process customer orders with reliable email notifications
             </p>
           </div>
         </div>

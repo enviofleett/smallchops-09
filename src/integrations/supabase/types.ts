@@ -5420,6 +5420,54 @@ export type Database = {
           },
         ]
       }
+      order_status_notifications: {
+        Row: {
+          created_at: string
+          customer_email: string | null
+          customer_name: string | null
+          error_message: string | null
+          id: string
+          new_status: string
+          old_status: string | null
+          order_id: string
+          order_number: string | null
+          processed_at: string | null
+          retry_count: number
+          template_key: string | null
+          template_variables: Json | null
+        }
+        Insert: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          error_message?: string | null
+          id?: string
+          new_status: string
+          old_status?: string | null
+          order_id: string
+          order_number?: string | null
+          processed_at?: string | null
+          retry_count?: number
+          template_key?: string | null
+          template_variables?: Json | null
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          error_message?: string | null
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          order_id?: string
+          order_number?: string | null
+          processed_at?: string | null
+          retry_count?: number
+          template_key?: string | null
+          template_variables?: Json | null
+        }
+        Relationships: []
+      }
       order_update_metrics: {
         Row: {
           admin_user_id: string | null
@@ -9498,7 +9546,9 @@ export type Database = {
         Returns: Json
       }
       admin_update_order_status_simple: {
-        Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
+        Args:
+          | { new_status_param: string; order_id_param: string }
+          | { p_admin_id: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
       archive_old_communication_events: {

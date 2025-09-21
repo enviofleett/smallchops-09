@@ -62,7 +62,7 @@ export const useOrdersNew = (filters: OrderFilters = {}) => {
   });
 };
 
-// Order status update hook with conflict resolution
+// Order status update hook with simple email processing
 export const useOrderUpdate = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -73,19 +73,22 @@ export const useOrderUpdate = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase.functions.invoke('order-manager', {
-        body: {
-          action: 'update_status',
-          order_id: request.order_id,
-          new_status: request.new_status,
-          admin_id: user.id,
-          admin_name: request.admin_name || 'Admin',
-          version: request.version
-        }
+      const { data, error } = await supabase.rpc('admin_update_order_status_simple', {
+        p_order_id: request.order_id,
+        p_new_status: request.new_status,
+        p_admin_id: user.id
       });
 
       if (error) throw error;
-      return data;
+      
+      const result = data as any; // Cast from Json to any for proper access
+      
+      return {
+        success: result.success,
+        data: result,
+        error: result.error,
+        code: result.success ? 'SUCCESS' : 'ERROR'
+      };
     },
     onSuccess: (result, variables) => {
       if (result.success) {

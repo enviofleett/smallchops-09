@@ -9497,6 +9497,10 @@ export type Database = {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
+      admin_update_order_status_simple: {
+        Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
       archive_old_communication_events: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -9902,6 +9906,10 @@ export type Database = {
       }
       cleanup_stuck_request_cache: {
         Args: Record<PropertyKey, never> | { p_minutes_threshold?: number }
+        Returns: Json
+      }
+      clear_all_pending_emails: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       clear_production_data: {

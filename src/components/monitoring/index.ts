@@ -4,15 +4,8 @@ export { AlertDashboard } from './AlertDashboard';
 export { PerformanceMonitor } from './PerformanceMonitor';
 
 // Re-export monitoring hooks
-export { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
+// export { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
 export { useAlertSystem } from '@/hooks/useAlertSystem';
-export type { 
-  CacheHealthMetrics, 
-  LockContentionMetrics, 
-  PerformanceMetrics,
-  ConflictResolutionMetrics,
-  AlertRule 
-} from '@/hooks/useRealTimeMonitoring';
 
 // Re-export monitoring utilities
 export * from '@/utils/orderStatusMonitoring';

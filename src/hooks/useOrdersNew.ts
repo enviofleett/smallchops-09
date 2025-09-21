@@ -129,10 +129,8 @@ export const useOrdersRealTime = () => {
             if (payload.eventType === 'UPDATE' && payload.new) {
               const order = payload.new;
               if (order.updated_by_name) {
-                queryClient.getQueryClient()?.getQueryCache().notify({
-                  type: 'added',
-                  query: queryClient.getQueryCache().find({ queryKey: ['orders-new'] }),
-                });
+                // Just invalidate queries - the complex notification is not needed
+                queryClient.invalidateQueries({ queryKey: ['orders-new'] });
               }
             }
           }

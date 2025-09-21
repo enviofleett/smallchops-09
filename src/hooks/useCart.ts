@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { useCartTracking } from '@/hooks/useCartTracking';
 import { calculateAdvancedOrderDiscount, CartPromotion } from '@/lib/discountCalculations';
-import { calculateCartVATSummary } from '@/lib/vatCalculations';
+import { calculateCartVATSummary } from '@/lib/vatCalculationsV2';
+import { OrderCalculationService, type CalculationItem } from '@/services/OrderCalculationService';
 import { validatePromotionCode } from '@/api/promotionValidation';
 import { usePromotions } from './usePromotions';
 import { useGuestSession } from './useGuestSession';
@@ -130,28 +131,28 @@ export const useCartInternal = () => {
     return () => clearTimeout(timeoutId);
   }, [cart, isInitialized]);
 
-  // Memoized cart calculations for performance
+  // Enhanced cart calculations using OrderCalculationService
   const calculateCartSummary = useCallback((
     items: CartItem[], 
     deliveryFee = 0, 
     promotionCode?: string
   ): Cart => {
-    const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    console.log('🔢 Starting cart calculation with OrderCalculationService', {
+      itemCount: items.length,
+      deliveryFee,
+      promotionCode,
+      items: items.map(item => ({
+        id: item.product_id,
+        name: item.product_name,
+        price: item.price,
+        quantity: item.quantity
+      }))
+    });
+
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-    // Calculate VAT breakdown
-    const vatSummary = calculateCartVATSummary(
-      items.map(item => ({
-        product_id: item.product_id,
-        product_name: item.product_name,
-        price: item.price,
-        quantity: item.quantity,
-        vat_rate: item.vat_rate || 7.5
-      })),
-      deliveryFee
-    );
-
-    // Calculate promotions using advanced discount calculation (after VAT calculation)
+    // Get promotion calculation first
+    const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const promotionResult = calculateAdvancedOrderDiscount(
       items.map(item => ({
         id: item.id,
@@ -167,25 +168,91 @@ export const useCartInternal = () => {
       promotionCode
     );
 
-    const finalDeliveryFee = deliveryFee - promotionResult.delivery_discount;
-    const total_amount = subtotal + finalDeliveryFee - promotionResult.total_discount;
+    // Convert cart items to calculation format
+    const calculationItems: CalculationItem[] = items.map(item => ({
+      id: item.id,
+      product_id: item.product_id,
+      product_name: item.product_name,
+      price: item.price,
+      quantity: item.quantity,
+      vat_rate: item.vat_rate || 7.5
+    }));
 
-    return {
-      items: items,
-      summary: {
-        subtotal: Math.round(subtotal * 100) / 100,
-        subtotal_cost: Math.round(vatSummary.subtotal_cost * 100) / 100,
-        total_vat: Math.round(vatSummary.total_vat * 100) / 100,
-        tax_amount: 0,
-        delivery_fee: Math.round(deliveryFee * 100) / 100,
-        applied_promotions: promotionResult.applied_promotions || [],
-        discount_amount: Math.round(promotionResult.total_discount * 100) / 100,
-        delivery_discount: Math.round(promotionResult.delivery_discount * 100) / 100,
-        total_amount: Math.round(total_amount * 100) / 100,
-      },
-      itemCount,
-      promotion_code: promotionCode
-    };
+    // Convert promotions to calculation format
+    const calculationPromotions = (promotionResult?.applied_promotions || []).map(promo => ({
+      id: promo.id,
+      name: promo.name,
+      code: promo.code,
+      type: promo.type as 'percentage' | 'fixed_amount' | 'free_delivery',
+      discount_amount: promo.discount_amount,
+      free_delivery: promo.free_delivery || false
+    }));
+
+    // Use OrderCalculationService for consistent calculation
+    try {
+      const calculationResult = OrderCalculationService.calculateOrder({
+        items: calculationItems,
+        delivery_fee: deliveryFee,
+        promotions: calculationPromotions,
+        promotion_code: promotionCode,
+        calculation_source: 'client'
+      });
+
+      console.log('✅ Cart calculation completed', {
+        subtotal: calculationResult.subtotal,
+        deliveryFee: calculationResult.delivery_fee,
+        discountAmount: calculationResult.discount_amount,
+        totalAmount: calculationResult.total_amount,
+        calculationBreakdown: calculationResult.calculation_breakdown
+      });
+
+      return {
+        items: items,
+        summary: {
+          subtotal: calculationResult.subtotal,
+          subtotal_cost: calculationResult.subtotal_cost,
+          total_vat: calculationResult.total_vat,
+          tax_amount: 0,
+          delivery_fee: calculationResult.delivery_fee,
+          applied_promotions: calculationResult.applied_promotions.map(promo => ({
+            id: promo.id,
+            name: promo.name,
+            code: promo.code,
+            type: promo.type,
+            discount_amount: promo.discount_amount,
+            free_delivery: promo.free_delivery
+          })),
+          discount_amount: calculationResult.discount_amount,
+          delivery_discount: calculationResult.delivery_discount,
+          total_amount: calculationResult.total_amount,
+        },
+        itemCount,
+        promotion_code: promotionCode
+      };
+    } catch (error) {
+      console.error('❌ Cart calculation failed, falling back to basic calculation', error);
+      
+      // Fallback to basic calculation with promotion result
+      const finalDeliveryFee = deliveryFee - promotionResult.delivery_discount;
+      const total_amount = subtotal + finalDeliveryFee - promotionResult.total_discount;
+
+      return {
+        items: items,
+        summary: {
+          subtotal: Math.round(subtotal * 100) / 100,
+          subtotal_cost: Math.round(subtotal * 0.93 * 100) / 100, // Approximate pre-VAT
+          total_vat: Math.round(subtotal * 0.07 * 100) / 100, // Approximate VAT
+          tax_amount: 0,
+          delivery_fee: Math.round(deliveryFee * 100) / 100,
+          applied_promotions: promotionResult.applied_promotions || [],
+          discount_amount: Math.round(promotionResult.total_discount * 100) / 100,
+          delivery_discount: Math.round(promotionResult.delivery_discount * 100) / 100,
+          total_amount: Math.round(total_amount * 100) / 100,
+        },
+        itemCount,
+        promotion_code: promotionCode
+      };
+    }
   }, [promotions]);
 
   const addItem = (product: {

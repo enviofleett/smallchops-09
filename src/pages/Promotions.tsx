@@ -290,10 +290,10 @@ export default function PromotionsPage() {
 
       {/* Create Promotion Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl w-[95vw] sm:w-full max-h-[98vh] sm:max-h-[95vh] lg:max-h-[90vh] p-0 flex flex-col overflow-hidden border-0 shadow-2xl mx-auto">
-          <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 flex-shrink-0">
-            <DialogTitle className="text-lg sm:text-xl font-semibold flex items-center gap-2">
-              <PlusCircle className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+        <DialogContent className="max-w-4xl w-[96vw] sm:w-[90vw] lg:w-full max-h-[96vh] sm:max-h-[94vh] lg:max-h-[88vh] p-0 flex flex-col overflow-hidden border-0 shadow-2xl mx-auto">
+          <DialogHeader className="p-3 sm:p-4 lg:p-6 pb-2 sm:pb-3 lg:pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 flex-shrink-0">
+            <DialogTitle className="text-base sm:text-lg lg:text-xl font-semibold flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-blue-600" />
               Create New Promotion
             </DialogTitle>
           </DialogHeader>

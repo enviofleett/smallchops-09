@@ -44,22 +44,27 @@ serve(async (req) => {
     console.log(`Reports parameters: groupBy=${groupBy}, startDate=${startDate}, endDate=${endDate}`);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       console.error("Missing environment variables");
       throw new Error("Missing Supabase environment variables");
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    // Create client with user's auth token for authentication checks
+    const supabaseWithAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
       auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+        persistSession: false,
+      },
     });
 
-    // Verify user is admin
-    const { data: userData, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    // Verify user is authenticated and admin
+    const { data: userData, error: userError } = await supabaseWithAuth.auth.getUser();
     if (userError || !userData.user) {
       console.error("Invalid token:", userError);
       return new Response(JSON.stringify({ error: "Invalid token" }), {
@@ -68,7 +73,7 @@ serve(async (req) => {
       });
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseWithAuth
       .from('profiles')
       .select('role')
       .eq('id', userData.user.id)
@@ -81,6 +86,15 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Create service role client for data queries
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     console.log(`Fetching analytics data for ${groupBy} grouping from ${startDate} to ${endDate}`);
 

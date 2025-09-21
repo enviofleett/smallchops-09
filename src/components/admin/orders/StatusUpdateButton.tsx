@@ -8,8 +8,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useOrderUpdate } from '@/hooks/useOrdersNew';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2, Mail, MailCheck, MailX, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface StatusUpdateButtonProps {
   order: any;
@@ -52,13 +53,16 @@ const STATUS_COLORS = {
 
 export function StatusUpdateButton({ order, onConflict, className }: StatusUpdateButtonProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const updateMutation = useOrderUpdate();
+  const { toast } = useToast();
 
   const currentStatus = order.status;
   const nextStatuses = STATUS_FLOW[currentStatus as keyof typeof STATUS_FLOW] || [];
 
   const handleStatusUpdate = async (newStatus: string) => {
     setIsUpdating(true);
+    setEmailStatus('pending');
     
     try {
       const result = await updateMutation.mutateAsync({
@@ -68,7 +72,28 @@ export function StatusUpdateButton({ order, onConflict, className }: StatusUpdat
         version: order.version
       });
 
-      if (!result.success && result.code === 'VERSION_CONFLICT') {
+      if (result.success) {
+        // Check email queue status from result
+        const emailQueued = result.data?.email_queued || result.data?.email_result;
+        
+        if (emailQueued?.success) {
+          setEmailStatus('success');
+          toast({
+            title: "Status Updated",
+            description: `Order status changed to ${newStatus}. Customer notification sent.`,
+          });
+        } else if (emailQueued?.success === false) {
+          setEmailStatus('failed');
+          toast({
+            title: "Status Updated",
+            description: `Order status changed to ${newStatus}. Email notification failed - will retry automatically.`,
+            variant: "destructive"
+          });
+        } else {
+          setEmailStatus('success'); // Assume success if no specific feedback
+        }
+      } else if (result.code === 'VERSION_CONFLICT') {
+        setEmailStatus(null);
         onConflict({
           orderId: order.id,
           currentVersion: result.conflict?.current_version || 0,
@@ -80,8 +105,26 @@ export function StatusUpdateButton({ order, onConflict, className }: StatusUpdat
       }
     } catch (error) {
       console.error('Status update error:', error);
+      setEmailStatus('failed');
     } finally {
       setIsUpdating(false);
+      // Clear email status after 5 seconds
+      if (emailStatus !== null) {
+        setTimeout(() => setEmailStatus(null), 5000);
+      }
+    }
+  };
+
+  const getEmailIcon = () => {
+    switch (emailStatus) {
+      case 'pending':
+        return <Mail className="h-3 w-3 animate-pulse" />;
+      case 'success':
+        return <MailCheck className="h-3 w-3 text-green-600" />;
+      case 'failed':
+        return <MailX className="h-3 w-3 text-red-600" />;
+      default:
+        return null;
     }
   };
 
@@ -95,15 +138,32 @@ export function StatusUpdateButton({ order, onConflict, className }: StatusUpdat
 
   if (nextStatuses.length === 1) {
     return (
-      <Button
-        onClick={() => handleStatusUpdate(nextStatuses[0])}
-        disabled={isUpdating}
-        size="sm"
-        className={cn("w-full", className)}
-      >
-        {isUpdating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-        {isUpdating ? 'Updating...' : `Mark as ${STATUS_LABELS[nextStatuses[0] as keyof typeof STATUS_LABELS]}`}
-      </Button>
+      <div className="space-y-1">
+        <Button
+          onClick={() => handleStatusUpdate(nextStatuses[0])}
+          disabled={isUpdating}
+          size="sm"
+          className={cn("w-full", className)}
+        >
+          {isUpdating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {isUpdating ? 'Updating...' : `Mark as ${STATUS_LABELS[nextStatuses[0] as keyof typeof STATUS_LABELS]}`}
+        </Button>
+        {emailStatus && (
+          <div className={cn(
+            "flex items-center justify-center gap-1 text-xs",
+            emailStatus === 'success' && "text-green-600",
+            emailStatus === 'failed' && "text-red-600", 
+            emailStatus === 'pending' && "text-blue-600"
+          )}>
+            {getEmailIcon()}
+            <span>
+              {emailStatus === 'success' && 'Email sent'}
+              {emailStatus === 'failed' && 'Email failed'}
+              {emailStatus === 'pending' && 'Sending email...'}
+            </span>
+          </div>
+        )}
+      </div>
     );
   }
 

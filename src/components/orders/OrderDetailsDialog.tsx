@@ -191,7 +191,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           : 'Order updated successfully.'
       });
       queryClient.invalidateQueries({
-        queryKey: ['orders']
+        queryKey: ['orders-new']
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['order-details', order.id]
       });
       onClose();
     },

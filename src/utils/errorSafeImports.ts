@@ -90,7 +90,7 @@ class ErrorSafeImportManager {
     options: any = {}
   ): Promise<void> {
     try {
-      const adminToastMessages = await this.safeImport('@/utils/adminToastMessages');
+      const adminToastMessages = await this.safeImport('@/utils/adminToastMessages.tsx');
       
       if (adminToastMessages?.showAdminToast) {
         adminToastMessages.showAdminToast(toastFn, messageType, options);
@@ -112,7 +112,7 @@ class ErrorSafeImportManager {
     options: any = {}
   ): Promise<void> {
     try {
-      const adminToastMessages = await this.safeImport('@/utils/adminToastMessages');
+      const adminToastMessages = await this.safeImport('@/utils/adminToastMessages.tsx');
       
       if (adminToastMessages?.showAdminErrorToast) {
         adminToastMessages.showAdminErrorToast(toastFn, error, options);

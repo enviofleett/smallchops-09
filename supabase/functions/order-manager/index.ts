@@ -135,7 +135,7 @@ async function listOrders(request: OrderUpdateRequest): Promise<OrderUpdateRespo
       *,
       order_items_new(*),
       order_delivery_schedule(*)
-    `)
+    `, { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + pageSize - 1);
 

@@ -5,9 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, RefreshCw, Filter, X, RotateCcw } from 'lucide-react';
 import { OrderStatus } from '@/types/orders'; 
-import { DeliveryFilterType, getFilterDescription } from '@/utils/dateFilterUtils';
 import { HourlyDeliveryFilter } from './HourlyDeliveryFilter';
-import { DeliveryDateFilter } from './DeliveryDateFilter';
 import { OrderTabDropdown } from './OrderTabDropdown';
 
 interface AdminOrdersFiltersProps {
@@ -15,8 +13,6 @@ interface AdminOrdersFiltersProps {
   setSearchQuery: (query: string) => void;
   statusFilter: 'all' | OrderStatus;
   setStatusFilter: (filter: 'all' | OrderStatus) => void;
-  deliveryFilter: DeliveryFilterType;
-  setDeliveryFilter: (filter: DeliveryFilterType) => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   selectedDay: 'today' | 'tomorrow' | null;
@@ -26,7 +22,6 @@ interface AdminOrdersFiltersProps {
   isMobile: boolean;
   refetch: () => void;
   orders: any[];
-  deliverySchedules: Record<string, any>;
   filteredOrdersCount?: number;
 }
 
@@ -35,8 +30,6 @@ export function AdminOrdersFilters({
   setSearchQuery,
   statusFilter,
   setStatusFilter,
-  deliveryFilter,
-  setDeliveryFilter,
   activeTab,
   setActiveTab,
   selectedDay,
@@ -46,7 +39,6 @@ export function AdminOrdersFilters({
   isMobile,
   refetch,
   orders,
-  deliverySchedules,
   filteredOrdersCount
 }: AdminOrdersFiltersProps) {
   
@@ -54,27 +46,18 @@ export function AdminOrdersFilters({
   const hasActiveFilters = useMemo(() => {
     return searchQuery.length > 0 || 
            statusFilter !== 'all' || 
-           deliveryFilter !== 'all' ||
            selectedDay !== null ||
            selectedHour !== null;
-  }, [searchQuery, statusFilter, deliveryFilter, selectedDay, selectedHour]);
+  }, [searchQuery, statusFilter, selectedDay, selectedHour]);
 
   // Clear all filters
   const clearAllFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
-    setDeliveryFilter('all');
     setSelectedDay(null);
     setSelectedHour(null);
   };
 
-  // Get filter description for current state
-  const currentFilterDescription = useMemo(() => {
-    if (deliveryFilter !== 'all' && filteredOrdersCount !== undefined) {
-      return getFilterDescription(deliveryFilter, filteredOrdersCount, orders.length);
-    }
-    return null;
-  }, [deliveryFilter, filteredOrdersCount, orders.length]);
 
   return (
     <div className="space-y-4">
@@ -178,15 +161,6 @@ export function AdminOrdersFilters({
             </Badge>
           )}
           
-          {deliveryFilter !== 'all' && (
-            <Badge variant="secondary" className="gap-1">
-              Delivery: {deliveryFilter}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => setDeliveryFilter('all')}
-              />
-            </Badge>
-          )}
           
           {selectedDay && (
             <Badge variant="secondary" className="gap-1">
@@ -210,21 +184,6 @@ export function AdminOrdersFilters({
         </div>
       )}
 
-      {/* Filter Description */}
-      {currentFilterDescription && (
-        <div className="text-sm text-muted-foreground bg-background border border-border rounded-lg p-3">
-          {currentFilterDescription}
-        </div>
-      )}
-
-      {/* Delivery Date Filter */}
-      <DeliveryDateFilter 
-        value={deliveryFilter}
-        onChange={setDeliveryFilter}
-        orders={orders}
-        deliverySchedules={deliverySchedules}
-        showCounts={true}
-      />
 
       {/* Order Tabs */}
       <OrderTabDropdown

@@ -183,7 +183,7 @@ class ErrorSafeImportManager {
       description = 'The operation took too long. Please try again.';
     }
 
-    toastFn(title, {
+    toastFn.error(title, {
       description,
       action: options.onRetry ? {
         label: 'Retry',

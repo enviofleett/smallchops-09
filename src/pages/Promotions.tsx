@@ -290,10 +290,10 @@ export default function PromotionsPage() {
 
       {/* Create Promotion Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl w-[96vw] sm:w-[90vw] lg:w-full max-h-[96vh] sm:max-h-[94vh] lg:max-h-[88vh] p-0 flex flex-col overflow-hidden border-0 shadow-2xl mx-auto">
-          <DialogHeader className="p-3 sm:p-4 lg:p-6 pb-2 sm:pb-3 lg:pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 flex-shrink-0">
-            <DialogTitle className="text-base sm:text-lg lg:text-xl font-semibold flex items-center gap-2">
-              <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-blue-600" />
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-[85vw] md:max-w-3xl lg:max-w-4xl h-[95vh] sm:h-[90vh] md:h-[85vh] p-0 flex flex-col overflow-hidden border-0 shadow-2xl mx-auto rounded-xl sm:rounded-2xl">
+          <DialogHeader className="p-4 sm:p-5 md:p-6 pb-3 sm:pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50 flex-shrink-0 sticky top-0 z-10 backdrop-blur-sm">
+            <DialogTitle className="text-lg sm:text-xl md:text-2xl font-semibold flex items-center gap-2 text-foreground">
+              <PlusCircle className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               Create New Promotion
             </DialogTitle>
           </DialogHeader>

@@ -175,7 +175,7 @@ export default function CreatePromotionForm({
   }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden bg-background">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(handleSubmit)}
@@ -183,16 +183,18 @@ export default function CreatePromotionForm({
           noValidate
           className="flex flex-col h-full overflow-hidden"
         >
-          {/* Scrollable Content */}
-          <ScrollArea className="flex-1 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-            <div className="space-y-4 sm:space-y-6 py-2 sm:py-3 lg:py-4 px-3 sm:px-4 lg:px-6 pb-4 sm:pb-6 lg:pb-8 min-h-0">
-              {/* Form content will be inserted here */}
-              <div className="space-y-6">
+          {/* Scrollable Content Area */}
+          <ScrollArea className="flex-1 overflow-y-auto overscroll-contain" style={{ scrollbarGutter: 'stable' }}>
+            <div className="space-y-6 sm:space-y-8 p-4 sm:p-6 md:p-8 pb-8 min-h-0">
+              <div className="space-y-8">
                 {/* Basic Information */}
-                <div className="space-y-3 sm:space-y-4">
-                  <h4 className="font-medium text-xs sm:text-sm text-muted-foreground uppercase tracking-wide">
-                    Basic Information
-                  </h4>
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="pb-2 border-b border-border/50">
+                    <h4 className="font-semibold text-sm sm:text-base text-foreground flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                      Basic Information
+                    </h4>
+                  </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {/* Name */}
@@ -488,28 +490,31 @@ export default function CreatePromotionForm({
             </div>
           </ScrollArea>
 
-          {/* Fixed Footer with CTA Button */}
-          <div className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mt-auto shadow-lg">
-            <div className="p-3 sm:p-4 lg:p-6 pb-4 sm:pb-5 lg:pb-6">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 sm:justify-end">
+          {/* Fixed Footer with Prominent CTA Button */}
+          <div className="flex-shrink-0 border-t bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/90 mt-auto shadow-2xl sticky bottom-0 z-20">
+            <div className="p-4 sm:p-5 md:p-6">
+              <div className="flex flex-col gap-3">
                 <Button
                   type="submit"
                   disabled={disabled || isSubmitting || createMutation.isPending}
-                  className="w-full sm:w-auto min-w-[140px] sm:min-w-[160px] h-11 sm:h-12 text-sm sm:text-base font-medium touch-manipulation shadow-md hover:shadow-lg transition-all duration-200"
+                  className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold touch-manipulation shadow-lg hover:shadow-xl transition-all duration-300 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
                   size="lg"
                 >
                   {isSubmitting || createMutation.isPending ? (
                     <>
-                      <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                      Creating...
+                      <div className="animate-spin mr-3 w-5 h-5 border-2 border-current border-t-transparent rounded-full" />
+                      Creating Promotion...
                     </>
                   ) : (
                     <>
-                      <Plus className="w-4 h-4 mr-2" />
+                      <Plus className="w-5 h-5 mr-3" />
                       Create Promotion
                     </>
                   )}
                 </Button>
+                <p className="text-xs sm:text-sm text-muted-foreground text-center">
+                  All fields are validated before creation
+                </p>
               </div>
             </div>
           </div>

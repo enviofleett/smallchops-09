@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getOrders, OrderWithItems } from '@/api/orders';
+import { OrderWithItems } from '@/api/orders';
+import { useOrdersNew, useOrdersRealTime } from '@/hooks/useOrdersNew';
+import { adaptNewOrdersToOld } from '@/utils/orderDataAdapter';
 import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
@@ -96,26 +98,29 @@ export function AdminOrdersContent() {
     }
   }, [activeTab]);
 
-  // Fetch orders with pagination and filters
-  const {
-    data: ordersData,
-    isLoading,
-    error,
-    refetch
-  } = useQuery({
-    queryKey: ['admin-orders', currentPage, statusFilter, debouncedSearchQuery],
-    queryFn: () => getOrders({
-      page: currentPage,
-      pageSize: 20,
-      status: statusFilter === 'all' || statusFilter === 'overdue' ? undefined : statusFilter,
-      searchQuery: debouncedSearchQuery || undefined
-    }),
-    refetchInterval: 30000, // Refresh every 30 seconds
-    placeholderData: (previousData) => previousData // Keep previous data while loading new data
+  // Use new order management hooks
+  const { data: newOrdersData, isLoading, error, refetch } = useOrdersNew({
+    status: statusFilter === 'all' || statusFilter === 'overdue' ? undefined : statusFilter,
+    search: debouncedSearchQuery || undefined,
+    page: currentPage,
+    pageSize: 20
   });
   
-  const orders = ordersData?.orders || [];
-  const totalCount = ordersData?.count || 0;
+  // Real-time updates
+  const { subscribe } = useOrdersRealTime();
+  
+  useEffect(() => {
+    const unsubscribe = subscribe();
+    return unsubscribe;
+  }, [subscribe]);
+  
+  // Adapt new orders data to old structure
+  const orders = useMemo(() => {
+    if (!newOrdersData?.orders) return [];
+    return adaptNewOrdersToOld(newOrdersData.orders);
+  }, [newOrdersData?.orders]);
+  
+  const totalCount = newOrdersData?.total_count || 0;
   const totalPages = Math.ceil(totalCount / 20);
 
   // Use the overdue orders logic hook

@@ -1,8 +1,8 @@
 import React from 'react';
-import { OrdersPageNew } from '@/components/admin/orders/OrdersPageNew';
+import { AdminOrdersContent } from '@/components/admin/orders/AdminOrdersContent';
 
 function AdminOrdersWrapper() {
-  return <OrdersPageNew />;
+  return <AdminOrdersContent />;
 }
 
 export default AdminOrdersWrapper;

@@ -129,39 +129,62 @@ async function listOrders(request: OrderUpdateRequest): Promise<OrderUpdateRespo
   const pageSize = request.page_size || 20;
   const offset = (page - 1) * pageSize;
 
-  let query = supabase
-    .from('orders_new')
-    .select(`
-      *,
-      order_items_new(*)
-    `, { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(offset, offset + pageSize - 1);
+  try {
+    // First get the base orders with count
+    let baseQuery = supabase
+      .from('orders_new')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
 
-  // Apply filters
-  if (request.status_filter && request.status_filter !== 'all') {
-    query = query.eq('status', request.status_filter);
-  }
+    // Apply filters
+    if (request.status_filter && request.status_filter !== 'all') {
+      baseQuery = baseQuery.eq('status', request.status_filter);
+    }
 
-  if (request.search_query) {
-    query = query.or(`order_number.ilike.%${request.search_query}%,customer_name.ilike.%${request.search_query}%,customer_email.ilike.%${request.search_query}%`);
-  }
+    if (request.search_query) {
+      baseQuery = baseQuery.or(`order_number.ilike.%${request.search_query}%,customer_name.ilike.%${request.search_query}%,customer_email.ilike.%${request.search_query}%`);
+    }
 
-  const { data: orders, error, count } = await query;
+    const { data: orders, error, count } = await baseQuery;
 
-  if (error) {
+    if (error) {
+      throw new Error(`Failed to fetch orders: ${error.message}`);
+    }
+
+    // Get order items for these orders
+    const orderIds = orders?.map(order => order.id) || [];
+    let orderItems: any[] = [];
+    
+    if (orderIds.length > 0) {
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items_new')
+        .select('*')
+        .in('order_id', orderIds);
+      
+      if (!itemsError) {
+        orderItems = items || [];
+      }
+    }
+
+    // Combine orders with their items
+    const ordersWithItems = orders?.map(order => ({
+      ...order,
+      order_items_new: orderItems.filter(item => item.order_id === order.id)
+    })) || [];
+
+    return {
+      success: true,
+      data: {
+        orders: ordersWithItems,
+        total_count: count,
+        page,
+        page_size: pageSize
+      }
+    };
+  } catch (error: any) {
     throw new Error(`Failed to fetch orders: ${error.message}`);
   }
-
-  return {
-    success: true,
-    data: {
-      orders: orders || [],
-      total_count: count,
-      page,
-      page_size: pageSize
-    }
-  };
 }
 
 async function updateOrderStatus(request: OrderUpdateRequest): Promise<OrderUpdateResponse> {

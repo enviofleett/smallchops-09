@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { getOrders } from '@/api/orders';
+import { useOrdersNew } from '@/hooks/useOrdersNew';
 import { getRoutes } from '@/api/routes';
 import { getDrivers } from '@/api/drivers';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
@@ -12,24 +12,9 @@ export function SystemStatusChecker() {
     data: ordersData,
     error: ordersError,
     isLoading: ordersLoading
-  } = useQuery({
-    queryKey: ['system-test-orders'],
-    queryFn: async () => {
-      try {
-        console.log('🔍 Testing Orders API...');
-        const result = await getOrders({
-          page: 1,
-          pageSize: 1
-        });
-        console.log('✅ Orders API success:', result);
-        return result;
-      } catch (error) {
-        console.error('❌ Orders API failed:', error);
-        throw error;
-      }
-    },
-    retry: 1,
-    staleTime: 30000 // 30 seconds
+  } = useOrdersNew({
+    page: 1,
+    pageSize: 1
   });
   const {
     data: routes,

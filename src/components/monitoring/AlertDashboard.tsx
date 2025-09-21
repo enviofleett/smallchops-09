@@ -64,7 +64,7 @@ export const AlertDashboard: React.FC = () => {
 
       // Fetch circuit breaker status
       const { data: cbStatus, error: cbError } = await supabase.functions.invoke(
-        'admin-orders-manager',
+        'order-manager',
         {
           method: 'GET',
           body: { action: 'get_circuit_breaker_status' }
@@ -120,7 +120,7 @@ export const AlertDashboard: React.FC = () => {
   const resetCircuitBreaker = async (breakerName: string) => {
     try {
       const { error } = await supabase.functions.invoke(
-        'admin-orders-manager',
+        'order-manager',
         {
           body: { 
             action: 'reset_circuit_breaker',

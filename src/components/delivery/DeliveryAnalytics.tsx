@@ -16,8 +16,7 @@ import {
 } from "lucide-react";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useQuery } from '@tanstack/react-query';
-import { getOrders } from '@/api/orders';
+import { useOrdersNew } from '@/hooks/useOrdersNew';
 import { Line, LineChart, Bar, BarChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 interface DeliveryAnalyticsProps {
@@ -51,23 +50,19 @@ export function DeliveryAnalytics({ className }: DeliveryAnalyticsProps) {
   };
 
   // Fetch orders data for analytics
-  const { data: ordersData, isLoading } = useQuery({
-    queryKey: ['delivery-analytics', format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd')],
-    queryFn: () => getOrders({
-      page: 1,
-      pageSize: 1000,
-      startDate: format(startDate, 'yyyy-MM-dd'),
-      endDate: format(endDate, 'yyyy-MM-dd'),
-    }),
-    refetchInterval: 300000, // 5 minutes
+  const { data: ordersData, isLoading } = useOrdersNew({
+    page: 1,
+    pageSize: 1000,
+    startDate: format(startDate, 'yyyy-MM-dd'),
+    endDate: format(endDate, 'yyyy-MM-dd'),
   });
 
   // Process analytics data
   const analytics = useMemo(() => {
-    if (!ordersData?.orders) return null;
+    if (!ordersData?.data?.orders) return null;
 
-    const deliveryOrders = ordersData.orders.filter(order => order.order_type === 'delivery');
-    const pickupOrders = ordersData.orders.filter(order => order.order_type === 'pickup');
+    const deliveryOrders = ordersData.data.orders.filter(order => order.order_type === 'delivery');
+    const pickupOrders = ordersData.data.orders.filter(order => order.order_type === 'pickup');
     
     // Status distribution
     const statusDistribution = deliveryOrders.reduce((acc, order) => {
@@ -90,12 +85,15 @@ export function DeliveryAnalytics({ className }: DeliveryAnalyticsProps) {
     }, {} as Record<string, { orders: number; revenue: number; deliveries: number }>);
 
     // Convert to chart format
-    const chartData = Object.entries(dailyMetrics).map(([date, metrics]) => ({
-      date: format(new Date(date), 'MMM dd'),
-      orders: metrics.orders,
-      revenue: metrics.revenue,
-      deliveries: metrics.deliveries,
-    })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const chartData = Object.entries(dailyMetrics).map(([date, metrics]) => {
+      const metricData = metrics as { orders: number; revenue: number; deliveries: number };
+      return {
+        date: format(new Date(date), 'MMM dd'),
+        orders: metricData.orders,
+        revenue: metricData.revenue,
+        deliveries: metricData.deliveries,
+      };
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Delivery time analysis
     const averageDeliveryTime = deliveryOrders

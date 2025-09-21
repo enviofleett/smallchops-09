@@ -7,6 +7,8 @@ interface OrderFilters {
   search?: string;
   page?: number;
   pageSize?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface OrderUpdateRequest {
@@ -44,7 +46,9 @@ export const useOrdersNew = (filters: OrderFilters = {}) => {
           page: filters.page || 1,
           page_size: filters.pageSize || 20,
           status_filter: filters.status || 'all',
-          search_query: filters.search || ''
+          search_query: filters.search || '',
+          start_date: filters.startDate,
+          end_date: filters.endDate
         }
       });
 

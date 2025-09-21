@@ -81,22 +81,38 @@ export function AdminOrdersContent() {
   // Debounce search query to avoid excessive API calls
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
+  // Handle category click from stats cards
+  const handleCategoryClick = (category: 'all' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'overdue') => {
+    setActiveTab(category);
+    
+    // Map category to status filter
+    if (category === 'all') {
+      setStatusFilter('all');
+    } else if (category === 'overdue') {
+      setStatusFilter('overdue');
+    } else {
+      setStatusFilter(category as OrderStatus);
+    }
+    
+    // Reset pagination and filters when switching categories
+    setCurrentPage(1);
+    setSearchQuery('');
+    setDeliveryFilter('all');
+    
+    // Reset category-specific filters
+    if (category !== 'confirmed') {
+      setSelectedDay(null);
+      setSelectedHour(null);
+    }
+    if (category !== 'overdue') {
+      setSelectedOverdueDateFilter(null);
+    }
+  };
+
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter, debouncedSearchQuery, deliveryFilter, selectedDay, selectedHour, selectedOverdueDateFilter]);
-
-  // Reset hourly filters when changing tabs (except for confirmed tab)
-  useEffect(() => {
-    if (activeTab !== 'confirmed') {
-      setSelectedDay(null);
-      setSelectedHour(null);
-    }
-    // Reset overdue filters when changing tabs (except for overdue tab)
-    if (activeTab !== 'overdue') {
-      setSelectedOverdueDateFilter(null);
-    }
-  }, [activeTab]);
 
   // Use new order management hooks
   const { data: newOrdersData, isLoading, error, refetch } = useOrdersNew({
@@ -337,6 +353,8 @@ export function AdminOrdersContent() {
         activeTab={activeTab}
         showDeliveryReport={showDeliveryReport}
         setShowDeliveryReport={setShowDeliveryReport}
+        onCategoryClick={handleCategoryClick}
+        isLoading={isLoading}
       />
       
       <AdminOrdersList

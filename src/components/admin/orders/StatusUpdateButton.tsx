@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useSimpleOrderStatusUpdate } from '@/hooks/useSimpleOrderStatusUpdate';
+import { useOrderUpdate } from '@/hooks/useOrdersNew';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown, Loader2, Mail, MailCheck, MailX, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -52,33 +52,66 @@ const STATUS_COLORS = {
 };
 
 export function StatusUpdateButton({ order, onConflict, className }: StatusUpdateButtonProps) {
+  const [isUpdating, setIsUpdating] = useState(false);
   const [emailStatus, setEmailStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
-  const { updateOrderStatus, isUpdating, error } = useSimpleOrderStatusUpdate();
+  const updateMutation = useOrderUpdate();
   const { toast } = useToast();
 
   const currentStatus = order.status;
   const nextStatuses = STATUS_FLOW[currentStatus as keyof typeof STATUS_FLOW] || [];
 
   const handleStatusUpdate = async (newStatus: string) => {
+    setIsUpdating(true);
     setEmailStatus('pending');
     
     try {
-      const result = await updateOrderStatus(order.id, newStatus as any);
-      
-      // Show success feedback
-      setEmailStatus('success');
-      toast({
-        title: "Status Updated",
-        description: `Order status changed to ${newStatus}. Customer will be notified.`,
+      const result = await updateMutation.mutateAsync({
+        order_id: order.id,
+        new_status: newStatus,
+        admin_id: order.updated_by || 'admin',
+        version: order.version
       });
-      
+
+      if (result.success) {
+        // Check email queue status from result
+        const emailQueued = result.data?.email_result;
+        
+        if (emailQueued?.success) {
+          setEmailStatus('success');
+          toast({
+            title: "Status Updated",
+            description: `Order status changed to ${newStatus}. Customer notification sent.`,
+          });
+        } else if (emailQueued?.success === false) {
+          setEmailStatus('failed');
+          toast({
+            title: "Status Updated",
+            description: `Order status changed to ${newStatus}. Email notification failed - will retry automatically.`,
+            variant: "destructive"
+          });
+        } else {
+          setEmailStatus('success'); // Assume success if no specific feedback
+        }
+      } else if (result.code === 'VERSION_CONFLICT') {
+        setEmailStatus(null);
+        onConflict({
+          orderId: order.id,
+          currentVersion: result.conflict?.current_version || 0,
+          currentStatus: result.conflict?.current_status || '',
+          lastUpdatedBy: result.conflict?.last_updated_by || '',
+          lastUpdatedAt: result.conflict?.last_updated_at || '',
+          attemptedStatus: newStatus
+        });
+      }
     } catch (error) {
       console.error('Status update error:', error);
       setEmailStatus('failed');
-      // Error toast is already handled by the simple hook
     } finally {
+      setIsUpdating(false);
       // Clear email status after 5 seconds
-      setTimeout(() => setEmailStatus(null), 5000);
+      if (emailStatus !== null) {
+        setTimeout(() => setEmailStatus(null), 5000);
+      }
     }
   };
 

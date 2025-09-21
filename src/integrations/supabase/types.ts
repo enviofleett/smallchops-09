@@ -11100,7 +11100,7 @@ export type Database = {
       }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
-        Returns: number
+        Returns: Json
       }
       production_cleanup: {
         Args: Record<PropertyKey, never>

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 import { OrderStatus } from '@/types/orders';
 
-type OrderCategory = 'all' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'overdue';
+type OrderCategory = 'all' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
 
 interface StatCard {
   title: string;
@@ -22,7 +22,6 @@ interface StatCard {
 
 interface AdminOrdersStatsProps {
   orders: any[];
-  overdueOrders: any[];
   activeTab: string;
   showDeliveryReport: boolean;
   setShowDeliveryReport: (show: boolean) => void;
@@ -32,7 +31,6 @@ interface AdminOrdersStatsProps {
 
 export function AdminOrdersStats({
   orders,
-  overdueOrders,
   activeTab,
   showDeliveryReport,
   setShowDeliveryReport,
@@ -46,8 +44,7 @@ export function AdminOrdersStats({
     preparing: orders.filter(o => o.status === 'preparing').length,
     ready: orders.filter(o => o.status === 'ready').length,
     out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
-    overdue: overdueOrders.length
+    delivered: orders.filter(o => o.status === 'delivered').length
   };
 
   const statCards: StatCard[] = [
@@ -95,15 +92,6 @@ export function AdminOrdersStats({
       textColor: 'text-indigo-600',
       category: 'out_for_delivery',
       description: 'Orders currently being delivered'
-    },
-    {
-      title: 'Overdue',
-      value: orderCounts.overdue,
-      icon: AlertCircle,
-      color: 'bg-red-500',
-      textColor: 'text-red-600',
-      category: 'overdue',
-      description: 'Orders past their delivery time'
     }
   ];
 
@@ -116,7 +104,7 @@ export function AdminOrdersStats({
     <TooltipProvider>
       <div className="space-y-4">
         {/* Production-Ready Order Stats with Click Functionality */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5 gap-3 md:gap-4">
           {statCards.map((stat, index) => {
             const Icon = stat.icon;
             const isActive = activeTab === stat.category;
@@ -192,7 +180,6 @@ export function AdminOrdersStats({
           <Badge variant="outline" className="text-sm font-medium">
             {activeTab === 'all' ? 'All Orders' : 
              activeTab === 'confirmed' ? 'Confirmed Orders' :
-             activeTab === 'overdue' ? 'Overdue Orders' :
              `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('_', ' ')} Orders`}
           </Badge>
           <div className="text-sm text-muted-foreground">

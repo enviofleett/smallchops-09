@@ -25,7 +25,7 @@ export function AdminOrdersContent() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus | 'overdue'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilterType>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
@@ -82,14 +82,12 @@ export function AdminOrdersContent() {
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
   // Handle category click from stats cards
-  const handleCategoryClick = (category: 'all' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'overdue') => {
+  const handleCategoryClick = (category: 'all' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered') => {
     setActiveTab(category);
     
     // Map category to status filter
     if (category === 'all') {
       setStatusFilter('all');
-    } else if (category === 'overdue') {
-      setStatusFilter('overdue');
     } else {
       setStatusFilter(category as OrderStatus);
     }
@@ -104,9 +102,6 @@ export function AdminOrdersContent() {
       setSelectedDay(null);
       setSelectedHour(null);
     }
-    if (category !== 'overdue') {
-      setSelectedOverdueDateFilter(null);
-    }
   };
 
   // Reset pagination when filters change
@@ -116,7 +111,7 @@ export function AdminOrdersContent() {
 
   // Use new order management hooks
   const { data: newOrdersData, isLoading, error, refetch } = useOrdersNew({
-    status: statusFilter === 'all' || statusFilter === 'overdue' ? undefined : statusFilter,
+    status: statusFilter === 'all' ? undefined : statusFilter,
     search: debouncedSearchQuery || undefined,
     page: currentPage,
     pageSize: 20
@@ -161,33 +156,6 @@ export function AdminOrdersContent() {
   const prioritySortedOrders = useMemo(() => {
     let ordersCopy = [...orders];
     
-    // Filter for overdue orders
-    if (statusFilter === 'overdue') {
-      ordersCopy = orders.filter(order => {
-        const schedule = deliverySchedules[order.id];
-        if (!schedule) return false;
-        
-        // Only show paid orders that are overdue and haven't been delivered
-        return order.payment_status === 'paid' && 
-               isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
-               ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status);
-      });
-      
-      // Sort overdue orders by how long they've been overdue (most critical first)
-      ordersCopy.sort((a, b) => {
-        const scheduleA = deliverySchedules[a.id];
-        const scheduleB = deliverySchedules[b.id];
-        
-        if (!scheduleA || !scheduleB) return 0;
-        
-        const deadlineA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_end}`);
-        const deadlineB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_end}`);
-        
-        // Most overdue orders come first (earlier deadlines first)
-        return deadlineA.getTime() - deadlineB.getTime();
-      });
-    }
-    
     // Filter and sort confirmed orders - ONLY PAID ORDERS
     if (statusFilter === 'confirmed') {
       // First filter: only paid confirmed orders
@@ -211,13 +179,8 @@ export function AdminOrdersContent() {
         if (aIsToday && !bIsToday) return -1;
         if (!aIsToday && bIsToday) return 1;
         
-        // Among today's orders, overdue ones get highest priority
+        // Among today's orders, prioritize by status and delivery time
         if (aIsToday && bIsToday) {
-          const aOverdue = scheduleA && isOrderOverdue(scheduleA.delivery_date, scheduleA.delivery_time_end);
-          const bOverdue = scheduleB && isOrderOverdue(scheduleB.delivery_date, scheduleB.delivery_time_end);
-          
-          if (aOverdue && !bOverdue) return -1;
-          if (!aOverdue && bOverdue) return 1;
           
           // Both today - sort by time slot
           if (scheduleA && scheduleB) {
@@ -249,16 +212,16 @@ export function AdminOrdersContent() {
 
   // Filter orders by delivery schedule with defensive date handling + hourly filtering
   const filteredOrders = useMemo(() => {
-    // Use overdue orders for the overdue tab, regular orders for others  
-    let result = statusFilter === 'overdue' ? overdueOrders : prioritySortedOrders;
+    // Use regular orders for filtering
+    let result = prioritySortedOrders;
     
     // Apply comprehensive delivery/pickup date filter using utility functions
-    if (deliveryFilter !== 'all' && (statusFilter as string) !== 'overdue') {
+    if (deliveryFilter !== 'all') {
       try {
         result = filterOrdersByDate(result, deliveryFilter, deliverySchedules);
       } catch (error) {
         console.error('Error applying date filter:', error);
-        result = statusFilter === 'overdue' ? overdueOrders : prioritySortedOrders;
+        result = prioritySortedOrders;
       }
     }
     
@@ -322,7 +285,7 @@ export function AdminOrdersContent() {
     }
     
     return result;
-  }, [prioritySortedOrders, overdueOrders, deliverySchedules, deliveryFilter, statusFilter, selectedDay, selectedHour, activeTab]);
+  }, [prioritySortedOrders, deliverySchedules, deliveryFilter, statusFilter, selectedDay, selectedHour, activeTab]);
 
   return (
     <>
@@ -339,8 +302,6 @@ export function AdminOrdersContent() {
         setSelectedDay={setSelectedDay}
         selectedHour={selectedHour}
         setSelectedHour={setSelectedHour}
-        selectedOverdueDateFilter={selectedOverdueDateFilter}
-        setSelectedOverdueDateFilter={setSelectedOverdueDateFilter}
         isMobile={isMobile}
         refetch={refetch}
         orders={orders}
@@ -349,7 +310,6 @@ export function AdminOrdersContent() {
       
       <AdminOrdersStats
         orders={orders}
-        overdueOrders={overdueOrders}
         activeTab={activeTab}
         showDeliveryReport={showDeliveryReport}
         setShowDeliveryReport={setShowDeliveryReport}

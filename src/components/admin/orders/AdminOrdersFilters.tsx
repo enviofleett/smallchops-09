@@ -9,14 +9,12 @@ import { DeliveryFilterType } from '@/utils/dateFilterUtils';
 import { HourlyDeliveryFilter } from './HourlyDeliveryFilter';
 import { DeliveryDateFilter } from './DeliveryDateFilter';
 import { OrderTabDropdown } from './OrderTabDropdown';
-import { OverdueDateFilter } from './OverdueDateFilter';
-import { isOrderOverdue } from '@/utils/scheduleTime';
 
 interface AdminOrdersFiltersProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  statusFilter: 'all' | OrderStatus | 'overdue';
-  setStatusFilter: (filter: 'all' | OrderStatus | 'overdue') => void;
+  statusFilter: 'all' | OrderStatus;
+  setStatusFilter: (filter: 'all' | OrderStatus) => void;
   deliveryFilter: DeliveryFilterType;
   setDeliveryFilter: (filter: DeliveryFilterType) => void;
   activeTab: string;
@@ -25,8 +23,6 @@ interface AdminOrdersFiltersProps {
   setSelectedDay: (day: 'today' | 'tomorrow' | null) => void;
   selectedHour: string | null;
   setSelectedHour: (hour: string | null) => void;
-  selectedOverdueDateFilter: string | null;
-  setSelectedOverdueDateFilter: (filter: string | null) => void;
   isMobile: boolean;
   refetch: () => void;
   orders: any[];
@@ -46,8 +42,6 @@ export function AdminOrdersFilters({
   setSelectedDay,
   selectedHour,
   setSelectedHour,
-  selectedOverdueDateFilter,
-  setSelectedOverdueDateFilter,
   isMobile,
   refetch,
   orders,
@@ -82,7 +76,6 @@ export function AdminOrdersFilters({
               <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -101,12 +94,10 @@ export function AdminOrdersFilters({
       </div>
 
       {/* Delivery Date Filter */}
-      {statusFilter !== 'overdue' && (
-        <DeliveryDateFilter 
-          value={deliveryFilter}
-          onChange={setDeliveryFilter}
-        />
-      )}
+      <DeliveryDateFilter 
+        value={deliveryFilter}
+        onChange={setDeliveryFilter}
+      />
 
       {/* Order Tabs */}
       <OrderTabDropdown
@@ -118,11 +109,7 @@ export function AdminOrdersFilters({
           preparing: orders.filter(o => o.status === 'preparing').length,
           ready: orders.filter(o => o.status === 'ready').length,
           out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
-          delivered: orders.filter(o => o.status === 'delivered').length,
-          overdue: orders.filter(o => {
-            const schedule = deliverySchedules[o.id];
-            return schedule && isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end);
-          }).length
+          delivered: orders.filter(o => o.status === 'delivered').length
         }}
       />
 
@@ -133,20 +120,6 @@ export function AdminOrdersFilters({
           onDayChange={setSelectedDay}
           selectedHour={selectedHour}
           onHourChange={setSelectedHour}
-        />
-      )}
-
-      {/* Overdue Date Filter for Overdue Tab */}
-      {activeTab === 'overdue' && (
-        <OverdueDateFilter
-          selectedDateFilter={selectedOverdueDateFilter}
-          onDateFilterChange={setSelectedOverdueDateFilter}
-          overdueOrderCounts={{
-            today: 0,
-            yesterday: 0,
-            lastWeek: 0,
-            older: 0
-          }}
         />
       )}
     </div>

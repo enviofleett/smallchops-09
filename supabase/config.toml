@@ -76,6 +76,9 @@ verify_jwt = false
 [functions.admin-orders-manager]
 verify_jwt = false
 
+[functions.order-manager]
+verify_jwt = false
+
 [functions.user-journey-automation]
 verify_jwt = false
 

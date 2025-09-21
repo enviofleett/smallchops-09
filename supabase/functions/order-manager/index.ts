@@ -1,380 +1,399 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface OrderUpdateRequest {
-  action: 'update_status' | 'assign_rider' | 'add_notes' | 'list_orders';
-  order_id?: string;
-  new_status?: string;
-  rider_id?: string;
-  rider_name?: string;
-  notes?: string;
-  admin_id: string;
-  admin_name?: string;
-  version?: number;
-  // List parameters
-  page?: number;
-  page_size?: number;
-  status_filter?: string;
-  search_query?: string;
-}
-
-interface OrderUpdateResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
-  code?: string;
-  conflict?: {
-    current_version: number;
-    current_status: string;
-    last_updated_by: string;
-    last_updated_at: string;
-  };
-}
-
-// Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
-
-serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    // Validate JWT token
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      throw new Error('Invalid token');
-    }
-
-    // Parse request body
-    const body: OrderUpdateRequest = await req.json();
-    
-    // Validate admin permissions
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || profile.role !== 'admin') {
-      throw new Error('Admin access required');
-    }
-
-    // Route to appropriate handler
-    let result: OrderUpdateResponse;
-    
-    switch (body.action) {
-      case 'list_orders':
-        result = await listOrders(body);
-        break;
-      case 'update_status':
-        result = await updateOrderStatus(body);
-        break;
-      case 'assign_rider':
-        result = await assignRider(body);
-        break;
-      case 'add_notes':
-        result = await addNotes(body);
-        break;
-      default:
-        throw new Error(`Unknown action: ${body.action}`);
-    }
-
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-
-  } catch (error) {
-    console.error('Order manager error:', error);
-    
-    const errorResponse: OrderUpdateResponse = {
-      success: false,
-      error: error.message,
-      code: getErrorCode(error.message)
+// Import shared CORS with inline fallback for production stability
+let getCorsHeaders;
+let handleCorsPreflightResponse;
+try {
+  const corsModule = await import('../_shared/cors.ts');
+  getCorsHeaders = corsModule.getCorsHeaders;
+  handleCorsPreflightResponse = corsModule.handleCorsPreflightResponse;
+  console.log('✅ Loaded shared CORS module');
+} catch (error) {
+  console.warn('⚠️ Failed to load shared CORS, using inline fallback:', error);
+  const FALLBACK_ALLOWED_ORIGINS = [
+    'https://startersmallchops.com',
+    'https://www.startersmallchops.com',
+    'https://oknnklksdiqaifhxaccs.lovable.app',
+    'https://id-preview--7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.app',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.sandbox.lovable.dev',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  const DEV_PATTERNS = [
+    /^https:\/\/.*\.lovable\.app$/,
+    /^https:\/\/.*\.sandbox\.lovable\.dev$/,
+    /^http:\/\/localhost:\d+$/
+  ];
+  
+  getCorsHeaders = (origin) => {
+    const baseHeaders = {
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Access-Control-Allow-Credentials': 'false'
     };
-
-    const status = getErrorStatus(error.message);
-
-    return new Response(JSON.stringify(errorResponse), {
-      status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-});
-
-async function listOrders(request: OrderUpdateRequest): Promise<OrderUpdateResponse> {
-  const page = request.page || 1;
-  const pageSize = request.page_size || 20;
-  const offset = (page - 1) * pageSize;
-
-  try {
-    // First get the base orders with count
-    let baseQuery = supabase
-      .from('orders_new')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + pageSize - 1);
-
-    // Apply filters
-    if (request.status_filter && request.status_filter !== 'all') {
-      baseQuery = baseQuery.eq('status', request.status_filter);
-    }
-
-    if (request.search_query) {
-      baseQuery = baseQuery.or(`order_number.ilike.%${request.search_query}%,customer_name.ilike.%${request.search_query}%,customer_email.ilike.%${request.search_query}%`);
-    }
-
-    const { data: orders, error, count } = await baseQuery;
-
-    if (error) {
-      throw new Error(`Failed to fetch orders: ${error.message}`);
-    }
-
-    // Get order items for these orders
-    const orderIds = orders?.map(order => order.id) || [];
-    let orderItems: any[] = [];
     
-    if (orderIds.length > 0) {
-      const { data: items, error: itemsError } = await supabase
-        .from('order_items_new')
-        .select('*')
-        .in('order_id', orderIds);
-      
-      if (!itemsError) {
-        orderItems = items || [];
-      }
-    }
-
-    // Combine orders with their items
-    const ordersWithItems = orders?.map(order => ({
-      ...order,
-      order_items_new: orderItems.filter(item => item.order_id === order.id)
-    })) || [];
-
-    return {
-      success: true,
-      data: {
-        orders: ordersWithItems,
-        total_count: count,
-        page,
-        page_size: pageSize
-      }
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to fetch orders: ${error.message}`);
-  }
-}
-
-async function updateOrderStatus(request: OrderUpdateRequest): Promise<OrderUpdateResponse> {
-  if (!request.order_id || !request.new_status || !request.admin_id) {
-    throw new Error('Missing required fields: order_id, new_status, admin_id');
-  }
-
-  // First, get current order to check version
-  const { data: currentOrder, error: fetchError } = await supabase
-    .from('orders_new')
-    .select('*')
-    .eq('id', request.order_id)
-    .single();
-
-  if (fetchError || !currentOrder) {
-    throw new Error('Order not found');
-  }
-
-  // Check for version conflict (optimistic locking)
-  if (request.version && currentOrder.version !== request.version) {
-    return {
-      success: false,
-      error: 'Order was updated by another admin',
-      code: 'VERSION_CONFLICT',
-      conflict: {
-        current_version: currentOrder.version,
-        current_status: currentOrder.status,
-        last_updated_by: currentOrder.updated_by_name || 'Unknown',
-        last_updated_at: currentOrder.updated_at
-      }
-    };
-  }
-
-  // Update the order status
-  const { data: updatedOrder, error: updateError } = await supabase
-    .from('orders_new')
-    .update({
-      status: request.new_status,
-      updated_by: request.admin_id,
-      updated_by_name: request.admin_name || 'Admin',
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', request.order_id)
-    .eq('version', currentOrder.version) // Double-check version
-    .select()
-    .single();
-
-  if (updateError) {
-    // Check if it's a version conflict
-    if (updateError.message.includes('version')) {
-      // Re-fetch current state for conflict info
-      const { data: conflictOrder } = await supabase
-        .from('orders_new')
-        .select('*')
-        .eq('id', request.order_id)
-        .single();
-
+    if (!origin || (!FALLBACK_ALLOWED_ORIGINS.includes(origin) && !DEV_PATTERNS.some(pattern => pattern.test(origin)))) {
       return {
-        success: false,
-        error: 'Order was updated by another admin',
-        code: 'VERSION_CONFLICT',
-        conflict: conflictOrder ? {
-          current_version: conflictOrder.version,
-          current_status: conflictOrder.status,
-          last_updated_by: conflictOrder.updated_by_name || 'Unknown',
-          last_updated_at: conflictOrder.updated_at
-        } : undefined
+        ...baseHeaders,
+        'Access-Control-Allow-Origin': '*'
       };
     }
     
-    throw new Error(`Failed to update order: ${updateError.message}`);
-  }
-
-  if (!updatedOrder) {
-    throw new Error('Order update returned no data - possible version conflict');
-  }
-
-  // Send notification email if status change is significant
-  const notificationStatuses = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
-  if (notificationStatuses.includes(request.new_status)) {
-    await sendStatusNotification(updatedOrder, request.new_status);
-  }
-
-  return {
-    success: true,
-    data: updatedOrder
+    return {
+      ...baseHeaders,
+      'Access-Control-Allow-Origin': origin,
+      'Vary': 'Origin'
+    };
   };
-}
-
-async function assignRider(request: OrderUpdateRequest): Promise<OrderUpdateResponse> {
-  if (!request.order_id || !request.rider_id || !request.admin_id) {
-    throw new Error('Missing required fields: order_id, rider_id, admin_id');
-  }
-
-  const { data: schedule, error } = await supabase
-    .from('order_delivery_schedule')
-    .update({
-      assigned_rider_id: request.rider_id,
-      assigned_rider_name: request.rider_name || 'Rider',
-      updated_at: new Date().toISOString()
-    })
-    .eq('order_id', request.order_id)
-    .select()
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to assign rider: ${error.message}`);
-  }
-
-  return {
-    success: true,
-    data: schedule
-  };
-}
-
-async function addNotes(request: OrderUpdateRequest): Promise<OrderUpdateResponse> {
-  if (!request.order_id || !request.notes || !request.admin_id) {
-    throw new Error('Missing required fields: order_id, notes, admin_id');
-  }
-
-  // Add to audit log
-  const { error } = await supabase
-    .from('order_audit')
-    .insert({
-      order_id: request.order_id,
-      admin_id: request.admin_id,
-      admin_name: request.admin_name || 'Admin',
-      notes: request.notes,
-      action_type: 'add_notes'
+  
+  handleCorsPreflightResponse = (origin) => {
+    return new Response(null, {
+      status: 204,
+      headers: getCorsHeaders(origin)
     });
-
-  if (error) {
-    throw new Error(`Failed to add notes: ${error.message}`);
-  }
-
-  return {
-    success: true,
-    data: { message: 'Notes added successfully' }
   };
 }
 
-async function sendStatusNotification(order: any, newStatus: string) {
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '', 
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
+
+// Enhanced admin authentication function
+async function authenticateAdmin(req) {
   try {
-    // Queue email notification (non-blocking)
-    await supabase.from('communication_events').insert({
-      event_type: 'order_status_update',
-      recipient_email: order.customer_email,
-      template_key: `order_${newStatus}`,
-      template_variables: {
-        customer_name: order.customer_name,
-        order_number: order.order_number,
-        status: newStatus
-      },
-      order_id: order.id,
-      status: 'queued'
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.log('⚠️ No authorization header found');
+      return { success: false, error: 'No authorization header' };
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Get user from token
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError || !user) {
+      console.log('⚠️ Invalid token or user not found:', userError?.message);
+      return { success: false, error: 'Invalid token or user not found' };
+    }
+
+    // Check if user is admin via profiles table
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.log('⚠️ Error fetching user profile:', profileError.message);
+      return { success: false, error: 'Error fetching user profile' };
+    }
+
+    if (!profile || profile.role !== 'admin' || !profile.is_active) {
+      console.log('⚠️ User is not an active admin:', { role: profile?.role, is_active: profile?.is_active });
+      return { success: false, error: 'Insufficient permissions' };
+    }
+
+    console.log('✅ Admin authentication successful:', {
+      userId: user.id,
+      email: user.email,
+      authMethod: 'profiles_table',
+      timestamp: new Date().toISOString()
     });
+
+    return { 
+      success: true, 
+      user: user,
+      profile: profile
+    };
   } catch (error) {
-    console.error('Failed to queue notification:', error);
-    // Don't throw - this is non-critical
+    console.error('❌ Authentication error:', error.message);
+    return { success: false, error: 'Authentication failed' };
   }
 }
 
-function getErrorCode(errorMessage: string): string {
-  if (errorMessage.includes('version') || errorMessage.includes('conflict')) {
-    return 'VERSION_CONFLICT';
+serve(async (req) => {
+  const origin = req.headers.get('origin');
+  console.log('🚀 Order Manager: POST request from origin:', origin, `[req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}]`);
+
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return handleCorsPreflightResponse(origin);
   }
-  if (errorMessage.includes('not found')) {
-    return 'NOT_FOUND';
+
+  try {
+    // Authenticate admin
+    const authResult = await authenticateAdmin(req);
+    if (!authResult.success) {
+      return new Response(
+        JSON.stringify({ success: false, error: authResult.error }),
+        { 
+          status: 401, 
+          headers: { 
+            'Content-Type': 'application/json',
+            ...getCorsHeaders(origin)
+          }
+        }
+      );
+    }
+
+    const body = await req.json();
+    const { action } = body;
+
+    console.log('📋 Processing admin request:', {
+      action: action || 'undefined',
+      orderId: body.order_id || 'N/A',
+      timestamp: new Date().toISOString()
+    });
+
+    switch (action) {
+      case 'list_orders':
+        return await handleListOrders(body, origin);
+      
+      case 'update_status':
+        return await handleUpdateStatus(body, authResult.user, origin);
+      
+      case 'assign_rider':
+        return await handleAssignRider(body, authResult.user, origin);
+      
+      default:
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid action' }),
+          { 
+            status: 400, 
+            headers: { 
+              'Content-Type': 'application/json',
+              ...getCorsHeaders(origin)
+            }
+          }
+        );
+    }
+  } catch (error) {
+    console.error('❌ Order Manager Error:', error.message);
+    return new Response(
+      JSON.stringify({ success: false, error: 'Internal server error' }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
   }
-  if (errorMessage.includes('admin') || errorMessage.includes('permission')) {
-    return 'PERMISSION_DENIED';
+});
+
+async function handleListOrders(body, origin) {
+  const { 
+    page = 1, 
+    page_size = 20, 
+    status_filter = 'all', 
+    search_query = '',
+    start_date,
+    end_date
+  } = body;
+
+  console.log('Admin function: Listing orders', {
+    page,
+    pageSize: page_size,
+    status: status_filter,
+    searchQuery: search_query,
+    startDate: start_date,
+    endDate: end_date
+  });
+
+  try {
+    let query = supabaseClient
+      .from('orders')
+      .select(`
+        *,
+        order_items(*)
+      `, { count: 'exact' });
+
+    // Apply filters
+    if (status_filter !== 'all') {
+      query = query.eq('status', status_filter);
+    }
+
+    if (search_query) {
+      query = query.or(`customer_name.ilike.%${search_query}%,customer_email.ilike.%${search_query}%,order_number.ilike.%${search_query}%`);
+    }
+
+    if (start_date) {
+      query = query.gte('created_at', start_date);
+    }
+
+    if (end_date) {
+      query = query.lte('created_at', end_date);
+    }
+
+    // Apply pagination
+    const offset = (page - 1) * page_size;
+    query = query
+      .range(offset, offset + page_size - 1)
+      .order('created_at', { ascending: false });
+
+    const { data: orders, error, count } = await query;
+
+    if (error) {
+      console.error('❌ Database error:', error.message);
+      throw error;
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        data: { 
+          orders: orders || [], 
+          total_count: count || 0 
+        } 
+      }),
+      { 
+        status: 200, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
+  } catch (error) {
+    console.error('❌ List orders error:', error.message);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
   }
-  if (errorMessage.includes('validation') || errorMessage.includes('required')) {
-    return 'VALIDATION_ERROR';
-  }
-  return 'UNKNOWN_ERROR';
 }
 
-function getErrorStatus(errorMessage: string): number {
-  if (errorMessage.includes('admin') || errorMessage.includes('permission')) {
-    return 403;
+async function handleUpdateStatus(body, user, origin) {
+  const { order_id, new_status, admin_name = 'Admin' } = body;
+
+  if (!order_id || !new_status) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Missing order_id or new_status' }),
+      { 
+        status: 400, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
   }
-  if (errorMessage.includes('not found')) {
-    return 404;
+
+  try {
+    // Use the enhanced production function for order status updates
+    const { data, error } = await supabaseClient.rpc('admin_update_order_status_production', {
+      p_order_id: order_id,
+      p_new_status: new_status,
+      p_admin_id: user.id
+    });
+
+    if (error) {
+      console.error('❌ Order update error:', error.message);
+      throw error;
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, data }),
+      { 
+        status: 200, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
+  } catch (error) {
+    console.error('❌ Update status error:', error.message);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
   }
-  if (errorMessage.includes('validation') || errorMessage.includes('required')) {
-    return 400;
+}
+
+async function handleAssignRider(body, user, origin) {
+  const { order_id, rider_id, rider_name } = body;
+
+  if (!order_id || !rider_id) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Missing order_id or rider_id' }),
+      { 
+        status: 400, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
   }
-  if (errorMessage.includes('version') || errorMessage.includes('conflict')) {
-    return 409;
+
+  try {
+    // Update order with rider assignment
+    const { data, error } = await supabaseClient
+      .from('orders')
+      .update({ 
+        assigned_rider_id: rider_id,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id
+      })
+      .eq('id', order_id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Rider assignment error:', error.message);
+      throw error;
+    }
+
+    // Log the assignment
+    await supabaseClient.from('audit_logs').insert({
+      action: 'rider_assigned',
+      category: 'Order Management',
+      message: `Rider ${rider_name} assigned to order ${data.order_number}`,
+      user_id: user.id,
+      entity_id: order_id,
+      new_values: {
+        rider_id: rider_id,
+        rider_name: rider_name
+      }
+    });
+
+    return new Response(
+      JSON.stringify({ success: true, data }),
+      { 
+        status: 200, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
+  } catch (error) {
+    console.error('❌ Assign rider error:', error.message);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
   }
-  return 500;
 }

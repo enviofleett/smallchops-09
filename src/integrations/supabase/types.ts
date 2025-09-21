@@ -10082,7 +10082,7 @@ export type Database = {
               p_pickup_point_id?: string
               p_promotion_code?: string
             }
-        Returns: string
+        Returns: Json
       }
       create_payment_intent: {
         Args: { p_amount: number; p_currency?: string; p_order_id: string }

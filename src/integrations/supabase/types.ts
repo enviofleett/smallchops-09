@@ -10054,17 +10054,34 @@ export type Database = {
         Returns: Json
       }
       create_order_with_items: {
-        Args: {
-          p_client_total?: number
-          p_customer_id: string
-          p_delivery_address?: Json
-          p_delivery_zone_id?: string
-          p_fulfillment_type: string
-          p_guest_session_id?: string
-          p_items: Json
-          p_pickup_point_id?: string
-          p_promotion_code?: string
-        }
+        Args:
+          | {
+              p_client_calculated_total?: number
+              p_customer_email: string
+              p_customer_name: string
+              p_customer_phone: string
+              p_delivery_address: string
+              p_delivery_fee: number
+              p_delivery_instructions: string
+              p_items: Json
+              p_order_time: string
+              p_order_type: Database["public"]["Enums"]["order_type"]
+              p_promotion_code?: string
+              p_promotion_discount?: number
+              p_subtotal: number
+              p_total: number
+            }
+          | {
+              p_client_total?: number
+              p_customer_id: string
+              p_delivery_address?: Json
+              p_delivery_zone_id?: string
+              p_fulfillment_type: string
+              p_guest_session_id?: string
+              p_items: Json
+              p_pickup_point_id?: string
+              p_promotion_code?: string
+            }
         Returns: string
       }
       create_payment_intent: {

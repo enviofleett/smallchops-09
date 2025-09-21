@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, RefreshCw, Filter } from 'lucide-react';
-import { OrderStatus } from '@/types/orders';
-import { DeliveryFilterType } from '@/utils/dateFilterUtils';
+import { Search, RefreshCw, Filter, X, RotateCcw } from 'lucide-react';
+import { OrderStatus } from '@/types/orders'; 
+import { DeliveryFilterType, getFilterDescription } from '@/utils/dateFilterUtils';
 import { HourlyDeliveryFilter } from './HourlyDeliveryFilter';
 import { DeliveryDateFilter } from './DeliveryDateFilter';
 import { OrderTabDropdown } from './OrderTabDropdown';
@@ -27,6 +27,7 @@ interface AdminOrdersFiltersProps {
   refetch: () => void;
   orders: any[];
   deliverySchedules: Record<string, any>;
+  filteredOrdersCount?: number;
 }
 
 export function AdminOrdersFilters({
@@ -45,8 +46,36 @@ export function AdminOrdersFilters({
   isMobile,
   refetch,
   orders,
-  deliverySchedules
+  deliverySchedules,
+  filteredOrdersCount
 }: AdminOrdersFiltersProps) {
+  
+  // Calculate if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return searchQuery.length > 0 || 
+           statusFilter !== 'all' || 
+           deliveryFilter !== 'all' ||
+           selectedDay !== null ||
+           selectedHour !== null;
+  }, [searchQuery, statusFilter, deliveryFilter, selectedDay, selectedHour]);
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setDeliveryFilter('all');
+    setSelectedDay(null);
+    setSelectedHour(null);
+  };
+
+  // Get filter description for current state
+  const currentFilterDescription = useMemo(() => {
+    if (deliveryFilter !== 'all' && filteredOrdersCount !== undefined) {
+      return getFilterDescription(deliveryFilter, filteredOrdersCount, orders.length);
+    }
+    return null;
+  }, [deliveryFilter, filteredOrdersCount, orders.length]);
+
   return (
     <div className="space-y-4">
       {/* Search and Filter Controls */}
@@ -60,27 +89,57 @@ export function AdminOrdersFilters({
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
+            {searchQuery && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                onClick={() => setSearchQuery('')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
           
           {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Orders</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="preparing">Preparing</SelectItem>
-              <SelectItem value="ready">Ready</SelectItem>
-              <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="relative">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Filter by status" />
+                {statusFilter !== 'all' && (
+                  <Badge variant="secondary" className="ml-2">
+                    Active
+                  </Badge>
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="preparing">Preparing</SelectItem>
+                <SelectItem value="ready">Ready</SelectItem>
+                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="flex gap-2">
+          {/* Clear Filters Button */}
+          {hasActiveFilters && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={clearAllFilters}
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Clear Filters
+            </Button>
+          )}
+          
           <Button 
             variant="outline" 
             size="sm" 
@@ -93,10 +152,78 @@ export function AdminOrdersFilters({
         </div>
       </div>
 
+      {/* Active Filters Summary */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Active filters:</span>
+          
+          {searchQuery && (
+            <Badge variant="secondary" className="gap-1">
+              Search: "{searchQuery}"
+              <X 
+                className="h-3 w-3 cursor-pointer" 
+                onClick={() => setSearchQuery('')}
+              />
+            </Badge>
+          )}
+          
+          {statusFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              Status: {statusFilter}
+              <X 
+                className="h-3 w-3 cursor-pointer" 
+                onClick={() => setStatusFilter('all')}
+              />
+            </Badge>
+          )}
+          
+          {deliveryFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              Delivery: {deliveryFilter}
+              <X 
+                className="h-3 w-3 cursor-pointer" 
+                onClick={() => setDeliveryFilter('all')}
+              />
+            </Badge>
+          )}
+          
+          {selectedDay && (
+            <Badge variant="secondary" className="gap-1">
+              Day: {selectedDay}
+              <X 
+                className="h-3 w-3 cursor-pointer" 
+                onClick={() => setSelectedDay(null)}
+              />
+            </Badge>
+          )}
+          
+          {selectedHour && (
+            <Badge variant="secondary" className="gap-1">
+              Hour: {selectedHour}
+              <X 
+                className="h-3 w-3 cursor-pointer" 
+                onClick={() => setSelectedHour(null)}
+              />
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {/* Filter Description */}
+      {currentFilterDescription && (
+        <div className="text-sm text-muted-foreground bg-background border border-border rounded-lg p-3">
+          {currentFilterDescription}
+        </div>
+      )}
+
       {/* Delivery Date Filter */}
       <DeliveryDateFilter 
         value={deliveryFilter}
         onChange={setDeliveryFilter}
+        orders={orders}
+        deliverySchedules={deliverySchedules}
+        showCounts={true}
       />
 
       {/* Order Tabs */}

@@ -1448,42 +1448,6 @@ export type Database = {
         }
         Relationships: []
       }
-      communication_events_collision_log: {
-        Row: {
-          admin_session_ids: string[] | null
-          collision_count: number | null
-          event_type: string | null
-          first_collision_at: string | null
-          id: string
-          last_collision_at: string | null
-          order_id: string | null
-          original_dedupe_key: string
-          resolution_strategy: string | null
-        }
-        Insert: {
-          admin_session_ids?: string[] | null
-          collision_count?: number | null
-          event_type?: string | null
-          first_collision_at?: string | null
-          id?: string
-          last_collision_at?: string | null
-          order_id?: string | null
-          original_dedupe_key: string
-          resolution_strategy?: string | null
-        }
-        Update: {
-          admin_session_ids?: string[] | null
-          collision_count?: number | null
-          event_type?: string | null
-          first_collision_at?: string | null
-          id?: string
-          last_collision_at?: string | null
-          order_id?: string | null
-          original_dedupe_key?: string
-          resolution_strategy?: string | null
-        }
-        Relationships: []
-      }
       communication_logs: {
         Row: {
           channel: string
@@ -5017,6 +4981,42 @@ export type Database = {
         }
         Relationships: []
       }
+      order_audit: {
+        Row: {
+          action_type: string | null
+          admin_id: string
+          admin_name: string | null
+          created_at: string | null
+          id: string
+          new_status: Database["public"]["Enums"]["order_status"] | null
+          notes: string | null
+          old_status: Database["public"]["Enums"]["order_status"] | null
+          order_id: string
+        }
+        Insert: {
+          action_type?: string | null
+          admin_id: string
+          admin_name?: string | null
+          created_at?: string | null
+          id?: string
+          new_status?: Database["public"]["Enums"]["order_status"] | null
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["order_status"] | null
+          order_id: string
+        }
+        Update: {
+          action_type?: string | null
+          admin_id?: string
+          admin_name?: string | null
+          created_at?: string | null
+          id?: string
+          new_status?: Database["public"]["Enums"]["order_status"] | null
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["order_status"] | null
+          order_id?: string
+        }
+        Relationships: []
+      }
       order_audit_log: {
         Row: {
           action: string
@@ -5228,6 +5228,44 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items_new: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_id: string | null
+          product_name: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          product_name: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          product_name?: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_new_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_new"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_modifications: {
         Row: {
           created_at: string
@@ -5381,48 +5419,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      order_update_locks: {
-        Row: {
-          acquired_at: string
-          acquired_by: string
-          created_at: string
-          expires_at: string
-          id: string
-          lock_key: string
-          order_id: string
-          release_reason: string | null
-          released_at: string | null
-          renewal_count: number | null
-          renewed_at: string | null
-        }
-        Insert: {
-          acquired_at?: string
-          acquired_by: string
-          created_at?: string
-          expires_at?: string
-          id?: string
-          lock_key: string
-          order_id: string
-          release_reason?: string | null
-          released_at?: string | null
-          renewal_count?: number | null
-          renewed_at?: string | null
-        }
-        Update: {
-          acquired_at?: string
-          acquired_by?: string
-          created_at?: string
-          expires_at?: string
-          id?: string
-          lock_key?: string
-          order_id?: string
-          release_reason?: string | null
-          released_at?: string | null
-          renewal_count?: number | null
-          renewed_at?: string | null
-        }
-        Relationships: []
       }
       order_update_metrics: {
         Row: {
@@ -5807,6 +5803,66 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      orders_new: {
+        Row: {
+          created_at: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address: Json | null
+          id: string
+          order_number: string
+          order_type: Database["public"]["Enums"]["order_type"] | null
+          payment_reference: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          special_instructions: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          total_amount: number
+          updated_at: string | null
+          updated_by: string | null
+          updated_by_name: string | null
+          version: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address?: Json | null
+          id?: string
+          order_number: string
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          payment_reference?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          total_amount?: number
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_name?: string | null
+          version?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string
+          delivery_address?: Json | null
+          id?: string
+          order_number?: string
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          payment_reference?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          total_amount?: number
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_name?: string | null
+          version?: number | null
         }
         Relationships: []
       }
@@ -7646,39 +7702,6 @@ export type Database = {
           status?: string
           user_agent?: string | null
           user_id?: string | null
-        }
-        Relationships: []
-      }
-      request_cache: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          expires_at: string
-          id: string
-          idempotency_key: string
-          request_data: Json
-          response_data: Json | null
-          status: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          expires_at?: string
-          id?: string
-          idempotency_key: string
-          request_data: Json
-          response_data?: Json | null
-          status?: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          expires_at?: string
-          id?: string
-          idempotency_key?: string
-          request_data?: Json
-          response_data?: Json | null
-          status?: string
         }
         Relationships: []
       }
@@ -10950,6 +10973,10 @@ export type Database = {
       manual_setup_store_admin: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      migrate_orders_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       migrate_pay_to_txn_reference: {
         Args: { pay_ref: string }

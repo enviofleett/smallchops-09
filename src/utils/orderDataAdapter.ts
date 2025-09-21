@@ -2,6 +2,20 @@ import { OrderWithItems } from '@/api/orders';
 
 // Adapter to convert orders_new data to old OrderWithItems structure
 export function adaptNewOrderToOld(newOrder: any): OrderWithItems {
+  // Helper function to safely handle dates
+  const safeDate = (dateValue: any): string | null => {
+    if (!dateValue) return null;
+    if (dateValue === 'null' || dateValue === 'undefined') return null;
+    
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return null;
+      return date.toISOString();
+    } catch {
+      return null;
+    }
+  };
+
   return {
     // Core order fields
     id: newOrder.id,
@@ -13,18 +27,18 @@ export function adaptNewOrderToOld(newOrder: any): OrderWithItems {
     status: newOrder.status,
     payment_status: newOrder.payment_status,
     payment_reference: newOrder.payment_reference,
-    payment_verified_at: newOrder.payment_verified_at,
+    payment_verified_at: safeDate(newOrder.payment_verified_at),
     total_amount: newOrder.total_amount,
     delivery_fee: newOrder.delivery_fee,
     tax_amount: newOrder.vat_amount || newOrder.tax_amount || 0,
     order_type: newOrder.order_type,
-    order_time: newOrder.order_time,
+    order_time: safeDate(newOrder.order_time) || safeDate(newOrder.created_at),
     delivery_zone_id: newOrder.delivery_zone_id,
     assigned_rider_id: newOrder.assigned_rider_id,
     special_instructions: newOrder.special_instructions,
     admin_notes: newOrder.admin_notes,
-    created_at: newOrder.created_at,
-    updated_at: newOrder.updated_at,
+    created_at: safeDate(newOrder.created_at) || new Date().toISOString(),
+    updated_at: safeDate(newOrder.updated_at) || new Date().toISOString(),
     updated_by: newOrder.updated_by,
     
     // Required fields with defaults
@@ -32,26 +46,26 @@ export function adaptNewOrderToOld(newOrder: any): OrderWithItems {
     created_by: newOrder.created_by || null,
     customer_id: newOrder.customer_id || null,
     delivery_status: newOrder.delivery_status || null,
-    delivery_time: newOrder.delivery_time || null,
+    delivery_time: safeDate(newOrder.delivery_time),
     delivery_time_slot_id: newOrder.delivery_time_slot_id || null,
     discount_amount: newOrder.discount_amount || null,
     email: newOrder.customer_email || null,
-    estimated_delivery_date: newOrder.estimated_delivery_date || null,
+    estimated_delivery_date: safeDate(newOrder.estimated_delivery_date),
     guest_session_id: newOrder.guest_session_id || null,
     idempotency_key: newOrder.idempotency_key || null,
     last_modified_by: newOrder.last_modified_by || null,
-    paid_at: newOrder.paid_at || null,
+    paid_at: safeDate(newOrder.paid_at),
     payment_method: newOrder.payment_method || null,
     paystack_reference: newOrder.paystack_reference || null,
     pickup_point_id: newOrder.pickup_point_id || null,
     pickup_ready: newOrder.pickup_ready || null,
-    pickup_time: newOrder.pickup_time || null,
-    preferred_delivery_time: newOrder.preferred_delivery_time || null,
+    pickup_time: safeDate(newOrder.pickup_time),
+    preferred_delivery_time: safeDate(newOrder.preferred_delivery_time),
     processing_lock: newOrder.processing_lock || null,
     processing_officer_id: newOrder.processing_officer_id || null,
     processing_officer_name: newOrder.processing_officer_name || null,
-    processing_started_at: newOrder.processing_started_at || null,
-    reference_updated_at: newOrder.reference_updated_at || null,
+    processing_started_at: safeDate(newOrder.processing_started_at),
+    reference_updated_at: safeDate(newOrder.reference_updated_at),
     subtotal: newOrder.subtotal || newOrder.total_amount || 0,
     subtotal_cost: newOrder.subtotal_cost || null,
     total_vat: newOrder.total_vat || newOrder.vat_amount || null,

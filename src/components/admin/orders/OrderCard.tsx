@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusUpdateButton } from './StatusUpdateButton';
 import { OrderDetailsDialog } from './OrderDetailsDialog';
 import { formatCurrency } from '@/lib/utils';
-import { format } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDateFormat';
 import { Eye, Phone, Mail, MapPin } from 'lucide-react';
 
 interface OrderCardProps {
@@ -56,7 +56,7 @@ export function OrderCard({ order, onConflict }: OrderCardProps) {
             </Badge>
           </div>
           <div className="text-sm text-muted-foreground">
-            {format(new Date(order.created_at), 'MMM dd, yyyy - HH:mm')}
+            {safeFormatDate(order.created_at, 'MMM dd, yyyy - HH:mm')}
           </div>
         </CardHeader>
 
@@ -130,7 +130,7 @@ export function OrderCard({ order, onConflict }: OrderCardProps) {
               Last updated by {order.updated_by_name}
               {order.updated_at && (
                 <span className="ml-1">
-                  ({format(new Date(order.updated_at), 'HH:mm')})
+                  ({safeFormatDate(order.updated_at, 'HH:mm')})
                 </span>
               )}
             </div>

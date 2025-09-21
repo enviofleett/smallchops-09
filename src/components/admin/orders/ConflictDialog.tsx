@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, User, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDateFormat';
 
 interface ConflictDialogProps {
   conflictInfo: {
@@ -78,7 +78,7 @@ export function ConflictDialog({ conflictInfo, onResolve }: ConflictDialogProps)
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 <span>
-                  At: {format(new Date(conflictInfo.lastUpdatedAt), 'MMM dd, yyyy HH:mm')}
+                  At: {safeFormatDate(conflictInfo.lastUpdatedAt, 'MMM dd, yyyy HH:mm')}
                 </span>
               </div>
             </div>

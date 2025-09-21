@@ -10055,13 +10055,15 @@ export type Database = {
       }
       create_order_with_items: {
         Args: {
+          p_client_total?: number
           p_customer_id: string
           p_delivery_address?: Json
           p_delivery_zone_id?: string
           p_fulfillment_type: string
           p_guest_session_id?: string
-          p_items?: Json
+          p_items: Json
           p_pickup_point_id?: string
+          p_promotion_code?: string
         }
         Returns: string
       }

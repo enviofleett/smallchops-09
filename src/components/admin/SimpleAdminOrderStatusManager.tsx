@@ -3,20 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useSimpleOrderStatusUpdate } from '@/hooks/useSimpleOrderStatusUpdate';
 import { OrderStatus } from '@/types/orders';
-import { RefreshCw, Send, Clock, AlertTriangle, Zap } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { RefreshCw, Send, Clock } from 'lucide-react';
 
-interface AdminOrderStatusManagerProps {
+interface SimpleAdminOrderStatusManagerProps {
   orderId: string;
   currentStatus: OrderStatus;
   orderNumber: string;
   customerEmail?: string;
-  lockInfo?: any;
   className?: string;
-  size?: 'sm' | 'default' | 'lg';
-  onStatusUpdate?: (newStatus: OrderStatus) => void;
 }
 
 const STATUS_FLOW = {
@@ -52,15 +46,12 @@ const STATUS_COLORS = {
   completed: 'bg-gray-500'
 };
 
-export const AdminOrderStatusManager: React.FC<AdminOrderStatusManagerProps> = ({
+export const SimpleAdminOrderStatusManager: React.FC<SimpleAdminOrderStatusManagerProps> = ({
   orderId,
   currentStatus,
   orderNumber,
   customerEmail,
-  lockInfo,
-  className,
-  size = 'sm',
-  onStatusUpdate
+  className
 }) => {
   const { updateOrderStatus, isUpdating, adminUserId } = useSimpleOrderStatusUpdate();
   const [emailStatus, setEmailStatus] = useState<'sending' | 'sent' | 'failed' | null>(null);
@@ -95,23 +86,8 @@ export const AdminOrderStatusManager: React.FC<AdminOrderStatusManagerProps> = (
     }
   };
 
-  // Check if order is locked by another admin
-  const isLockedByOther = Boolean(
-    lockInfo?.is_locked && 
-    lockInfo?.locking_admin_id && 
-    lockInfo?.locking_admin_id !== adminUserId
-  );
-
   return (
-    <div className={`space-y-4 p-4 border rounded-lg bg-white ${className}`}>
-      {/* Lock Status Warning */}
-      {isLockedByOther && (
-        <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-          <AlertTriangle className="h-4 w-4" />
-          <span>Order is being updated by {lockInfo.locking_admin_name}</span>
-        </div>
-      )}
-
+    <div className={`space-y-4 ${className}`}>
       {/* Current Status */}
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">Current Status:</span>
@@ -121,7 +97,7 @@ export const AdminOrderStatusManager: React.FC<AdminOrderStatusManagerProps> = (
       </div>
 
       {/* Status Update Actions */}
-      {nextStatuses.length > 0 && !isLockedByOther && (
+      {nextStatuses.length > 0 && (
         <div className="space-y-2">
           <div className="text-sm font-medium text-gray-700">Available Actions:</div>
           <div className="flex flex-wrap gap-2">
@@ -150,7 +126,7 @@ export const AdminOrderStatusManager: React.FC<AdminOrderStatusManagerProps> = (
 
       {/* Email Status Feedback */}
       {emailStatus && customerEmail && (
-        <div className="flex items-center gap-2 text-sm p-2 bg-gray-50 rounded">
+        <div className="flex items-center gap-2 text-sm">
           {getEmailStatusIcon()}
           <span className="text-gray-600">
             {emailStatus === 'sending' && 'Sending email notification...'}
@@ -161,15 +137,10 @@ export const AdminOrderStatusManager: React.FC<AdminOrderStatusManagerProps> = (
       )}
 
       {/* Order Info */}
-      <div className="text-xs text-gray-500 border-t pt-2 space-y-1">
+      <div className="text-xs text-gray-500">
         <div>Order: {orderNumber}</div>
         {customerEmail && <div>Customer: {customerEmail}</div>}
         {adminUserId && <div>Admin: {adminUserId}</div>}
-        {lockInfo?.is_locked && (
-          <div className="text-yellow-600">
-            {lockInfo.is_lock_holder ? '🔓 You have the lock' : '🔒 Locked by another admin'}
-          </div>
-        )}
       </div>
     </div>
   );

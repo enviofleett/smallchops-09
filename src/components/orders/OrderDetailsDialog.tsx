@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { OrderWithItems, manuallyQueueCommunicationEvent } from '@/api/orders';
-import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpdate';
+import { useSimpleOrderStatusUpdate } from '@/hooks/useSimpleOrderStatusUpdate';
 import { getDispatchRiders, DispatchRider } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
@@ -158,15 +158,8 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       console.log('✅ Loaded dispatch riders:', riders.length, 'active riders');
     }
   }, [ridersError, riders, toast]);
-  // Use enhanced order status update hook with bypass functionality
-  const {
-    updateOrderStatus,
-    bypassCacheAndUpdate,
-    isUpdating,
-    isBypassing,
-    show409Error,
-    clearBypassError
-  } = useEnhancedOrderStatusUpdate();
+  // Use simple order status update hook
+  const { updateOrderStatus, isUpdating } = useSimpleOrderStatusUpdate();
 
   const updateMutation = useMutation({
     mutationFn: async (updates: {
@@ -464,21 +457,16 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 onManualSend={handleManualSend} 
                 onUpdate={handleUpdate} 
                 onVerifyPayment={handleVerifyWithPaystack} 
-                paymentReference={order.payment_reference} 
-                isUpdating={updateMutation.isPending || isUpdating} 
-                isSendingManual={manualSendMutation.isPending} 
-                isVerifying={verifying} 
-                verifyState={verifyState} 
-                verifyMessage={verifyMessage}
-                orderId={order.id}
-                customerEmail={order.customer_email}
-                orderNumber={order.order_number}
-                // Enhanced bypass functionality
-                show409Error={show409Error === order.id}
-                onBypassCacheAndUpdate={() => bypassCacheAndUpdate(order.id, selectedStatus)}
-                isBypassing={isBypassing}
-                clearBypassError={clearBypassError}
-              />
+                 paymentReference={order.payment_reference} 
+                 isUpdating={updateMutation.isPending || isUpdating} 
+                 isSendingManual={manualSendMutation.isPending} 
+                 isVerifying={verifying} 
+                 verifyState={verifyState} 
+                 verifyMessage={verifyMessage}
+                 orderId={order.id}
+                 customerEmail={order.customer_email}
+                 orderNumber={order.order_number}
+               />
             </section>
           </div>
         </div>

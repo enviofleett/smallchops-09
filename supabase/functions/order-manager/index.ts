@@ -157,6 +157,9 @@ serve(async (req) => {
       case 'assign_rider':
         return await handleAssignRider(body, authResult.user, origin);
       
+      case 'cleanup':
+        return await handleCleanup(body, authResult.user, origin);
+      
       default:
         return new Response(
           JSON.stringify({ success: false, error: 'Invalid action' }),
@@ -385,6 +388,75 @@ async function handleAssignRider(body, user, origin) {
     );
   } catch (error) {
     console.error('❌ Assign rider error:', error.message);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
+  }
+}
+
+async function handleCleanup(body, user, origin) {
+  const { order_id, reason = 'manual_cleanup' } = body;
+
+  if (!order_id) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Missing order_id' }),
+      { 
+        status: 400, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
+  }
+
+  try {
+    // Clear any processing locks and cache for the order
+    const { data, error } = await supabaseClient.rpc('force_clear_order_cache', {
+      p_order_id: order_id
+    });
+
+    if (error) {
+      console.error('❌ Cleanup error:', error.message);
+      throw error;
+    }
+
+    // Log the cleanup
+    await supabaseClient.from('audit_logs').insert({
+      action: 'order_cleanup',
+      category: 'Order Management',
+      message: `Order cleanup performed: ${reason}`,
+      user_id: user.id,
+      entity_id: order_id,
+      new_values: {
+        reason: reason,
+        entries_cleared: data?.entries_cleared || 0
+      }
+    });
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: 'Order cleanup completed',
+        entries_cleared: data?.entries_cleared || 0
+      }),
+      { 
+        status: 200, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
+  } catch (error) {
+    console.error('❌ Cleanup error:', error.message);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { 

@@ -24,7 +24,7 @@ const STATUS_FLOW = {
   preparing: ['ready', 'cancelled'],
   ready: ['out_for_delivery', 'cancelled'],
   out_for_delivery: ['delivered', 'cancelled'],
-  delivered: ['completed'],
+  delivered: [],
   cancelled: [],
   completed: []
 };
@@ -74,7 +74,7 @@ export function StatusUpdateButton({ order, onConflict, className }: StatusUpdat
 
       if (result.success) {
         // Check email queue status from result
-        const emailQueued = result.data?.email_queued || result.data?.email_result;
+        const emailQueued = result.data?.email_result;
         
         if (emailQueued?.success) {
           setEmailStatus('success');
@@ -168,43 +168,60 @@ export function StatusUpdateButton({ order, onConflict, className }: StatusUpdat
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={isUpdating}
-          className={cn("w-full justify-between", className)}
-        >
-          {isUpdating ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Updating...
-            </>
-          ) : (
-            <>
-              Update Status
-              <ChevronDown className="h-4 w-4 ml-2" />
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      
-      <DropdownMenuContent align="end" className="w-48">
-        {nextStatuses.map((status) => (
-          <DropdownMenuItem
-            key={status}
-            onClick={() => handleStatusUpdate(status)}
+    <div className="space-y-1">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
             disabled={isUpdating}
-            className="flex items-center gap-2"
+            className={cn("w-full justify-between", className)}
           >
-            <div 
-              className={cn("w-3 h-3 rounded-full", STATUS_COLORS[status as keyof typeof STATUS_COLORS])}
-            />
-            {STATUS_LABELS[status as keyof typeof STATUS_LABELS]}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            {isUpdating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              <>
+                Update Status
+                <ChevronDown className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        
+        <DropdownMenuContent align="end" className="w-48">
+          {nextStatuses.map((status) => (
+            <DropdownMenuItem
+              key={status}
+              onClick={() => handleStatusUpdate(status)}
+              disabled={isUpdating}
+              className="flex items-center gap-2"
+            >
+              <div 
+                className={cn("w-3 h-3 rounded-full", STATUS_COLORS[status as keyof typeof STATUS_COLORS])}
+              />
+              {STATUS_LABELS[status as keyof typeof STATUS_LABELS]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {emailStatus && (
+        <div className={cn(
+          "flex items-center justify-center gap-1 text-xs",
+          emailStatus === 'success' && "text-green-600",
+          emailStatus === 'failed' && "text-red-600", 
+          emailStatus === 'pending' && "text-blue-600"
+        )}>
+          {getEmailIcon()}
+          <span>
+            {emailStatus === 'success' && 'Email sent'}
+            {emailStatus === 'failed' && 'Email failed'}
+            {emailStatus === 'pending' && 'Sending email...'}
+          </span>
+        </div>
+      )}
+    </div>
   );
 }

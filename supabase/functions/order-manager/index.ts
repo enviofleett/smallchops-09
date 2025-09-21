@@ -289,8 +289,8 @@ async function handleUpdateStatus(body, user, origin) {
   }
 
   try {
-    // Use the enhanced production function for order status updates
-    const { data, error } = await supabaseClient.rpc('admin_update_order_status_production', {
+    // Use the enhanced function with guaranteed email notifications
+    const { data, error } = await supabaseClient.rpc('admin_update_order_status_enhanced_notifications', {
       p_order_id: order_id,
       p_new_status: new_status,
       p_admin_id: user.id

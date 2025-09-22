@@ -19,29 +19,34 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
 }) => {
   const orderItems = items.length > 0 ? items : order.order_items || [];
   
-  const formatCurrency = (amount: number) => {
-    return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+  const formatCurrency = (amount: number | null | undefined) => {
+    const validAmount = amount || 0;
+    return `₦${validAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
   };
 
   const getDeliveryInfo = () => {
     if (order.order_type === 'pickup' && pickupPoint) {
       return {
         type: 'Pickup',
-        address: pickupPoint.address || 'Pickup Point',
+        address: pickupPoint.address || pickupPoint.name || 'Main Store',
         time: deliverySchedule?.scheduled_date ? 
           format(new Date(deliverySchedule.scheduled_date), 'PPP p') : 
-          'Not scheduled'
+          'Today (Business Hours)'
       };
     } else if (order.order_type === 'delivery') {
       return {
         type: 'Delivery',
-        address: order.delivery_address || 'Not provided',
+        address: order.delivery_address || 'Address not provided',
         time: deliverySchedule?.scheduled_date ? 
           format(new Date(deliverySchedule.scheduled_date), 'PPP p') : 
-          'Not scheduled'
+          'To be scheduled'
       };
     }
-    return { type: 'Unknown', address: 'Not provided', time: 'Not scheduled' };
+    return { 
+      type: order.order_type ? order.order_type.charAt(0).toUpperCase() + order.order_type.slice(1) : 'Unknown', 
+      address: 'Not provided', 
+      time: 'Not scheduled' 
+    };
   };
 
   const deliveryInfo = getDeliveryInfo();
@@ -503,21 +508,21 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
       <div className="total-section">
         <div className="total-row">
           <span>Subtotal:</span>
-          <span>{formatCurrency(order.subtotal || 0)}</span>
+          <span>{formatCurrency(order.subtotal || order.total_amount || 0)}</span>
         </div>
-        {order.delivery_fee > 0 && (
+        {(order.delivery_fee && order.delivery_fee > 0) && (
           <div className="total-row">
             <span>Delivery Fee:</span>
             <span>{formatCurrency(order.delivery_fee)}</span>
           </div>
         )}
-        {order.total_vat > 0 && (
+        {(order.total_vat && order.total_vat > 0) && (
           <div className="total-row">
             <span>VAT:</span>
             <span>{formatCurrency(order.total_vat)}</span>
           </div>
         )}
-        {order.discount_amount > 0 && (
+        {(order.discount_amount && order.discount_amount > 0) && (
           <div className="total-row">
             <span>Discount:</span>
             <span>-{formatCurrency(order.discount_amount)}</span>
@@ -525,7 +530,7 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
         )}
         <div className="total-row grand-total">
           <span>TOTAL AMOUNT:</span>
-          <span>{formatCurrency(order.total_amount)}</span>
+          <span>{formatCurrency(order.total_amount || 0)}</span>
         </div>
       </div>
 

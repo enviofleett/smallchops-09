@@ -342,12 +342,32 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     });
   };
 
-  // Job order print handler
+  // Enhanced job order print handler with validation
   const handleJobOrderPrint = () => {
+    console.log('🖨️ Print button clicked for order:', order.order_number);
+    
+    // Validate order data before printing
+    if (!order || !order.order_number) {
+      toast({
+        title: 'Print Error',
+        description: 'Order data is incomplete. Cannot generate print.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
     const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
     
-    printJobOrder(order, items, schedule, pickupPoint, user?.name || 'Unknown Admin');
+    console.log('🖨️ Print data:', {
+      order: order.order_number,
+      itemsCount: items.length,
+      hasSchedule: !!schedule,
+      hasPickupPoint: !!pickupPoint,
+      adminName: user?.name
+    });
+    
+    printJobOrder(order, items, schedule, pickupPoint, user?.name || 'Admin User');
   };
 
   // Safe print handler using react-to-print (for detailed receipt)
@@ -394,6 +414,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
             <Button onClick={handleJobOrderPrint} variant="outline" size="sm" className="gap-2" aria-label="Print job order">
               <Printer className="h-4 w-4" />
               <span className="hidden sm:inline">Print Job Order</span>
+            </Button>
+            
+            <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2" aria-label="Print detailed receipt">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Print Receipt</span>
             </Button>
             
           </div>

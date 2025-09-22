@@ -490,11 +490,6 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
                 <strong>{item.product?.name || item.name || 'Unknown Item'}</strong>
                 {/* Enhanced Product Details */}
                 <div style={{ fontSize: '9pt', color: '#333333', marginTop: '1mm', lineHeight: '1.3' }}>
-                  {item.product?.description && (
-                    <div style={{ marginBottom: '1mm' }}>
-                      <strong>Description:</strong> {item.product.description}
-                    </div>
-                  )}
                   {item.product?.category && (
                     <div style={{ marginBottom: '1mm' }}>
                       <strong>Category:</strong> {item.product.category}
@@ -592,7 +587,7 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
         <p>Generated on {format(new Date(), 'PPP p')}</p>
         {adminName && (
           <p style={{ fontWeight: 'bold', color: '#2c3e50', marginTop: '2mm', fontSize: '11pt' }}>
-            🖨️ Job order printed by: <span style={{ color: '#1976d2' }}>{adminName}</span>
+            Prepared by {adminName}
           </p>
         )}
         <p style={{ marginTop: '1mm', fontSize: '8pt', color: '#666' }}>

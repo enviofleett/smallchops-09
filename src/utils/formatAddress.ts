@@ -8,7 +8,6 @@ export interface DeliveryAddress {
   country?: string;
   postal_code?: string;
   landmark?: string;
-  delivery_instructions?: string;
 }
 
 export const formatAddress = (address: any): string => {
@@ -63,8 +62,6 @@ export const formatAddress = (address: any): string => {
     if (addr.postal_code?.trim()) {
       parts.push(addr.postal_code.trim());
     }
-    
-    // Note: delivery_instructions handled separately by getDeliveryInstructionsFromAddress
     
     return parts.length > 0 ? parts.join(', ') : 'N/A';
   }
@@ -127,8 +124,6 @@ export const formatAddressMultiline = (address: any): string => {
     if (addr.country?.trim() && addr.country.trim() !== 'Nigeria') {
       lines.push(addr.country.trim());
     }
-    
-    // Note: delivery_instructions handled separately by getDeliveryInstructionsFromAddress
     
     return lines.length > 0 ? lines.join('\n') : 'N/A';
   }

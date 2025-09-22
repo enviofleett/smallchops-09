@@ -70,31 +70,15 @@ async function authenticateAdmin(req) {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    console.log('🔍 Attempting to authenticate with token length:', token.length);
     
-    // Create a temporary client with the user's JWT for user context
-    const supabaseUser = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      }
-    );
-
-    // Get user from token using the user context client
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    // Get user from token
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
     if (userError || !user) {
-      console.log('⚠️ Invalid token or user not found:', userError?.message || 'No user data');
+      console.log('⚠️ Invalid token or user not found:', userError?.message);
       return { success: false, error: 'Invalid token or user not found' };
     }
 
-    console.log('✅ User authenticated:', { userId: user.id, email: user.email });
-
-    // Check if user is admin via profiles table using service role client
+    // Check if user is admin via profiles table
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role, is_active')
@@ -114,7 +98,6 @@ async function authenticateAdmin(req) {
     console.log('✅ Admin authentication successful:', {
       userId: user.id,
       email: user.email,
-      role: profile.role,
       authMethod: 'profiles_table',
       timestamp: new Date().toISOString()
     });
@@ -155,32 +138,7 @@ serve(async (req) => {
       );
     }
 
-    // Safe JSON parsing with validation
-    let body;
-    try {
-      const bodyText = await req.text();
-      console.log('📥 Raw request body length:', bodyText.length);
-      
-      if (!bodyText || bodyText.trim() === '') {
-        throw new Error('Empty request body');
-      }
-      
-      body = JSON.parse(bodyText);
-      console.log('✅ JSON parsed successfully:', { action: body.action || 'undefined' });
-    } catch (jsonError) {
-      console.error('❌ JSON parsing error:', jsonError.message);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid JSON in request body' }),
-        { 
-          status: 400, 
-          headers: { 
-            'Content-Type': 'application/json',
-            ...getCorsHeaders(origin)
-          }
-        }
-      );
-    }
-
+    const body = await req.json();
     const { action } = body;
 
     console.log('📋 Processing admin request:', {

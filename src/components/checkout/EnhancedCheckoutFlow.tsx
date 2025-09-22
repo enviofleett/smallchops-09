@@ -35,15 +35,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { RequiredFieldLabel } from "@/components/ui/required-field-label";
-import { OrderCalculationService } from '@/services/OrderCalculationService';
-import { CheckoutStateManager } from '@/utils/checkoutStateManager';
-import { useSecurePayment } from '@/hooks/useSecurePayment';
-import { validatePromotionCode } from '@/api/promotionValidation';
-import { PromotionNormalizer } from '@/services/PromotionNormalizer';
-import { ServerAuthoritativeCalculationService } from '@/services/ServerAuthoritativeCalculationService';
-import { useEnhancedPromotions } from '@/hooks/useEnhancedPromotions';
-import { CheckoutErrorRecovery } from '@/services/CheckoutErrorRecovery';
-import { logger } from '@/lib/logger';
 interface DeliveryAddress {
   address_line_1: string;
   address_line_2?: string;
@@ -426,64 +417,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     return deliveryZone?.base_fee || 0;
   }, [formData.fulfillment_type, deliveryZone?.base_fee]);
 
-  // Calculate totals using OrderCalculationService for server consistency
-  const { subtotal, total: calculatedTotal } = useMemo(() => {
-    const cartSubtotal = getCartTotal();
-    const calculatedDeliveryFee = deliveryFee;
-    
-    // Use OrderCalculationService to ensure calculation consistency
-    try {
-      const calculationItems = items.map(item => ({
-        id: item.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        price: item.price,
-        quantity: item.quantity,
-        vat_rate: item.vat_rate || 7.5
-      }));
-
-      // CRITICAL FIX: Map promotion fields correctly for server consistency
-      const promotions = cart.promotion_code && cart.summary.applied_promotions ? 
-        cart.summary.applied_promotions.map(promo => ({
-          id: promo.id,
-          name: promo.name,
-          code: promo.code,
-          type: promo.type as 'percentage' | 'fixed_amount' | 'free_delivery' | 'buy_one_get_one',
-          value: promo.discount_amount || 0, // SERVER-AUTHORITATIVE: Use discount_amount as value
-          free_delivery: promo.free_delivery || false,
-          min_order_amount: (promo as any).min_order_amount || 0
-        })) : [];
-
-      const calculationResult = OrderCalculationService.calculateOrder({
-        items: calculationItems,
-        delivery_fee: calculatedDeliveryFee,
-        promotions,
-        promotion_code: cart.promotion_code,
-        calculation_source: 'client'
-      });
-
-      const finalTotal = calculationResult.total_amount;
-
-      logger.info('💰 Checkout total calculation', {
-        cartSubtotal,
-        deliveryFee: calculatedDeliveryFee,
-        promotionCode: cart.promotion_code,
-        finalTotal,
-        calculationDetails: calculationResult.calculation_breakdown
-      });
-
-      return { 
-        subtotal: cartSubtotal, 
-        total: finalTotal 
-      };
-    } catch (error) {
-      logger.error('❌ Checkout total calculation failed, using fallback', error);
-      return { 
-        subtotal: cartSubtotal, 
-        total: cartSubtotal + calculatedDeliveryFee 
-      };
-    }
-  }, [getCartTotal, deliveryFee, cart.promotion_code, cart.summary.applied_promotions, items]);
+  // Calculate totals
+  const subtotal = getCartTotal();
+  const total = subtotal + deliveryFee;
   const handleFormChange = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -590,12 +526,14 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         return;
       }
 
-      // Enhanced data structure to match backend expectations
-      const backendPayload = {
-        customer_email: formData.customer_email.trim().toLowerCase(),
-        customer_name: formData.customer_name.trim(),
-        customer_phone: formData.customer_phone?.trim() || undefined,
-        fulfillment_type: formData.fulfillment_type,
+      // Enhanced data sanitization and validation - Structure payload for backend
+      const sanitizedData = {
+        customer: {
+          name: formData.customer_name.trim(),
+          email: formData.customer_email.trim().toLowerCase(),
+          phone: formData.customer_phone?.trim() || undefined,
+          guest_session_id: guestSessionId || undefined // Include guest session for guest users
+        },
         items: items.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name || 'Product',
@@ -603,12 +541,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           unit_price: item.price,
           customizations: item.customizations || undefined
         })),
-        delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : null,
-        pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : null,
-        delivery_zone_id: deliveryZone?.id || null,
-        guest_session_id: guestSessionId || null,
-        promotion_code: cart.promotion_code || null,
-        client_total: calculatedTotal,
+        fulfillment: {
+          type: formData.fulfillment_type,
+          address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : undefined,
+          pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : undefined,
+          delivery_zone_id: deliveryZone?.id || undefined
+        },
         delivery_schedule: formData.delivery_date ? {
           delivery_date: formData.delivery_date,
           delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
@@ -618,12 +556,20 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         } : null,
         payment: {
           method: formData.payment_method || 'paystack'
+        },
+        // Include promotion info for backend discount application
+        promotion: {
+          code: cart.promotion_code || null,
+          client_calculated_total: total, // Frontend calculated total for validation
+          client_subtotal: subtotal,
+          client_discount: cart.summary.discount_amount,
+          client_delivery_discount: cart.summary.delivery_discount
         }
       };
-      
-      console.log('📦 Submitting checkout data (backend format):', backendPayload);
+      console.log('📦 Submitting checkout data:', sanitizedData);
 
-      const invokeOptions: any = { body: backendPayload };
+      // Call Supabase edge function with authentication when available
+      const invokeOptions: any = { body: sanitizedData };
       if (session?.access_token) {
         invokeOptions.headers = { Authorization: `Bearer ${session.access_token}` };
       }
@@ -649,17 +595,17 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         parsedData = {
           order_id: data?.order_id,
           order_number: data?.order_number,
-          amount: data?.amount || calculatedTotal,
+          amount: data?.amount || total,
           // Prioritize backend amount
-          customer_email: backendPayload.customer_email,
+          customer_email: sanitizedData.customer.email,
           success: true
         };
       }
 
       // 🔧 CRITICAL: Use backend-returned amount if available
-      const authoritativeAmount = data?.amount || parsedData?.amount || calculatedTotal;
+      const authoritativeAmount = data?.amount || parsedData?.amount || total;
       console.log('💰 Amount prioritization:', {
-        client_calculated: calculatedTotal,
+        client_calculated: total,
         backend_returned: data?.amount,
         authoritative_amount: authoritativeAmount,
         items_subtotal: data?.items_subtotal,
@@ -672,7 +618,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         console.log('🔗 Redirecting to payment URL:', paymentUrl);
 
         // Save state before redirecting  
-        savePrePaymentState(backendPayload, checkoutStep, deliveryFee, 'direct_redirect');
+        savePrePaymentState(sanitizedData, checkoutStep, deliveryFee, 'direct_redirect');
 
         // Close dialog immediately and redirect to payment
         onClose();
@@ -688,91 +634,67 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       // Don't clear cart before payment - only clear after successful payment
 
       // Store payment reference for callback page
-      const paymentReference = data?.payment?.reference || data?.reference || parsedData?.reference || '';
-      sessionStorage.setItem('paystack_payment_reference', paymentReference);
+      sessionStorage.setItem('paystack_payment_reference', data?.reference || parsedData?.reference || '');
       sessionStorage.setItem('payment_order_id', parsedData?.order_id || data?.order?.id || '');
-
-      console.log('💾 Stored payment reference:', paymentReference);
 
       // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({
         orderId: parsedData?.order_id || data?.order?.id,
         orderNumber: parsedData?.order_number || data?.order?.order_number,
         amount: authoritativeAmount,
-        email: backendPayload.customer_email,
+        email: sanitizedData.customer.email,
         successUrl: `${window.location.origin}/payment-callback`,
         cancelUrl: window.location.href
       });
 
-      // Navigate to callback page with reference for immediate processing
-      const callbackUrl = paymentReference 
-        ? `/payment-callback?status=processing&reference=${encodeURIComponent(paymentReference)}`
-        : '/payment-callback?status=processing';
-      
-      console.log('🔗 Navigating to payment callback:', callbackUrl);
-      navigate(callbackUrl);
+      // Navigate to callback page immediately to show clean processing state
+      navigate('/payment-callback?status=processing');
       setIsSubmitting(false);
-      logPaymentAttempt(backendPayload, 'success');
+      logPaymentAttempt(sanitizedData, 'success');
     } catch (error: any) {
       console.error('🚨 Checkout submission error:', error);
       setIsSubmitting(false);
 
-      // Analyze error and determine recovery strategy using the new service
-      const checkoutError = CheckoutErrorRecovery.analyzeError(error);
-      const recoveryStrategy = CheckoutErrorRecovery.getRecoveryStrategy(checkoutError);
-      
-      // Track error for monitoring
-      CheckoutErrorRecovery.trackError(checkoutError, {
-        step: checkoutStep,
-        customer_email: formData.customer_email,
-        items_count: items.length
-      });
-
-      // 🔧 CIRCUIT BREAKER: Increment failure count for non-recoverable errors
-      if (!checkoutError.recoverable) {
-        const newFailedAttempts = failedAttempts + 1;
-        setFailedAttempts(newFailedAttempts);
-        if (newFailedAttempts >= 3) {
-          setCircuitBreakerActive(true);
-          // Reset circuit breaker after 5 minutes
-          setTimeout(() => {
-            setCircuitBreakerActive(false);
-            setFailedAttempts(0);
-          }, 5 * 60 * 1000);
-        }
-      }
-
-      // Get user-friendly error message
-      const userFriendlyMessage = CheckoutErrorRecovery.getUserFriendlyMessage(checkoutError);
-      setLastPaymentError(userFriendlyMessage);
-
-      // Execute recovery strategy if applicable
-      if (recoveryStrategy.canRecover && recoveryStrategy.action === 'retry' && recoveryStrategy.delay && recoveryStrategy.delay > 0) {
-        toast({
-          title: "Retrying checkout...",
-          description: `${recoveryStrategy.message} Retrying automatically...`,
-          variant: "default",
-        });
-
-        // Auto-retry with delay for recoverable errors
+      // 🔧 CIRCUIT BREAKER: Increment failure count and activate if needed
+      const newFailedAttempts = failedAttempts + 1;
+      setFailedAttempts(newFailedAttempts);
+      if (newFailedAttempts >= 3) {
+        setCircuitBreakerActive(true);
+        // Reset circuit breaker after 5 minutes
         setTimeout(() => {
-          handleFormSubmit(); // Recursive retry
-        }, recoveryStrategy.delay);
-      } else {
-        // Show error to user
-        toast({
-          title: checkoutError.recoverable ? "Checkout Error" : "Checkout Failed",
-          description: userFriendlyMessage,
-          variant: "destructive"
-        });
-
-        // Execute other recovery actions if needed
-        if (recoveryStrategy.action !== 'retry') {
-          CheckoutErrorRecovery.executeRecovery(recoveryStrategy);
-        }
+          setCircuitBreakerActive(false);
+          setFailedAttempts(0);
+        }, 5 * 60 * 1000);
       }
 
+      // Enhanced error handling with safe message extraction
+      const errorMessage = safeErrorMessage(error);
+
+      // Map specific errors to user-friendly messages
+      let userFriendlyMessage: string;
+      if (errorMessage.includes('ORDER_CREATION_FAILED') || errorMessage.includes('INVALID_ORDER_DATA')) {
+        userFriendlyMessage = 'Order creation failed. Please check your details and try again.';
+      } else if (errorMessage.includes('CUSTOMER_ERROR')) {
+        userFriendlyMessage = 'There was an issue with customer information. Please verify your details.';
+      } else if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
+        userFriendlyMessage = 'Payment system configuration issue. Please contact support.';
+      } else if (errorMessage.includes('Payment URL not available')) {
+        userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
+      } else {
+        // Generate user-friendly error with safe fallback
+        const validationResult = validatePaymentInitializationData({
+          success: false,
+          error: errorMessage
+        });
+        userFriendlyMessage = generateUserFriendlyErrorMessage(validationResult);
+      }
+      setLastPaymentError(userFriendlyMessage);
       logPaymentAttempt(null, 'failure');
+      toast({
+        title: "Checkout Error",
+        description: userFriendlyMessage,
+        variant: "destructive"
+      });
     }
   };
   const handlePaymentSuccess = useCallback((reference: string) => {
@@ -844,7 +766,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       <GuestOrLoginChoice 
         onContinueAsGuest={handleContinueAsGuest} 
         onLogin={handleLogin} 
-        totalAmount={calculatedTotal} 
+        totalAmount={total} 
       />
     </div>;
   const renderDetailsStep = () => <div className="space-y-6">
@@ -1177,7 +1099,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
 
           {/* Mobile Order Summary */}
           <div className="md:hidden flex-shrink-0">
-            <OrderSummaryCard items={items} subtotal={subtotal} deliveryFee={deliveryFee} total={calculatedTotal} collapsibleOnMobile={true} />
+            <OrderSummaryCard items={items} subtotal={subtotal} deliveryFee={deliveryFee} total={total} collapsibleOnMobile={true} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
@@ -1191,7 +1113,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   <h2 className="text-lg font-semibold">Order Details</h2>
                 </div>
                 
-                <OrderSummaryCard items={items} subtotal={subtotal} deliveryFee={deliveryFee} total={calculatedTotal} collapsibleOnMobile={false} className="shadow-none border-0 bg-transparent" />
+                <OrderSummaryCard items={items} subtotal={subtotal} deliveryFee={deliveryFee} total={total} collapsibleOnMobile={false} className="shadow-none border-0 bg-transparent" />
               </div>
             </div>
 
@@ -1255,7 +1177,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                     ) : (!isAuthenticated && !guestSession) ? (
                       "Please choose checkout method"
                     ) : (
-                      `Proceed to Payment • ₦${calculatedTotal.toLocaleString()}`
+                      `Proceed to Payment • ₦${total.toLocaleString()}`
                     )}
                   </Button>
                   

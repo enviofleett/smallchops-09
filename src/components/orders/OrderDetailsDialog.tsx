@@ -4,7 +4,8 @@ import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpda
 import { getDispatchRiders, DispatchRider } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
-import { X, FileText, Download, Printer, ExternalLink, Clock, Receipt } from 'lucide-react';
+import { X, FileText, Download, Printer, ExternalLink, Clock } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +18,6 @@ import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
-import { useOrderReceiptPrint } from '@/hooks/useOrderReceiptPrint';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -29,7 +29,6 @@ import { ActionsPanel } from './details/ActionsPanel';
 import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
-import { PrintPreviewDialog } from './PrintPreviewDialog';
 
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 interface OrderDetailsDialogProps {
@@ -61,16 +60,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [verifyState, setVerifyState] = useState<'idle' | 'success' | 'failed' | 'pending'>('idle');
 
-  // Print preview states
-  const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [printPreviewType, setPrintPreviewType] = useState<'job-order' | 'receipt'>('job-order');
-
   // Print ref for react-to-print
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Print hooks for unified system
+  // Job order print hook
   const { printJobOrder } = useJobOrderPrint();
-  const { printOrderReceipt } = useOrderReceiptPrint();
   const { user } = useAuth();
 
   // Use detailed order data to get product features and full information
@@ -348,108 +342,35 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     });
   };
 
-  // Enhanced job order print handler with preview
+  // Job order print handler
   const handleJobOrderPrint = () => {
-    console.log('🖨️ Job Order print preview requested for:', order.order_number);
-    
-    toast({
-      title: 'Opening Print Preview',
-      description: 'Review the job order details before sending to printer'
-    });
-    
-    setPrintPreviewType('job-order');
-    setShowPrintPreview(true);
-  };
-
-  // Enhanced receipt print handler with preview  
-  const handlePrintReceipt = () => {
-    console.log('🧾 Receipt print preview requested for:', order.order_number);
-    
-    toast({
-      title: 'Opening Print Preview',
-      description: 'Review the receipt details before sending to printer'
-    });
-    
-    setPrintPreviewType('receipt');
-    setShowPrintPreview(true);
-  };
-
-  // Actual print execution handlers
-  const executeJobOrderPrint = () => {
-    // Validate order data before printing
-    if (!order || !order.order_number) {
-      toast({
-        title: 'Print Error',
-        description: 'Order data is incomplete. Cannot generate print.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
     const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
     const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
     
-    console.log('🖨️ Executing job order print:', {
-      order: order.order_number,
-      itemsCount: items.length,
-      hasSchedule: !!schedule,
-      hasPickupPoint: !!pickupPoint,
-      adminName: user?.name
-    });
-    
-    printJobOrder(order, items, schedule, pickupPoint, user?.name || 'Admin User');
-    
-    toast({
-      title: 'Job Order Printing',
-      description: 'Job order has been sent to printer with professional formatting.'
-    });
+    printJobOrder(order, items, schedule, pickupPoint, user?.name || 'Unknown Admin');
   };
 
-  const executeReceiptPrint = () => {
-    // Validate order data before printing
-    if (!order || !order.order_number) {
+  // Safe print handler using react-to-print (for detailed receipt)
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Order-${order.order_number}`,
+    onAfterPrint: () => {
+      toast({
+        title: 'Print Ready',
+        description: 'Order details have been sent to printer.'
+      });
+    },
+    onPrintError: () => {
       toast({
         title: 'Print Error',
-        description: 'Order data is incomplete. Cannot generate receipt.',
+        description: 'Failed to print order details.',
         variant: 'destructive'
       });
-      return;
     }
-
-    // Business information for the receipt
-    const businessInfo = {
-      name: 'Starters Small Chops & Catering',
-      address: '2B Close Off 11Crescent Kado Estate, Kado',
-      phone: '0807 301 1100',
-      email: 'store@startersmallchops.com',
-    };
-
-    const items = enrichedItems || order.order_items || [];
-    const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
-    
-    console.log('📄 Executing receipt print:', {
-      orderNumber: order.order_number,
-      itemCount: items.length,
-      hasSchedule: !!schedule,
-      hasPickupPoint: !!pickupPoint,
-      hasBusinessInfo: !!businessInfo
-    });
-    
-    printOrderReceipt(order, items, schedule, pickupPoint, businessInfo, user?.name || 'Admin User');
-
-    toast({
-      title: 'Receipt Printing',
-      description: 'Receipt has been sent to printer with professional formatting.'
-    });
-  };
+  });
 
   // Helper function for missing data fallbacks
   const safeFallback = (value: any, fallback = 'Not provided') => {
-    // For objects (like delivery_address), return as-is for proper handling
-    if (value && typeof value === 'object') {
-      return value;
-    }
-    // For primitive values, check if they exist and have content
     return value && value.toString().trim() ? value : fallback;
   };
   return <AdaptiveDialog open={isOpen} onOpenChange={onClose} title={`Order Details - #${order.order_number}`} size="xl" className={cn("print:bg-white print:text-black print:shadow-none", "w-full max-w-none sm:max-w-6xl lg:max-w-7xl")}>
@@ -470,14 +391,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             
             
-            <Button onClick={handleJobOrderPrint} variant="outline" size="sm" className="gap-2" aria-label="Preview and print job order">
+            <Button onClick={handleJobOrderPrint} variant="outline" size="sm" className="gap-2" aria-label="Print job order">
               <Printer className="h-4 w-4" />
               <span className="hidden sm:inline">Print Job Order</span>
-            </Button>
-            
-            <Button onClick={handlePrintReceipt} variant="outline" size="sm" className="gap-2" aria-label="Print detailed receipt with product specs & admin info">
-              <Receipt className="h-4 w-4" />
-              <span className="hidden sm:inline">Print Receipt</span>
             </Button>
             
           </div>
@@ -576,25 +492,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Print Preview Dialog */}
-      <PrintPreviewDialog
-        isOpen={showPrintPreview}
-        onClose={() => setShowPrintPreview(false)}
-        onPrint={printPreviewType === 'job-order' ? executeJobOrderPrint : executeReceiptPrint}
-        order={order}
-        items={detailedOrderData?.items || enrichedItems || order.order_items || []}
-        deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
-        pickupPoint={pickupPoint}
-        businessInfo={printPreviewType === 'receipt' ? {
-          name: 'Starters Small Chops & Catering',
-          address: '2B Close Off 11Crescent Kado Estate, Kado',
-          phone: '0807 301 1100',
-          email: 'store@startersmallchops.com',
-        } : undefined}
-        printType={printPreviewType}
-        adminName={user?.name || 'Admin User'}
-      />
     </AdaptiveDialog>;
 };
 export default OrderDetailsDialog;

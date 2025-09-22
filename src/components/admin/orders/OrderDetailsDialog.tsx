@@ -5,40 +5,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Phone, Mail, MapPin, Package, Calendar, User, Printer, Receipt } from 'lucide-react';
-import { OrderWithItems } from '@/api/orders';
-import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
-import { useOrderReceiptPrint } from '@/hooks/useOrderReceiptPrint';
+import { Phone, Mail, MapPin, Package, Calendar, User } from 'lucide-react';
 
 interface OrderDetailsDialogProps {
-  order: OrderWithItems;
+  order: any;
   isOpen: boolean;
   onClose: () => void;
 }
 
 export function OrderDetailsDialog({ order, isOpen, onClose }: OrderDetailsDialogProps) {
-  const { printJobOrder } = useJobOrderPrint();
-  const { printOrderReceipt } = useOrderReceiptPrint();
-
-  const handlePrintJobOrder = () => {
-    printJobOrder(order, order.order_items);
-  };
-
-  const handlePrintReceipt = () => {
-    const businessInfo = {
-      name: 'Starters Small Chops & Catering',
-      address: '2B Close Off 11Crescent Kado Estate, Kado',
-      phone: '0807 301 1100',
-      email: 'store@startersmallchops.com',
-    };
-    
-    printOrderReceipt(order, order.order_items, undefined, undefined, businessInfo);
-  };
   const getStatusColor = (status: string) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
@@ -73,26 +52,13 @@ export function OrderDetailsDialog({ order, isOpen, onClose }: OrderDetailsDialo
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Order #{order.order_number}</span>
-            <div className="flex items-center gap-2">
-              <Badge className={getStatusColor(order.status)}>
-                {getStatusLabel(order.status)}
-              </Badge>
-            </div>
+            <Badge className={getStatusColor(order.status)}>
+              {getStatusLabel(order.status)}
+            </Badge>
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Print Actions */}
-          <div className="flex gap-2 justify-end border-b pb-4">
-            <Button onClick={handlePrintJobOrder} variant="outline" size="sm">
-              <Printer className="w-4 h-4 mr-2" />
-              Print Job Order
-            </Button>
-            <Button onClick={handlePrintReceipt} variant="outline" size="sm">
-              <Receipt className="w-4 h-4 mr-2" />
-              Print Receipt
-            </Button>
-          </div>
           {/* Order Info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -156,7 +122,7 @@ export function OrderDetailsDialog({ order, isOpen, onClose }: OrderDetailsDialo
               {order.order_type === 'delivery' && order.delivery_address && (
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{typeof order.delivery_address === 'string' ? order.delivery_address : 'Delivery Address'}</span>
+                  <span>{order.delivery_address.address || 'Delivery Address'}</span>
                 </div>
               )}
             </div>
@@ -171,9 +137,9 @@ export function OrderDetailsDialog({ order, isOpen, onClose }: OrderDetailsDialo
               Order Items
             </h4>
             
-            {order.order_items && order.order_items.length > 0 ? (
+            {order.order_items_new && order.order_items_new.length > 0 ? (
               <div className="space-y-3">
-                {order.order_items.map((item: any, index: number) => (
+                {order.order_items_new.map((item: any, index: number) => (
                   <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div>
                       <div className="font-medium">{item.product_name}</div>
@@ -195,26 +161,28 @@ export function OrderDetailsDialog({ order, isOpen, onClose }: OrderDetailsDialo
           <Separator />
 
           {/* Delivery Schedule */}
-          {order.delivery_schedule && (
+          {order.order_delivery_schedule && order.order_delivery_schedule.length > 0 && (
             <>
               <div>
                 <h4 className="font-semibold mb-3">Delivery Schedule</h4>
-                <div className="space-y-2">
-                  <div className="text-sm">
-                    <span className="font-medium">Date:</span> {order.delivery_schedule.delivery_date || 'Not scheduled'}
+                {order.order_delivery_schedule.map((schedule: any, index: number) => (
+                  <div key={index} className="space-y-2">
+                    <div className="text-sm">
+                      <span className="font-medium">Date:</span> {schedule.delivery_date}
+                    </div>
+                    {schedule.delivery_time_start && (
+                      <div className="text-sm">
+                        <span className="font-medium">Time:</span> 
+                        {schedule.delivery_time_start} - {schedule.delivery_time_end}
+                      </div>
+                    )}
+                    {schedule.assigned_rider_name && (
+                      <div className="text-sm">
+                        <span className="font-medium">Rider:</span> {schedule.assigned_rider_name}
+                      </div>
+                    )}
                   </div>
-                  {order.delivery_schedule.delivery_time_start && (
-                    <div className="text-sm">
-                      <span className="font-medium">Time:</span> 
-                      {order.delivery_schedule.delivery_time_start} - {order.delivery_schedule.delivery_time_end}
-                    </div>
-                  )}
-                  {order.delivery_schedule.special_instructions && (
-                    <div className="text-sm">
-                      <span className="font-medium">Instructions:</span> {order.delivery_schedule.special_instructions}
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
               <Separator />
             </>
@@ -240,9 +208,9 @@ export function OrderDetailsDialog({ order, isOpen, onClose }: OrderDetailsDialo
           </div>
 
           {/* Last Updated Info */}
-          {order.updated_by && (
+          {order.updated_by_name && (
             <div className="text-sm text-muted-foreground border-t pt-3">
-              Last updated by {order.updated_by} on{' '}
+              Last updated by {order.updated_by_name} on{' '}
               {format(new Date(order.updated_at), 'MMM dd, yyyy HH:mm')}
             </div>
           )}

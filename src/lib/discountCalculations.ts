@@ -35,10 +35,9 @@ export interface CartPromotion {
   id: string;
   name: string;
   code?: string;
-  type: PromotionType | 'buy_one_get_one'; // Add BOGO support
+  type: PromotionType;
   discount_amount: number;
   free_delivery?: boolean;
-  min_order_amount?: number; // Add minimum order amount field
 }
 
 export interface DiscountInfo {

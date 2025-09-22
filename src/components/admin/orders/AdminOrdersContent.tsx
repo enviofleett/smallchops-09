@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { OrderWithItems } from '@/api/orders';
-import { useOrdersProduction, useOrdersRealTimeProduction } from '@/hooks/useOrdersProduction';
+import { useOrdersNew, useOrdersRealTime } from '@/hooks/useOrdersNew';
+import { adaptNewOrdersToOld } from '@/utils/orderDataAdapter';
 import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
@@ -105,36 +106,29 @@ export function AdminOrdersContent() {
     setCurrentPage(1);
   }, [statusFilter, debouncedSearchQuery, selectedDay, selectedHour, selectedOverdueDateFilter]);
 
-  // Use production-ready order fetching with automatic fallback
-  const { data: ordersData, isLoading, error, refetch } = useOrdersProduction({
+  // Use new order management hooks
+  const { data: newOrdersData, isLoading, error, refetch } = useOrdersNew({
     status: statusFilter === 'all' ? undefined : statusFilter,
     search: debouncedSearchQuery || undefined,
     page: currentPage,
     pageSize: 20
   });
   
-  // Real-time updates for production
-  const { subscribe } = useOrdersRealTimeProduction();
+  // Real-time updates
+  const { subscribe } = useOrdersRealTime();
   
   useEffect(() => {
     const unsubscribe = subscribe();
     return unsubscribe;
   }, [subscribe]);
   
-  // Convert to old format for compatibility
+  // Adapt new orders data to old structure
   const orders = useMemo(() => {
-    if (!ordersData?.orders) return [];
-    
-    // Map the orders to the expected OrderWithItems format
-    return ordersData.orders.map(order => ({
-      ...order,
-      order_items: order.order_items || [],
-      delivery_schedule: order.delivery_schedule || null,
-      delivery_zones: order.delivery_zones || null
-    }));
-  }, [ordersData?.orders]);
+    if (!newOrdersData?.orders) return [];
+    return adaptNewOrdersToOld(newOrdersData.orders);
+  }, [newOrdersData?.orders]);
   
-  const totalCount = ordersData?.total_count || 0;
+  const totalCount = newOrdersData?.total_count || 0;
   const totalPages = Math.ceil(totalCount / 20);
 
   // Use the overdue orders logic hook
@@ -215,13 +209,6 @@ export function AdminOrdersContent() {
         showPreview={(order) => showPreview(order, null, businessInfo)}
         isMobile={isMobile}
       />
-
-      {/* Show data source indicator */}
-      {ordersData?.source && (
-        <div className="text-xs text-muted-foreground mt-2">
-          Data source: {ordersData.source === 'edge-function' ? '🚀 Edge Function' : '🔄 Direct Query'}
-        </div>
-      )}
 
       {/* Thermal Receipt Preview Modal */}
       {isPreviewOpen && previewOrder && (

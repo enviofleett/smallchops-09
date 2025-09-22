@@ -25,20 +25,10 @@ export const getOrdersViaNewBackend = async ({
   endDate,
 }: GetOrdersParams): Promise<{ orders: OrderWithItems[]; count: number }> => {
   try {
-    // Get current user session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('Not authenticated');
-    }
-
     const { data, error } = await supabase.functions.invoke('order-manager', {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
       body: {
         action: 'list_orders',
-        admin_id: session.user.id,
+        admin_id: 'current-user',
         page,
         page_size: pageSize,
         status_filter: status === 'all' ? 'all' : status,
@@ -78,22 +68,12 @@ export const updateOrderViaNewBackend = async (
   updates: { status?: OrderStatus; assigned_rider_id?: string | null; [key: string]: any }
 ): Promise<OrderWithItems> => {
   try {
-    // Get current user session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('Not authenticated');
-    }
-
     const { data, error } = await supabase.functions.invoke('order-manager', {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
       body: {
         action: 'update_status',
         order_id: orderId,
         new_status: updates.status,
-        admin_id: session.user.id
+        admin_id: 'current-user'
       }
     });
 

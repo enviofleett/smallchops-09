@@ -21,12 +21,9 @@ export interface PromotionCalculation {
   id: string;
   name: string;
   code: string;
-  type: 'percentage' | 'fixed_amount' | 'free_delivery' | 'buy_one_get_one';
-  value: number; // SERVER-AUTHORITATIVE: Matches server 'value' field
-  discount_amount?: number; // LEGACY: Keep for backward compatibility
+  type: 'percentage' | 'fixed_amount' | 'free_delivery';
+  discount_amount: number;
   free_delivery: boolean;
-  min_order_amount?: number; // Add minimum order validation
-  max_usage_per_customer?: number; // Add usage limits
 }
 
 export interface OrderCalculationResult {
@@ -107,17 +104,16 @@ function calculateVATBreakdown(priceInNaira: number, vatRate: number = VAT_RATE_
 
 export class OrderCalculationService {
   /**
-   * Calculate complete order totals with detailed logging (ENHANCED)
+   * Calculate complete order totals with detailed logging
    * Uses integer arithmetic to prevent floating point issues
    */
   static calculateOrder(input: OrderCalculationInput): OrderCalculationResult {
     const startTime = performance.now();
     
-    logger.info(`🔢 Order calculation starting (${input.calculation_source})`, {
+    logger.info(`Order calculation starting (${input.calculation_source})`, {
       itemCount: input.items.length,
       deliveryFee: input.delivery_fee,
-      promotionCode: input.promotion_code,
-      promotions: input.promotions?.length || 0
+      promotionCode: input.promotion_code
     });
 
     try {
@@ -139,8 +135,6 @@ export class OrderCalculationService {
         subtotalCostCents += itemCostCents;
         totalVatCents += itemVatCents;
         
-        logger.debug(`Item calculation: ${item.product_name} - ${item.quantity} x ₦${item.price} = ${itemTotalCents} cents`);
-        
         return {
           ...item,
           unit_price_cents: itemPriceCents,
@@ -152,11 +146,8 @@ export class OrderCalculationService {
         };
       });
 
-      logger.info(`✅ Subtotal calculated: ${subtotalCents} cents (₦${toNaira(subtotalCents)})`);
-
       // Step 2: Calculate delivery fee
       const deliveryFeeCents = toCents(input.delivery_fee || 0);
-      logger.info(`🚚 Delivery fee: ${deliveryFeeCents} cents (₦${toNaira(deliveryFeeCents)})`);
       
       // Step 3: Apply promotions
       const promotionResult = this.calculatePromotions(
@@ -165,8 +156,6 @@ export class OrderCalculationService {
         input.promotions || [],
         input.promotion_code
       );
-      
-      logger.info(`🎟️ Promotions applied: discount=${promotionResult.discountCents} cents, delivery_discount=${promotionResult.deliveryDiscountCents} cents`);
       
       // Step 4: Calculate final totals
       const finalTotalCents = subtotalCents + deliveryFeeCents - promotionResult.discountCents - promotionResult.deliveryDiscountCents;
@@ -193,31 +182,14 @@ export class OrderCalculationService {
       const endTime = performance.now();
       const calculationTime = endTime - startTime;
 
-      // Enhanced detailed logging for debugging mismatches
-      logger.info(`✅ Order calculation completed (${input.calculation_source})`, {
+      // Detailed logging for debugging
+      logger.info(`Order calculation completed (${input.calculation_source})`, {
         calculationTimeMs: Math.round(calculationTime * 100) / 100,
-        finalTotals: {
-          subtotal: result.subtotal,
-          deliveryFee: result.delivery_fee,
-          discountAmount: result.discount_amount,
-          deliveryDiscount: result.delivery_discount,
-          totalAmount: result.total_amount
-        },
-        centuAnalysis: {
-          subtotal_cents: subtotalCents,
-          delivery_fee_cents: deliveryFeeCents,
-          discount_cents: promotionResult.discountCents,
-          delivery_discount_cents: promotionResult.deliveryDiscountCents,
-          total_cents: finalTotalCents
-        },
-        appliedPromotions: promotionResult.appliedPromotions.map(p => ({
-          id: p.id,
-          name: p.name,
-          code: p.code,
-          type: p.type,
-          value: p.value ?? p.discount_amount,
-          free_delivery: p.free_delivery
-        })),
+        subtotal: result.subtotal,
+        deliveryFee: result.delivery_fee,
+        discountAmount: result.discount_amount,
+        totalAmount: result.total_amount,
+        appliedPromotions: result.applied_promotions.length,
         itemBreakdowns: itemBreakdowns.map(item => ({
           id: item.id,
           name: item.product_name,
@@ -230,11 +202,10 @@ export class OrderCalculationService {
       return result;
       
     } catch (error) {
-      logger.error(`❌ Order calculation failed (${input.calculation_source})`, error, JSON.stringify({
+      logger.error(`Order calculation failed (${input.calculation_source})`, error, JSON.stringify({
         itemCount: input.items.length,
         deliveryFee: input.delivery_fee,
-        promotionCode: input.promotion_code,
-        promotions: input.promotions?.length || 0
+        promotionCode: input.promotion_code
       }));
       
       throw new Error(`Order calculation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -286,7 +257,7 @@ export class OrderCalculationService {
   }
 
   /**
-   * Apply a single promotion (ENHANCED: Server-consistent field mapping)
+   * Apply a single promotion
    */
   private static applyPromotion(
     promotion: PromotionCalculation,
@@ -296,43 +267,17 @@ export class OrderCalculationService {
     let discountCents = 0;
     let deliveryDiscountCents = 0;
 
-    // CRITICAL FIX: Use server-authoritative 'value' field
-    const promotionValue = promotion.value;
-    if (promotionValue === undefined || promotionValue === null) {
-      logger.warn('Promotion missing value field:', { promotionId: promotion.id, type: promotion.type });
-      return { discountCents: 0, deliveryDiscountCents: 0 };
-    }
-
-    // Check minimum order requirement
-    if (promotion.min_order_amount && toNaira(subtotalCents) < promotion.min_order_amount) {
-      logger.info('Promotion minimum order not met:', { 
-        required: promotion.min_order_amount, 
-        actual: toNaira(subtotalCents),
-        promotionId: promotion.id
-      });
-      return { discountCents: 0, deliveryDiscountCents: 0 };
-    }
-
     switch (promotion.type) {
       case 'percentage':
-        // Cap percentage at 100%
-        const cappedPercentage = Math.min(promotionValue, 100);
-        discountCents = Math.round((subtotalCents * cappedPercentage) / 100);
+        discountCents = Math.round((subtotalCents * promotion.discount_amount) / 100);
         break;
         
       case 'fixed_amount':
-        // Fixed amount cannot exceed subtotal
-        discountCents = Math.min(toCents(promotionValue), subtotalCents);
+        discountCents = Math.min(toCents(promotion.discount_amount), subtotalCents);
         break;
         
       case 'free_delivery':
         deliveryDiscountCents = deliveryFeeCents;
-        break;
-
-      case 'buy_one_get_one':
-        // BOGO: Apply 50% discount on eligible items (simplified implementation)
-        // Full BOGO logic handled in server validation
-        discountCents = Math.round((subtotalCents * promotionValue) / 100);
         break;
     }
 
@@ -341,20 +286,11 @@ export class OrderCalculationService {
       deliveryDiscountCents = deliveryFeeCents;
     }
 
-    logger.debug('Promotion applied:', {
-      promotionId: promotion.id,
-      type: promotion.type,
-      value: promotionValue,
-      discountCents,
-      deliveryDiscountCents
-    });
-
     return { discountCents, deliveryDiscountCents };
   }
 
   /**
    * Compare two calculation results and check if they're within tolerance
-   * ENHANCED: Better mismatch detection and logging
    */
   static compareCalculations(
     clientResult: OrderCalculationResult,
@@ -369,7 +305,6 @@ export class OrderCalculationService {
       discount_diff: number;
       total_diff: number;
     };
-    recommendation: 'use_client' | 'use_server' | 'investigate';
   } {
     const totalDiff = Math.abs(clientResult.total_amount - serverResult.total_amount);
     const subtotalDiff = Math.abs(clientResult.subtotal - serverResult.subtotal);
@@ -377,39 +312,19 @@ export class OrderCalculationService {
     const discountDiff = Math.abs(clientResult.discount_amount - serverResult.discount_amount);
 
     const matches = totalDiff <= CALCULATION_TOLERANCE;
-    
-    // Determine recommendation based on differences
-    let recommendation: 'use_client' | 'use_server' | 'investigate' = 'use_server'; // Default to server-authoritative
-    
-    if (matches) {
-      recommendation = 'use_client'; // Calculations match within tolerance
-    } else if (totalDiff > 100) { // More than ₦1.00 difference
-      recommendation = 'investigate'; // Significant mismatch needs investigation
-    }
 
-    logger.info('📊 Calculation comparison (CLIENT vs SERVER)', {
-      client: {
-        subtotal: clientResult.subtotal,
-        delivery: clientResult.delivery_fee,
-        discount: clientResult.discount_amount,
-        total: clientResult.total_amount
-      },
-      server: {
-        subtotal: serverResult.subtotal,
-        delivery: serverResult.delivery_fee,
-        discount: serverResult.discount_amount,
-        total: serverResult.total_amount
-      },
-      differences: {
-        subtotal: subtotalDiff,
-        delivery: deliveryDiff,
-        discount: discountDiff,
-        total: totalDiff
-      },
+    logger.info('Calculation comparison', {
+      clientTotal: clientResult.total_amount,
+      serverTotal: serverResult.total_amount,
+      difference: totalDiff,
       tolerance: CALCULATION_TOLERANCE,
       matches,
-      recommendation,
-      severity: totalDiff > 100 ? 'HIGH' : totalDiff > 10 ? 'MEDIUM' : 'LOW'
+      breakdown: {
+        subtotal_diff: subtotalDiff,
+        delivery_diff: deliveryDiff,
+        discount_diff: discountDiff,
+        total_diff: totalDiff
+      }
     });
 
     return {
@@ -421,8 +336,7 @@ export class OrderCalculationService {
         delivery_diff: deliveryDiff,
         discount_diff: discountDiff,
         total_diff: totalDiff
-      },
-      recommendation
+      }
     };
   }
 

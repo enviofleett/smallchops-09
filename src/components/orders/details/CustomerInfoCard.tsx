@@ -67,23 +67,11 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
                   </span>
                 </div>
                 <div className="ml-6 space-y-1">
-                  {(() => {
-                    try {
-                      const addressLines = formatAddressMultiline(deliveryAddress).split('\n');
-                      return addressLines.map((line, index) => (
-                        <div key={index} className="text-sm text-foreground">
-                          {line}
-                        </div>
-                      ));
-                    } catch (error) {
-                      console.error('Error formatting delivery address:', error);
-                      return (
-                        <div className="text-sm text-foreground">
-                          Address information unavailable
-                        </div>
-                      );
-                    }
-                  })()}
+                  {formatAddressMultiline(deliveryAddress).split('\n').map((line, index) => (
+                    <div key={index} className="text-sm text-foreground">
+                      {line}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

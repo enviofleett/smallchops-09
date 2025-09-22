@@ -10,6 +10,40 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+// Hot fix: Function to get or create customer ID from email
+async function getOrCreateCustomerId(email: string): Promise<string> {
+  try {
+    // First, try to find existing customer
+    const { data: existingCustomer, error: findError } = await supabaseAdmin
+      .from('customers')
+      .select('id')
+      .eq('email', email)
+      .single()
+    
+    if (existingCustomer && !findError) {
+      return existingCustomer.id
+    }
+    
+    // If not found, create new customer
+    const { data: newCustomer, error: createError } = await supabaseAdmin
+      .from('customers')
+      .insert({ email })
+      .select('id')
+      .single()
+    
+    if (createError) {
+      console.error('Failed to create customer:', createError)
+      throw new Error(`Failed to create customer: ${createError.message}`)
+    }
+    
+    return newCustomer.id
+    
+  } catch (error) {
+    console.error('Error in getOrCreateCustomerId:', error)
+    throw error
+  }
+}
+
 serve(async (req: Request) => {
   const origin = req.headers.get('origin');
   
@@ -150,11 +184,15 @@ serve(async (req: Request) => {
       }
     }
 
-    // --- Step 3: Call DB function to create order ---
+    // --- Step 3: Convert email to customer_id and create order ---
+    console.log("🔍 Converting email to customer_id:", customer_email);
+    const customer_id = await getOrCreateCustomerId(customer_email);
+    console.log("✅ Customer ID obtained:", customer_id);
+
     const { data: orderResult, error: orderError } = await supabaseAdmin.rpc(
       "create_order_with_items",
       {
-        p_customer_email: customer_email,
+        p_customer_id: customer_id, // ✅ Changed from p_customer_email
         p_fulfillment_type: fulfillment_type,
         p_items: items,
         p_delivery_address: delivery_address || null,

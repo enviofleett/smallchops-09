@@ -5554,6 +5554,7 @@ export type Database = {
           discount_amount: number | null
           email: string | null
           estimated_delivery_date: string | null
+          fulfillment_type: string | null
           guest_session_id: string | null
           id: string
           idempotency_key: string | null
@@ -5575,6 +5576,9 @@ export type Database = {
           processing_officer_id: string | null
           processing_officer_name: string | null
           processing_started_at: string | null
+          promotion_code: string | null
+          promotion_discount: number | null
+          promotion_id: string | null
           reference_updated_at: string | null
           special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"]
@@ -5606,6 +5610,7 @@ export type Database = {
           discount_amount?: number | null
           email?: string | null
           estimated_delivery_date?: string | null
+          fulfillment_type?: string | null
           guest_session_id?: string | null
           id?: string
           idempotency_key?: string | null
@@ -5627,6 +5632,9 @@ export type Database = {
           processing_officer_id?: string | null
           processing_officer_name?: string | null
           processing_started_at?: string | null
+          promotion_code?: string | null
+          promotion_discount?: number | null
+          promotion_id?: string | null
           reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -5658,6 +5666,7 @@ export type Database = {
           discount_amount?: number | null
           email?: string | null
           estimated_delivery_date?: string | null
+          fulfillment_type?: string | null
           guest_session_id?: string | null
           id?: string
           idempotency_key?: string | null
@@ -5679,6 +5688,9 @@ export type Database = {
           processing_officer_id?: string | null
           processing_officer_name?: string | null
           processing_started_at?: string | null
+          promotion_code?: string | null
+          promotion_discount?: number | null
+          promotion_id?: string | null
           reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -5718,6 +5730,13 @@ export type Database = {
             columns: ["pickup_point_id"]
             isOneToOne: false
             referencedRelation: "pickup_points"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
             referencedColumns: ["id"]
           },
         ]
@@ -10070,6 +10089,17 @@ export type Database = {
               p_promotion_discount?: number
               p_subtotal: number
               p_total: number
+            }
+          | {
+              p_client_total?: number
+              p_customer_id: string
+              p_delivery_address?: Json
+              p_delivery_zone_id?: string
+              p_fulfillment_type: string
+              p_guest_session_id?: string
+              p_items: Json
+              p_pickup_point_id?: string
+              p_promotion_code?: string
             }
           | {
               p_client_total?: number

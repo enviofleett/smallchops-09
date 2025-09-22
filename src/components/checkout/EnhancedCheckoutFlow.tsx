@@ -590,14 +590,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         return;
       }
 
-      // Enhanced data sanitization and validation - Structure payload for backend
-      const sanitizedData = {
-        customer: {
-          name: formData.customer_name.trim(),
-          email: formData.customer_email.trim().toLowerCase(),
-          phone: formData.customer_phone?.trim() || undefined,
-          guest_session_id: guestSessionId || undefined // Include guest session for guest users
-        },
+      // Enhanced data structure to match backend expectations
+      const backendPayload = {
+        customer_email: formData.customer_email.trim().toLowerCase(),
+        customer_name: formData.customer_name.trim(),
+        customer_phone: formData.customer_phone?.trim() || undefined,
+        fulfillment_type: formData.fulfillment_type,
         items: items.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name || 'Product',
@@ -605,12 +603,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           unit_price: item.price,
           customizations: item.customizations || undefined
         })),
-        fulfillment: {
-          type: formData.fulfillment_type,
-          address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : undefined,
-          pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : undefined,
-          delivery_zone_id: deliveryZone?.id || undefined
-        },
+        delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : null,
+        pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : null,
+        delivery_zone_id: deliveryZone?.id || null,
+        guest_session_id: guestSessionId || null,
+        promotion_code: cart.promotion_code || null,
+        client_total: calculatedTotal,
         delivery_schedule: formData.delivery_date ? {
           delivery_date: formData.delivery_date,
           delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
@@ -620,23 +618,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         } : null,
         payment: {
           method: formData.payment_method || 'paystack'
-        },
-        // Include promotion info for backend validation (ENHANCED)
-        promotion: cart.promotion_code ? {
-          code: cart.promotion_code,
-          client_calculated_total: calculatedTotal, // Frontend calculated total for server validation
-          client_subtotal: subtotal,
-          client_discount: cart.summary.discount_amount,
-          client_delivery_discount: cart.summary.delivery_discount,
-          client_delivery_fee: deliveryFee
-        } : null,
-        // CRITICAL: Add top-level client total for server validation (FIXED)
-        client_calculated_total: calculatedTotal
+        }
       };
-      console.log('📦 Submitting checkout data:', sanitizedData);
+      
+      console.log('📦 Submitting checkout data (backend format):', backendPayload);
 
-      // Call Supabase edge function with authentication when available
-      const invokeOptions: any = { body: sanitizedData };
+      const invokeOptions: any = { body: backendPayload };
       if (session?.access_token) {
         invokeOptions.headers = { Authorization: `Bearer ${session.access_token}` };
       }
@@ -664,7 +651,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           order_number: data?.order_number,
           amount: data?.amount || calculatedTotal,
           // Prioritize backend amount
-          customer_email: sanitizedData.customer.email,
+          customer_email: backendPayload.customer_email,
           success: true
         };
       }
@@ -685,7 +672,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         console.log('🔗 Redirecting to payment URL:', paymentUrl);
 
         // Save state before redirecting  
-        savePrePaymentState(sanitizedData, checkoutStep, deliveryFee, 'direct_redirect');
+        savePrePaymentState(backendPayload, checkoutStep, deliveryFee, 'direct_redirect');
 
         // Close dialog immediately and redirect to payment
         onClose();
@@ -709,15 +696,21 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         orderId: parsedData?.order_id || data?.order?.id,
         orderNumber: parsedData?.order_number || data?.order?.order_number,
         amount: authoritativeAmount,
-        email: sanitizedData.customer.email,
+        email: backendPayload.customer_email,
         successUrl: `${window.location.origin}/payment-callback`,
         cancelUrl: window.location.href
       });
 
-      // Navigate to callback page immediately to show clean processing state
-      navigate('/payment-callback?status=processing');
+      // Navigate to callback page with reference for immediate processing
+      const paymentReference = data?.reference || parsedData?.reference || '';
+      const callbackUrl = paymentReference 
+        ? `/payment-callback?status=processing&reference=${encodeURIComponent(paymentReference)}`
+        : '/payment-callback?status=processing';
+      
+      console.log('🔗 Navigating to payment callback:', callbackUrl);
+      navigate(callbackUrl);
       setIsSubmitting(false);
-      logPaymentAttempt(sanitizedData, 'success');
+      logPaymentAttempt(backendPayload, 'success');
     } catch (error: any) {
       console.error('🚨 Checkout submission error:', error);
       setIsSubmitting(false);

@@ -19,14 +19,21 @@ export const PaymentCallbackHandler: React.FC = () => {
   useEffect(() => {
     const handleCallback = async (attemptNumber = 0) => {
       try {
-        // Get reference from URL params (prefer reference over trxref)
-        const reference = searchParams.get('reference') || searchParams.get('trxref');
+        // Get reference from URL params or sessionStorage (enhanced fallback)
+        let reference = searchParams.get('reference') || searchParams.get('trxref');
         const urlStatus = searchParams.get('status');
         const orderId = searchParams.get('order_id');
         
+        // Enhanced fallback: check sessionStorage if no URL reference found
+        if (!reference) {
+          reference = sessionStorage.getItem('paystack_payment_reference') || '';
+          console.log('📱 No URL reference found, using sessionStorage reference:', reference);
+        }
+        
         if (!reference) {
           setStatus('error');
-          setMessage('No payment reference found in callback URL');
+          setMessage('Invalid payment callback - no reference found');
+          console.error('❌ No payment reference found in URL or sessionStorage');
           return;
         }
 

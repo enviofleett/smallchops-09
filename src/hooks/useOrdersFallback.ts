@@ -128,16 +128,20 @@ export const useOrdersSmart = (filters: OrderFilters = {}) => {
   // Fallback query - only runs if edge function fails
   const fallbackQuery = useOrdersFallback(filters);
 
-  // Return the successful query or fallback
+  // Return the successful query or fallback with better logic
   if (edgeFunctionQuery.data && !edgeFunctionQuery.error) {
+    console.log('✅ Using edge function data');
     return {
       ...edgeFunctionQuery,
       data: { ...edgeFunctionQuery.data, source: 'edge-function' }
     };
   } else if (edgeFunctionQuery.error || edgeFunctionQuery.failureCount > 0) {
+    console.log('⚠️ Edge function failed, using fallback:', edgeFunctionQuery.error?.message);
     return {
       ...fallbackQuery,
-      data: fallbackQuery.data ? { ...fallbackQuery.data, source: 'fallback' } : undefined
+      data: fallbackQuery.data ? { ...fallbackQuery.data, source: 'fallback' } : undefined,
+      isLoading: fallbackQuery.isLoading,
+      error: fallbackQuery.error
     };
   }
 

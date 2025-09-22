@@ -155,7 +155,32 @@ serve(async (req) => {
       );
     }
 
-    const body = await req.json();
+    // Safe JSON parsing with validation
+    let body;
+    try {
+      const bodyText = await req.text();
+      console.log('📥 Raw request body length:', bodyText.length);
+      
+      if (!bodyText || bodyText.trim() === '') {
+        throw new Error('Empty request body');
+      }
+      
+      body = JSON.parse(bodyText);
+      console.log('✅ JSON parsed successfully:', { action: body.action || 'undefined' });
+    } catch (jsonError) {
+      console.error('❌ JSON parsing error:', jsonError.message);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { 
+            'Content-Type': 'application/json',
+            ...getCorsHeaders(origin)
+          }
+        }
+      );
+    }
+
     const { action } = body;
 
     console.log('📋 Processing admin request:', {

@@ -5,8 +5,7 @@ import OrdersFilter from '@/components/orders/OrdersFilter';
 import OrdersTable from '@/components/orders/OrdersTable';
 import OrdersPagination from '@/components/orders/OrdersPagination';
 import { useQuery, keepPreviousData, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useOrdersNew } from '@/hooks/useOrdersNew';
-import { OrderWithItems, deleteOrder, bulkDeleteOrders } from '@/api/orders';
+import { getOrders, OrderWithItems, deleteOrder, bulkDeleteOrders } from '@/api/orders';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
@@ -74,8 +73,8 @@ const Orders = () => {
   React.useEffect(() => {
     const channel = supabase
       .channel('orders-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders_new' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['orders-new'] });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
       })
       .subscribe();
 
@@ -89,7 +88,7 @@ const Orders = () => {
     const channel = supabase
       .channel('payment-transactions-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_transactions' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['orders-new'] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
         queryClient.invalidateQueries({ queryKey: ['payment_tx_for_orders'] });
       })
       .subscribe();
@@ -99,17 +98,24 @@ const Orders = () => {
     };
   }, [queryClient]);
 
-  const { data, isLoading, isError, error } = useOrdersNew({
-    page: currentPage, 
-    pageSize: PAGE_SIZE, 
-    status: statusFilter === 'overdue' ? 'all' : statusFilter,
-    search: searchQuery,
-    startDate: startDate?.toISOString().split('T')[0],
-    endDate: endDate?.toISOString().split('T')[0]
+  const { data, isLoading, isError, error } = useQuery<{
+    orders: OrderWithItems[];
+    count: number;
+  }>({
+    queryKey: ['orders', { currentPage, statusFilter, searchQuery, startDate, endDate }],
+    queryFn: () => getOrders({ 
+      page: currentPage, 
+      pageSize: PAGE_SIZE, 
+      status: statusFilter === 'overdue' ? 'all' : statusFilter,
+      searchQuery,
+      startDate: startDate?.toISOString().split('T')[0],
+      endDate: endDate?.toISOString().split('T')[0]
+    }),
+    placeholderData: keepPreviousData,
   });
 
-  const orders = data?.data?.orders ?? [];
-  const totalCount = data?.data?.total ?? 0;
+  const orders = data?.orders ?? [];
+  const totalCount = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   // Fetch delivery schedules for relevant orders (confirmed and overdue filter)
@@ -246,7 +252,7 @@ const Orders = () => {
   const deleteOrderMutation = useMutation({
     mutationFn: deleteOrder,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders-new'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast({ title: 'Success', description: 'Order deleted successfully' });
       setDeleteConfirmOpen(false);
       setOrderToDelete(null);
@@ -263,7 +269,7 @@ const Orders = () => {
   const bulkDeleteMutation = useMutation({
     mutationFn: bulkDeleteOrders,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders-new'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast({ 
         title: 'Success', 
         description: `${selectedOrders.length} order${selectedOrders.length > 1 ? 's' : ''} deleted successfully`
@@ -332,7 +338,7 @@ const Orders = () => {
       const res = await runPaystackBatchVerify({ limit: 200, dryRun: false });
       if ((res as any)?.error) throw new Error((res as any).error);
       toast({ title: 'Reconcile started', description: 'Batch verify invoked. Refreshing orders…' });
-      queryClient.invalidateQueries({ queryKey: ['orders-new'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (e: any) {
       toast({ title: 'Reconcile failed', description: e.message || 'Unable to run batch verify', variant: 'destructive' });
     }

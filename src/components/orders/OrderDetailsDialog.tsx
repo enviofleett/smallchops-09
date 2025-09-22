@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { OrderWithItems, manuallyQueueCommunicationEvent } from '@/api/orders';
-import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpdate';
+import { OrderWithItems, updateOrder, manuallyQueueCommunicationEvent } from '@/api/orders';
 import { getDispatchRiders, DispatchRider } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
@@ -19,7 +18,6 @@ import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
 
 // Import our new components
 import { StatCard } from './details/StatCard';
@@ -29,29 +27,22 @@ import { ActionsPanel } from './details/ActionsPanel';
 import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
-
+import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 interface OrderDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  order: OrderWithItems | null; // Allow null for safety
+  order: OrderWithItems;
 }
 const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   isOpen,
   onClose,
   order
 }) => {
-  // Critical safety check for production
-  if (!order) {
-    console.warn('OrderDetailsDialog: order is null, closing dialog');
-    if (isOpen) {
-      onClose();
-    }
-    return null;
-  }
-
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(order.status);
   const [assignedRider, setAssignedRider] = useState<string | null>(order.assigned_rider_id);
@@ -65,7 +56,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
   // Job order print hook
   const { printJobOrder } = useJobOrderPrint();
-  const { user } = useAuth();
 
   // Use detailed order data to get product features and full information
   const {
@@ -158,30 +148,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       console.log('✅ Loaded dispatch riders:', riders.length, 'active riders');
     }
   }, [ridersError, riders, toast]);
-  // Use enhanced order status update hook with bypass functionality
-  const {
-    updateOrderStatus,
-    bypassCacheAndUpdate,
-    isUpdating,
-    isBypassing,
-    show409Error,
-    clearBypassError
-  } = useEnhancedOrderStatusUpdate();
-
   const updateMutation = useMutation({
-    mutationFn: async (updates: {
+    mutationFn: (updates: {
       status?: OrderStatus;
       assigned_rider_id?: string | null;
-    }) => {
-      // If status is being updated, use the enhanced hook
-      if (updates.status) {
-        await updateOrderStatus(order.id, updates.status);
-      }
-      
-      // TODO: Handle rider assignment separately if needed
-      // For now, just handle status updates through enhanced hook
-      return { success: true };
-    },
+    }) => updateOrder(order.id, updates),
     onSuccess: () => {
       const statusChanged = selectedStatus !== order.status;
       toast({
@@ -191,16 +162,16 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           : 'Order updated successfully.'
       });
       queryClient.invalidateQueries({
-        queryKey: ['orders-new']
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['order-details', order.id]
+        queryKey: ['orders']
       });
       onClose();
     },
     onError: error => {
-      // Enhanced hook already handles error messages, so we can skip duplicate toasts
-      console.error('Update failed:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to update order: ${error.message}`,
+        variant: 'destructive'
+      });
     }
   });
   const manualSendMutation = useMutation({
@@ -347,7 +318,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
     const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
     
-    printJobOrder(order, items, schedule, pickupPoint, user?.name || 'Unknown Admin');
+    printJobOrder(order, items, schedule, pickupPoint);
   };
 
   // Safe print handler using react-to-print (for detailed receipt)
@@ -425,6 +396,20 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <OrderInfoCard orderNumber={safeFallback(order.order_number)} orderTime={order.order_time} orderType={order.order_type as 'delivery' | 'pickup'} status={order.status} paymentStatus={order.payment_status} paymentReference={safeFallback(order.payment_reference)} totalAmount={order.total_amount} deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule} isLoadingSchedule={isLoadingDetails || isLoadingSchedule} onRecoveryAttempt={() => attemptScheduleRecovery(order.id)} recoveryPending={isRecovering} recoveryError={!!detailsError} recoveryStatus={recoveryStatus} />
             </section>
 
+            {/* Delivery Schedule Section - Show all delivery_schedule data */}
+            {(detailedOrderData?.delivery_schedule || deliverySchedule) && (
+              <section aria-labelledby="delivery-schedule-heading" className={cn("print:break-inside-avoid print:mb-6")}>
+                <h2 id="delivery-schedule-heading" className={cn("text-lg font-semibold text-foreground mb-4", "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2")}>
+                  {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Schedule
+                </h2>
+                <DeliveryScheduleDisplay 
+                  schedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+                  orderType={order.order_type as 'delivery' | 'pickup'}
+                  orderStatus={order.status}
+                  className="mb-0"
+                />
+              </section>
+            )}
 
             <section aria-labelledby="payment-details-heading" className={cn("print:break-inside-avoid print:mb-6")}>
               <h2 id="payment-details-heading" className={cn("text-lg font-semibold text-foreground mb-4", "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2")}>
@@ -465,7 +450,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 onUpdate={handleUpdate} 
                 onVerifyPayment={handleVerifyWithPaystack} 
                 paymentReference={order.payment_reference} 
-                isUpdating={updateMutation.isPending || isUpdating} 
+                isUpdating={updateMutation.isPending} 
                 isSendingManual={manualSendMutation.isPending} 
                 isVerifying={verifying} 
                 verifyState={verifyState} 
@@ -473,11 +458,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 orderId={order.id}
                 customerEmail={order.customer_email}
                 orderNumber={order.order_number}
-                // Enhanced bypass functionality
-                show409Error={show409Error === order.id}
-                onBypassCacheAndUpdate={() => bypassCacheAndUpdate(order.id, selectedStatus)}
-                isBypassing={isBypassing}
-                clearBypassError={clearBypassError}
               />
             </section>
           </div>

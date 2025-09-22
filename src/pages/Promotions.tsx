@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { Trophy, PlusCircle, Edit, Trash, Calendar, Target, BarChart3, Settings, ChevronRight, Percent, DollarSign, Truck } from "lucide-react";
+import { Trophy, PlusCircle, Edit, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -16,46 +15,31 @@ import EditPromotionDialog from "@/components/promotions/EditPromotionDialog";
 import type { Promotion, PromotionStatus } from "@/api/promotions";
 
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query"; // For the usage counts
+import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
+
 
 // --- Status badge component with semantic tokens ---
 function StatusBadge({ status }: { status: string }) {
-  const getStatusConfig = (status: string) => {
+  const getStatusVariant = (status: string) => {
     switch (status) {
       case "active":
-        return { variant: "default", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" };
+        return "default";
       case "paused":
       case "inactive":
-        return { variant: "secondary", className: "bg-amber-100 text-amber-800 hover:bg-amber-100" };
+        return "secondary";
       case "expired":
-        return { variant: "outline", className: "bg-red-100 text-red-800 border-red-200 hover:bg-red-100" };
+        return "outline";
       default:
-        return { variant: "outline", className: "bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-100" };
+        return "outline";
     }
   };
 
-  const config = getStatusConfig(status);
-
   return (
-    <Badge variant={config.variant as any} className={config.className}>
+    <Badge variant={getStatusVariant(status)}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
-}
-
-// --- Promotion Type Icon ---
-function PromotionTypeIcon({ type, className = "w-5 h-5" }: { type: string; className?: string }) {
-  switch (type) {
-    case "percentage":
-      return <Percent className={`${className} text-blue-600`} />;
-    case "fixed_amount":
-      return <DollarSign className={`${className} text-green-600`} />;
-    case "free_delivery":
-      return <Truck className={`${className} text-purple-600`} />;
-    default:
-      return <Target className={`${className} text-gray-600`} />;
-  }
 }
 
 // --- Usage fetching helper ---
@@ -91,7 +75,7 @@ export default function PromotionsPage() {
     queryFn: getPromotionUsage,
   });
 
-  function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
+function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
     const confirmLabel = newStatus === 'expired'
       ? "Are you sure you want to expire this promotion? This cannot be undone."
       : undefined;
@@ -120,184 +104,204 @@ export default function PromotionsPage() {
     );
   }
 
+
   function onEditPromotion(promo: Promotion) {
     setEditingPromotion(promo);
     setEditDialogOpen(true);
   }
 
-  function onDeletePromotion(promo: Promotion) {
-    if (window.confirm(`Are you sure you want to delete "${promo.name}"? This action cannot be undone.`)) {
-      deleteMutation.mutate(promo.id, {
-        onSuccess: () => {
-          toast({
-            title: "Promotion deleted",
-            description: `"${promo.name}" has been successfully deleted.`,
-          });
-        },
-        onError: (error) => {
-          toast({
-            title: "Failed to delete promotion",
-            description: "Please try again later.",
-            variant: "destructive"
-          });
-        }
-      });
-    }
-  }
-
-  // Calculate stats
-  const activePromotions = data.filter(p => p.status === 'active').length;
-  const totalUsage = Object.values(usageData).reduce((sum, count) => sum + count, 0);
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex flex-col space-y-4 sm:flex-row sm:items-start sm:justify-between sm:space-y-0">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500">
-                  <Trophy className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-                    Promotions
-                  </h1>
-                  <p className="text-sm text-gray-600 sm:text-base">
-                    Manage your discounts and special offers
-                  </p>
-                </div>
-              </div>
-            </div>
-            <Button 
-              size="lg" 
-              onClick={() => setDialogOpen(true)} 
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              <PlusCircle className="w-5 h-5 mr-2" />
-              Create Promotion
-            </Button>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-600">Total Promotions</p>
-                    <p className="text-2xl font-bold text-blue-900">{data.length}</p>
-                  </div>
-                  <BarChart3 className="h-8 w-8 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-emerald-600">Active</p>
-                    <p className="text-2xl font-bold text-emerald-900">{activePromotions}</p>
-                  </div>
-                  <Target className="h-8 w-8 text-emerald-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-600">Total Usage</p>
-                    <p className="text-2xl font-bold text-purple-900">{totalUsage}</p>
-                  </div>
-                  <Calendar className="h-8 w-8 text-purple-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-orange-600">This Month</p>
-                    <p className="text-2xl font-bold text-orange-900">{Math.floor(totalUsage * 0.6)}</p>
-                  </div>
-                  <Trophy className="h-8 w-8 text-orange-600" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
+      {/* Header */}
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+        <div className="space-y-1.5">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <Trophy className="w-6 h-6 md:w-8 md:h-8 text-yellow-500" /> Promotions
+          </h1>
+          <p className="text-gray-600">Manage your discounts, loyalty and referral promotions here.</p>
         </div>
+        <Button size="lg" variant="default" onClick={() => setDialogOpen(true)} className="w-full sm:w-auto min-h-[44px]">
+          <PlusCircle className="w-5 h-5" />
+          Create Promotion
+        </Button>
+      </div>
 
-        {/* Promotions Content */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
-              <p className="mt-4 text-gray-600">Loading promotions...</p>
+      {/* Promotions Table */}
+      {isLoading && <div className="p-8 text-center">Loading...</div>}
+      {isError && <div className="p-8 text-center text-red-500">Failed to load promotions.</div>}
+      {!isLoading && !isError && (
+        <ResponsiveTable
+          className="overflow-x-auto rounded-xl border bg-white p-2"
+          mobileComponent={
+            <div className="space-y-3">
+              {data.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No promotions found.</div>
+              ) : (
+                data.map(promo => (
+                  <MobileCard key={promo.id}>
+                    <MobileCardHeader>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{promo.name}</h3>
+                        <p className="text-sm text-gray-600 capitalize">{promo.type}</p>
+                      </div>
+                      <StatusBadge status={promo.status ?? "active"} />
+                    </MobileCardHeader>
+                    
+                    <MobileCardContent>
+                      <MobileCardRow 
+                        label="Discount" 
+                        value={promo.value ? `₦${promo.value}` : "-"} 
+                      />
+                      <MobileCardRow 
+                        label="Min. Purchase" 
+                        value={promo.min_order_amount || "-"} 
+                      />
+                      <MobileCardRow 
+                        label="Valid From" 
+                        value={promo.valid_from ? promo.valid_from.substring(0,10) : "-"} 
+                      />
+                      <MobileCardRow 
+                        label="Expires" 
+                        value={promo.valid_until ? promo.valid_until.substring(0,10) : "-"} 
+                      />
+                      <MobileCardRow 
+                        label="Usage" 
+                        value={<span className="font-semibold">{usageData[promo.id] ?? 0}</span>} 
+                      />
+                    </MobileCardContent>
+                    
+                    <MobileCardActions>
+                      <Button size="sm" variant="outline"
+                        onClick={() => onEditPromotion(promo)}
+                        className="flex items-center gap-2">
+                        <Edit className="w-4 h-4" />
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline"
+                        onClick={() => deleteMutation.mutate(promo.id)}
+                        className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50">
+                        <Trash className="w-4 h-4" />
+                        Delete
+                      </Button>
+                    </MobileCardActions>
+                    
+                    {/* Status buttons for mobile */}
+                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+                      {promo.status !== "active" &&
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleStatusChange(promo, "active")}
+                          className="flex-1 min-w-0"
+                        >Activate</Button>
+                      }
+                      {promo.status !== "inactive" &&
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusChange(promo, "inactive")}
+                          className="flex-1 min-w-0"
+                        >Pause</Button>
+                      }
+                      {promo.status !== "expired" &&
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleStatusChange(promo, "expired")}
+                          className="flex-1 min-w-0"
+                        >Expire</Button>
+                      }
+                    </div>
+                  </MobileCard>
+                ))
+              )}
             </div>
-          </div>
-        )}
-
-        {isError && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="p-8 text-center">
-              <div className="text-red-600">
-                <Trophy className="mx-auto h-12 w-12 opacity-50" />
-                <p className="mt-4 font-medium">Failed to load promotions</p>
-                <p className="text-sm">Please refresh the page or try again later.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {!isLoading && !isError && (
-          <>
-            {data.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="py-12 text-center">
-                  <Trophy className="mx-auto h-16 w-16 text-gray-400" />
-                  <h3 className="mt-4 text-lg font-medium text-gray-900">No promotions yet</h3>
-                  <p className="mt-2 text-gray-600">Get started by creating your first promotion.</p>
-                  <Button 
-                    className="mt-6" 
-                    onClick={() => setDialogOpen(true)}
-                  >
-                    <PlusCircle className="w-4 h-4 mr-2" />
-                    Create Your First Promotion
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-                {data.map((promo) => (
-                  <PromotionCard 
-                    key={promo.id}
-                    promotion={promo}
-                    usage={usageData[promo.id] ?? 0}
-                    onEdit={() => onEditPromotion(promo)}
-                    onDelete={() => onDeletePromotion(promo)}
-                    onStatusChange={(status) => handleStatusChange(promo, status)}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
+          }
+        >
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b text-sm text-gray-600">
+                <th className="p-3">Name</th>
+                <th className="p-3">Type</th>
+                <th className="p-3">Discount</th>
+                <th className="p-3">Min. Purchase</th>
+                <th className="p-3">Starts</th>
+                <th className="p-3">Expires</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Usage</th>
+                <th className="p-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map(promo => (
+                <tr key={promo.id} className="border-b hover:bg-gray-50">
+                  <td className="p-3">{promo.name}</td>
+                  <td className="p-3 capitalize">{promo.type.replace('_', ' ')}</td>
+                  <td className="p-3">
+                    {promo.type === "percentage" && `${promo.value}%`}
+                    {promo.type === "fixed_amount" && `₦${promo.value}`}
+                    {promo.type === "free_delivery" && "Free"}
+                  </td>
+                  <td className="p-3">{promo.min_order_amount || "-"}</td>
+                  <td className="p-3">{promo.valid_from ? promo.valid_from.substring(0,10) : "-"}</td>
+                  <td className="p-3">{promo.valid_until ? promo.valid_until.substring(0,10) : "-"}</td>
+                  <td className="p-3">
+                    <StatusBadge status={promo.status ?? "active"} />
+                  </td>
+                  <td className="p-3 text-center">
+                    {usageData[promo.id] ?? 0}
+                  </td>
+                  <td className="p-3 flex flex-col md:flex-row gap-2">
+                    <Button size="sm" variant="outline"
+                      onClick={() => onEditPromotion(promo)}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="destructive"
+                      onClick={() => deleteMutation.mutate(promo.id)}>
+                      <Trash className="w-4 h-4" />
+                    </Button>
+                    {/* Status action buttons */}
+                    <div className="flex gap-1 mt-1">
+                      {promo.status !== "active" &&
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleStatusChange(promo, "active")}
+                        >Activate</Button>
+                      }
+                      {promo.status !== "inactive" &&
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusChange(promo, "inactive")}
+                        >Pause</Button>
+                      }
+                      {promo.status !== "expired" &&
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleStatusChange(promo, "expired")}
+                        >Expire</Button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {data.length === 0 &&
+                <tr><td colSpan={9} className="p-8 text-center text-gray-500">No promotions found.</td></tr>
+              }
+            </tbody>
+          </table>
+        </ResponsiveTable>
+      )}
 
       {/* Create Promotion Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] p-0 flex flex-col overflow-hidden border-0 shadow-2xl">
-          <DialogHeader className="p-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 flex-shrink-0">
-            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-              <PlusCircle className="w-6 h-6 text-blue-600" />
-              Create New Promotion
-            </DialogTitle>
+        <DialogContent className="max-w-2xl w-full max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="p-4 pb-2 border-b flex-shrink-0">
+            <DialogTitle>Create Promotion</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0">
             <CreatePromotionForm
               onSuccess={() => setDialogOpen(false)}
             />
@@ -312,171 +316,6 @@ export default function PromotionsPage() {
         promotion={editingPromotion}
         onSuccess={() => setEditDialogOpen(false)}
       />
-      </div>
     </div>
-  );
-}
-
-// Promotion Card Component
-interface PromotionCardProps {
-  promotion: Promotion;
-  usage: number;
-  onEdit: () => void;
-  onDelete: () => void;
-  onStatusChange: (status: PromotionStatus) => void;
-}
-
-function PromotionCard({ promotion, usage, onEdit, onDelete, onStatusChange }: PromotionCardProps) {
-  const getDiscountDisplay = () => {
-    switch (promotion.type) {
-      case "percentage":
-        return `${promotion.value}% OFF`;
-      case "fixed_amount":
-        return `₦${promotion.value} OFF`;
-      case "free_delivery":
-        return "FREE DELIVERY";
-      default:
-        return "DISCOUNT";
-    }
-  };
-
-  const getTypeColor = () => {
-    switch (promotion.type) {
-      case "percentage":
-        return "from-blue-500 to-indigo-600";
-      case "fixed_amount":
-        return "from-green-500 to-emerald-600";
-      case "free_delivery":
-        return "from-purple-500 to-violet-600";
-      default:
-        return "from-gray-500 to-gray-600";
-    }
-  };
-
-  return (
-    <Card className="group hover:shadow-lg transition-all duration-200 border-0 shadow-md">
-      <CardContent className="p-0">
-        {/* Header with discount badge */}
-        <div className={`bg-gradient-to-r ${getTypeColor()} p-6 text-white relative overflow-hidden`}>
-          <div className="absolute top-0 right-0 w-32 h-32 transform rotate-12 translate-x-8 -translate-y-8 opacity-10">
-            <PromotionTypeIcon type={promotion.type} className="w-full h-full" />
-          </div>
-          <div className="relative z-10">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-bold text-xl mb-1">{promotion.name}</h3>
-                <div className="flex items-center gap-2">
-                  <PromotionTypeIcon type={promotion.type} className="w-4 h-4" />
-                  <span className="text-sm opacity-90 capitalize">{promotion.type.replace('_', ' ')}</span>
-                </div>
-              </div>
-              <StatusBadge status={promotion.status ?? "active"} />
-            </div>
-            <div className="mt-4">
-              <div className="text-2xl font-bold">{getDiscountDisplay()}</div>
-              {promotion.min_order_amount > 0 && (
-                <div className="text-sm opacity-90 mt-1">
-                  Min. order: ₦{promotion.min_order_amount}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-gray-500 font-medium">Valid From</p>
-              <p className="text-gray-900">
-                {promotion.valid_from ? format(new Date(promotion.valid_from), 'MMM dd, yyyy') : 'Not set'}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-500 font-medium">Expires</p>
-              <p className="text-gray-900">
-                {promotion.valid_until ? format(new Date(promotion.valid_until), 'MMM dd, yyyy') : 'No expiry'}
-              </p>
-            </div>
-          </div>
-
-          {/* Usage */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-gray-600" />
-              <span className="font-medium text-gray-700">Times Used</span>
-            </div>
-            <span className="font-bold text-lg text-gray-900">{usage}</span>
-          </div>
-
-          {/* Code */}
-          {promotion.code && (
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">Promo Code</p>
-              <p className="font-mono text-lg font-bold text-blue-900">{promotion.code}</p>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex flex-col gap-2 pt-2">
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onEdit}
-                className="flex-1 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700"
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onDelete}
-                className="flex-1 hover:bg-red-50 hover:border-red-200 hover:text-red-700"
-              >
-                <Trash className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
-            </div>
-
-            {/* Status Actions */}
-            <div className="flex gap-1">
-              {promotion.status !== "active" && (
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => onStatusChange("active")}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                >
-                  Activate
-                </Button>
-              )}
-              {promotion.status !== "inactive" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onStatusChange("inactive")}
-                  className="flex-1"
-                >
-                  Pause
-                </Button>
-              )}
-              {promotion.status !== "expired" && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onStatusChange("expired")}
-                  className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  Expire
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

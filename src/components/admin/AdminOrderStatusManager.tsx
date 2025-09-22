@@ -1,10 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpdate';
-import { OrderLockStatus } from './OrderLockStatus';
+import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
 import { OrderStatus } from '@/types/orders';
-import { RefreshCw, Send, Clock, AlertTriangle, Zap } from 'lucide-react';
+import { RefreshCw, Send } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -16,16 +15,6 @@ interface AdminOrderStatusManagerProps {
   className?: string;
   size?: 'sm' | 'default' | 'lg';
   onStatusUpdate?: (newStatus: OrderStatus) => void;
-  lockInfo?: {
-    is_locked: boolean;
-    locking_admin_id?: string;
-    locking_admin_name?: string;
-    locking_admin_avatar?: string;
-    locking_admin_email?: string;
-    lock_expires_at?: string;
-    seconds_remaining?: number;
-    acquired_at?: string;
-  };
 }
 
 export const AdminOrderStatusManager = ({ 
@@ -34,59 +23,18 @@ export const AdminOrderStatusManager = ({
   orderNumber,
   className = '',
   size = 'sm',
-  onStatusUpdate,
-  lockInfo
+  onStatusUpdate
 }: AdminOrderStatusManagerProps) => {
   const queryClient = useQueryClient();
-  
-  
-  // Use enhanced hook with idempotency and distributed locking
-  const { 
-    updateOrderStatus, 
-    bypassCacheAndUpdate,
-    isUpdating,
-    isBypassing, 
-    error,
-    adminUserId,
-    show409Error,
-    clearBypassError,
-    isPending,
-    getTimeSinceLastUpdate 
-  } = useEnhancedOrderStatusUpdate();
-  
-  // Check if order is locked by another admin
-  const isLockedByOther = Boolean(
-    lockInfo?.is_locked && 
-    lockInfo?.locking_admin_id && 
-    lockInfo?.locking_admin_id !== adminUserId // Compare with current admin user ID
-  );
-  
-  // Check if current admin is the lock holder
-  const isLockHolder = Boolean(
-    lockInfo?.is_locked && 
-    lockInfo?.locking_admin_id && 
-    lockInfo?.locking_admin_id === adminUserId
-  );
-  
-  const [showProcessing, setShowProcessing] = useState(false);
-  const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [selectedStatusForBypass, setSelectedStatusForBypass] = useState<OrderStatus | null>(null);
+  const { updateStatus, isUpdating, error } = useProductionStatusUpdate();
 
-  // Clean up debounce timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimeout) {
-        clearTimeout(debounceTimeout);
-      }
-    };
-  }, [debounceTimeout]);
-
-  // Secure email notification mutation
+  // Secure email notification mutation using edge function
   const sendDeliveryEmailMutation = useMutation({
     mutationFn: async (orderId: string) => {
       const { data, error } = await supabase.functions.invoke('send-out-for-delivery-email', {
         body: { order_id: orderId }
       });
+      
       if (error) throw error;
       return data;
     },
@@ -99,315 +47,125 @@ export const AdminOrderStatusManager = ({
     }
   });
 
-  const handleStatusUpdate = useCallback(async (newStatus: OrderStatus) => {
-    // Clear any existing debounce timeout
-    if (debounceTimeout) {
-      clearTimeout(debounceTimeout);
-      setDebounceTimeout(null);
-    }
-
-    const timeSinceLastUpdate = getTimeSinceLastUpdate(orderId);
-    
-    if (isPending(orderId)) {
-      toast.info('Another admin is currently updating this order. Please wait...');
-      return;
-    }
-
-    // Skip timing restrictions for lock holders
-    if (!isLockHolder && timeSinceLastUpdate < 2000) {
-      const remainingSeconds = Math.ceil((2000 - timeSinceLastUpdate) / 1000);
-      toast.info(`Please wait ${remainingSeconds} seconds before updating again`);
-      return;
-    }
-
-    // Implement timing logic based on lock status
-    const debounceTime = isLockHolder ? 0 : 2000; // No delay for lock holders
-    const timeoutId = setTimeout(async () => {
-      setShowProcessing(true);
-      try {
-        await updateOrderStatus(orderId, newStatus, isLockHolder); // Skip debounce for lock holders
-        onStatusUpdate?.(newStatus);
-        toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
-      } catch (error: any) {
-        // Enhanced error messages for different error types
-        if (error.message?.includes('409') || error.message?.includes('conflict') || error.message?.includes('CONCURRENT_UPDATE_IN_PROGRESS')) {
-          setSelectedStatusForBypass(newStatus); // Store the status for bypass
-          
-          // Use admin-friendly toast message
-          import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
-            showAdminErrorToast(toast, error, {
-              orderId,
-              orderNumber: orderNumber,
-              onBypassCache: () => handleBypassCacheAndUpdate(),
-              onRetry: () => handleStatusUpdate(newStatus)
-            });
-          });
-        } else if (error.message?.includes('401') || error.message?.includes('unauthorized')) {
-          toast.error('Session expired. Please refresh and try again.');
-        } else if (error.message?.includes('Network')) {
-          toast.error('Network error. Retrying in 3 seconds...');
-          // Auto-retry for network errors
-          setTimeout(() => handleStatusUpdate(newStatus), 3000);
-        } else {
-          // Use admin-friendly error message for other errors
-          import('@/utils/adminToastMessages').then(({ showAdminErrorToast }) => {
-            showAdminErrorToast(toast, error, {
-              orderId,
-              orderNumber: orderNumber,
-              onRetry: () => handleStatusUpdate(newStatus)
-            });
-          });
-        }
-      } finally {
-        setShowProcessing(false);
-        setDebounceTimeout(null);
-      }
-    }, debounceTime);
-
-    setDebounceTimeout(timeoutId);
-    setShowProcessing(true);
-    
-    if (isLockHolder) {
-      toast.info(`Updating status to ${newStatus.replace('_', ' ')}...`);
-    } else {
-      toast.info(`Scheduling status change to ${newStatus.replace('_', ' ')}...`);
-    }
-  }, [updateOrderStatus, orderId, onStatusUpdate, isPending, getTimeSinceLastUpdate, debounceTimeout, isLockHolder]);
-
-  const handleBypassCacheAndUpdate = useCallback(async () => {
-    if (!selectedStatusForBypass) return;
-
-    try {
-      await bypassCacheAndUpdate(orderId, selectedStatusForBypass);
-      onStatusUpdate?.(selectedStatusForBypass);
-      setSelectedStatusForBypass(null);
-      clearBypassError();
-      
-      // Show success message
-      import('@/utils/adminToastMessages').then(({ showAdminToast }) => {
-        showAdminToast(toast, 'cacheBypassSuccess', {
-          orderId,
-          orderNumber: orderNumber
-        });
-      });
-    } catch (error: any) {
-      console.error('Bypass failed:', error);
-      // Error handling is already done in the hook
-    }
-  }, [bypassCacheAndUpdate, orderId, selectedStatusForBypass, onStatusUpdate, clearBypassError]);
-
-  const handleSendDeliveryEmail = useCallback(() => {
-    sendDeliveryEmailMutation.mutate(orderId);
-  }, [sendDeliveryEmailMutation, orderId]);
-
-  // Status transition validation
-  const isValidTransition = (from: OrderStatus, to: OrderStatus): boolean => {
-    const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      pending: ['confirmed', 'cancelled'],
-      confirmed: ['preparing', 'cancelled'],
-      preparing: ['ready', 'cancelled'],
-      ready: ['out_for_delivery', 'cancelled'],
-      out_for_delivery: ['delivered', 'cancelled'],
-      delivered: ['completed', 'returned'],
-      cancelled: ['pending'],
-      refunded: [],
-      completed: [],
-      returned: ['refunded']
-    };
-    
-    return validTransitions[from]?.includes(to) || false;
+  const handleStatusUpdate = (newStatus: OrderStatus) => {
+    updateStatus({ orderId, status: newStatus });
+    onStatusUpdate?.(newStatus);
   };
 
-  const getStatusColor = (status: OrderStatus): string => {
-    const colorMap: Record<OrderStatus, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-blue-100 text-blue-800',
-      preparing: 'bg-orange-100 text-orange-800',
-      ready: 'bg-green-100 text-green-800',
-      out_for_delivery: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-green-500 text-white',
-      cancelled: 'bg-red-100 text-red-800',
-      refunded: 'bg-gray-100 text-gray-800',
-      completed: 'bg-green-600 text-white',
-      returned: 'bg-red-200 text-red-900'
-    };
-    return colorMap[status] || 'bg-gray-100 text-gray-800';
+  const handleSendDeliveryEmail = () => {
+    sendDeliveryEmailMutation.mutate(orderId);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
+      case 'out_for_delivery': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'preparing': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'confirmed': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'pending': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
   };
 
   const renderStatusBadge = () => (
-    <Badge className={getStatusColor(currentStatus)}>
-      {currentStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+    <Badge 
+      variant="outline" 
+      className={`${getStatusColor(currentStatus)} capitalize font-medium`}
+    >
+      {currentStatus.replace('_', ' ')}
     </Badge>
   );
 
   const renderActionButtons = () => {
-    // Show lock status message if locked by another admin
-    if (isLockedByOther) {
-      return (
-        <div className="text-sm text-muted-foreground italic flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" />
-          Order is being updated by {lockInfo?.locking_admin_name || 'another admin'}
-        </div>
-      );
-    }
-
-    const isProcessing = isUpdating || sendDeliveryEmailMutation.isPending || showProcessing;
-    const isOrderPending = isPending(orderId);
-    const timeSinceLastUpdate = getTimeSinceLastUpdate(orderId);
-    const isInDebounceWindow = !isLockHolder && timeSinceLastUpdate < 2000; // Skip debounce window for lock holders
-    const isDisabled = isProcessing || isOrderPending || isInDebounceWindow;
-    const remainingSeconds = isInDebounceWindow ? Math.ceil((2000 - timeSinceLastUpdate) / 1000) : 0;
-    
-    const getNextValidStatuses = (): OrderStatus[] => {
-      const validNext: Record<OrderStatus, OrderStatus[]> = {
-        pending: ['confirmed'],
-        confirmed: ['preparing'],
-        preparing: ['ready'],
-        ready: ['out_for_delivery'],
-        out_for_delivery: ['delivered'],
-        delivered: ['completed'],
-        cancelled: [],
-        refunded: [],
-        completed: [],
-        returned: ['refunded']
-      };
-      return validNext[currentStatus] || [];
-    };
-
-    const validNextStatuses = getNextValidStatuses();
-    
-    // Show bypass section if 409 error is detected
-    const show409 = Boolean((show409Error === orderId) || selectedStatusForBypass);
+    const isProcessing = isUpdating || sendDeliveryEmailMutation.isPending;
     
     return (
-      <div className={`flex flex-col gap-2 ${className}`}>
-        {/* Bypass Cache Section */}
-        {show409 && selectedStatusForBypass && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
-            <div className="flex items-start gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-              <div className="text-sm">
-                <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                  Cache Conflict Detected
-                </p>
-                <p className="text-amber-700 dark:text-amber-300 text-xs">
-                  Status update to "{selectedStatusForBypass.replace('_', ' ')}" blocked by cache. Use bypass to force update.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleBypassCacheAndUpdate}
-                disabled={isBypassing}
-                variant="outline"
-                size="sm"
-                className="border-orange-200 dark:border-orange-800 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 text-orange-700 dark:text-orange-300"
-              >
-                {isBypassing ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                    Bypassing...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 mr-1" />
-                    Bypass Cache
-                  </>
-                )}
-              </Button>
-              
-              <Button 
-                onClick={() => {
-                  setSelectedStatusForBypass(null);
-                  clearBypassError();
-                }}
-                variant="outline"
-                size="sm"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        {/* Normal Action Buttons */}
-        <div className="flex gap-1">
-          {validNextStatuses.map(nextStatus => {
-          const isValidNext = isValidTransition(currentStatus, nextStatus);
-          
-          return (
-            <Button
-              key={nextStatus}
-              size={size}
-              variant="outline"
-              onClick={() => handleStatusUpdate(nextStatus)}
-              disabled={isDisabled || !isValidNext || show409}
-              className={!isValidNext ? 'opacity-50 cursor-not-allowed' : ''}
-            >
-              {isProcessing ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin mr-1" />
-                  {debounceTimeout ? 'Scheduling...' : 'Processing...'}
-                </>
-              ) : isInDebounceWindow ? (
-                <>
-                  <Clock className="w-4 h-4 mr-1" />
-                  Wait {remainingSeconds}s
-                </>
-              ) : error ? (
-                <>
-                  <AlertTriangle className="w-4 h-4 mr-1" />
-                  Retry
-                </>
-              ) : (
-                `Mark ${nextStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`
-              )}
-            </Button>
-          );
-        })}
-        
-        {/* Cancel button for most statuses */}
-        {!['delivered', 'completed', 'cancelled', 'refunded'].includes(currentStatus) && (
+      <div className={`flex gap-1 ${className}`}>
+        {/* Confirmed -> Preparing */}
+        {currentStatus === 'confirmed' && (
           <Button
             size={size}
-            variant="destructive"
-            onClick={() => handleStatusUpdate('cancelled')}
-            disabled={isDisabled || show409}
+            variant="outline"
+            onClick={() => handleStatusUpdate('preparing')}
+            disabled={isProcessing}
           >
-            {isProcessing ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin mr-1" />
-                Cancelling...
-              </>
+            {isUpdating ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              'Cancel Order'
+              'Start Preparing'
             )}
           </Button>
         )}
-        </div>
+
+        {/* Preparing -> Ready + Send Email */}
+        {currentStatus === 'preparing' && (
+          <>
+            <Button
+              size={size}
+              variant="outline"
+              onClick={() => handleStatusUpdate('ready')}
+              disabled={isProcessing}
+            >
+              {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Mark Ready'}
+            </Button>
+            <Button
+              size={size}
+              variant="outline"
+              onClick={handleSendDeliveryEmail}
+              disabled={isProcessing}
+              title="Send out-for-delivery email"
+            >
+              {sendDeliveryEmailMutation.isPending ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+          </>
+        )}
+
+        {/* Ready -> Out for Delivery */}
+        {currentStatus === 'ready' && (
+          <Button
+            size={size}
+            variant="outline"
+            onClick={() => {
+              handleStatusUpdate('out_for_delivery');
+              handleSendDeliveryEmail();
+            }}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <Send className="w-4 h-4 mr-1" />
+                Out for Delivery
+              </>
+            )}
+          </Button>
+        )}
+
+        {/* Out for Delivery -> Delivered */}
+        {currentStatus === 'out_for_delivery' && (
+          <Button
+            size={size}
+            variant="outline"
+            onClick={() => handleStatusUpdate('delivered')}
+            disabled={isProcessing}
+          >
+            {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Mark Delivered'}
+          </Button>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Lock Status Display */}
-      {lockInfo?.is_locked && (
-        <div className="bg-muted/30 rounded-lg p-2">
-          <OrderLockStatus
-            orderId={orderId}
-            lockInfo={lockInfo}
-            size="sm"
-          />
-        </div>
-      )}
-      
-      {/* Status and Actions */}
-      <div className="flex items-center gap-2">
-        {renderStatusBadge()}
-        {renderActionButtons()}
-      </div>
+    <div className="flex items-center gap-2">
+      {renderStatusBadge()}
+      {renderActionButtons()}
     </div>
   );
 };

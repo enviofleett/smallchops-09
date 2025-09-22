@@ -5,7 +5,7 @@ import { SectionHeading } from './SectionHeading';
 import { StatCard } from './StatCard';
 import { DeliveryScheduleDisplay } from '../DeliveryScheduleDisplay';
 import { OrderStatus } from '@/types/orders';
-import { safeFormatDate } from '@/utils/safeDateFormat';
+import { format } from 'date-fns';
 
 interface OrderInfoCardProps {
   orderNumber: string;
@@ -113,7 +113,7 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
             <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <div>
               <span className="text-xs text-muted-foreground uppercase tracking-wider block">Order Time</span>
-              <span className="font-medium">{safeFormatDate(orderTime, 'MMM d, yyyy h:mm a')}</span>
+              <span className="font-medium">{format(new Date(orderTime), 'MMM d, yyyy h:mm a')}</span>
             </div>
           </div>
 

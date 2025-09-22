@@ -59,12 +59,12 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
 
   console.log(`🔍 CORS: Checking origin="${origin}" in env="${ENV_NAME}"`);
 
-  // PRODUCTION FIX: Allow null origins for Paystack webhooks
+  // If no origin specified, reject with null (more secure)
   if (!origin) {
-    console.log('⚠️ CORS: No origin provided (likely Paystack webhook), allowing with wildcard');
+    console.log('⚠️ CORS: No origin provided, returning null');
     return {
       ...baseHeaders,
-      'Access-Control-Allow-Origin': '*'
+      'Access-Control-Allow-Origin': 'null'
     };
   }
 

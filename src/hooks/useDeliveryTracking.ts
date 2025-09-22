@@ -32,76 +32,36 @@ export const useDeliveryTracking = (orderIdOrNumber?: string) => {
     setError(null);
 
     try {
-      console.log(`🔍 [TRACK] Starting order tracking for: ${orderIdentifier}`);
-      
-      // Enhanced tracking for both authenticated and guest users
+      // Get order details with rider assignment
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .select(`
           *,
-          customer_accounts(name, email)
+          profiles:assigned_rider_id(name, phone),
+          vehicle_assignments(
+            vehicles(type, brand, model, license_plate)
+          )
         `)
         .or(`id.eq.${orderIdentifier},order_number.eq.${orderIdentifier}`)
-        .maybeSingle();
+        .single();
 
-      if (orderError) {
-        console.error(`❌ [TRACK] Database error:`, orderError);
-        // More helpful error message for guests
-        throw new Error('Unable to connect to tracking service. Please try again or contact support.');
-      }
+      if (orderError) throw orderError;
 
-      if (!order) {
-        console.warn(`⚠️ [TRACK] Order not found: ${orderIdentifier}`);
-        // Better error message with suggestions
-        throw new Error(`Order not found. Please check your order number and try again. If you just placed this order, please wait a few minutes and try again.`);
-      }
-
-      console.log(`✅ [TRACK] Order found:`, order.order_number);
-
-      // Step 2: Get rider information safely (separate query to avoid JOIN issues)
-      let riderInfo = undefined;
-      if (order.assigned_rider_id) {
-        console.log(`👤 [TRACK] Fetching rider info for ID: ${order.assigned_rider_id}`);
-        try {
-          const { data: riderData, error: riderError } = await supabase
-            .from('profiles')
-            .select('name, phone')
-            .eq('id', order.assigned_rider_id)
-            .maybeSingle();
-
-          if (!riderError && riderData) {
-            riderInfo = {
-              name: riderData.name || 'Delivery Rider',
-              phone: riderData.phone || '',
-              vehicleInfo: 'Delivery Vehicle'
-            };
-            console.log(`✅ [TRACK] Rider info loaded:`, riderInfo.name);
-          }
-        } catch (riderErr) {
-          console.warn(`⚠️ [TRACK] Could not load rider info (non-blocking):`, riderErr);
-          // Continue without rider info - this shouldn't break tracking
-        }
-      }
-
-      // Step 3: Create tracking data
       const trackingData: DeliveryTracking = {
         orderId: order.id,
         orderNumber: order.order_number,
         status: order.status,
         estimatedDeliveryTime: order.delivery_time,
-        riderInfo
+        riderInfo: order.profiles ? {
+          name: order.profiles.name || 'Delivery Rider',
+          phone: order.profiles.phone || '',
+          vehicleInfo: 'Delivery Vehicle'
+        } : undefined
       };
-
-      console.log(`🎯 [TRACK] Tracking data prepared:`, {
-        orderNumber: trackingData.orderNumber,
-        status: trackingData.status,
-        hasRider: !!trackingData.riderInfo
-      });
 
       setTracking(trackingData);
     } catch (err) {
-      console.error(`❌ [TRACK] Tracking failed:`, err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to track order. Please try again or contact support.';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to track order';
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -110,39 +70,27 @@ export const useDeliveryTracking = (orderIdOrNumber?: string) => {
   };
 
   const subscribeToUpdates = (orderIdOrNumber: string) => {
-    // Only subscribe if we have a valid tracking object
-    if (!tracking) {
-      console.log(`⚠️ [TRACK] Skipping real-time subscription - no active tracking`);
-      return () => {};
-    }
-
-    console.log(`📡 [TRACK] Setting up real-time updates for: ${orderIdOrNumber}`);
-    
     const channel = supabase
-      .channel(`order-tracking-${orderIdOrNumber}`)
+      .channel('order-tracking')
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'orders',
-          filter: `id.eq.${tracking.orderId}` // Use actual order ID, not search term
+          filter: `id.eq.${orderIdOrNumber}`
         },
         (payload) => {
-          console.log(`📡 [TRACK] Real-time update received:`, payload.new);
-          if (tracking && payload.new) {
+          if (tracking) {
             setTracking(prev => prev ? {
               ...prev,
               status: payload.new.status,
               estimatedDeliveryTime: payload.new.delivery_time
             } : null);
-            toast.info(`Order status updated to: ${payload.new.status.replace('_', ' ')}`);
           }
         }
       )
-      .subscribe((status) => {
-        console.log(`📡 [TRACK] Subscription status:`, status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);

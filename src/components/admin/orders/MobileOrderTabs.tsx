@@ -7,7 +7,7 @@ import { Package, MapPin, User, Clock, AlertTriangle } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
 import { OrderWithItems } from '@/api/orders';
-import { safeFormatDate } from '@/utils/safeDateFormat';
+import { format } from 'date-fns';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 
@@ -40,13 +40,13 @@ export const MobileOrderTabs = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'delivered': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case 'out_for_delivery': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'preparing': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'ready': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
-      case 'confirmed': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'out_for_delivery': return 'bg-blue-100 text-blue-800';
+      case 'preparing': return 'bg-orange-100 text-orange-800';
+      case 'ready': return 'bg-purple-100 text-purple-800';
+      case 'confirmed': return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -76,20 +76,20 @@ export const MobileOrderTabs = ({
     const isOverdue = schedule && isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end);
     
     return (
-      <MobileCard key={order.id} onClick={() => onOrderSelect?.(order)} className="touch-manipulation">
+      <MobileCard key={order.id} onClick={() => onOrderSelect?.(order)}>
         <MobileCardHeader>
-          <div className="flex items-center justify-between w-full min-w-0">
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-sm truncate">#{order.order_number}</h3>
+          <div className="flex items-center justify-between w-full">
+            <div>
+              <h3 className="font-semibold text-sm">#{order.order_number}</h3>
               <p className="text-xs text-muted-foreground">
-                {safeFormatDate(order.created_at, 'MMM dd, HH:mm')}
+                {format(new Date(order.created_at), 'MMM dd, HH:mm')}
               </p>
             </div>
-            <div className="flex flex-col gap-1.5 items-end shrink-0 ml-3">
+            <div className="flex flex-col gap-1 items-end">
               <Badge className={getStatusColor(order.status)} variant="secondary">
-                <span className="text-xs">{order.status.replace('_', ' ')}</span>
+                {order.status.replace('_', ' ')}
               </Badge>
-              <Badge variant={order.order_type === 'delivery' ? 'default' : 'outline'} className="text-xs">
+              <Badge variant={order.order_type === 'delivery' ? 'default' : 'outline'}>
                 {order.order_type}
               </Badge>
               {isOverdue && (
@@ -106,20 +106,20 @@ export const MobileOrderTabs = ({
           <MobileCardRow 
             label="Customer" 
             value={
-              <div className="text-right min-w-0 flex-1">
-                <p className="font-medium text-sm truncate">{order.customer_name}</p>
-                <p className="text-xs text-muted-foreground truncate">{order.customer_email}</p>
+              <div className="text-right">
+                <p className="font-medium text-sm">{order.customer_name}</p>
+                <p className="text-xs text-muted-foreground">{order.customer_email}</p>
               </div>
             } 
           />
           <MobileCardRow 
             label="Amount" 
-            value={<span className="font-bold text-sm whitespace-nowrap">₦{order.total_amount.toLocaleString()}</span>} 
+            value={<span className="font-bold">₦{order.total_amount.toLocaleString()}</span>} 
           />
           <MobileCardRow 
             label="Payment" 
             value={
-              <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'} className="text-xs">
+              <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
                 {order.payment_status}
               </Badge>
             } 
@@ -128,11 +128,11 @@ export const MobileOrderTabs = ({
             <>
               <MobileCardRow 
                 label="Delivery Date" 
-                value={<span className="text-sm">{safeFormatDate(schedule.delivery_date, 'MMM dd, yyyy')}</span>} 
+                value={format(new Date(schedule.delivery_date), 'MMM dd, yyyy')} 
               />
               <MobileCardRow 
                 label="Time Window" 
-                value={<span className="text-sm whitespace-nowrap">{schedule.delivery_time_start} - {schedule.delivery_time_end}</span>} 
+                value={`${schedule.delivery_time_start} - ${schedule.delivery_time_end}`} 
               />
               {schedule.delivery_time_end && schedule.delivery_time_start && (
                 <MobileCardRow 
@@ -153,7 +153,7 @@ export const MobileOrderTabs = ({
             <MobileCardRow 
               label="Address" 
               value={
-                <span className="text-xs text-right max-w-32 sm:max-w-48 truncate">
+                <span className="text-xs">
                   {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
                     ? `${(order.delivery_address as any).address_line_1 || ''}, ${(order.delivery_address as any).city || ''}`.trim()
                     : typeof order.delivery_address === 'string' 
@@ -167,21 +167,21 @@ export const MobileOrderTabs = ({
         </MobileCardContent>
 
         <MobileCardActions>
-          <Button size="sm" variant="outline" className="text-xs px-3 py-1.5">
+          <Button size="sm" variant="outline">
             View Details
           </Button>
           {order.status === 'confirmed' && (
-            <Button size="sm" className="text-xs px-3 py-1.5">
+            <Button size="sm">
               Start Preparing
             </Button>
           )}
           {order.status === 'preparing' && (
-            <Button size="sm" className="text-xs px-3 py-1.5">
+            <Button size="sm">
               Mark Ready
             </Button>
           )}
           {order.status === 'ready' && (
-            <Button size="sm" className="text-xs px-3 py-1.5">
+            <Button size="sm">
               Out for Delivery
             </Button>
           )}
@@ -194,10 +194,10 @@ export const MobileOrderTabs = ({
     if (orderList.length === 0) {
       return (
         <Card>
-          <CardContent className="p-6 sm:p-8 text-center">
-            <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold mb-2">No Orders Found</h3>
-            <p className="text-muted-foreground text-sm">
+          <CardContent className="p-8 text-center">
+            <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Orders Found</h3>
+            <p className="text-muted-foreground">
               No orders match the current filter criteria.
             </p>
           </CardContent>
@@ -217,7 +217,7 @@ export const MobileOrderTabs = ({
   }
 
   return (
-    <div className="space-y-3 px-1">
+    <div className="space-y-3">
       {orders.map(renderOrderCard)}
     </div>
   );

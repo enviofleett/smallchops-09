@@ -320,6 +320,16 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
               </div>
             )}
 
+            {/* Overall Schedule Status */}
+            {!validation.isValid && (
+              <Alert variant="destructive" className="py-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  <div className="font-medium">Schedule requires attention</div>
+                  <div className="text-xs mt-1">This delivery schedule has validation issues that need to be resolved.</div>
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         )}
 

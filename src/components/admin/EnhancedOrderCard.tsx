@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { OrderWithItems } from '@/api/orders';
 import { AdminOrderStatusManager } from './AdminOrderStatusManager';
 import { SecureOrderStatusUpdater } from './SecureOrderStatusUpdater';
-import { OrderLockStatus } from './OrderLockStatus';
 import ProductionOrderErrorBoundary from './ProductionOrderErrorBoundary';
 import { format } from 'date-fns';
 import { 
@@ -24,18 +23,7 @@ import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 
 export interface EnhancedOrderCardProps {
-  order: OrderWithItems & {
-    lock_info?: {
-      is_locked: boolean;
-      locking_admin_id?: string;
-      locking_admin_name?: string;
-      locking_admin_avatar?: string;
-      locking_admin_email?: string;
-      lock_expires_at?: string;
-      seconds_remaining?: number;
-      acquired_at?: string;
-    };
-  };
+  order: OrderWithItems;
   deliverySchedule?: any;
   onOrderSelect?: (order: OrderWithItems) => void;
   showAdvancedControls?: boolean;
@@ -80,61 +68,58 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
         isOverdue ? 'border-l-4 border-l-destructive bg-red-50/20' : 
         order.payment_status === 'paid' ? 'border-l-4 border-l-green-500 bg-green-50/20' : ''
       }`}>
-        <CardHeader className="pb-2 sm:pb-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2 min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
                 {getStatusIcon(order.status)}
-                <h3 className="font-semibold text-base sm:text-lg truncate">#{order.order_number}</h3>
+                <h3 className="font-semibold text-lg">#{order.order_number}</h3>
                 {isOverdue && (
-                  <Badge variant="destructive" className="animate-pulse text-xs">
+                  <Badge variant="destructive" className="animate-pulse">
                     <AlertTriangle className="w-3 h-3 mr-1" />
-                    <span className="hidden xs:inline">Overdue</span>
+                    Overdue
                   </Badge>
                 )}
                 {order.payment_status === 'paid' && (
-                  <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 text-xs">
+                  <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
                     <CheckCircle className="w-3 h-3 mr-1" />
-                    <span className="hidden xs:inline">Paid</span>
+                    Paid
                   </Badge>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                <span className="hidden sm:inline">{format(new Date(order.created_at), 'MMM dd, yyyy HH:mm')}</span>
-                <span className="sm:hidden">{format(new Date(order.created_at), 'MMM dd')}</span>
+                {format(new Date(order.created_at), 'MMM dd, yyyy HH:mm')}
               </p>
             </div>
 
             {!showAdvancedControls && (
-              <div className="shrink-0 w-full sm:w-auto">
-                <AdminOrderStatusManager
-                  orderId={order.id}
-                  currentStatus={order.status}
-                  orderNumber={order.order_number}
-                  size="sm"
-                />
-              </div>
+              <AdminOrderStatusManager
+                orderId={order.id}
+                currentStatus={order.status}
+                orderNumber={order.order_number}
+                size="sm"
+              />
             )}
           </div>
         </CardHeader>
         
-        <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-6">
+        <CardContent className="space-y-4">
           {/* Customer Information */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2 text-xs sm:text-sm">
+              <h4 className="font-medium flex items-center gap-2 text-sm">
                 <User className="w-4 h-4" />
                 Customer Details
               </h4>
-              <div className="space-y-1 pl-4 sm:pl-6">
-                <p className="font-medium text-sm sm:text-base truncate">{order.customer_name}</p>
-                <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+              <div className="space-y-1 pl-6">
+                <p className="font-medium">{order.customer_name}</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <Mail className="w-3 h-3" />
-                  <span className="truncate">{order.customer_email}</span>
+                  {order.customer_email}
                 </p>
                 {order.customer_phone && (
-                  <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
                     <Phone className="w-3 h-3" />
                     {order.customer_phone}
                   </p>
@@ -143,25 +128,25 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
             </div>
 
             <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2 text-xs sm:text-sm">
+              <h4 className="font-medium flex items-center gap-2 text-sm">
                 <DollarSign className="w-4 h-4" />
                 Order Summary
               </h4>
-              <div className="space-y-1 pl-4 sm:pl-6">
-                <p className="text-xs sm:text-sm">Items: {order.order_items?.length || 0}</p>
-                <p className="font-bold text-base sm:text-lg text-green-600">
+              <div className="space-y-1 pl-6">
+                <p className="text-sm">Items: {order.order_items?.length || 0}</p>
+                <p className="font-bold text-lg text-green-600">
                   {formatCurrency(order.total_amount)}
                 </p>
                 {order.delivery_fee && order.delivery_fee > 0 && (
-                  <p className="text-xs sm:text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Delivery: {formatCurrency(order.delivery_fee)}
                   </p>
                 )}
-                <Badge variant="outline" className={`text-xs ${
+                <Badge variant="outline" className={
                   order.order_type === 'delivery' 
                     ? 'bg-blue-100 text-blue-800 border-blue-200' 
                     : 'bg-gray-100 text-gray-800 border-gray-200'
-                }`}>
+                }>
                   {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'}
                 </Badge>
               </div>
@@ -224,17 +209,6 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
             </div>
           )}
 
-          {/* Lock Status Display */}
-          {order.lock_info && (
-            <div className="bg-muted/30 rounded-lg p-3">
-              <OrderLockStatus
-                orderId={order.id}
-                lockInfo={order.lock_info}
-                size="sm"
-              />
-            </div>
-          )}
-
           {/* Advanced Controls */}
           {showAdvancedControls && (
             <div className="border-t pt-4">
@@ -248,19 +222,17 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2 border-t">
+          <div className="flex flex-wrap gap-2 pt-2 border-t">
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => onOrderSelect?.(order)}
-              className="w-full sm:w-auto text-xs sm:text-sm"
             >
-              <span className="hidden sm:inline">View Details</span>
-              <span className="sm:hidden">Details</span>
+              View Details
             </Button>
             
             {order.payment_status !== 'paid' && order.status === 'pending' && (
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs w-full sm:w-auto justify-center sm:justify-start">
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                 Awaiting Payment
               </Badge>
             )}

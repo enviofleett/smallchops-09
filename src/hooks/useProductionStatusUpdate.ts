@@ -5,12 +5,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { validateOrderStatus, isValidOrderStatus } from '@/utils/orderValidation';
 
-// Define enhanced error type
-interface EnhancedError extends Error {
-  conflictInfo?: any;
-  isRetriable?: boolean;
-}
-
 /**
  * Production-hardened status update hook with comprehensive error handling
  */
@@ -26,48 +20,35 @@ export const useProductionStatusUpdate = () => {
 
       const validatedStatus = validateOrderStatus(status);
       
-      // Enhanced error handling with retry logic for production resilience
-      const result = await handleProductionError(
+      // Use production-grade error handling with circuit breaker
+      return await handleProductionError(
         async () => {
-          const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+          const response = await supabase.functions.invoke('admin-orders-manager', {
             body: {
-              action: 'update_status',
+              action: 'update',
               orderId,
-              newStatus: validatedStatus
+              updates: { status: validatedStatus }
             }
           });
 
-          if (error) {
-            throw new Error(`Network error: ${error.message}`);
+          if (response.error) {
+            throw new Error(response.error.message || 'Failed to update order status');
           }
 
-          if (!data?.success) {
-            // Handle structured conflict responses
-            const conflictInfo = data?.conflict_info || {};
-            const errorMessage = data?.error || 'Status update failed';
-            
-            // Create enhanced error with conflict details
-            const enhancedError = new Error(errorMessage) as EnhancedError;
-            enhancedError.name = 'StatusUpdateError';
-            enhancedError.conflictInfo = conflictInfo;
-            enhancedError.isRetriable = conflictInfo.reason === 'max_retries_exceeded';
-            
-            throw enhancedError;
+          if (!response.data?.success) {
+            throw new Error(response.data?.error || 'Status update failed');
           }
 
-          return data;
+          return response.data.order || response.data;
         },
         `order-status-update-${orderId}`,
         circuitBreakers.adminOrders,
         {
-          maxAttempts: 3,
-          baseDelay: 2000,
-          timeout: 25000,
-          exponentialBackoff: true
+          maxAttempts: 2,
+          baseDelay: 1500,
+          timeout: 15000
         }
       );
-
-      return result;
     },
     onSuccess: (data, variables) => {
       const statusLabel = variables.status.replace('_', ' ');
@@ -87,44 +68,40 @@ export const useProductionStatusUpdate = () => {
       queryClient.invalidateQueries({ queryKey: ['unified-orders'] });
       queryClient.invalidateQueries({ queryKey: ['detailed-order', variables.orderId] });
     },
-    onError: (error: EnhancedError, variables) => {
+    onError: (error: any, variables) => {
       console.error('❌ Production status update failed:', error);
       
-      // Handle enhanced error responses with conflict information
-      let errorMessage = 'Failed to update order status. Please try again.';
-      const conflictInfo = error.conflictInfo || {};
+      // BULLETPROOF: Enhanced error messaging with specific error detection
+      let errorMessage = 'Failed to update order status';
+      const errorMsg = error?.message || '';
       
-      if (error.message?.includes('network')) {
-        errorMessage = 'Network error. Please check your connection and try again.';
-      } else if (error.message?.includes('unauthorized')) {
-        errorMessage = 'You are not authorized to perform this action.';
-      } else if (error.message?.includes('not found')) {
-        errorMessage = 'Order not found. Please refresh the page.';
-      } else if (conflictInfo.reason === 'max_retries_exceeded') {
-        errorMessage = 'Order is being updated by another admin. Please wait and try again.';
-      } else if (conflictInfo.reason === 'invalid_transition') {
-        errorMessage = `Cannot change status from ${conflictInfo.current_status} to ${conflictInfo.requested_status}.`;
-      } else if (conflictInfo.reason === 'no_change_needed') {
-        errorMessage = 'Order status is already set to the requested value.';
-      } else if (conflictInfo.reason === 'order_not_found') {
-        errorMessage = 'Order not found. Please refresh the page.';
-      } else if (conflictInfo.reason === 'database_error') {
-        errorMessage = 'Database error occurred. Please try again.';
+      if (errorMsg.includes('Rate limit exceeded')) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      } else if (errorMsg.includes('Order is currently being modified by another admin')) {
+        errorMessage = 'Order is being updated by another admin. Please try again in a moment.';
+      } else if (errorMsg.includes('authentication') || errorMsg.includes('unauthorized')) {
+        errorMessage = 'Authentication expired. Please refresh and try again.';
+      } else if (errorMsg.includes('edge function') || errorMsg.includes('non-2xx status')) {
+        errorMessage = 'Service temporarily unavailable. Please try again.';
+      } else if (errorMsg.includes('validation') || errorMsg.includes('invalid input value for enum')) {
+        errorMessage = 'Invalid status update. Please refresh the page and try again.';
+      } else if (errorMsg.includes('Invalid status:') || errorMsg.includes('Invalid order status:')) {
+        errorMessage = errorMsg; // Use the specific validation message
+      } else if (errorMsg.includes('duplicate key value violates unique constraint')) {
+        errorMessage = 'Update in progress by another session. Please try again.';
+      } else if (errorMsg && errorMsg !== 'Failed to update order status') {
+        errorMessage = errorMsg; // Use the actual error message if it's meaningful
       }
       
       toast.error(errorMessage);
       
-      // Log the enhanced error for monitoring (non-blocking)
+      // Log error for monitoring (non-blocking)
       supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'log_admin_error',
           orderId: variables.orderId,
           errorType: 'status_update_failed',
-          error: {
-            message: error.message,
-            conflictInfo: conflictInfo,
-            isRetriable: error.isRetriable || false
-          }
+          error: error.message
         }
       }).catch(() => {
         // Silently fail - error logging shouldn't block user workflow

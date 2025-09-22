@@ -23,7 +23,7 @@ import {
 import { format, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useQuery } from '@tanstack/react-query';
-import { useOrdersNew } from '@/hooks/useOrdersNew';
+import { getOrders } from '@/api/orders';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { OrderWithItems } from '@/api/orders';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
@@ -43,18 +43,24 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
   // Fetch orders for selected date
-  const { data: ordersData, isLoading, error } = useOrdersNew({
-    page: 1,
-    pageSize: 100,
-    startDate: formattedDate,
-    endDate: formattedDate,
+  const { data: ordersData, isLoading, error } = useQuery({
+    queryKey: ['delivery-orders', formattedDate],
+    queryFn: () => getOrders({
+      page: 1,
+      pageSize: 100,
+      startDate: formattedDate,
+      endDate: formattedDate,
+    }),
+    refetchInterval: 30000,
+    retry: 2,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 
   // Filter orders based on dropdown selections
   const filteredOrders = useMemo(() => {
-    if (!ordersData?.data?.orders) return [];
+    if (!ordersData?.orders) return [];
     
-    let filtered = ordersData.data.orders.filter(order => {
+    let filtered = ordersData.orders.filter(order => {
       // Only show relevant delivery statuses (removed 'ready')
       return ['confirmed', 'preparing', 'out_for_delivery', 'delivered'].includes(order.status);
     });

@@ -171,20 +171,19 @@ export default function EditPromotionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl w-full max-h-[90vh] sm:max-h-[85vh] p-0 flex flex-col overflow-hidden">
-        <DialogHeader className="p-6 pb-2 border-b flex-shrink-0">
+      <DialogContent className="max-w-xl w-full p-0">
+        <DialogHeader className="p-6 pb-2">
           <DialogTitle>
             <Edit className="inline mr-1" /> Edit Promotion
           </DialogTitle>
         </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="p-6 pt-0">
           <Form {...form}>
             <form
-              className="h-full flex flex-col overflow-hidden"
+              className="space-y-6"
               onSubmit={form.handleSubmit(handleSubmit)}
               autoComplete="off"
             >
-              <div className="flex-1 overflow-y-auto p-6 pt-4 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Name */}
                 <FormField
@@ -400,9 +399,8 @@ export default function EditPromotionDialog({
                   )}
                 />
               </div>
-              </div>
-              
-              <DialogFooter className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-6 pt-4 mt-auto">
+
+              <DialogFooter className="pt-2 flex flex-row gap-2">
                 <Button
                   type="button"
                   variant="outline"

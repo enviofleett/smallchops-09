@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import heroPlaceholder from '@/assets/hero-placeholder.jpg';
 
 interface HeroImage {
   id: string;
@@ -25,7 +24,7 @@ export const HeroCarousel = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
 
-  // Fetch hero images with stable caching
+  // Fetch hero images
   const { data: heroImages = [] } = useQuery({
     queryKey: ['hero-images-public'],
     queryFn: async () => {
@@ -41,29 +40,12 @@ export const HeroCarousel = ({
       }
       return data as HeroImage[];
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
-    refetchOnWindowFocus: false
   });
-
-  // Preload all hero images for instant loading
-  useEffect(() => {
-    if (heroImages.length > 0) {
-      heroImages.forEach((image, index) => {
-        const img = new Image();
-        img.src = image.image_url;
-        if (index === 0) {
-          // Highest priority for first image
-          img.fetchPriority = 'high';
-        }
-      });
-    }
-  }, [heroImages]);
 
   // Only show uploaded images - no hardcoded fallbacks
   const imagesToShow = heroImages.length > 0 ? heroImages : [];
 
-  // Auto-rotate images every 8 seconds with smooth fade effect
+  // Auto-rotate images every 20 seconds with fade effect
   useEffect(() => {
     if (imagesToShow.length <= 1) return;
 
@@ -77,8 +59,8 @@ export const HeroCarousel = ({
           (prevIndex + 1) % imagesToShow.length
         );
         setIsVisible(true);
-      }, 300); // 300ms fade out duration
-    }, 8000); // 8 seconds
+      }, 500); // 500ms fade out duration
+    }, 20000); // 20 seconds
 
     return () => clearInterval(interval);
   }, [imagesToShow.length]);
@@ -89,17 +71,15 @@ export const HeroCarousel = ({
     setCurrentIndex(0);
   }, [imagesToShow]);
 
-  // Use first available hero image as fallback
+  // Don't render anything if no uploaded images available
   if (imagesToShow.length === 0) {
     return (
-      <div className={className}>
-        <img 
-          src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/hero-images/hero-1757891367984-6626d388.jpg"
-          alt="Hero showcase" 
-          className="w-full h-full object-cover rounded-2xl"
-          loading="eager"
-          fetchPriority="high"
-        />
+      <div className={`${className} flex items-center justify-center bg-gray-100 rounded-2xl`}>
+        <div className="text-center p-6">
+          <div className="text-gray-400 text-sm font-medium">
+            Upload images to showcase your products
+          </div>
+        </div>
       </div>
     );
   }
@@ -111,12 +91,10 @@ export const HeroCarousel = ({
       <img 
         src={currentImage.image_url} 
         alt={currentImage.alt_text || 'Uploaded product image'} 
-        className={`w-full h-full object-cover rounded-2xl transition-all duration-300 ease-in-out ${
-          isVisible ? 'opacity-100 animate-fade-in' : 'opacity-0 animate-fade-out'
+        className={`w-full h-full object-cover rounded-2xl transition-opacity duration-500 ease-in-out ${
+          isVisible ? 'opacity-100' : 'opacity-0'
         }`}
         loading="eager"
-        fetchPriority="high"
-        decoding="async"
         onError={(e) => {
           console.error('Failed to load hero image:', currentImage.image_url);
           // Don't fallback to any hardcoded image

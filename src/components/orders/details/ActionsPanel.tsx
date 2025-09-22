@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, ShieldCheck, Send, RefreshCw, Info, Zap, AlertTriangle } from 'lucide-react';
+import { Settings, ShieldCheck, Send, RefreshCw, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +9,6 @@ import { OrderStatus } from '@/types/orders';
 import { Constants } from '@/integrations/supabase/types';
 import { EmailStatusGuide } from '../EmailStatusGuide';
 import { EmailTestButton } from '../EmailTestButton';
-import { recoverReadyStatusTransition } from '@/utils/cacheRecoveryUtils';
 
 interface DispatchRider {
   id: string;
@@ -41,11 +40,6 @@ interface ActionsDrawerProps {
   orderId?: string;
   customerEmail?: string;
   orderNumber?: string;
-  // Bypass functionality
-  show409Error?: boolean;
-  onBypassCacheAndUpdate?: () => void;
-  isBypassing?: boolean;
-  clearBypassError?: () => void;
 }
 
 export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
@@ -68,11 +62,7 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
   verifyMessage,
   orderId,
   customerEmail,
-  orderNumber,
-  show409Error,
-  onBypassCacheAndUpdate,
-  isBypassing,
-  clearBypassError
+  orderNumber
 }) => {
   return (
     <Card>
@@ -250,95 +240,8 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
           </div>
         </div>
 
-        {/* Cache Bypass Section - Always available for admins */}
-        {onBypassCacheAndUpdate && (
-          <div className="space-y-2">
-            {show409Error ? (
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm">
-                    <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                      Cache Conflict Detected
-                    </p>
-                    <p className="text-amber-700 dark:text-amber-300 text-xs">
-                      {selectedStatus === 'preparing' && (orderId && orderId.length > 0) 
-                        ? 'This transition is prone to cache issues. Use recovery or bypass options below.'
-                        : 'The system cache is preventing the update. Use the bypass button to force the update and clear the cache.'
-                      }
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm">
-                    <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">
-                      Advanced Update Options
-                    </p>
-                    <p className="text-blue-700 dark:text-blue-300 text-xs">
-                      Use these options if the regular update fails or for troubleshooting cache issues.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div className="flex gap-2">
-              {selectedStatus === 'preparing' && orderId && (
-                <Button
-                  onClick={async () => {
-                    if (orderId) {
-                      const result = await recoverReadyStatusTransition(orderId);
-                      if (result.success && clearBypassError) {
-                        clearBypassError();
-                      }
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Recover Cache
-                </Button>
-              )}
-              <Button 
-                onClick={onBypassCacheAndUpdate}
-                disabled={isBypassing}
-                variant="outline"
-                className={`${selectedStatus === 'preparing' && orderId ? 'flex-1' : 'w-full'} border-orange-200 dark:border-orange-800 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 text-orange-700 dark:text-orange-300 hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-900/30 dark:hover:to-amber-900/30`}
-                size="lg"
-              >
-                {isBypassing ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Bypassing Cache...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Bypass Cache & Update
-                  </>
-                )}
-              </Button>
-              {clearBypassError && (
-                <Button
-                  onClick={clearBypassError}
-                  variant="ghost"
-                  size="sm"
-                >
-                  Dismiss
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Update Button */}
-        <div className="pt-4 border-t border-border space-y-2">
+        <div className="pt-4 border-t border-border">
           <Button 
             onClick={onUpdate} 
             disabled={isUpdating} 
@@ -354,12 +257,6 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
               'Update Order'
             )}
           </Button>
-          
-          {show409Error && (
-            <p className="text-xs text-center text-muted-foreground">
-              Regular update failed. Use bypass option above.
-            </p>
-          )}
         </div>
 
       </CardContent>

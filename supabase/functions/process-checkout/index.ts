@@ -271,16 +271,23 @@ serve(async (req) => {
     // ✅ Create order via database function with comprehensive error handling
     console.log("💾 Creating order in database...");
     
+    // Transform orderItems to match RPC function expectations
+    const rpcItems = orderItems.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      price: item.unit_price  // Map unit_price to price for RPC function
+    }));
+    
     let orderId;
     try {
       const { data: orderResult, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", {
         p_customer_id: customerId,
         p_fulfillment_type: requestBody.fulfillment.type,
-        p_items: orderItems,
+        p_items: rpcItems,  // Use transformed items
         p_delivery_address: processedDeliveryAddress,
         p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
         p_delivery_zone_id: deliveryZoneId,
-        p_guest_session_id: undefined,
+        p_guest_session_id: null,  // Use null instead of undefined
         p_promotion_code: promotionCode,
         p_client_total: requestBody.client_calculated_total || null
       });
@@ -425,9 +432,9 @@ serve(async (req) => {
         amount: paymentAmount,
         metadata: {
           order_id: order.id,
-          customer_name: order.customer_name || requestBody.customer.name,
+          customer_name: order.customer_name || (requestBody?.customer?.name || 'Unknown'),
           order_number: order.order_number,
-          fulfillment_type: requestBody.fulfillment.type,
+          fulfillment_type: requestBody?.fulfillment?.type || order.fulfillment_type,
           items_subtotal: order.subtotal || paymentAmount,
           delivery_fee: order.delivery_fee || 0,
           promotion_discount: order.promotion_discount || 0,
@@ -505,7 +512,7 @@ serve(async (req) => {
           delivery_fee: order.delivery_fee || 0,
           promotion_discount: order.promotion_discount || 0,
           status: order.status || "pending",
-          fulfillment_type: order.fulfillment_type || requestBody.fulfillment.type,
+          fulfillment_type: order.fulfillment_type || (requestBody?.fulfillment?.type || 'delivery'),
         },
         customer: {
           id: customerId,

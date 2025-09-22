@@ -5554,7 +5554,6 @@ export type Database = {
           discount_amount: number | null
           email: string | null
           estimated_delivery_date: string | null
-          fulfillment_type: string | null
           guest_session_id: string | null
           id: string
           idempotency_key: string | null
@@ -5576,9 +5575,6 @@ export type Database = {
           processing_officer_id: string | null
           processing_officer_name: string | null
           processing_started_at: string | null
-          promotion_code: string | null
-          promotion_discount: number | null
-          promotion_id: string | null
           reference_updated_at: string | null
           special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"]
@@ -5610,7 +5606,6 @@ export type Database = {
           discount_amount?: number | null
           email?: string | null
           estimated_delivery_date?: string | null
-          fulfillment_type?: string | null
           guest_session_id?: string | null
           id?: string
           idempotency_key?: string | null
@@ -5632,9 +5627,6 @@ export type Database = {
           processing_officer_id?: string | null
           processing_officer_name?: string | null
           processing_started_at?: string | null
-          promotion_code?: string | null
-          promotion_discount?: number | null
-          promotion_id?: string | null
           reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -5666,7 +5658,6 @@ export type Database = {
           discount_amount?: number | null
           email?: string | null
           estimated_delivery_date?: string | null
-          fulfillment_type?: string | null
           guest_session_id?: string | null
           id?: string
           idempotency_key?: string | null
@@ -5688,9 +5679,6 @@ export type Database = {
           processing_officer_id?: string | null
           processing_officer_name?: string | null
           processing_started_at?: string | null
-          promotion_code?: string | null
-          promotion_discount?: number | null
-          promotion_id?: string | null
           reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -5730,13 +5718,6 @@ export type Database = {
             columns: ["pickup_point_id"]
             isOneToOne: false
             referencedRelation: "pickup_points"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_promotion_id_fkey"
-            columns: ["promotion_id"]
-            isOneToOne: false
-            referencedRelation: "promotions"
             referencedColumns: ["id"]
           },
         ]
@@ -10073,62 +10054,16 @@ export type Database = {
         Returns: Json
       }
       create_order_with_items: {
-        Args:
-          | {
-              p_client_calculated_total?: number
-              p_customer_email: string
-              p_customer_name: string
-              p_customer_phone: string
-              p_delivery_address: string
-              p_delivery_fee: number
-              p_delivery_instructions: string
-              p_items: Json
-              p_order_time: string
-              p_order_type: Database["public"]["Enums"]["order_type"]
-              p_promotion_code?: string
-              p_promotion_discount?: number
-              p_subtotal: number
-              p_total: number
-            }
-          | {
-              p_client_total?: number
-              p_customer_id: string
-              p_delivery_address?: Json
-              p_delivery_zone_id?: string
-              p_fulfillment_type: string
-              p_guest_session_id?: string
-              p_items: Json
-              p_pickup_point_id?: string
-              p_promotion_code?: string
-            }
-          | {
-              p_client_total?: number
-              p_customer_id: string
-              p_delivery_address?: Json
-              p_delivery_zone_id?: string
-              p_fulfillment_type: string
-              p_guest_session_id?: string
-              p_items: Json
-              p_pickup_point_id?: string
-              p_promotion_code?: string
-            }
-          | {
-              p_customer_address: string
-              p_customer_email: string
-              p_customer_name: string
-              p_customer_phone: string
-              p_delivery_fee: number
-              p_delivery_instructions: string
-              p_delivery_zone_id?: string
-              p_fulfillment_type: string
-              p_items: Json
-              p_payment_method: string
-              p_scheduled_delivery_time?: string
-              p_subtotal: number
-              p_total_amount: number
-              p_vat_amount: number
-            }
-        Returns: Json
+        Args: {
+          p_customer_id: string
+          p_delivery_address?: Json
+          p_delivery_zone_id?: string
+          p_fulfillment_type: string
+          p_guest_session_id?: string
+          p_items?: Json
+          p_pickup_point_id?: string
+        }
+        Returns: string
       }
       create_payment_intent: {
         Args: { p_amount: number; p_currency?: string; p_order_id: string }

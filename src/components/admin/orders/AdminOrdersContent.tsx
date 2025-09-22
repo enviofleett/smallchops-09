@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from '@/hooks/useDebounce';
 import { addDays, startOfDay } from 'date-fns';
+import { filterOrdersByDate, DeliveryFilterType } from '@/utils/dateFilterUtils';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { AdminOrdersFilters } from './AdminOrdersFilters';
@@ -25,6 +26,7 @@ export function AdminOrdersContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
+  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilterType>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
   const [showDeliveryReport, setShowDeliveryReport] = useState(false);
@@ -93,6 +95,7 @@ export function AdminOrdersContent() {
     // Reset pagination and filters when switching categories
     setCurrentPage(1);
     setSearchQuery('');
+    setDeliveryFilter('all');
     
     // Reset category-specific filters
     if (category !== 'confirmed') {
@@ -104,7 +107,7 @@ export function AdminOrdersContent() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, debouncedSearchQuery, selectedDay, selectedHour, selectedOverdueDateFilter]);
+  }, [statusFilter, debouncedSearchQuery, deliveryFilter, selectedDay, selectedHour, selectedOverdueDateFilter]);
 
   // Use new order management hooks
   const { data: newOrdersData, isLoading, error, refetch } = useOrdersNew({
@@ -138,6 +141,16 @@ export function AdminOrdersContent() {
     isLoading: isOverdueLoading
   } = useOverdueOrdersLogic();
 
+  // Extract delivery schedules from orders (now included in admin function)
+  const deliverySchedules = useMemo(() => {
+    const scheduleMap: Record<string, any> = {};
+    orders.forEach((order: any) => {
+      if (order.delivery_schedule) {
+        scheduleMap[order.id] = order.delivery_schedule;
+      }
+    });
+    return scheduleMap;
+  }, [orders]);
 
   // Priority sort and filter orders
   const prioritySortedOrders = useMemo(() => {
@@ -150,21 +163,129 @@ export function AdminOrdersContent() {
         order.status === 'confirmed' && order.payment_status === 'paid'
       );
       
-      // Simple sort by order creation time (most recent first)
+      // Sort with today's orders first, then by delivery schedule
       ordersCopy.sort((a, b) => {
+        const scheduleA = deliverySchedules[a.id];
+        const scheduleB = deliverySchedules[b.id];
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Check if orders are scheduled for today
+        const aIsToday = scheduleA && new Date(scheduleA.delivery_date).setHours(0, 0, 0, 0) === today.getTime();
+        const bIsToday = scheduleB && new Date(scheduleB.delivery_date).setHours(0, 0, 0, 0) === today.getTime();
+        
+        // Today's orders come first
+        if (aIsToday && !bIsToday) return -1;
+        if (!aIsToday && bIsToday) return 1;
+        
+        // Among today's orders, prioritize by status and delivery time
+        if (aIsToday && bIsToday) {
+          
+          // Both today - sort by time slot
+          if (scheduleA && scheduleB) {
+            const timeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+            const timeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+            return timeA.getTime() - timeB.getTime();
+          }
+        }
+        
+        // For non-today orders, sort by delivery date + time
+        if (scheduleA && scheduleB) {
+          const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+          const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+          return dateTimeA.getTime() - dateTimeB.getTime();
+        }
+        
+        // Orders with schedules come first
+        if (scheduleA && !scheduleB) return -1;
+        if (!scheduleA && scheduleB) return 1;
+        
+        // Fallback to order time (most recent first for unscheduled orders)
         return new Date(b.order_time || b.created_at).getTime() - 
                new Date(a.order_time || a.created_at).getTime();
       });
     }
     
     return ordersCopy;
-  }, [orders, statusFilter]);
+  }, [orders, deliverySchedules, statusFilter]);
 
   // Filter orders by delivery schedule with defensive date handling + hourly filtering
   const filteredOrders = useMemo(() => {
-    // Use regular orders for filtering - simplified without delivery schedules
-    return prioritySortedOrders;
-  }, [prioritySortedOrders]);
+    // Use regular orders for filtering
+    let result = prioritySortedOrders;
+    
+    // Apply comprehensive delivery/pickup date filter using utility functions
+    if (deliveryFilter !== 'all') {
+      try {
+        result = filterOrdersByDate(result, deliveryFilter, deliverySchedules);
+      } catch (error) {
+        console.error('Error applying date filter:', error);
+        result = prioritySortedOrders;
+      }
+    }
+    
+    // Apply hourly filtering for confirmed tab
+    if (activeTab === 'confirmed' && (selectedDay || selectedHour)) {
+      const today = startOfDay(new Date());
+      const tomorrow = startOfDay(addDays(new Date(), 1));
+      
+      result = result.filter(order => {
+        // Only filter delivery orders with paid status that have schedules
+        if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
+          return false;
+        }
+        
+        const schedule = deliverySchedules[order.id];
+        if (!schedule?.delivery_date) return false;
+        
+        try {
+          const deliveryDate = new Date(schedule.delivery_date);
+          
+          // Validate delivery date
+          if (isNaN(deliveryDate.getTime())) {
+            console.warn('Invalid delivery date for order:', order.id, schedule.delivery_date);
+            return false;
+          }
+          
+          const normalizedDeliveryDate = startOfDay(deliveryDate);
+          
+          // Filter by selected day - must match exactly
+          if (selectedDay) {
+            const targetDate = selectedDay === 'today' ? today : tomorrow;
+            if (normalizedDeliveryDate.getTime() !== targetDate.getTime()) {
+              return false;
+            }
+          }
+          
+          // Filter by selected hour - more robust hour matching
+          if (selectedHour && schedule.delivery_time_start) {
+            const orderTimeComponents = schedule.delivery_time_start.split(':');
+            const selectedTimeComponents = selectedHour.split(':');
+            
+            if (orderTimeComponents.length < 2 || selectedTimeComponents.length < 2) {
+              console.warn('Invalid time format for order:', order.id, schedule.delivery_time_start);
+              return false;
+            }
+            
+            const orderHour = parseInt(orderTimeComponents[0], 10);
+            const selectedHourInt = parseInt(selectedTimeComponents[0], 10);
+            
+            if (isNaN(orderHour) || isNaN(selectedHourInt) || orderHour !== selectedHourInt) {
+              return false;
+            }
+          }
+          
+          return true;
+        } catch (error) {
+          console.warn('Error processing delivery schedule for order:', order.id, error);
+          return false;
+        }
+      });
+    }
+    
+    return result;
+  }, [prioritySortedOrders, deliverySchedules, deliveryFilter, statusFilter, selectedDay, selectedHour, activeTab]);
 
   return (
     <>
@@ -173,6 +294,8 @@ export function AdminOrdersContent() {
         setSearchQuery={setSearchQuery}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
+        deliveryFilter={deliveryFilter}
+        setDeliveryFilter={setDeliveryFilter}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         selectedDay={selectedDay}
@@ -182,6 +305,7 @@ export function AdminOrdersContent() {
         isMobile={isMobile}
         refetch={refetch}
         orders={orders}
+        deliverySchedules={deliverySchedules}
       />
       
       <AdminOrdersStats
@@ -200,13 +324,13 @@ export function AdminOrdersContent() {
         selectedOrder={selectedOrder}
         setSelectedOrder={setSelectedOrder}
         setIsDialogOpen={setIsDialogOpen}
-        deliverySchedules={{}}
+        deliverySchedules={deliverySchedules}
         activeTab={activeTab}
         statusFilter={statusFilter}
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
         totalPages={totalPages}
-        showPreview={(order) => showPreview(order, null, businessInfo)}
+        showPreview={(order) => showPreview(order, deliverySchedules[order.id], businessInfo)}
         isMobile={isMobile}
       />
 

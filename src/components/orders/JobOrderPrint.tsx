@@ -488,13 +488,40 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
             <tr key={index}>
               <td>
                 <strong>{item.product?.name || item.name || 'Unknown Item'}</strong>
-                {item.product?.features && (
-                  <div style={{ fontSize: '9pt', color: '#6c757d', marginTop: '1mm' }}>
-                    Features: {Array.isArray(item.product.features) 
-                      ? item.product.features.join(', ') 
-                      : item.product.features}
-                  </div>
-                )}
+                {/* Enhanced Product Details */}
+                <div style={{ fontSize: '9pt', color: '#333333', marginTop: '1mm', lineHeight: '1.3' }}>
+                  {item.product?.description && (
+                    <div style={{ marginBottom: '1mm' }}>
+                      <strong>Description:</strong> {item.product.description}
+                    </div>
+                  )}
+                  {item.product?.category && (
+                    <div style={{ marginBottom: '1mm' }}>
+                      <strong>Category:</strong> {item.product.category}
+                    </div>
+                  )}
+                  {item.product?.features && (
+                    <div style={{ marginBottom: '1mm' }}>
+                      <strong>Features:</strong> {Array.isArray(item.product.features) 
+                        ? item.product.features.join(', ') 
+                        : item.product.features}
+                    </div>
+                  )}
+                  {item.product?.ingredients && (
+                    <div style={{ marginBottom: '1mm' }}>
+                      <strong>Ingredients:</strong> {Array.isArray(item.product.ingredients) 
+                        ? item.product.ingredients.join(', ') 
+                        : item.product.ingredients}
+                    </div>
+                  )}
+                  {item.product?.allergens && (
+                    <div style={{ color: '#d32f2f', fontWeight: 'bold' }}>
+                      <strong>Allergens:</strong> {Array.isArray(item.product.allergens) 
+                        ? item.product.allergens.join(', ') 
+                        : item.product.allergens}
+                    </div>
+                  )}
+                </div>
               </td>
               <td>{item.quantity}</td>
               <td>{formatCurrency(item.unit_price || 0)}</td>
@@ -564,10 +591,13 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
       }}>
         <p>Generated on {format(new Date(), 'PPP p')}</p>
         {adminName && (
-          <p style={{ fontWeight: 'bold', color: '#2c3e50', marginTop: '2mm' }}>
-            Job order printed by: {adminName}
+          <p style={{ fontWeight: 'bold', color: '#2c3e50', marginTop: '2mm', fontSize: '11pt' }}>
+            🖨️ Job order printed by: <span style={{ color: '#1976d2' }}>{adminName}</span>
           </p>
         )}
+        <p style={{ marginTop: '1mm', fontSize: '8pt', color: '#666' }}>
+          Print Date: {format(new Date(), 'PPP')} | Print Time: {format(new Date(), 'p')}
+        </p>
       </div>
     </div>
   );

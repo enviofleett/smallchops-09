@@ -435,7 +435,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       hasBusinessInfo: !!businessInfo
     });
     
-    printOrderReceipt(order, items, schedule, pickupPoint, businessInfo);
+    printOrderReceipt(order, items, schedule, pickupPoint, businessInfo, user?.name || 'Admin User');
 
     toast({
       title: 'Receipt Printing',
@@ -470,7 +470,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <span className="hidden sm:inline">Print Job Order</span>
             </Button>
             
-            <Button onClick={handlePrintReceipt} variant="outline" size="sm" className="gap-2" aria-label="Preview and print professional receipt">
+            <Button onClick={handlePrintReceipt} variant="outline" size="sm" className="gap-2" aria-label="Print detailed receipt with product specs & admin info">
               <Receipt className="h-4 w-4" />
               <span className="hidden sm:inline">Print Receipt</span>
             </Button>

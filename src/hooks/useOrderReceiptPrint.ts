@@ -13,7 +13,8 @@ export const useOrderReceiptPrint = () => {
       address: string;
       phone: string;
       email: string;
-    }
+    },
+    adminName?: string
   ) => {
     try {
       // Validate required data
@@ -47,7 +48,8 @@ export const useOrderReceiptPrint = () => {
         items: items || order.order_items || [],
         deliverySchedule,
         pickupPoint,
-        businessInfo
+        businessInfo,
+        adminName
       });
 
       console.log('Rendering receipt component...');

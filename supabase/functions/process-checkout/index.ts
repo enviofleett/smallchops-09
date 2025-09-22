@@ -2,6 +2,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, handleCorsPreflightResponse } from '../_shared/cors.ts';
 
 // Supabase client
 const supabaseAdmin = createClient(
@@ -10,6 +11,13 @@ const supabaseAdmin = createClient(
 );
 
 serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return handleCorsPreflightResponse(origin);
+  }
+
   try {
     // Hot fix: Add comprehensive request validation
     if (req.method !== 'POST') {
@@ -17,7 +25,7 @@ serve(async (req: Request) => {
         JSON.stringify({ error: 'Method not allowed' }),
         { 
           status: 405,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
         }
       );
     }
@@ -29,7 +37,7 @@ serve(async (req: Request) => {
         JSON.stringify({ error: 'Content-Type must be application/json' }),
         { 
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
         }
       );
     }
@@ -45,7 +53,7 @@ serve(async (req: Request) => {
           JSON.stringify({ error: 'Request body cannot be empty' }),
           { 
             status: 400,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
           }
         );
       }
@@ -62,7 +70,7 @@ serve(async (req: Request) => {
         }),
         { 
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
         }
       );
     }
@@ -73,7 +81,7 @@ serve(async (req: Request) => {
         JSON.stringify({ error: 'Request body must be a valid JSON object' }),
         { 
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
         }
       );
     }
@@ -95,21 +103,30 @@ serve(async (req: Request) => {
     if (!customer_email) {
       return new Response(
         JSON.stringify({ error: "Customer email is required" }),
-        { status: 400 }
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
+        }
       );
     }
 
     if (!["pickup", "delivery"].includes(fulfillment_type)) {
       return new Response(
         JSON.stringify({ error: "Invalid fulfillment type" }),
-        { status: 400 }
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
+        }
       );
     }
 
     if (!items || items.length === 0) {
       return new Response(
         JSON.stringify({ error: "At least one item is required" }),
-        { status: 400 }
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
+        }
       );
     }
 
@@ -125,7 +142,10 @@ serve(async (req: Request) => {
         console.error("❌ Invalid or expired promotion:", promoError);
         return new Response(
           JSON.stringify({ error: "Invalid promotion code or promotion has expired." }),
-          { status: 400 }
+          { 
+            status: 400,
+            headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
+          }
         );
       }
     }
@@ -150,7 +170,10 @@ serve(async (req: Request) => {
       console.error("❌ Database function error (full):", JSON.stringify(orderError, null, 2));
       return new Response(
         JSON.stringify({ error: "Order creation failed", details: orderError }),
-        { status: 500 }
+        { 
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
+        }
       );
     }
 
@@ -197,7 +220,10 @@ serve(async (req: Request) => {
           error: "Payment initialization failed", 
           details: paystackData.message || "Unknown error" 
         }),
-        { status: 500 }
+        { 
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
+        }
       );
     }
 
@@ -228,7 +254,10 @@ serve(async (req: Request) => {
           payment_url: paystackData.data.authorization_url
         }
       }),
-      { status: 200 }
+      { 
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
+      }
     );
   } catch (err) {
     console.error("❌ Checkout processing error:", err);
@@ -238,7 +267,10 @@ serve(async (req: Request) => {
         error: "Checkout failed",
         details: err.message || err.toString(),
       }),
-      { status: 500 }
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...getCorsHeaders(origin) }
+      }
     );
   }
 });

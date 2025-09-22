@@ -384,7 +384,7 @@ export const EmailSystemAuditDashboard = () => {
         p_delivery_address: null,
         p_pickup_point_id: null,
         p_delivery_zone_id: null,
-        p_guest_session_id: null,
+        p_guest_session_id: undefined,
         p_items: JSON.stringify([{
           product_id: '00000000-0000-0000-0000-000000000001',
           quantity: 1,

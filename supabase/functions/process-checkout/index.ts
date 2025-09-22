@@ -260,7 +260,7 @@ serve(async (req) => {
         p_delivery_address: processedDeliveryAddress,
         p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
         p_delivery_zone_id: requestBody.fulfillment.delivery_zone_id || null,
-        p_guest_session_id: null,
+        p_guest_session_id: undefined,
         p_promotion_code: promotionCode,
         p_client_total: requestBody.client_calculated_total || null
       });

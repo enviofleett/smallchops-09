@@ -178,13 +178,14 @@ export const useCartInternal = () => {
       vat_rate: item.vat_rate || 7.5
     }));
 
-    // Convert promotions to calculation format
+    // Convert promotions to calculation format (FIXED: Use 'value' field)
     const calculationPromotions = (promotionResult?.applied_promotions || []).map(promo => ({
       id: promo.id,
       name: promo.name,
       code: promo.code,
       type: promo.type as 'percentage' | 'fixed_amount' | 'free_delivery',
-      discount_amount: promo.discount_amount,
+      value: promo.discount_amount, // Map discount_amount to value field
+      discount_amount: promo.discount_amount, // Keep for compatibility
       free_delivery: promo.free_delivery || false
     }));
 
@@ -219,7 +220,7 @@ export const useCartInternal = () => {
             name: promo.name,
             code: promo.code,
             type: promo.type,
-            discount_amount: promo.discount_amount,
+            discount_amount: promo.value ?? promo.discount_amount ?? 0, // Use value field first
             free_delivery: promo.free_delivery
           })),
           discount_amount: calculationResult.discount_amount,

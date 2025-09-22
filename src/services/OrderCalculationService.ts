@@ -22,7 +22,8 @@ export interface PromotionCalculation {
   name: string;
   code: string;
   type: 'percentage' | 'fixed_amount' | 'free_delivery';
-  discount_amount: number;
+  value: number; // Changed from discount_amount to match server field
+  discount_amount?: number; // Keep for backward compatibility
   free_delivery: boolean;
 }
 
@@ -104,16 +105,17 @@ function calculateVATBreakdown(priceInNaira: number, vatRate: number = VAT_RATE_
 
 export class OrderCalculationService {
   /**
-   * Calculate complete order totals with detailed logging
+   * Calculate complete order totals with detailed logging (ENHANCED)
    * Uses integer arithmetic to prevent floating point issues
    */
   static calculateOrder(input: OrderCalculationInput): OrderCalculationResult {
     const startTime = performance.now();
     
-    logger.info(`Order calculation starting (${input.calculation_source})`, {
+    logger.info(`🔢 Order calculation starting (${input.calculation_source})`, {
       itemCount: input.items.length,
       deliveryFee: input.delivery_fee,
-      promotionCode: input.promotion_code
+      promotionCode: input.promotion_code,
+      promotions: input.promotions?.length || 0
     });
 
     try {
@@ -135,6 +137,8 @@ export class OrderCalculationService {
         subtotalCostCents += itemCostCents;
         totalVatCents += itemVatCents;
         
+        logger.debug(`Item calculation: ${item.product_name} - ${item.quantity} x ₦${item.price} = ${itemTotalCents} cents`);
+        
         return {
           ...item,
           unit_price_cents: itemPriceCents,
@@ -146,8 +150,11 @@ export class OrderCalculationService {
         };
       });
 
+      logger.info(`✅ Subtotal calculated: ${subtotalCents} cents (₦${toNaira(subtotalCents)})`);
+
       // Step 2: Calculate delivery fee
       const deliveryFeeCents = toCents(input.delivery_fee || 0);
+      logger.info(`🚚 Delivery fee: ${deliveryFeeCents} cents (₦${toNaira(deliveryFeeCents)})`);
       
       // Step 3: Apply promotions
       const promotionResult = this.calculatePromotions(
@@ -156,6 +163,8 @@ export class OrderCalculationService {
         input.promotions || [],
         input.promotion_code
       );
+      
+      logger.info(`🎟️ Promotions applied: discount=${promotionResult.discountCents} cents, delivery_discount=${promotionResult.deliveryDiscountCents} cents`);
       
       // Step 4: Calculate final totals
       const finalTotalCents = subtotalCents + deliveryFeeCents - promotionResult.discountCents - promotionResult.deliveryDiscountCents;
@@ -182,14 +191,31 @@ export class OrderCalculationService {
       const endTime = performance.now();
       const calculationTime = endTime - startTime;
 
-      // Detailed logging for debugging
-      logger.info(`Order calculation completed (${input.calculation_source})`, {
+      // Enhanced detailed logging for debugging mismatches
+      logger.info(`✅ Order calculation completed (${input.calculation_source})`, {
         calculationTimeMs: Math.round(calculationTime * 100) / 100,
-        subtotal: result.subtotal,
-        deliveryFee: result.delivery_fee,
-        discountAmount: result.discount_amount,
-        totalAmount: result.total_amount,
-        appliedPromotions: result.applied_promotions.length,
+        finalTotals: {
+          subtotal: result.subtotal,
+          deliveryFee: result.delivery_fee,
+          discountAmount: result.discount_amount,
+          deliveryDiscount: result.delivery_discount,
+          totalAmount: result.total_amount
+        },
+        centuAnalysis: {
+          subtotal_cents: subtotalCents,
+          delivery_fee_cents: deliveryFeeCents,
+          discount_cents: promotionResult.discountCents,
+          delivery_discount_cents: promotionResult.deliveryDiscountCents,
+          total_cents: finalTotalCents
+        },
+        appliedPromotions: promotionResult.appliedPromotions.map(p => ({
+          id: p.id,
+          name: p.name,
+          code: p.code,
+          type: p.type,
+          value: p.value ?? p.discount_amount,
+          free_delivery: p.free_delivery
+        })),
         itemBreakdowns: itemBreakdowns.map(item => ({
           id: item.id,
           name: item.product_name,
@@ -202,10 +228,11 @@ export class OrderCalculationService {
       return result;
       
     } catch (error) {
-      logger.error(`Order calculation failed (${input.calculation_source})`, error, JSON.stringify({
+      logger.error(`❌ Order calculation failed (${input.calculation_source})`, error, JSON.stringify({
         itemCount: input.items.length,
         deliveryFee: input.delivery_fee,
-        promotionCode: input.promotion_code
+        promotionCode: input.promotion_code,
+        promotions: input.promotions?.length || 0
       }));
       
       throw new Error(`Order calculation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -257,7 +284,7 @@ export class OrderCalculationService {
   }
 
   /**
-   * Apply a single promotion
+   * Apply a single promotion (FIXED: Use 'value' field to match server)
    */
   private static applyPromotion(
     promotion: PromotionCalculation,
@@ -267,13 +294,16 @@ export class OrderCalculationService {
     let discountCents = 0;
     let deliveryDiscountCents = 0;
 
+    // Use 'value' field (matches server) with fallback to 'discount_amount' for compatibility
+    const promotionValue = promotion.value ?? promotion.discount_amount ?? 0;
+
     switch (promotion.type) {
       case 'percentage':
-        discountCents = Math.round((subtotalCents * promotion.discount_amount) / 100);
+        discountCents = Math.round((subtotalCents * promotionValue) / 100);
         break;
         
       case 'fixed_amount':
-        discountCents = Math.min(toCents(promotion.discount_amount), subtotalCents);
+        discountCents = Math.min(toCents(promotionValue), subtotalCents);
         break;
         
       case 'free_delivery':

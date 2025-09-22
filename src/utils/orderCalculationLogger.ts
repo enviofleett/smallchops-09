@@ -2,6 +2,7 @@
 // Implements Phase 2 of senior engineer's recommendations
 
 import { logger } from '@/lib/logger';
+import { trackCalculationMismatch } from './calculationMismatchTracker';
 import type { OrderCalculationResult } from '@/services/OrderCalculationService';
 
 export interface CalculationLogData {
@@ -144,6 +145,24 @@ export function logCalculationMismatch(mismatch: CalculationMismatchLog): void {
       }
       
       localStorage.setItem('calculation_mismatches', JSON.stringify(mismatchHistory));
+
+      // Also track in the new enhanced mismatch tracker
+      trackCalculationMismatch({
+        orderId: mismatch.orderId,
+        sessionId: mismatch.sessionId,
+        clientTotal: mismatch.clientCalculation.total_amount,
+        serverTotal: mismatch.serverCalculation.total_amount,
+        difference: mismatch.difference,
+        tolerance: mismatch.tolerance,
+        calculationDetails: {
+          client_subtotal: mismatch.clientCalculation.subtotal,
+          client_delivery_fee: mismatch.clientCalculation.delivery_fee,
+          client_discount: mismatch.clientCalculation.discount_amount
+        },
+        timestamp: mismatch.timestamp,
+        resolution: mismatch.resolution,
+        severity: mismatch.difference > 5 ? 'critical' : mismatch.difference > 1 ? 'high' : 'low'
+      });
     } catch (error) {
       console.warn('Failed to store mismatch history:', error);
     }

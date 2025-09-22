@@ -70,15 +70,31 @@ async function authenticateAdmin(req) {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    console.log('🔍 Attempting to authenticate with token length:', token.length);
     
-    // Get user from token
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    // Create a temporary client with the user's JWT for user context
+    const supabaseUser = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
+
+    // Get user from token using the user context client
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) {
-      console.log('⚠️ Invalid token or user not found:', userError?.message);
+      console.log('⚠️ Invalid token or user not found:', userError?.message || 'No user data');
       return { success: false, error: 'Invalid token or user not found' };
     }
 
-    // Check if user is admin via profiles table
+    console.log('✅ User authenticated:', { userId: user.id, email: user.email });
+
+    // Check if user is admin via profiles table using service role client
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role, is_active')
@@ -98,6 +114,7 @@ async function authenticateAdmin(req) {
     console.log('✅ Admin authentication successful:', {
       userId: user.id,
       email: user.email,
+      role: profile.role,
       authMethod: 'profiles_table',
       timestamp: new Date().toISOString()
     });

@@ -289,7 +289,9 @@ serve(async (req) => {
         p_delivery_address: processedDeliveryAddress,
         p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
         p_delivery_zone_id: deliveryZoneId,
-        p_guest_session_id: null,  // Use null instead of undefined
+        // FIXED: Ensure guest_session_id is always TEXT or null to match function signature
+        p_guest_session_id: requestBody.guest_session_id ? 
+          String(requestBody.guest_session_id) : null,
         p_promotion_code: promotionCode,
         p_client_total: requestBody.client_calculated_total || null
       });

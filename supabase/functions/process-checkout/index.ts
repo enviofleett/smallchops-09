@@ -219,10 +219,30 @@ serve(async (req) => {
     // ✅ Sanitize and validate delivery/pickup information
     let processedDeliveryAddress = null;
     let deliveryInstructions = null;
+    let deliveryZoneId = null;
 
     if (requestBody.fulfillment.type === 'delivery') {
       if (!requestBody.fulfillment.address) {
         throw new Error("Delivery address is required for delivery orders");
+      }
+
+      // Validate delivery zone for delivery orders
+      if (!requestBody.fulfillment.delivery_zone_id) {
+        console.warn("⚠️ No delivery zone provided for delivery order, using default");
+        // Try to get a default delivery zone
+        const { data: defaultZone } = await supabaseAdmin
+          .from("delivery_zones")
+          .select("id")
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+        
+        deliveryZoneId = defaultZone?.id || null;
+        if (!deliveryZoneId) {
+          throw new Error("Delivery orders must specify a delivery zone");
+        }
+      } else {
+        deliveryZoneId = requestBody.fulfillment.delivery_zone_id;
       }
 
       processedDeliveryAddress = {
@@ -236,7 +256,7 @@ serve(async (req) => {
       };
 
       deliveryInstructions = processedDeliveryAddress.delivery_instructions;
-      console.log("🏠 Processed delivery address with instructions");
+      console.log("🏠 Processed delivery address with zone:", deliveryZoneId);
     } else {
       console.log("📦 Pickup order - no delivery address needed");
     }
@@ -259,7 +279,7 @@ serve(async (req) => {
         p_items: orderItems,
         p_delivery_address: processedDeliveryAddress,
         p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
-        p_delivery_zone_id: requestBody.fulfillment.delivery_zone_id || null,
+        p_delivery_zone_id: deliveryZoneId,
         p_guest_session_id: undefined,
         p_promotion_code: promotionCode,
         p_client_total: requestBody.client_calculated_total || null
@@ -294,9 +314,16 @@ serve(async (req) => {
     }
     
     // ✅ Handle delivery schedule with improved error handling
-    if (requestBody.delivery_schedule && orderId) {
+    if (requestBody.delivery_schedule && orderId && typeof orderId === 'string') {
       console.log("📅 Saving delivery schedule for order:", orderId);
       try {
+        // Validate orderId is a valid UUID before proceeding
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(orderId)) {
+          console.error("❌ Invalid order ID format for delivery schedule:", orderId);
+          throw new Error("Invalid order ID format");
+        }
+
         const scheduleData = {
           order_id: orderId,
           delivery_date: requestBody.delivery_schedule.delivery_date,
@@ -336,7 +363,7 @@ serve(async (req) => {
           total_amount, 
           customer_email, 
           customer_name,
-          subtotal_amount,
+          subtotal,
           delivery_fee,
           promotion_discount,
           status,
@@ -388,7 +415,7 @@ serve(async (req) => {
           customer_name: order.customer_name || requestBody.customer.name,
           order_number: order.order_number,
           fulfillment_type: requestBody.fulfillment.type,
-          items_subtotal: order.subtotal_amount || paymentAmount,
+          items_subtotal: order.subtotal || paymentAmount,
           delivery_fee: order.delivery_fee || 0,
           promotion_discount: order.promotion_discount || 0,
           client_total: paymentAmount,
@@ -461,7 +488,7 @@ serve(async (req) => {
           id: order.id,
           order_number: order.order_number,
           total_amount: order.total_amount,
-          subtotal_amount: order.subtotal_amount || order.total_amount,
+          subtotal_amount: order.subtotal || order.total_amount,
           delivery_fee: order.delivery_fee || 0,
           promotion_discount: order.promotion_discount || 0,
           status: order.status || "pending",

@@ -38,22 +38,13 @@ export const BudgetBallerSection = ({
     },
   });
 
-  // Fallback content if nothing is configured
-  const defaultContent = {
-    title: 'The Budget Baller',
-    description: undefined,
-    items: [
-      { name: '5 Samosa', included: true },
-      { name: '5 Spring Rolls', included: true },
-      { name: '5 Stick Meat', included: true },
-      { name: '20 Poff-Poff', included: true },
-    ],
-    background_color: '#f59e0b',
-    text_color: '#1f2937',
-  };
+  // Only render if there's actual database content - no fallback
+  if (!budgetBaller) {
+    return null;
+  }
 
-  const content = budgetBaller || defaultContent;
-  const items = Array.isArray(content.items) ? content.items : defaultContent.items;
+  const content = budgetBaller;
+  const items = Array.isArray(content.items) ? content.items : [];
   const includedItems = items.filter((item: any) => item.included);
 
   return (
@@ -92,7 +83,7 @@ export const BudgetBallerSection = ({
               key={index}
               className="text-sm text-center block pb-1 border-b border-dotted border-gray-400 text-gray-700"
             >
-              {item.name}
+              {typeof item === 'object' && item && 'name' in item ? String(item.name) : ''}
             </span>
           ))}
         </div>

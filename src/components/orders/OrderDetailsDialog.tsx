@@ -29,6 +29,7 @@ import { ActionsPanel } from './details/ActionsPanel';
 import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
+import { PrintPreviewDialog } from './PrintPreviewDialog';
 
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 interface OrderDetailsDialogProps {
@@ -59,6 +60,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const [verifying, setVerifying] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [verifyState, setVerifyState] = useState<'idle' | 'success' | 'failed' | 'pending'>('idle');
+
+  // Print preview states
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [printPreviewType, setPrintPreviewType] = useState<'job-order' | 'receipt'>('job-order');
 
   // Print ref for react-to-print
   const printRef = useRef<HTMLDivElement>(null);
@@ -343,10 +348,34 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     });
   };
 
-  // Enhanced job order print handler with validation
+  // Enhanced job order print handler with preview
   const handleJobOrderPrint = () => {
-    console.log('🖨️ Print button clicked for order:', order.order_number);
+    console.log('🖨️ Job Order print preview requested for:', order.order_number);
     
+    toast({
+      title: 'Opening Print Preview',
+      description: 'Review the job order details before sending to printer'
+    });
+    
+    setPrintPreviewType('job-order');
+    setShowPrintPreview(true);
+  };
+
+  // Enhanced receipt print handler with preview  
+  const handlePrintReceipt = () => {
+    console.log('🧾 Receipt print preview requested for:', order.order_number);
+    
+    toast({
+      title: 'Opening Print Preview',
+      description: 'Review the receipt details before sending to printer'
+    });
+    
+    setPrintPreviewType('receipt');
+    setShowPrintPreview(true);
+  };
+
+  // Actual print execution handlers
+  const executeJobOrderPrint = () => {
     // Validate order data before printing
     if (!order || !order.order_number) {
       toast({
@@ -360,7 +389,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
     const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
     
-    console.log('🖨️ Print data:', {
+    console.log('🖨️ Executing job order print:', {
       order: order.order_number,
       itemsCount: items.length,
       hasSchedule: !!schedule,
@@ -369,12 +398,14 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     });
     
     printJobOrder(order, items, schedule, pickupPoint, user?.name || 'Admin User');
+    
+    toast({
+      title: 'Job Order Printing',
+      description: 'Job order has been sent to printer with professional formatting.'
+    });
   };
 
-  // Enhanced receipt print handler using our unified system
-  const handlePrintReceipt = () => {
-    console.log('🧾 Receipt print button clicked for order:', order.order_number);
-    
+  const executeReceiptPrint = () => {
     // Validate order data before printing
     if (!order || !order.order_number) {
       toast({
@@ -393,11 +424,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       email: 'store@startersmallchops.com',
     };
 
-    // Use enriched items if available, otherwise fallback to order items
     const items = enrichedItems || order.order_items || [];
     const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
     
-    console.log('📄 Printing receipt with data:', {
+    console.log('📄 Executing receipt print:', {
       orderNumber: order.order_number,
       itemCount: items.length,
       hasSchedule: !!schedule,
@@ -435,12 +465,12 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             
             
-            <Button onClick={handleJobOrderPrint} variant="outline" size="sm" className="gap-2" aria-label="Print job order">
+            <Button onClick={handleJobOrderPrint} variant="outline" size="sm" className="gap-2" aria-label="Preview and print job order">
               <Printer className="h-4 w-4" />
               <span className="hidden sm:inline">Print Job Order</span>
             </Button>
             
-            <Button onClick={handlePrintReceipt} variant="outline" size="sm" className="gap-2" aria-label="Print professional receipt">
+            <Button onClick={handlePrintReceipt} variant="outline" size="sm" className="gap-2" aria-label="Preview and print professional receipt">
               <Receipt className="h-4 w-4" />
               <span className="hidden sm:inline">Print Receipt</span>
             </Button>
@@ -541,6 +571,25 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Print Preview Dialog */}
+      <PrintPreviewDialog
+        isOpen={showPrintPreview}
+        onClose={() => setShowPrintPreview(false)}
+        onPrint={printPreviewType === 'job-order' ? executeJobOrderPrint : executeReceiptPrint}
+        order={order}
+        items={detailedOrderData?.items || enrichedItems || order.order_items || []}
+        deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+        pickupPoint={pickupPoint}
+        businessInfo={printPreviewType === 'receipt' ? {
+          name: 'Starters Small Chops & Catering',
+          address: '2B Close Off 11Crescent Kado Estate, Kado',
+          phone: '0807 301 1100',
+          email: 'store@startersmallchops.com',
+        } : undefined}
+        printType={printPreviewType}
+        adminName={user?.name || 'Admin User'}
+      />
     </AdaptiveDialog>;
 };
 export default OrderDetailsDialog;

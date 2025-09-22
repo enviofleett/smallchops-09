@@ -445,6 +445,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
   // Helper function for missing data fallbacks
   const safeFallback = (value: any, fallback = 'Not provided') => {
+    // For objects (like delivery_address), return as-is for proper handling
+    if (value && typeof value === 'object') {
+      return value;
+    }
+    // For primitive values, check if they exist and have content
     return value && value.toString().trim() ? value : fallback;
   };
   return <AdaptiveDialog open={isOpen} onOpenChange={onClose} title={`Order Details - #${order.order_number}`} size="xl" className={cn("print:bg-white print:text-black print:shadow-none", "w-full max-w-none sm:max-w-6xl lg:max-w-7xl")}>

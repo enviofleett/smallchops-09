@@ -556,14 +556,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         } : null,
         payment: {
           method: formData.payment_method || 'paystack'
-        },
-        // Include promotion info for backend discount application
-        promotion: {
-          code: cart.promotion_code || null,
-          client_calculated_total: total, // Frontend calculated total for validation
-          client_subtotal: subtotal,
-          client_discount: cart.summary.discount_amount,
-          client_delivery_discount: cart.summary.delivery_discount
         }
       };
       console.log('📦 Submitting checkout data:', sanitizedData);

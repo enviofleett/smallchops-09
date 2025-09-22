@@ -1,28 +1,36 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, RefreshCw, Filter, X, RotateCcw } from 'lucide-react';
-import { OrderStatus } from '@/types/orders'; 
+import { Search, RefreshCw, Filter } from 'lucide-react';
+import { OrderStatus } from '@/types/orders';
+import { DeliveryFilterType } from '@/utils/dateFilterUtils';
 import { HourlyDeliveryFilter } from './HourlyDeliveryFilter';
+import { DeliveryDateFilter } from './DeliveryDateFilter';
 import { OrderTabDropdown } from './OrderTabDropdown';
+import { OverdueDateFilter } from './OverdueDateFilter';
+import { isOrderOverdue } from '@/utils/scheduleTime';
 
 interface AdminOrdersFiltersProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  statusFilter: 'all' | OrderStatus;
-  setStatusFilter: (filter: 'all' | OrderStatus) => void;
+  statusFilter: 'all' | OrderStatus | 'overdue';
+  setStatusFilter: (filter: 'all' | OrderStatus | 'overdue') => void;
+  deliveryFilter: DeliveryFilterType;
+  setDeliveryFilter: (filter: DeliveryFilterType) => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   selectedDay: 'today' | 'tomorrow' | null;
   setSelectedDay: (day: 'today' | 'tomorrow' | null) => void;
   selectedHour: string | null;
   setSelectedHour: (hour: string | null) => void;
+  selectedOverdueDateFilter: string | null;
+  setSelectedOverdueDateFilter: (filter: string | null) => void;
   isMobile: boolean;
   refetch: () => void;
   orders: any[];
-  filteredOrdersCount?: number;
+  deliverySchedules: Record<string, any>;
 }
 
 export function AdminOrdersFilters({
@@ -30,35 +38,21 @@ export function AdminOrdersFilters({
   setSearchQuery,
   statusFilter,
   setStatusFilter,
+  deliveryFilter,
+  setDeliveryFilter,
   activeTab,
   setActiveTab,
   selectedDay,
   setSelectedDay,
   selectedHour,
   setSelectedHour,
+  selectedOverdueDateFilter,
+  setSelectedOverdueDateFilter,
   isMobile,
   refetch,
   orders,
-  filteredOrdersCount
+  deliverySchedules
 }: AdminOrdersFiltersProps) {
-  
-  // Calculate if any filters are active
-  const hasActiveFilters = useMemo(() => {
-    return searchQuery.length > 0 || 
-           statusFilter !== 'all' || 
-           selectedDay !== null ||
-           selectedHour !== null;
-  }, [searchQuery, statusFilter, selectedDay, selectedHour]);
-
-  // Clear all filters
-  const clearAllFilters = () => {
-    setSearchQuery('');
-    setStatusFilter('all');
-    setSelectedDay(null);
-    setSelectedHour(null);
-  };
-
-
   return (
     <div className="space-y-4">
       {/* Search and Filter Controls */}
@@ -72,57 +66,28 @@ export function AdminOrdersFilters({
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
-            {searchQuery && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                onClick={() => setSearchQuery('')}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            )}
           </div>
           
           {/* Status Filter */}
-          <div className="relative">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Filter by status" />
-                {statusFilter !== 'all' && (
-                  <Badge variant="secondary" className="ml-2">
-                    Active
-                  </Badge>
-                )}
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="preparing">Preparing</SelectItem>
-                <SelectItem value="ready">Ready</SelectItem>
-                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Orders</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="preparing">Preparing</SelectItem>
+              <SelectItem value="ready">Ready</SelectItem>
+              <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex gap-2">
-          {/* Clear Filters Button */}
-          {hasActiveFilters && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={clearAllFilters}
-              className="flex items-center gap-2"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Clear Filters
-            </Button>
-          )}
-          
           <Button 
             variant="outline" 
             size="sm" 
@@ -135,55 +100,13 @@ export function AdminOrdersFilters({
         </div>
       </div>
 
-      {/* Active Filters Summary */}
-      {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Active filters:</span>
-          
-          {searchQuery && (
-            <Badge variant="secondary" className="gap-1">
-              Search: "{searchQuery}"
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => setSearchQuery('')}
-              />
-            </Badge>
-          )}
-          
-          {statusFilter !== 'all' && (
-            <Badge variant="secondary" className="gap-1">
-              Status: {statusFilter}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => setStatusFilter('all')}
-              />
-            </Badge>
-          )}
-          
-          
-          {selectedDay && (
-            <Badge variant="secondary" className="gap-1">
-              Day: {selectedDay}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => setSelectedDay(null)}
-              />
-            </Badge>
-          )}
-          
-          {selectedHour && (
-            <Badge variant="secondary" className="gap-1">
-              Hour: {selectedHour}
-              <X 
-                className="h-3 w-3 cursor-pointer" 
-                onClick={() => setSelectedHour(null)}
-              />
-            </Badge>
-          )}
-        </div>
+      {/* Delivery Date Filter */}
+      {statusFilter !== 'overdue' && (
+        <DeliveryDateFilter 
+          value={deliveryFilter}
+          onChange={setDeliveryFilter}
+        />
       )}
-
 
       {/* Order Tabs */}
       <OrderTabDropdown
@@ -195,7 +118,11 @@ export function AdminOrdersFilters({
           preparing: orders.filter(o => o.status === 'preparing').length,
           ready: orders.filter(o => o.status === 'ready').length,
           out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
-          delivered: orders.filter(o => o.status === 'delivered').length
+          delivered: orders.filter(o => o.status === 'delivered').length,
+          overdue: orders.filter(o => {
+            const schedule = deliverySchedules[o.id];
+            return schedule && isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end);
+          }).length
         }}
       />
 
@@ -206,6 +133,20 @@ export function AdminOrdersFilters({
           onDayChange={setSelectedDay}
           selectedHour={selectedHour}
           onHourChange={setSelectedHour}
+        />
+      )}
+
+      {/* Overdue Date Filter for Overdue Tab */}
+      {activeTab === 'overdue' && (
+        <OverdueDateFilter
+          selectedDateFilter={selectedOverdueDateFilter}
+          onDateFilterChange={setSelectedOverdueDateFilter}
+          overdueOrderCounts={{
+            today: 0,
+            yesterday: 0,
+            lastWeek: 0,
+            older: 0
+          }}
         />
       )}
     </div>

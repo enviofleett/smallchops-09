@@ -10054,35 +10054,16 @@ export type Database = {
         Returns: Json
       }
       create_order_with_items: {
-        Args:
-          | {
-              p_client_calculated_total?: number
-              p_customer_email: string
-              p_customer_name: string
-              p_customer_phone: string
-              p_delivery_address: string
-              p_delivery_fee: number
-              p_delivery_instructions: string
-              p_items: Json
-              p_order_time: string
-              p_order_type: Database["public"]["Enums"]["order_type"]
-              p_promotion_code?: string
-              p_promotion_discount?: number
-              p_subtotal: number
-              p_total: number
-            }
-          | {
-              p_client_total?: number
-              p_customer_id: string
-              p_delivery_address?: Json
-              p_delivery_zone_id?: string
-              p_fulfillment_type: string
-              p_guest_session_id?: string
-              p_items: Json
-              p_pickup_point_id?: string
-              p_promotion_code?: string
-            }
-        Returns: Json
+        Args: {
+          p_customer_id: string
+          p_delivery_address?: Json
+          p_delivery_zone_id?: string
+          p_fulfillment_type: string
+          p_guest_session_id?: string
+          p_items?: Json
+          p_pickup_point_id?: string
+        }
+        Returns: string
       }
       create_payment_intent: {
         Args: { p_amount: number; p_currency?: string; p_order_id: string }
@@ -10414,10 +10395,6 @@ export type Database = {
         Returns: Json
       }
       get_email_health_status: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      get_email_queue_stats: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
@@ -11119,7 +11096,7 @@ export type Database = {
       }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
-        Returns: Json
+        Returns: number
       }
       production_cleanup: {
         Args: Record<PropertyKey, never>
@@ -11312,10 +11289,6 @@ export type Database = {
       }
       toggle_user_favorite: {
         Args: { p_product_id: string }
-        Returns: Json
-      }
-      trigger_email_processing: {
-        Args: Record<PropertyKey, never>
         Returns: Json
       }
       trigger_order_emails: {

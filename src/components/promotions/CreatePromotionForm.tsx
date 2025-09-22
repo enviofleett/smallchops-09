@@ -175,7 +175,7 @@ export default function CreatePromotionForm({
   }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-background">
+    <div className="h-full flex flex-col overflow-hidden">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(handleSubmit)}
@@ -183,20 +183,18 @@ export default function CreatePromotionForm({
           noValidate
           className="flex flex-col h-full overflow-hidden"
         >
-          {/* Scrollable Content Area */}
-          <ScrollArea className="flex-1 overflow-y-auto overscroll-contain" style={{ scrollbarGutter: 'stable' }}>
-            <div className="space-y-6 sm:space-y-8 p-4 sm:p-6 md:p-8 pb-8 min-h-0">
-              <div className="space-y-8">
+          {/* Scrollable Content */}
+          <ScrollArea className="flex-1 overflow-y-auto">
+            <div className="space-y-6 sm:space-y-8 py-4 sm:py-6 px-4 sm:px-6 pb-8">
+              {/* Form content will be inserted here */}
+              <div className="space-y-6">
                 {/* Basic Information */}
                 <div className="space-y-4 sm:space-y-6">
-                  <div className="pb-2 border-b border-border/50">
-                    <h4 className="font-semibold text-sm sm:text-base text-foreground flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-primary"></div>
-                      Basic Information
-                    </h4>
-                  </div>
+                  <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                    Basic Information
+                  </h4>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Name */}
                 <FormField
                   control={form.control}
@@ -206,14 +204,14 @@ export default function CreatePromotionForm({
                       <FormLabel>
                         Name <span className="text-destructive">*</span>
                       </FormLabel>
-                       <FormControl>
-                         <Input
-                           placeholder="e.g., Summer Sale"
-                           {...field}
-                           disabled={disabled}
-                           className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
-                         />
-                       </FormControl>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Summer Sale"
+                          {...field}
+                          disabled={disabled}
+                          className="h-11 text-base"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -233,11 +231,11 @@ export default function CreatePromotionForm({
                         value={field.value}
                         disabled={disabled}
                       >
-                         <FormControl>
-                           <SelectTrigger className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
-                             <SelectValue placeholder="Select promotion type" />
-                           </SelectTrigger>
-                         </FormControl>
+                        <FormControl>
+                          <SelectTrigger className="h-11 text-base">
+                            <SelectValue placeholder="Select promotion type" />
+                          </SelectTrigger>
+                        </FormControl>
                         <SelectContent>
                           <SelectItem value="percentage">
                             <div className="flex items-center gap-2">
@@ -273,13 +271,13 @@ export default function CreatePromotionForm({
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                       <Textarea
-                         placeholder="Describe this promotion..."
-                         {...field}
-                         disabled={disabled}
-                         rows={2}
-                         className="text-sm sm:text-base resize-none touch-manipulation min-h-[60px] sm:min-h-[80px]"
-                       />
+                      <Textarea
+                        placeholder="Describe this promotion..."
+                        {...field}
+                        disabled={disabled}
+                        rows={3}
+                        className="text-base resize-none"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -288,12 +286,12 @@ export default function CreatePromotionForm({
             </div>
 
                 {/* Promotion Settings */}
-                <div className="space-y-3 sm:space-y-4">
-                  <h4 className="font-medium text-xs sm:text-sm text-muted-foreground uppercase tracking-wide">
+                <div className="space-y-4 sm:space-y-6">
+                  <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                     Promotion Settings
                   </h4>
                   
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Value field - conditionally displayed */}
                 {watchType !== "free_delivery" && (
                   <FormField
@@ -307,19 +305,19 @@ export default function CreatePromotionForm({
                           <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
-                           <Input
-                             placeholder={
-                               watchType === "percentage" ? "e.g., 20" : "e.g., 2000"
-                             }
-                             type="number"
-                             inputMode="numeric"
-                             min={0}
-                             max={watchType === "percentage" ? 100 : undefined}
-                             {...field}
-                             value={field.value ?? ""}
-                             disabled={disabled}
-                             className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
-                           />
+                          <Input
+                            placeholder={
+                              watchType === "percentage" ? "e.g., 20" : "e.g., 2000"
+                            }
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            max={watchType === "percentage" ? 100 : undefined}
+                            {...field}
+                            value={field.value ?? ""}
+                            disabled={disabled}
+                            className="h-11 text-base"
+                          />
                         </FormControl>
                         <FormDescription>
                           {watchType === "percentage" && "Enter 1-100 for percentage discount"}
@@ -342,16 +340,16 @@ export default function CreatePromotionForm({
                         {watchType === "free_delivery" && <span className="text-destructive">*</span>}
                       </FormLabel>
                       <FormControl>
-                         <Input
-                           placeholder="e.g., 5000"
-                           type="number"
-                           inputMode="numeric"
-                           min={0}
-                           {...field}
-                           value={field.value ?? ""}
-                           disabled={disabled}
-                           className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
-                         />
+                        <Input
+                          placeholder="e.g., 5000"
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          {...field}
+                          value={field.value ?? ""}
+                          disabled={disabled}
+                          className="h-11 text-base"
+                        />
                       </FormControl>
                       <FormDescription>
                         {watchType === "free_delivery" 
@@ -366,8 +364,8 @@ export default function CreatePromotionForm({
             </div>
 
                 {/* Promotion Code */}
-                <div className="space-y-3 sm:space-y-4">
-                  <h4 className="font-medium text-xs sm:text-sm text-muted-foreground uppercase tracking-wide">
+                <div className="space-y-4 sm:space-y-6">
+                  <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                     Promotion Code (Optional)
                   </h4>
               
@@ -377,12 +375,12 @@ export default function CreatePromotionForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                       <Input
-                         placeholder="e.g., SAVE20 (optional)"
-                         {...field}
-                         disabled={disabled}
-                         className="uppercase h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
-                       />
+                      <Input
+                        placeholder="e.g., SAVE20 (optional)"
+                        {...field}
+                        disabled={disabled}
+                        className="uppercase h-11 text-base"
+                      />
                     </FormControl>
                     <FormDescription>
                       Leave empty for automatic discount, or enter a code customers can use
@@ -394,12 +392,12 @@ export default function CreatePromotionForm({
             </div>
 
                 {/* Validity Period */}
-                <div className="space-y-3 sm:space-y-4">
-                  <h4 className="font-medium text-xs sm:text-sm text-muted-foreground uppercase tracking-wide">
+                <div className="space-y-4 sm:space-y-6">
+                  <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                     Validity Period
                   </h4>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Start Date */}
                 <FormField
                   control={form.control}
@@ -412,14 +410,14 @@ export default function CreatePromotionForm({
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
-                             <Button
-                               variant="outline"
-                               className={cn(
-                                 "w-full justify-start text-left font-normal h-10 sm:h-11 text-sm sm:text-base touch-manipulation",
-                                 !field.value && "text-muted-foreground"
-                               )}
-                               disabled={disabled}
-                             >
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal h-11 text-base",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={disabled}
+                            >
                               <CalendarIcon className="mr-2 h-4 w-4" />
                               {field.value ? format(field.value, "PPP") : "Select start date"}
                             </Button>
@@ -450,14 +448,14 @@ export default function CreatePromotionForm({
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
-                             <Button
-                               variant="outline"
-                               className={cn(
-                                 "w-full justify-start text-left font-normal h-10 sm:h-11 text-sm sm:text-base touch-manipulation",
-                                 !field.value && "text-muted-foreground"
-                               )}
-                               disabled={disabled}
-                             >
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal h-11 text-base",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={disabled}
+                            >
                               <CalendarIcon className="mr-2 h-4 w-4" />
                               {field.value ? format(field.value, "PPP") : "No end date"}
                             </Button>
@@ -490,31 +488,28 @@ export default function CreatePromotionForm({
             </div>
           </ScrollArea>
 
-          {/* Fixed Footer with Prominent CTA Button */}
-          <div className="flex-shrink-0 border-t bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/90 mt-auto shadow-2xl sticky bottom-0 z-20">
-            <div className="p-4 sm:p-5 md:p-6">
-              <div className="flex flex-col gap-3">
+          {/* Fixed Footer with CTA Button */}
+          <div className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mt-auto">
+            <div className="p-4 sm:p-6 pt-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:justify-end">
                 <Button
                   type="submit"
                   disabled={disabled || isSubmitting || createMutation.isPending}
-                  className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold touch-manipulation shadow-lg hover:shadow-xl transition-all duration-300 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+                  className="w-full sm:w-auto min-w-[140px] h-11 text-base font-medium"
                   size="lg"
                 >
                   {isSubmitting || createMutation.isPending ? (
                     <>
-                      <div className="animate-spin mr-3 w-5 h-5 border-2 border-current border-t-transparent rounded-full" />
-                      Creating Promotion...
+                      <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                      Creating...
                     </>
                   ) : (
                     <>
-                      <Plus className="w-5 h-5 mr-3" />
+                      <Plus className="w-4 h-4 mr-2" />
                       Create Promotion
                     </>
                   )}
                 </Button>
-                <p className="text-xs sm:text-sm text-muted-foreground text-center">
-                  All fields are validated before creation
-                </p>
               </div>
             </div>
           </div>

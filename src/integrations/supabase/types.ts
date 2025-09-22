@@ -10398,6 +10398,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_email_queue_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_email_system_config_summary: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -11096,7 +11100,7 @@ export type Database = {
       }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
-        Returns: number
+        Returns: Json
       }
       production_cleanup: {
         Args: Record<PropertyKey, never>
@@ -11289,6 +11293,10 @@ export type Database = {
       }
       toggle_user_favorite: {
         Args: { p_product_id: string }
+        Returns: Json
+      }
+      trigger_email_processing: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       trigger_order_emails: {

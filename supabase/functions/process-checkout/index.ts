@@ -282,6 +282,32 @@ serve(async (req) => {
     
     let orderId;
     try {
+      // FIXED: Properly handle UUID conversion for guest_session_id and add customer_name fallback
+      let guestSessionUUID = null;
+      if (requestBody.guest_session_id) {
+        try {
+          // Validate UUID format before passing
+          const sessionId = requestBody.guest_session_id.toString().trim();
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(sessionId)) {
+            guestSessionUUID = sessionId;
+          } else {
+            console.warn("⚠️ Invalid guest_session_id format, setting to null:", sessionId);
+          }
+        } catch (sessionErr) {
+          console.warn("⚠️ Guest session ID processing error:", sessionErr);
+        }
+      }
+
+      console.log("🔧 RPC Parameters:", {
+        p_customer_id: customerId,
+        p_fulfillment_type: requestBody.fulfillment.type,
+        p_items_count: rpcItems.length,
+        p_delivery_zone_id: deliveryZoneId,
+        p_guest_session_id: guestSessionUUID,
+        p_promotion_code: promotionCode
+      });
+
       const { data: orderResult, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", {
         p_customer_id: customerId,
         p_fulfillment_type: requestBody.fulfillment.type,
@@ -289,9 +315,7 @@ serve(async (req) => {
         p_delivery_address: processedDeliveryAddress,
         p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
         p_delivery_zone_id: deliveryZoneId,
-        // FIXED: Ensure guest_session_id is always TEXT or null to match function signature
-        p_guest_session_id: requestBody.guest_session_id ? 
-          String(requestBody.guest_session_id) : null,
+        p_guest_session_id: guestSessionUUID,  // Pass as proper UUID or null
         p_promotion_code: promotionCode,
         p_client_total: requestBody.client_calculated_total || null
       });

@@ -7,6 +7,7 @@ import { Printer, X, Eye, FileText } from 'lucide-react';
 import { OrderWithItems } from '@/api/orders';
 import { JobOrderPrint } from './JobOrderPrint';
 import { OrderReceiptPrint } from './OrderReceiptPrint';
+import { ThermalOrderPrint } from './ThermalOrderPrint';
 
 interface PrintPreviewDialogProps {
   isOpen: boolean;
@@ -87,26 +88,81 @@ export function PrintPreviewDialog({
           </div>
         </DialogHeader>
 
-        {/* Preview Content - Scrollable */}
+        {/* Preview Content - Thermal Optimized */}
         <div className="flex-1 overflow-y-auto py-4">
-          <div className="bg-white border rounded-lg shadow-sm">
-            {printType === 'job-order' ? (
-              <JobOrderPrint
-                order={order}
-                items={items}
-                deliverySchedule={deliverySchedule}
-                pickupPoint={pickupPoint}
-                adminName={adminName}
-              />
-            ) : (
-              <OrderReceiptPrint
+          {/* Thermal Preview Indicator */}
+          <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-blue-700">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="font-medium">80mm Thermal Print Preview</span>
+              <span className="text-blue-600">• Max 2 pages • Optimized layout</span>
+            </div>
+          </div>
+
+          {/* Thermal Print Container */}
+          <div className="thermal-preview-container">
+            <div className="thermal-preview-wrapper bg-white border rounded-lg shadow-sm">
+              <ThermalOrderPrint
                 order={order}
                 items={items}
                 deliverySchedule={deliverySchedule}
                 pickupPoint={pickupPoint}
                 businessInfo={businessInfo}
+                printType={printType}
+                adminName={adminName}
               />
-            )}
+            </div>
+
+            {/* Thermal Preview Styles */}
+            <style>{`
+              .thermal-preview-container {
+                max-width: 320px;
+                margin: 0 auto;
+                font-family: 'Courier New', monospace;
+              }
+              
+              .thermal-preview-wrapper {
+                width: 80mm;
+                max-width: 320px;
+                background: white;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-radius: 8px;
+                overflow: hidden;
+                transform: scale(1);
+                transform-origin: top center;
+              }
+              
+              /* Enhanced preview for thermal print component */
+              .thermal-preview-wrapper .thermal-print-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 4mm !important;
+                background: white !important;
+                box-shadow: none !important;
+              }
+              
+              /* Page break visualization */
+              .thermal-preview-wrapper .page-break {
+                border-top: 2px dashed #e74c3c !important;
+                margin: 4mm 0 !important;
+                padding-top: 2mm !important;
+                position: relative;
+              }
+              
+              .thermal-preview-wrapper .page-break::before {
+                content: "PAGE 2";
+                position: absolute;
+                top: -10px;
+                right: 0;
+                font-size: 8px;
+                background: #e74c3c;
+                color: white;
+                padding: 2px 6px;
+                border-radius: 2px;
+                font-weight: bold;
+              }
+            `}</style>
           </div>
         </div>
 
@@ -116,7 +172,7 @@ export function PrintPreviewDialog({
         <DialogFooter className="flex-shrink-0 pt-4">
           <div className="flex items-center justify-between w-full">
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium">Print Format:</span> Professional layout optimized for A4 and thermal printers
+              <span className="font-medium">Print Format:</span> 80mm thermal printer optimized • Max 2 pages • Essential info only
             </div>
             <div className="flex gap-3">
               <Button

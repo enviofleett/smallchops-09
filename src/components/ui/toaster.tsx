@@ -39,7 +39,7 @@ export function Toaster() {
                   </ToastTitle>
                 )}
                 {description && (
-                  <ToastDescription className="text-sm leading-relaxed print-preview-enabled">
+                  <ToastDescription className="text-sm leading-relaxed">
                     {typeof description === 'string' ? description : description}
                   </ToastDescription>
                 )}

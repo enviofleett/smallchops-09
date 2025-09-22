@@ -190,9 +190,9 @@ serve(async (req: Request) => {
     console.log("✅ Customer ID obtained:", customer_id);
 
     const { data: orderResult, error: orderError } = await supabaseAdmin.rpc(
-      "create_order_with_items",
+      "create_order_with_items_v2",
       {
-        p_customer_id: customer_id, // ✅ Changed from p_customer_email
+        p_customer_id: customer_id,
         p_fulfillment_type: fulfillment_type,
         p_items: items,
         p_delivery_address: delivery_address || null,

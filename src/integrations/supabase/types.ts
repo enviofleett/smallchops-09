@@ -10130,6 +10130,20 @@ export type Database = {
             }
         Returns: Json
       }
+      create_order_with_items_v2: {
+        Args: {
+          p_client_total?: number
+          p_customer_id: string
+          p_delivery_address?: Json
+          p_delivery_zone_id?: string
+          p_fulfillment_type: string
+          p_guest_session_id?: string
+          p_items: Json
+          p_pickup_point_id?: string
+          p_promotion_code?: string
+        }
+        Returns: Json
+      }
       create_payment_intent: {
         Args: { p_amount: number; p_currency?: string; p_order_id: string }
         Returns: Json

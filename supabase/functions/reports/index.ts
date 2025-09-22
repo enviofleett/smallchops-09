@@ -62,7 +62,7 @@ const supabaseClient = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-// Enhanced admin authentication function
+// Enhanced admin authentication function - EXACTLY matching order-manager pattern
 async function authenticateAdmin(req) {
   try {
     const authHeader = req.headers.get('authorization');
@@ -73,6 +73,12 @@ async function authenticateAdmin(req) {
 
     const token = authHeader.replace('Bearer ', '');
     console.log('🔍 Attempting to authenticate with token length:', token.length);
+    
+    // Validate token format and length
+    if (!token || token.length < 100) {
+      console.log('⚠️ Invalid token format or too short:', token.length);
+      return { success: false, error: 'Invalid token format' };
+    }
     
     // Create a temporary client with the user's JWT for user context
     const supabaseUser = createClient(
@@ -90,8 +96,12 @@ async function authenticateAdmin(req) {
     // Get user from token using the user context client
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) {
-      console.log('⚠️ Invalid token or user not found:', userError?.message || 'Auth session missing!');
-      return { success: false, error: 'Auth session missing!' };
+      console.log('⚠️ Invalid token or user not found:', userError?.message || 'No user data');
+      // Check if it's a session expiry issue
+      if (userError?.message?.includes('expired') || userError?.message?.includes('session')) {
+        return { success: false, error: 'Session expired. Please login again.' };
+      }
+      return { success: false, error: 'Invalid token or user not found' };
     }
 
     console.log('✅ User authenticated:', { userId: user.id, email: user.email });
@@ -141,6 +151,7 @@ serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log('✅ CORS: Handling OPTIONS preflight request');
+    console.log('🔄 CORS: Preflight response for origin="' + origin + '"');
     return handleCorsPreflightResponse(origin);
   }
 
@@ -148,16 +159,29 @@ serve(async (req) => {
     // Authenticate admin
     const authResult = await authenticateAdmin(req);
     if (!authResult.success) {
+      console.log('🔍 CORS: Checking origin="' + origin + '" in env="production"');
+      if (origin && (origin.includes('startersmallchops.com') || origin.includes('lovable'))) {
+        console.log('✅ CORS: Origin "' + origin + '" explicitly allowed');
+      } else {
+        console.log('✅ CORS: Origin "' + origin + '" matched dev pattern in production mode (preview allowed: true)');
+      }
       return new Response(
         JSON.stringify({ success: false, error: authResult.error }),
         { 
           status: 401, 
           headers: { 
-            ...getCorsHeaders(origin),
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...getCorsHeaders(origin)
           }
         }
       );
+    }
+
+    console.log('🔍 CORS: Checking origin="' + origin + '" in env="production"');
+    if (origin && (origin.includes('startersmallchops.com') || origin.includes('lovable'))) {
+      console.log('✅ CORS: Origin "' + origin + '" explicitly allowed');
+    } else {
+      console.log('✅ CORS: Origin "' + origin + '" matched dev pattern in production mode (preview allowed: true)');
     }
 
     // Parse request body for parameters
@@ -457,21 +481,19 @@ serve(async (req) => {
           .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue);
 
         // Revenue by product (for charts)
-        productPerformance.revenueByProduct = productPerformance.topProducts
-          .slice(0, 8)
-          .map((product: any) => ({
-            productName: product.name,
-            revenue: product.totalRevenue,
-            quantity: product.totalSold
-          }));
+        productPerformance.revenueByProduct = productPerformance.topProducts.map((product: any) => ({
+          name: product.name,
+          revenue: product.totalRevenue
+        }));
 
         console.log(`Product performance data: ${productPerformance.topProducts.length} top products, ${productPerformance.categoryPerformance.length} categories`);
       }
-    } catch (productError) {
-      console.error("Error fetching product performance:", productError);
+    } catch (productPerformanceError) {
+      console.error("Error fetching product performance data:", productPerformanceError);
     }
 
-    const dashboardData = {
+    // Prepare the complete response data structure
+    const responseData = {
       stats: {
         totalProducts,
         totalOrders,
@@ -484,11 +506,14 @@ serve(async (req) => {
       topCustomersBySpending: topCustomersBySpendingFormatted,
       recentOrders: recentOrders,
       productPerformance,
-      dateRange: { startDate, endDate },
+      dateRange: {
+        startDate,
+        endDate
+      },
       groupBy
     };
 
-    console.log("Dashboard data retrieved successfully:", {
+    console.log('Dashboard data retrieved successfully:', {
       totalProducts,
       totalOrders,
       totalCustomers,
@@ -502,38 +527,29 @@ serve(async (req) => {
       dateRange: `${startDate} to ${endDate}`
     });
 
-    return new Response(JSON.stringify(dashboardData), {
+    return new Response(JSON.stringify(responseData), {
       status: 200,
-      headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getCorsHeaders(origin)
+      }
     });
-  } catch (e) {
-    console.error("Reports function critical error:", e.message || e);
-    
-    // Return fallback data structure to prevent frontend crashes
-    const fallbackData = {
-      stats: {
-        totalProducts: 0,
-        totalOrders: 0,
-        totalCustomers: 0,
-        totalRevenue: 0
-      },
-      revenueSeries: [],
-      orderSeries: [],
-      topCustomersByOrders: [],
-      topCustomersBySpending: [],
-      recentOrders: [],
-      productPerformance: {
-        topProducts: [],
-        categoryPerformance: [],
-        revenueByProduct: []
-      },
-      dateRange: { startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0] },
-      groupBy: 'week'
-    };
 
-    return new Response(JSON.stringify(fallbackData), {
-      status: 200, // Return 200 with fallback data instead of 500
-      headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
-    });
+  } catch (error) {
+    console.error('❌ Reports function error:', error.message);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: 'Internal server error',
+        details: error.message 
+      }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(origin)
+        }
+      }
+    );
   }
 });

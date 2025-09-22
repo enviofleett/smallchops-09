@@ -51,7 +51,7 @@ export async function validatePromotionCodeSecure(
   }
 }
 
-// Enhanced promotion code validation with client-side rate limiting awareness
+// Enhanced promotion code validation with normalized code handling
 export async function validatePromotionCode(
   code: string, 
   orderAmount: number,
@@ -66,13 +66,19 @@ export async function validatePromotionCode(
   rate_limited?: boolean;
   attempts_remaining?: number;
   bogo_items?: any[];
+  normalized_code?: string;
 }> {
   try {
-    // Input validation
-    if (!code || !code.trim()) {
+    // CRITICAL: Import PromotionNormalizer dynamically to avoid circular dependencies
+    const { PromotionNormalizer } = await import('@/services/PromotionNormalizer');
+    
+    // Normalize and validate promotion code
+    const { normalizedCode, error: validationError } = PromotionNormalizer.prepareForValidation(code);
+    
+    if (validationError || !normalizedCode) {
       return { 
         valid: false, 
-        error: 'Please enter a promotion code' 
+        error: validationError || 'Invalid promotion code format' 
       };
     }
 
@@ -83,9 +89,11 @@ export async function validatePromotionCode(
       };
     }
 
-    // Use the secure validation
+    console.log('🔄 Validating normalized promotion code:', { original: code, normalized: normalizedCode });
+
+    // Use the secure validation with normalized code
     const result = await validatePromotionCodeSecure({
-      code: code.trim().toUpperCase(),
+      code: normalizedCode, // Use normalized code
       order_amount: orderAmount,
       customer_email: customerEmail,
       customer_id: customerId,
@@ -101,19 +109,30 @@ export async function validatePromotionCode(
       };
     }
 
+    // Log successful validation
+    PromotionNormalizer.logUsage(code, normalizedCode, true, result.discount_amount);
+
     return {
       valid: true,
       promotion: result.promotion,
       discount_amount: result.discount_amount,
       bogo_items: result.bogo_items,
-      attempts_remaining: result.attempts_remaining
+      attempts_remaining: result.attempts_remaining,
+      normalized_code: normalizedCode
     };
 
   } catch (error) {
     console.error('❌ Promotion validation error:', error);
+    
+    // Log failed validation
+    try {
+      const { PromotionNormalizer } = await import('@/services/PromotionNormalizer');
+      PromotionNormalizer.logUsage(code, code, false);
+    } catch {} // Ignore logging errors
+
     return { 
       valid: false, 
-      error: 'Failed to validate promotion code. Please try again.' 
+      error: 'Failed to validate promotion code. Please check your connection and try again.' 
     };
   }
 }

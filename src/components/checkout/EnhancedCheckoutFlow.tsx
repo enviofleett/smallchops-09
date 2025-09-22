@@ -435,15 +435,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         vat_rate: item.vat_rate || 7.5
       }));
 
+      // CRITICAL FIX: Map promotion fields correctly for server consistency
       const promotions = cart.promotion_code && cart.summary.applied_promotions ? 
         cart.summary.applied_promotions.map(promo => ({
           id: promo.id,
           name: promo.name,
           code: promo.code,
-          type: promo.type as 'percentage' | 'fixed_amount' | 'free_delivery',
-          value: promo.discount_amount, // Map discount_amount to value
-          discount_amount: promo.discount_amount, // Keep for compatibility
-          free_delivery: promo.free_delivery || false
+          type: promo.type as 'percentage' | 'fixed_amount' | 'free_delivery' | 'buy_one_get_one',
+          value: promo.discount_amount || 0, // SERVER-AUTHORITATIVE: Use discount_amount as value
+          free_delivery: promo.free_delivery || false,
+          min_order_amount: (promo as any).min_order_amount || 0
         })) : [];
 
       const calculationResult = OrderCalculationService.calculateOrder({

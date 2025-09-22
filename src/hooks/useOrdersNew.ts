@@ -39,10 +39,20 @@ export const useOrdersNew = (filters: OrderFilters = {}) => {
   return useQuery({
     queryKey: ['orders-new', filters],
     queryFn: async () => {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
       const { data, error } = await supabase.functions.invoke('order-manager', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
         body: {
           action: 'list_orders',
-          admin_id: 'current-user', // Will be validated by edge function
+          admin_id: session.user.id,
           page: filters.page || 1,
           page_size: filters.pageSize || 20,
           status_filter: filters.status || 'all',
@@ -124,7 +134,7 @@ export const useOrdersRealTime = () => {
           {
             event: '*',
             schema: 'public',
-            table: 'orders_new'
+            table: 'orders'  // Use 'orders' table instead of 'orders_new'
           },
           (payload) => {
             console.log('Real-time order update:', payload);
@@ -157,10 +167,10 @@ export const useOrderDetails = (orderId: string) => {
     queryKey: ['order-details', orderId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('orders_new')
+        .from('orders')  // Use 'orders' table instead of 'orders_new'
         .select(`
           *,
-          order_items_new(*),
+          order_items(*),
           order_delivery_schedule(*),
           order_audit(*)
         `)
@@ -181,16 +191,20 @@ export const useAssignRider = () => {
 
   return useMutation({
     mutationFn: async ({ orderId, riderId, riderName }: { orderId: string; riderId: string; riderName: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
       const { data, error } = await supabase.functions.invoke('order-manager', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
         body: {
           action: 'assign_rider',
           order_id: orderId,
           rider_id: riderId,
           rider_name: riderName,
-          admin_id: user.id
+          admin_id: session.user.id
         }
       });
 

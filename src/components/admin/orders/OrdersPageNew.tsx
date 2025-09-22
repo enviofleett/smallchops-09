@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { OrderStatus } from '@/types/orders';
-import { useOrdersNew, useOrdersRealTime } from '@/hooks/useOrdersNew';
+import { useOrdersSmart } from '@/hooks/useOrdersFallback';
+import { useOrdersRealTime } from '@/hooks/useOrdersNew';
 import { OrdersList } from './OrdersList';
 import { OrderFilters } from './OrderFilters';
 import { OrderStats } from './OrderStats';
 import { ConflictDialog } from './ConflictDialog';
 import { EmailQueueStatus } from './EmailQueueStatus';
+import { DataSourceIndicator } from './DataSourceIndicator';
 import { Separator } from "@/components/ui/separator";
 
 interface ConflictInfo {
@@ -19,7 +21,12 @@ interface ConflictInfo {
 }
 
 export function OrdersPageNew() {
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    status: OrderStatus | 'all';
+    search: string;
+    page: number;
+    pageSize: number;
+  }>({
     status: 'all',
     search: '',
     page: 1,
@@ -28,8 +35,8 @@ export function OrdersPageNew() {
   
   const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
   
-  // Data fetching
-  const { data: ordersData, isLoading, error, refetch } = useOrdersNew(filters);
+  // Data fetching with smart fallback
+  const { data: ordersData, isLoading, error, refetch } = useOrdersSmart(filters);
   
   // Real-time updates
   const { subscribe } = useOrdersRealTime();
@@ -97,7 +104,7 @@ export function OrdersPageNew() {
         
         <Separator />
         
-        {/* Header */}
+        {/* Header with Data Source Indicator */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -107,6 +114,12 @@ export function OrdersPageNew() {
               Track, manage, and process customer orders with reliable email notifications
             </p>
           </div>
+          <DataSourceIndicator 
+            source={ordersData?.source}
+            isLoading={isLoading}
+            error={error}
+            ordersCount={ordersData?.orders?.length || ordersData?.total_count}
+          />
         </div>
 
         {/* Stats */}

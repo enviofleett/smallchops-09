@@ -71,7 +71,7 @@ serve(async (req: Request) => {
       "create_order_with_items",
       {
         p_customer_email: customer_email,
-        p_fulfillment_type: fulfillment_type, // ⚠️ requires enum or text in DB
+        p_fulfillment_type: fulfillment_type,
         p_items: items,
         p_delivery_address: delivery_address || null,
         p_pickup_point_id: pickup_point_id || null,
@@ -84,18 +84,6 @@ serve(async (req: Request) => {
 
     if (orderError) {
       console.error("❌ Database function error (full):", JSON.stringify(orderError, null, 2));
-
-      // Special handling for missing enum type
-      if (orderError.message?.includes('type "fulfillment_type" does not exist')) {
-        return new Response(
-          JSON.stringify({
-            error:
-              "Database schema error: missing enum type 'fulfillment_type'. Please create it or change function signature to use text.",
-          }),
-          { status: 500 }
-        );
-      }
-
       return new Response(
         JSON.stringify({ error: "Order creation failed", details: orderError }),
         { status: 500 }
@@ -104,11 +92,77 @@ serve(async (req: Request) => {
 
     console.log("✅ Order successfully created:", orderResult);
 
-    // --- Step 4: Build response ---
+    // --- Step 4: Initialize Paystack payment ---
+    const orderId = orderResult?.id || orderResult?.order_id;
+    const paymentReference = `txn_${orderId}_${Date.now()}`;
+    
+    console.log("💰 Initializing Paystack payment:", { orderId, paymentReference, amount: client_total });
+
+    const paystackPayload = {
+      email: customer_email,
+      amount: client_total * 100, // Paystack expects kobo
+      reference: paymentReference,
+      callback_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/payment-webhook`,
+      metadata: {
+        order_id: orderId,
+        custom_fields: [
+          {
+            display_name: "Order ID",
+            variable_name: "order_id",
+            value: orderId
+          }
+        ]
+      }
+    };
+
+    const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${Deno.env.get("PAYSTACK_SECRET_KEY")}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(paystackPayload),
+    });
+
+    const paystackData = await paystackResponse.json();
+
+    if (!paystackResponse.ok || !paystackData.status) {
+      console.error("❌ Paystack initialization failed:", paystackData);
+      return new Response(
+        JSON.stringify({ 
+          error: "Payment initialization failed", 
+          details: paystackData.message || "Unknown error" 
+        }),
+        { status: 500 }
+      );
+    }
+
+    console.log("✅ Paystack payment initialized successfully:", paystackData.data);
+
+    // --- Step 5: Update order with payment reference ---
+    const { error: updateError } = await supabaseAdmin
+      .from("orders")
+      .update({ 
+        payment_reference: paymentReference,
+        payment_status: 'pending'
+      })
+      .eq("id", orderId);
+
+    if (updateError) {
+      console.warn("⚠️ Failed to update order with payment reference:", updateError);
+    }
+
+    // --- Step 6: Build response ---
     return new Response(
       JSON.stringify({
         success: true,
         order: orderResult,
+        payment: {
+          reference: paymentReference,
+          authorization_url: paystackData.data.authorization_url,
+          access_code: paystackData.data.access_code,
+          payment_url: paystackData.data.authorization_url
+        }
       }),
       { status: 200 }
     );

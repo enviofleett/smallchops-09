@@ -688,8 +688,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       // Don't clear cart before payment - only clear after successful payment
 
       // Store payment reference for callback page
-      sessionStorage.setItem('paystack_payment_reference', data?.reference || parsedData?.reference || '');
+      const paymentReference = data?.payment?.reference || data?.reference || parsedData?.reference || '';
+      sessionStorage.setItem('paystack_payment_reference', paymentReference);
       sessionStorage.setItem('payment_order_id', parsedData?.order_id || data?.order?.id || '');
+
+      console.log('💾 Stored payment reference:', paymentReference);
 
       // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({
@@ -702,7 +705,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       });
 
       // Navigate to callback page with reference for immediate processing
-      const paymentReference = data?.reference || parsedData?.reference || '';
       const callbackUrl = paymentReference 
         ? `/payment-callback?status=processing&reference=${encodeURIComponent(paymentReference)}`
         : '/payment-callback?status=processing';

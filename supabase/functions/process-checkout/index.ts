@@ -11,8 +11,72 @@ const supabaseAdmin = createClient(
 
 serve(async (req: Request) => {
   try {
-    // Parse request body
-    const body = await req.json();
+    // Hot fix: Add comprehensive request validation
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { 
+          status: 405,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Hot fix: Check content-type header
+    const contentType = req.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      return new Response(
+        JSON.stringify({ error: 'Content-Type must be application/json' }),
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Hot fix: Safe JSON parsing with multiple fallbacks
+    let body;
+    try {
+      const rawBody = await req.text(); // Get as text first
+      
+      // Check if body is empty
+      if (!rawBody || rawBody.trim() === '') {
+        return new Response(
+          JSON.stringify({ error: 'Request body cannot be empty' }),
+          { 
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Try to parse JSON
+      body = JSON.parse(rawBody);
+      
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid JSON in request body',
+          details: parseError.message 
+        }),
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Hot fix: Validate required fields
+    if (!body || typeof body !== 'object') {
+      return new Response(
+        JSON.stringify({ error: 'Request body must be a valid JSON object' }),
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
     const {
       customer_email,
       fulfillment_type,

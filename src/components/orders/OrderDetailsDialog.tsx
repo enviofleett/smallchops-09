@@ -4,8 +4,7 @@ import { useEnhancedOrderStatusUpdate } from '@/hooks/useEnhancedOrderStatusUpda
 import { getDispatchRiders, DispatchRider } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
-import { X, FileText, Download, Printer, ExternalLink, Clock } from 'lucide-react';
-import { useReactToPrint } from 'react-to-print';
+import { X, FileText, Download, Printer, ExternalLink, Clock, Receipt } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +17,7 @@ import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
+import { useOrderReceiptPrint } from '@/hooks/useOrderReceiptPrint';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -63,8 +63,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   // Print ref for react-to-print
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Job order print hook
+  // Print hooks for unified system
   const { printJobOrder } = useJobOrderPrint();
+  const { printOrderReceipt } = useOrderReceiptPrint();
   const { user } = useAuth();
 
   // Use detailed order data to get product features and full information
@@ -370,24 +371,47 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     printJobOrder(order, items, schedule, pickupPoint, user?.name || 'Admin User');
   };
 
-  // Safe print handler using react-to-print (for detailed receipt)
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: `Order-${order.order_number}`,
-    onAfterPrint: () => {
-      toast({
-        title: 'Print Ready',
-        description: 'Order details have been sent to printer.'
-      });
-    },
-    onPrintError: () => {
+  // Enhanced receipt print handler using our unified system
+  const handlePrintReceipt = () => {
+    console.log('🧾 Receipt print button clicked for order:', order.order_number);
+    
+    // Validate order data before printing
+    if (!order || !order.order_number) {
       toast({
         title: 'Print Error',
-        description: 'Failed to print order details.',
+        description: 'Order data is incomplete. Cannot generate receipt.',
         variant: 'destructive'
       });
+      return;
     }
-  });
+
+    // Business information for the receipt
+    const businessInfo = {
+      name: 'Starters Small Chops & Catering',
+      address: '2B Close Off 11Crescent Kado Estate, Kado',
+      phone: '0807 301 1100',
+      email: 'store@startersmallchops.com',
+    };
+
+    // Use enriched items if available, otherwise fallback to order items
+    const items = enrichedItems || order.order_items || [];
+    const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
+    
+    console.log('📄 Printing receipt with data:', {
+      orderNumber: order.order_number,
+      itemCount: items.length,
+      hasSchedule: !!schedule,
+      hasPickupPoint: !!pickupPoint,
+      hasBusinessInfo: !!businessInfo
+    });
+    
+    printOrderReceipt(order, items, schedule, pickupPoint, businessInfo);
+
+    toast({
+      title: 'Receipt Printing',
+      description: 'Receipt has been sent to printer with professional formatting.'
+    });
+  };
 
   // Helper function for missing data fallbacks
   const safeFallback = (value: any, fallback = 'Not provided') => {
@@ -416,8 +440,8 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <span className="hidden sm:inline">Print Job Order</span>
             </Button>
             
-            <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2" aria-label="Print detailed receipt">
-              <FileText className="h-4 w-4" />
+            <Button onClick={handlePrintReceipt} variant="outline" size="sm" className="gap-2" aria-label="Print professional receipt">
+              <Receipt className="h-4 w-4" />
               <span className="hidden sm:inline">Print Receipt</span>
             </Button>
             

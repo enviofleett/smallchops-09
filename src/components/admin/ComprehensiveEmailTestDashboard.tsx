@@ -10,6 +10,7 @@ import { useEmailDeliveryTracking } from '@/hooks/useEmailDeliveryTracking';
 import { WebSocketStabilityMonitor } from './WebSocketStabilityMonitor';
 import { EmailSystemStatusOverview } from './EmailSystemStatusOverview';
 import { supabase } from '@/integrations/supabase/client';
+import { CreateOrderResult } from '@/types/order-creation';
 import { 
   TestTube, 
   Mail, 
@@ -162,22 +163,39 @@ export const ComprehensiveEmailTestDashboard = () => {
     updateTestResult('Order Flow', 'running', 'Testing order confirmation flow...');
     
     try {
-      // Create a test order
+      // Create a test order using standardized RPC function
       const { data: orderData, error: orderError } = await supabase.rpc('create_order_with_items', {
-        p_customer_id: 'test-customer-id',
+        p_customer_id: null, // Guest order
         p_fulfillment_type: 'delivery',
-        p_delivery_address: null,
+        p_delivery_address: { 
+          street: '123 Test St', 
+          city: 'Test City', 
+          postal_code: '12345' 
+        },
         p_pickup_point_id: null,
         p_delivery_zone_id: null,
-        p_guest_session_id: undefined,
-        p_items: JSON.stringify([{
+        p_guest_session_id: crypto.randomUUID(),
+        p_items: [{
           product_id: '00000000-0000-0000-0000-000000000001', // Assuming a test product exists
           quantity: 1,
-          unit_price: 1000
-        }])
+          price: 1000
+        }]
       });
 
-      const orderResult = orderData as any;
+      if (orderError) {
+        throw new Error(`Order creation failed: ${orderError.message}`);
+      }
+
+      const orderResult = orderData as unknown as CreateOrderResult;
+      
+      // Validate order creation success
+      if (!orderResult?.success) {
+        throw new Error(`Order creation failed: ${orderResult?.error || 'Unknown error'}`);
+      }
+
+      if (!orderResult.order_id) {
+        throw new Error('Order created but no order_id returned');
+      }
       if (orderError || !orderResult?.success) {
         updateTestResult('Order Flow', 'error', `Order creation failed: ${orderError?.message || 'Unknown error'}`);
         return false;

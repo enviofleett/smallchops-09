@@ -291,12 +291,25 @@ serve(async (req) => {
       }
 
       if (!orderResult) {
+        console.error("❌ No result returned from database function");
+        throw new Error("Order creation failed: No result returned");
+      }
+
+      // Handle new standardized return format
+      const typedResult = orderResult as { success: boolean; order_id?: string; order_number?: string; error?: string };
+      
+      if (!typedResult.success) {
+        console.error("❌ Order creation failed:", typedResult.error);
+        throw new Error(`Order creation failed: ${typedResult.error || 'Unknown error'}`);
+      }
+
+      if (!typedResult.order_id) {
         console.error("❌ No order ID returned from database function");
         throw new Error("Order creation failed: No order ID returned");
       }
 
-      orderId = orderResult;
-      console.log("✅ Order created successfully with ID:", orderId);
+      orderId = typedResult.order_id;
+      console.log("✅ Order created successfully with ID:", orderId, "Order Number:", typedResult.order_number);
 
     } catch (error) {
       console.error("❌ Order creation error:", error);

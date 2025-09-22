@@ -590,7 +590,7 @@ export const OrderReceiptPrint: React.FC<OrderReceiptPrintProps> = ({
         
         {adminName && (
           <p style={{ fontWeight: 'bold', color: '#2c3e50', marginTop: '3mm', fontSize: '11pt' }}>
-            Prepared by {adminName}
+            Printed by {adminName}
           </p>
         )}
         <p style={{ fontSize: '9pt', marginTop: '2mm' }}>

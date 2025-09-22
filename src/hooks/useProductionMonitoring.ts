@@ -44,19 +44,18 @@ export const useProductionMonitoring = () => {
     retry: 2
   });
 
-  // Monitor collision logs using audit logs instead
+  // Monitor collision logs
   const { data: collisionLogs, error: collisionError } = useQuery({
     queryKey: ['collision-logs'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('audit_logs')
+        .from('communication_events_collision_log')
         .select('*')
-        .ilike('action', '%collision%')
-        .order('event_time', { ascending: false })
+        .order('last_collision_at', { ascending: false })
         .limit(50);
       
       if (error) throw error;
-      return data as any[];
+      return data as CollisionLog[];
     },
     refetchInterval: 30000, // Refresh every 30 seconds
     retry: 2

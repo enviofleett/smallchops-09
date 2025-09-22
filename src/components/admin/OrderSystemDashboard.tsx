@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { OrderUpdateMonitor } from './OrderUpdateMonitor';
 import { SystemHealthIndicator } from './SystemHealthIndicator';
 import { Shield, Activity, Database, CheckCircle } from 'lucide-react';
 
@@ -46,6 +47,8 @@ export const OrderSystemDashboard = () => {
       </Card>
 
       <SystemHealthIndicator />
+      
+      <OrderUpdateMonitor />
 
       <Card>
         <CardHeader>

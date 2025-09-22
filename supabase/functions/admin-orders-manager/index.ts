@@ -1,117 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 
-// Circuit Breaker and Alert Infrastructure
-class CircuitBreaker {
-  private state = 'closed'; // closed, open, half-open
-  private failureCount = 0;
-  private lastFailureTime?: number;
-  private serviceName: string;
-  private failureThreshold: number;
-  private timeoutMs: number;
-
-  constructor(serviceName: string, failureThreshold = 5, timeoutMs = 60000) {
-    this.serviceName = serviceName;
-    this.failureThreshold = failureThreshold;
-    this.timeoutMs = timeoutMs;
-  }
-
-  async execute<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.state === 'open') {
-      if (this.shouldAttemptReset()) {
-        this.state = 'half-open';
-      } else {
-        throw new Error(`Circuit breaker is OPEN for ${this.serviceName}`);
-      }
-    }
-
-    try {
-      const result = await operation();
-      this.onSuccess();
-      return result;
-    } catch (error) {
-      this.onFailure();
-      throw error;
-    }
-  }
-
-  private shouldAttemptReset(): boolean {
-    if (!this.lastFailureTime) return true;
-    return Date.now() - this.lastFailureTime > this.timeoutMs;
-  }
-
-  private onSuccess() {
-    this.failureCount = 0;
-    this.state = 'closed';
-  }
-
-  private onFailure() {
-    this.failureCount++;
-    this.lastFailureTime = Date.now();
-    
-    if (this.failureCount >= this.failureThreshold) {
-      this.state = 'open';
-      console.error(`🚨 Circuit breaker OPENED for ${this.serviceName}`);
-    }
-  }
-
-  getStatus() {
-    return {
-      state: this.state,
-      failureCount: this.failureCount,
-      serviceName: this.serviceName
-    };
-  }
-}
-
-// Alert System
-async function sendAlert(alertType: string, message: string, severity = 'warning') {
-  const webhookUrl = Deno.env.get('SLACK_WEBHOOK_URL') || Deno.env.get('DISCORD_WEBHOOK_URL');
-  if (!webhookUrl) {
-    console.log(`📢 ALERT [${severity.toUpperCase()}] ${alertType}: ${message}`);
-    return;
-  }
-  
-  const colors = {
-    'critical': '#FF0000',
-    'warning': '#FFA500', 
-    'info': '#00FF00'
-  };
-  
-  const payload = {
-    username: 'Order System Monitor',
-    icon_emoji: ':rotating_light:',
-    attachments: [{
-      color: colors[severity] || '#FFA500',
-      title: `🚨 ${alertType}`,
-      text: message,
-      fields: [
-        {
-          title: 'Severity',
-          value: severity.toUpperCase(),
-          short: true
-        },
-        {
-          title: 'Timestamp',
-          value: new Date().toISOString(),
-          short: true
-        }
-      ]
-    }]
-  };
-  
-  try {
-    await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    console.log(`✅ Alert sent: ${alertType}`);
-  } catch (error) {
-    console.error('Failed to send alert:', error.message);
-  }
-}
-
 // Import shared CORS with inline fallback for production stability
 let getCorsHeaders;
 let handleCorsPreflightResponse;
@@ -163,165 +52,6 @@ try {
 }
 
 const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-
-// Initialize circuit breakers for different services
-const circuitBreakers = {
-  database: new CircuitBreaker('database_operations', 3, 30000),
-  orderUpdate: new CircuitBreaker('order_update_operations', 5, 10000),
-  webhooks: new CircuitBreaker('webhook_delivery', 2, 5000)
-};
-
-// Enhanced system health check function
-async function checkSystemHealth() {
-  const checks = [];
-  let overallHealth = true;
-  
-  // Database connectivity check
-  try {
-    const start = Date.now();
-    const { data, error } = await supabaseClient
-      .from('orders')
-      .select('count')
-      .limit(1);
-    
-    checks.push({
-      name: 'database_connectivity',
-      status: error ? 'fail' : 'pass',
-      responseTime: Date.now() - start,
-      error: error?.message
-    });
-    
-    if (error) overallHealth = false;
-  } catch (e) {
-    checks.push({
-      name: 'database_connectivity',
-      status: 'fail',
-      error: e.message
-    });
-    overallHealth = false;
-  }
-  
-  // Enhanced system health metrics including 409 conflicts
-  try {
-    const { data: healthMetrics, error } = await supabaseClient.rpc('get_enhanced_system_health_metrics');
-    
-    if (error) throw error;
-    
-    const metrics = healthMetrics || {};
-    const conflictData = metrics.conflict_resolution || {};
-    const conflictRate = conflictData.conflict_rate_percent || 0;
-    const avgResolutionTime = conflictData.avg_resolution_time_ms || 0;
-    
-    checks.push({
-      name: 'conflict_resolution_health',
-      status: conflictRate > 15 ? 'fail' : conflictRate > 5 ? 'warn' : 'pass',
-      conflictRate: `${conflictRate}%`,
-      avgResolutionTime: `${avgResolutionTime}ms`,
-      details: conflictData
-    });
-    
-    if (conflictRate > 15) {
-      overallHealth = false;
-      // Send critical alert for high conflict rate
-      await sendAlert(
-        'High 409 Conflict Rate', 
-        `Conflict resolution rate at ${conflictRate}% exceeds critical threshold of 15%`, 
-        'critical'
-      );
-    }
-  } catch (e) {
-    checks.push({
-      name: 'conflict_resolution_health',
-      status: 'fail',
-      error: e.message
-    });
-  }
-  
-  // Recent error rate check from order_update_metrics
-  try {
-    const { data: recentMetrics, error } = await supabaseClient
-      .from('order_update_metrics')
-      .select('*')
-      .gte('timestamp', new Date(Date.now() - 300000).toISOString()) // 5 minutes
-      .eq('status', 'error');
-    
-    const errorCount = recentMetrics?.length || 0;
-    const errorRate = errorCount > 10 ? 'fail' : errorCount > 5 ? 'warn' : 'pass';
-    
-    checks.push({
-      name: 'recent_error_rate',
-      status: errorRate,
-      recentErrors: errorCount,
-      threshold: '10 errors per 5min'
-    });
-    
-    if (errorRate === 'fail') {
-      overallHealth = false;
-      // Send alert for high error rate
-      await sendAlert(
-        'High Error Rate', 
-        `${errorCount} errors in last 5 minutes exceeds threshold of 10`, 
-        'critical'
-      );
-    }
-  } catch (e) {
-    checks.push({
-      name: 'recent_error_rate',
-      status: 'fail',
-      error: e.message
-    });
-  }
-
-  // Lock contention health check
-  try {
-    const { data: activeLocks, error } = await supabaseClient
-      .from('order_update_locks')
-      .select('*')
-      .is('released_at', null)
-      .gt('expires_at', new Date().toISOString());
-    
-    const lockCount = activeLocks?.length || 0;
-    const lockStatus = lockCount > 20 ? 'fail' : lockCount > 10 ? 'warn' : 'pass';
-    
-    checks.push({
-      name: 'lock_contention',
-      status: lockStatus,
-      activeLocks: lockCount,
-      threshold: '20 active locks'
-    });
-    
-    if (lockStatus === 'fail') {
-      overallHealth = false;
-      // Send alert for high lock contention
-      await sendAlert(
-        'High Lock Contention', 
-        `${lockCount} active locks exceeds threshold of 20`, 
-        'warning'
-      );
-    }
-  } catch (e) {
-    checks.push({
-      name: 'lock_contention', 
-      status: 'fail',
-      error: e.message
-    });
-  }
-  
-  // Include circuit breaker status
-  const circuitBreakerStatus = Object.entries(circuitBreakers).map(([name, breaker]) => ({
-    name,
-    ...breaker.getStatus()
-  }));
-  
-  return {
-    healthy: overallHealth,
-    timestamp: new Date().toISOString(),
-    checks,
-    circuitBreakers: circuitBreakerStatus,
-    version: '2.1.0',
-    uptime: process.uptime?.() || 0
-  };
-}
 
 // Template key mapping helper function
 function getTemplateKey(status: string): string {
@@ -511,53 +241,7 @@ serve(async (req)=>{
   
   const corsHeaders = getCorsHeaders(origin);
 
-  // Health endpoint with circuit breaker status and alert checking
-  if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
-    try {
-      const healthData = await circuitBreakers.database.execute(async () => {
-        return await checkSystemHealth();
-      });
-      
-      // Check alert rules in background
-      EdgeRuntime.waitUntil(
-        supabaseClient.rpc('check_alert_rules').then(result => {
-          console.log('Alert rules checked:', result.data);
-        }).catch(err => {
-          console.error('Failed to check alert rules:', err);
-        })
-      );
-      
-      return new Response(JSON.stringify(healthData), {
-        status: healthData.healthy ? 200 : 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    } catch (error) {
-      await sendAlert('Health Check Failed', `Health endpoint error: ${error.message}`, 'critical');
-      return new Response(JSON.stringify({
-        healthy: false,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      }), {
-        status: 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-  }
-
-  // Circuit breaker status endpoint
-  if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/circuit-breaker-status')) {
-    const status = Object.entries(circuitBreakers).map(([name, breaker]) => ({
-      name,
-      ...breaker.getStatus()
-    }));
-    
-    return new Response(JSON.stringify({
-      circuitBreakers: status,
-      timestamp: new Date().toISOString()
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
+  // Enhanced cleanup on function startup for better reliability
   try {
     // Clean up expired locks
     const { data: lockCleanupResult } = await supabaseClient.rpc('cleanup_expired_locks');
@@ -757,29 +441,6 @@ serve(async (req)=>{
     });
   }
 
-  // Phase 2: Enhanced Health Endpoint
-  if (req.method === 'GET' && req.url.includes('/health')) {
-    console.log(`🏥 Health check requested [${correlationId}]`);
-    try {
-      const healthData = await checkSystemHealth();
-      
-      return new Response(JSON.stringify(healthData), {
-        status: healthData.healthy ? 200 : 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    } catch (healthError) {
-      console.error('❌ Health check failed:', healthError.message);
-      return new Response(JSON.stringify({
-        healthy: false,
-        error: 'Health check system error',
-        timestamp: new Date().toISOString()
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-  }
-
   // Request Processing with Enhanced Error Handling
   try {
     let requestBody;
@@ -798,23 +459,7 @@ serve(async (req)=>{
     }
 
     // Validate required fields based on action
-    const { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds, admin_user_id } = requestBody;
-    
-    // CRITICAL FIX: Create consistent adminUserId variable for all cases
-    const adminUserId = admin_user_id || user.id;
-    
-    // Validate adminUserId is available
-    if (!adminUserId) {
-      console.error('❌ Missing admin user ID: admin_user_id not provided and user.id not available');
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Missing admin user identification',
-        errorCode: 'MISSING_ADMIN_USER_ID'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      });
-    }
+    const { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = requestBody;
     
     if (!action || typeof action !== 'string') {
       console.error('❌ Missing or invalid action parameter:', action);
@@ -1260,7 +905,6 @@ serve(async (req)=>{
 
       case 'bypass_and_update': {
         console.log(`🚨 Admin function: BYPASS cache and update order ${orderId} [${correlationId}]`);
-        console.log(`🔍 Using admin user ID: ${adminUserId} (source: ${admin_user_id ? 'request_body' : 'auth_user'})`);
         
         // Enhanced parameter validation for bypass
         if (!orderId) {
@@ -1284,13 +928,6 @@ serve(async (req)=>{
         }
 
         // Call the manual bypass function directly
-        console.log(`🔧 Calling manual_cache_bypass_and_update RPC with params:`, {
-          p_order_id: orderId,
-          p_new_status: updates.status,
-          p_admin_user_id: adminUserId,
-          p_bypass_reason: 'admin_409_conflict_resolution'
-        });
-        
         const { data: bypassResult, error: bypassError } = await supabaseClient.rpc('manual_cache_bypass_and_update', {
           p_order_id: orderId,
           p_new_status: updates.status,
@@ -1299,16 +936,7 @@ serve(async (req)=>{
         });
 
         if (bypassError) {
-          console.error(`❌ Manual bypass RPC failed [${correlationId}]:`, {
-            error: bypassError,
-            params: {
-              p_order_id: orderId,
-              p_new_status: updates.status,
-              p_admin_user_id: adminUserId,
-              adminUserIdSource: admin_user_id ? 'request_body' : 'auth_user'
-            },
-            correlationId
-          });
+          console.error(`❌ Manual bypass failed [${correlationId}]:`, bypassError);
           return new Response(JSON.stringify({
             success: false,
             error: `Bypass operation failed: ${bypassError.message}`,
@@ -1537,6 +1165,7 @@ serve(async (req)=>{
         sanitizedUpdates.updated_at = new Date().toISOString();
 
         // CRITICAL FIX: Generate deterministic idempotency key WITHOUT timestamp for true idempotency
+        const adminUserId = user.id;
         const idempotencyKey = `order_update_${orderId}_${sanitizedUpdates.status}_${adminUserId}`;
 
         // CRITICAL FIX: Use lock-first approach - this will acquire lock BEFORE cache operations
@@ -1548,14 +1177,6 @@ serve(async (req)=>{
 
         while (retryCount < maxRetries) {
           try {
-            console.log(`🔧 Calling admin_update_order_status_lock_first RPC (attempt ${retryCount + 1}/${maxRetries}) with params:`, {
-              p_order_id: orderId,
-              p_new_status: sanitizedUpdates.status,
-              p_admin_user_id: adminUserId,
-              adminUserIdSource: admin_user_id ? 'request_body' : 'auth_user',
-              p_notes: `Status updated by admin ${user.email || user.id}`
-            });
-            
             const result = await supabaseClient.rpc('admin_update_order_status_lock_first', {
               p_order_id: orderId,
               p_new_status: sanitizedUpdates.status,
@@ -1767,6 +1388,8 @@ serve(async (req)=>{
             status: 400
           });
         }
+
+        const adminUserId = user.id;
 
         try {
           // Step 1: Force cleanup order-specific cache entries

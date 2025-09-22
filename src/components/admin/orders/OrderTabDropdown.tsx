@@ -14,6 +14,7 @@ interface OrderTabDropdownProps {
     ready: number;
     out_for_delivery: number;
     delivered: number;
+    overdue: number;
   };
 }
 
@@ -30,7 +31,8 @@ export const OrderTabDropdown = ({
     { value: 'preparing', label: 'Preparing', count: orderCounts.preparing, color: '' },
     { value: 'ready', label: 'Ready', count: orderCounts.ready, color: '' },
     { value: 'out_for_delivery', label: 'Out for Delivery', count: orderCounts.out_for_delivery, color: '' },
-    { value: 'delivered', label: 'Delivered', count: orderCounts.delivered, color: '' }
+    { value: 'delivered', label: 'Delivered', count: orderCounts.delivered, color: '' },
+    { value: 'overdue', label: 'Overdue', count: orderCounts.overdue, color: 'text-destructive' },
   ];
 
   const activeTabData = tabs.find(tab => tab.value === activeTab);

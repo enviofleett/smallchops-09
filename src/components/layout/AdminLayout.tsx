@@ -19,8 +19,7 @@ const AdminLayout = () => {
             <TopNav />
             <main className={cn(
               "flex-1 admin-content transition-all duration-200",
-              "p-3 sm:p-4 md:p-5 lg:p-6 xl:p-8",
-              "min-h-0" // Prevent flex overflow issues
+              isMobile ? "p-4" : "p-6 lg:p-8"
             )}>
               <div className="admin-container">
                 <ProductionErrorBoundary>

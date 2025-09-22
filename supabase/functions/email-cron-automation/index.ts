@@ -61,21 +61,14 @@ async function executeEmailQueueProcessing(supabase: any) {
   console.log('🔄 Executing: Email Queue Processing');
   
   try {
-    // Call our new notification processor
-    const { data, error } = await supabase.functions.invoke('process-email-notifications');
+    // Process all priority levels
+    const { data, error } = await supabase.functions.invoke('email-queue-processor', {
+      body: { action: 'process_all_priorities' }
+    });
 
     if (error) throw error;
     
     console.log('✅ Email queue processing completed:', data);
-    
-    // Clean up old processed notifications (older than 7 days)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    await supabase
-      .from('order_status_notifications')
-      .delete()
-      .not('processed_at', 'is', null)
-      .lt('processed_at', sevenDaysAgo.toISOString());
-      
     return { success: true, data };
   } catch (error) {
     console.error('❌ Email queue processing failed:', error);

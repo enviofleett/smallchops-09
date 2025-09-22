@@ -42,16 +42,15 @@ export const getOrders = async ({
   endDate,
 }: GetOrdersParams): Promise<{ orders: OrderWithItems[]; count: number }> => {
   try {
-    const { data, error } = await supabase.functions.invoke('order-manager', {
+    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
       body: {
-        action: 'list_orders',
-        admin_id: 'current-user',
+        action: 'list',
         page,
-        page_size: pageSize,
-        status_filter: status,
-        search_query: searchQuery,
-        start_date: startDate,
-        end_date: endDate
+        pageSize,
+        status,
+        searchQuery,
+        startDate,
+        endDate
       }
     });
 
@@ -185,12 +184,11 @@ export const updateOrder = async (
         console.log('🎯 Assigning/reassigning rider using secure RPC:', updates.assigned_rider_id);
       }
       
-      const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('order-manager', {
+      const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
         body: {
           action: 'assign_rider',
-          order_id: orderId,
-          rider_id: updates.assigned_rider_id,
-          admin_id: 'current-user'
+          orderId,
+          riderId: updates.assigned_rider_id
         }
       });
 
@@ -243,12 +241,11 @@ export const updateOrder = async (
       delete otherUpdates.assigned_rider_id;
       
       if (Object.keys(otherUpdates).length > 0) {
-        const { data: updateResult, error: updateError } = await supabase.functions.invoke('order-manager', {
+        const { data: updateResult, error: updateError } = await supabase.functions.invoke('admin-orders-manager', {
           body: {
-            action: 'update_status',
-            order_id: orderId,
-            new_status: otherUpdates.status,
-            admin_id: 'current-user'
+            action: 'update',
+            orderId,
+            updates: otherUpdates
           }
         });
 
@@ -263,12 +260,11 @@ export const updateOrder = async (
     }
 
     // For non-rider updates, use the standard update path with cleaned data
-    const { data, error } = await supabase.functions.invoke('order-manager', {
+    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
       body: {
-        action: 'update_status',
-        order_id: orderId,
-        new_status: sanitizedUpdates.status,
-        admin_id: 'current-user'
+        action: 'update',
+        orderId,
+        updates: sanitizedUpdates
       }
     });
 
@@ -339,11 +335,10 @@ export const updateOrder = async (
 
 export const deleteOrder = async (orderId: string): Promise<void> => {
   try {
-    const { data, error } = await supabase.functions.invoke('order-manager', {
+    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
       body: {
-        action: 'delete_order',
-        order_id: orderId,
-        admin_id: 'current-user'
+        action: 'delete',
+        orderId
       }
     });
 
@@ -372,11 +367,10 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
 
 export const bulkDeleteOrders = async (orderIds: string[]): Promise<void> => {
   try {
-    const { data, error } = await supabase.functions.invoke('order-manager', {
+    const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
       body: {
-        action: 'bulk_delete_orders',
-        order_ids: orderIds,
-        admin_id: 'current-user'
+        action: 'bulk_delete',
+        orderIds
       }
     });
 

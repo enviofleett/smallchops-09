@@ -280,16 +280,7 @@ export const showAdminToast = (
   }
   
   const message = adminToastMessages[messageType as keyof Omit<typeof adminToastMessages, 'getErrorMessage'>](options);
-  
-  // Extract properties for toast function call
-  const { title, description, variant, duration, action } = message;
-  
-  return toastFn(title, {
-    description,
-    variant,
-    duration,
-    action
-  });
+  return toastFn(message);
 };
 
 // Convenience function for error toasts
@@ -299,14 +290,5 @@ export const showAdminErrorToast = (
   options: AdminToastOptions = {}
 ) => {
   const message = adminToastMessages.getErrorMessage(error, options);
-  
-  // Extract properties for toast function call
-  const { title, description, variant, duration, action } = message;
-  
-  return toastFn(title, {
-    description,
-    variant,
-    duration,
-    action
-  });
+  return toastFn(message);
 };

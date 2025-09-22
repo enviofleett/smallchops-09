@@ -58,12 +58,6 @@ serve(async (req) => {
     if (!requestBody.customer?.email) throw new Error("Customer email is required");
     if (!requestBody.items || requestBody.items.length === 0) throw new Error("Order must contain at least one item");
     if (!requestBody.fulfillment?.type) throw new Error("Fulfillment type is required");
-    
-    // ✅ Validate and sanitize customer name
-    const customerName = requestBody.customer.name?.trim() || "Customer";
-    if (!customerName || customerName.length === 0) {
-      throw new Error("Customer name is required");
-    }
 
     const customerEmail = requestBody.customer.email.toLowerCase();
     let customerId;
@@ -91,15 +85,15 @@ serve(async (req) => {
       const { data: newCustomer, error: createError } = await supabaseAdmin
         .from("customer_accounts")
         .insert({
-          name: customerName,
+          name: requestBody.customer.name,
           email: customerEmail,
-          phone: requestBody.customer.phone || null,
+          phone: requestBody.customer.phone,
           email_verified: false,
           phone_verified: false,
           profile_completion_percentage: 60,
         })
         .select("id")
-        .single();
+        .single(); // ✅ FIX: use .single()
 
       if (createError) {
         if (createError.code === "23505") {
@@ -263,7 +257,7 @@ serve(async (req) => {
         amount: order.total_amount,
         metadata: {
           order_id: order.id,
-          customer_name: customerName,
+          customer_name: requestBody.customer.name,
           order_number: order.order_number,
           fulfillment_type: requestBody.fulfillment.type,
           items_subtotal: order.total_amount - deliveryFee,

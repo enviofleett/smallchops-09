@@ -52,7 +52,7 @@ export const PerformanceMonitoringDashboard: React.FC = () => {
   // Fetch performance metrics
   const fetchMetrics = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('order-manager', {
+      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
         body: { action: 'get_performance_metrics' }
       });
 
@@ -67,7 +67,7 @@ export const PerformanceMonitoringDashboard: React.FC = () => {
   // Fetch realtime data
   const fetchRealtimeData = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('order-manager', {
+      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
         body: { 
           action: 'get_realtime_metrics',
           limit: 50

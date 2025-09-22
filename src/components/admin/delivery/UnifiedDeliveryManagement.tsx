@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useQuery } from '@tanstack/react-query';
-import { useOrdersNew, useOrderUpdate } from '@/hooks/useOrdersNew';
+import { getOrders, updateOrder } from '@/api/orders';
 import { AdminOrderStatusBadge } from '@/components/admin/AdminOrderStatusBadge';
 import { OrderReceiptModal } from '@/components/customer/OrderReceiptModal';
 import { DeliveryAssignmentDialog } from './DeliveryAssignmentDialog';
@@ -65,7 +65,7 @@ export function UnifiedDeliveryManagement({
   const { drivers } = useDriverManagement();
   
   // Use production-hardened status update hook
-  const updateOrderMutation = useOrderUpdate();
+  const { updateStatus, isUpdating } = useProductionStatusUpdate();
 
   // --- Debounced Search Query ---
   useEffect(() => {
@@ -99,19 +99,16 @@ export function UnifiedDeliveryManagement({
   }, [mode, selectedDate]);
 
   // --- Fetch Orders ---
-  const { data: ordersData, isLoading, refetch } = useOrdersNew({
-    page: queryParams.page,
-    pageSize: queryParams.pageSize,
-    status: queryParams.status,
-    search: '',
-    ...(queryParams.startDate && { startDate: queryParams.startDate }),
-    ...(queryParams.endDate && { endDate: queryParams.endDate })
+  const { data: ordersData, isLoading, refetch } = useQuery({
+    queryKey: ['unified-orders', mode, selectedDate?.toISOString(), typeFilter, statusFilter],
+    queryFn: () => getOrders(queryParams),
+    refetchInterval: mode === 'ready' ? 30000 : undefined,
   });
 
   // --- Filtered Orders ---
   const filteredOrders = useMemo(() => {
     if (ordersOverride) return ordersOverride;
-    let orders = ordersData?.data?.orders || [];
+    let orders = ordersData?.orders || [];
     if (typeLocal !== 'all') {
       orders = orders.filter(order => order.order_type === typeLocal);
     }
@@ -156,12 +153,7 @@ export function UnifiedDeliveryManagement({
       console.log(`🔄 Updating order ${orderId} status from "${order.status}" to "${newStatus}"`);
 
       // ENHANCED: Centralized error handling with loading state
-      await updateOrderMutation.mutateAsync({
-        order_id: orderId,
-        new_status: newStatus,
-        admin_id: 'current-user',
-        admin_name: 'Admin'
-      });
+      await updateOrder(orderId, { status: newStatus as any });
       toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
       refetch();
     } catch (error: any) {
@@ -191,15 +183,8 @@ export function UnifiedDeliveryManagement({
   // --- Bulk Driver Assignment ---
   const handleAssignDriver = async (orderIds: string[], driverId: string) => {
     try {
-      // Note: This would need bulk assignment support in the new backend
-      // For now, we'll do individual assignments
       const promises = orderIds.map(orderId =>
-        updateOrderMutation.mutateAsync({
-          order_id: orderId,
-          new_status: 'preparing', // Assume preparing when assigning driver
-          admin_id: 'current-user',
-          admin_name: 'Admin'
-        })
+        updateOrder(orderId, { assigned_rider_id: driverId })
       );
       await Promise.all(promises);
       toast.success(`${orderIds.length} order(s) assigned successfully`);

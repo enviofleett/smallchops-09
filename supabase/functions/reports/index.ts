@@ -1,32 +1,164 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-};
-
-serve(async (req) => {
-  console.log(`Reports function called with method: ${req.method}`);
+// Import shared CORS with inline fallback for production stability
+let getCorsHeaders;
+let handleCorsPreflightResponse;
+try {
+  const corsModule = await import('../_shared/cors.ts');
+  getCorsHeaders = corsModule.getCorsHeaders;
+  handleCorsPreflightResponse = corsModule.handleCorsPreflightResponse;
+  console.log('✅ Loaded shared CORS module');
+} catch (error) {
+  console.warn('⚠️ Failed to load shared CORS, using inline fallback:', error);
+  const FALLBACK_ALLOWED_ORIGINS = [
+    'https://startersmallchops.com',
+    'https://www.startersmallchops.com',
+    'https://oknnklksdiqaifhxaccs.lovable.app',
+    'https://id-preview--7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.app',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.sandbox.lovable.dev',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  const DEV_PATTERNS = [
+    /^https:\/\/.*\.lovable\.app$/,
+    /^https:\/\/.*\.sandbox\.lovable\.dev$/,
+    /^http:\/\/localhost:\d+$/
+  ];
   
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  getCorsHeaders = (origin) => {
+    const baseHeaders = {
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Access-Control-Allow-Credentials': 'false'
+    };
+    
+    if (!origin || (!FALLBACK_ALLOWED_ORIGINS.includes(origin) && !DEV_PATTERNS.some(pattern => pattern.test(origin)))) {
+      return {
+        ...baseHeaders,
+        'Access-Control-Allow-Origin': '*'
+      };
+    }
+    
+    return {
+      ...baseHeaders,
+      'Access-Control-Allow-Origin': origin,
+      'Vary': 'Origin'
+    };
+  };
+  
+  handleCorsPreflightResponse = (origin) => {
+    return new Response(null, {
+      status: 204,
+      headers: getCorsHeaders(origin)
+    });
+  };
+}
 
+console.log('🌍 CORS: Environment=production, Custom origins=https;//startersmallchops.com, Allow preview=true');
+
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '', 
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
+
+// Enhanced admin authentication function
+async function authenticateAdmin(req) {
   try {
-    // Check authentication and admin role
-    const authHeader = req.headers.get("authorization");
+    const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      console.error("No authorization header");
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.log('⚠️ No authorization header found');
+      return { success: false, error: 'No authorization header' };
     }
 
     const token = authHeader.replace('Bearer ', '');
     console.log('🔍 Attempting to authenticate with token length:', token.length);
+    
+    // Create a temporary client with the user's JWT for user context
+    const supabaseUser = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
+
+    // Get user from token using the user context client
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
+      console.log('⚠️ Invalid token or user not found:', userError?.message || 'Auth session missing!');
+      return { success: false, error: 'Auth session missing!' };
+    }
+
+    console.log('✅ User authenticated:', { userId: user.id, email: user.email });
+
+    // Check if user is admin via profiles table using service role client
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.log('⚠️ Error fetching user profile:', profileError.message);
+      return { success: false, error: 'Error fetching user profile' };
+    }
+
+    if (!profile || profile.role !== 'admin' || !profile.is_active) {
+      console.log('⚠️ User is not an active admin:', { role: profile?.role, is_active: profile?.is_active });
+      return { success: false, error: 'Insufficient permissions' };
+    }
+
+    console.log('✅ Admin authentication successful:', {
+      userId: user.id,
+      email: user.email,
+      role: profile.role,
+      authMethod: 'profiles_table',
+      timestamp: new Date().toISOString()
+    });
+
+    return { 
+      success: true, 
+      user: user,
+      profile: profile
+    };
+  } catch (error) {
+    console.error('❌ Authentication error:', error.message);
+    return { success: false, error: 'Authentication failed' };
+  }
+}
+
+serve(async (req) => {
+  const origin = req.headers.get('origin');
+  console.log('🚀 Reports: POST request from origin:', origin, `[req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}]`);
+
+  console.log('🔍 CORS: Checking origin="' + origin + '" in env="production"');
+  
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log('✅ CORS: Handling OPTIONS preflight request');
+    return handleCorsPreflightResponse(origin);
+  }
+
+  try {
+    // Authenticate admin
+    const authResult = await authenticateAdmin(req);
+    if (!authResult.success) {
+      return new Response(
+        JSON.stringify({ success: false, error: authResult.error }),
+        { 
+          status: 401, 
+          headers: { 
+            ...getCorsHeaders(origin),
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
 
     // Parse request body for parameters
     let requestBody = {};
@@ -46,75 +178,6 @@ serve(async (req) => {
 
     console.log(`Reports parameters: groupBy=${groupBy}, startDate=${startDate}, endDate=${endDate}`);
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("Missing environment variables");
-      throw new Error("Missing Supabase environment variables");
-    }
-
-    // Create a temporary client with the user's JWT for user context
-    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
-
-    // Get user from token using the user context client
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !user) {
-      console.log('⚠️ Invalid token or user not found:', userError?.message || 'No user data');
-      return new Response(JSON.stringify({ error: "Invalid token or user not found" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log('✅ User authenticated:', { userId: user.id, email: user.email });
-
-    // Create service role client for data queries and admin verification
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
-    // Check if user is admin via profiles table using service role client
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, is_active')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.log('⚠️ Profile not found or error:', profileError?.message);
-      return new Response(JSON.stringify({ error: "User profile not found" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (profile.role !== 'admin' || !profile.is_active) {
-      console.log('⚠️ Access denied:', { role: profile.role, isActive: profile.is_active });
-      return new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log('✅ Admin authentication successful:', {
-      userId: user.id,
-      email: user.email,
-      role: profile.role,
-      authMethod: 'profiles_table',
-      timestamp: new Date().toISOString()
-    });
-
     console.log(`Fetching analytics data for ${groupBy} grouping from ${startDate} to ${endDate}`);
 
     // Initialize default values for fallback
@@ -126,9 +189,9 @@ serve(async (req) => {
     try {
       // Get total stats with individual error handling - only production data
       const [productsResult, ordersResult, customersResult] = await Promise.allSettled([
-        supabase.from('products').select('id', { count: 'exact', head: true }).not('name', 'ilike', '%test%'),
-        supabase.from('orders').select('id, total_amount', { count: 'exact' }).eq('payment_status', 'paid'),
-        supabase.from('customer_accounts').select('id', { count: 'exact', head: true }).not('email', 'in', '(pam@gmail.com,lizzi4200@gmail.com,akpanphilip1122@gmail.com)')
+        supabaseClient.from('products').select('id', { count: 'exact', head: true }).not('name', 'ilike', '%test%'),
+        supabaseClient.from('orders').select('id, total_amount', { count: 'exact' }).eq('payment_status', 'paid'),
+        supabaseClient.from('customer_accounts').select('id', { count: 'exact', head: true }).not('email', 'in', '(pam@gmail.com,lizzi4200@gmail.com,akpanphilip1122@gmail.com)')
       ]);
 
       // Handle products count
@@ -153,7 +216,7 @@ serve(async (req) => {
         const authenticatedCustomers = customersResult.value.count || 0;
         
         // Add real guest customers from PAID orders only
-        const { data: guestOrdersData } = await supabase
+        const { data: guestOrdersData } = await supabaseClient
           .from('orders')
           .select('customer_email')
           .eq('payment_status', 'paid')
@@ -176,7 +239,7 @@ serve(async (req) => {
     let orderSeries = [];
     
     try {
-      const { data: paidOrders, error: ordersError } = await supabase
+      const { data: paidOrders, error: ordersError } = await supabaseClient
         .from('orders')
         .select('order_time, total_amount')
         .eq('payment_status', 'paid')
@@ -228,7 +291,7 @@ serve(async (req) => {
     // Get top customers by orders with error handling
     let topCustomersByOrdersFormatted = [];
     try {
-      const { data: topCustomersByOrders, error: customersOrdersError } = await supabase
+      const { data: topCustomersByOrders, error: customersOrdersError } = await supabaseClient
         .from('orders')
         .select('customer_name, customer_email')
         .limit(100);
@@ -264,7 +327,7 @@ serve(async (req) => {
     // Get top customers by spending with error handling
     let topCustomersBySpendingFormatted = [];
     try {
-      const { data: topCustomersBySpending, error: customersSpendingError } = await supabase
+      const { data: topCustomersBySpending, error: customersSpendingError } = await supabaseClient
         .from('orders')
         .select('customer_name, customer_email, total_amount')
         .limit(100);
@@ -300,7 +363,7 @@ serve(async (req) => {
     // Get recent orders with error handling
     let recentOrders = [];
     try {
-      const { data: recentOrdersData, error: recentOrdersError } = await supabase
+      const { data: recentOrdersData, error: recentOrdersError } = await supabaseClient
         .from('orders')
         .select('id, order_number, customer_name, total_amount, status, order_time')
         .order('order_time', { ascending: false })
@@ -325,7 +388,7 @@ serve(async (req) => {
 
     try {
       // Get top products by sales and revenue from order_items
-      const { data: orderItemsData, error: orderItemsError } = await supabase
+      const { data: orderItemsData, error: orderItemsError } = await supabaseClient
         .from('order_items')
         .select(`
           product_id,
@@ -441,7 +504,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify(dashboardData), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("Reports function critical error:", e.message || e);
@@ -470,7 +533,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify(fallbackData), {
       status: 200, // Return 200 with fallback data instead of 500
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
     });
   }
 });

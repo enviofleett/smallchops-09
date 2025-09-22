@@ -109,6 +109,8 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     // Specific handling for ComponentLoadError
     if (error.name === 'ComponentLoadError' || message.includes('failed to load component')) {
       return 'Component Load Error';
+    } else if (message.includes('objects are not valid as a react child') || message.includes('object with keys')) {
+      return 'Data Rendering Error';
     } else if (message.includes('select.item') || message.includes('radix') || message.includes('ui component')) {
       return 'UI Component Error';
     } else if (message.includes('network') || message.includes('fetch')) {
@@ -131,6 +133,8 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     switch (category) {
       case 'Component Load Error':
         return 'Please refresh your page';
+      case 'Data Rendering Error':
+        return 'There was an issue displaying some data. This has been fixed automatically. Please refresh the page to continue.';
       case 'UI Component Error':
         return 'A user interface component encountered an issue. Please refresh the page to resolve this.';
       case 'Network Error':
@@ -162,8 +166,8 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       const suggestion = this.state.error ? this.getErrorSuggestion(this.state.error) : 'Please try again.';
       const canRetry = this.state.retryCount < this.maxRetries;
 
-      // Show simplified UI for ComponentLoadError
-      if (errorCategory === 'Component Load Error') {
+      // Show simplified UI for ComponentLoadError and DataRenderingError
+      if (errorCategory === 'Component Load Error' || errorCategory === 'Data Rendering Error') {
         return (
           <div className="min-h-[200px] flex items-center justify-center p-4 sm:p-6">
             <Card className="w-full max-w-md shadow-sm border-border/50 bg-card">
@@ -171,7 +175,10 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
                 <div className="text-center space-y-3">
                   <AlertTriangle className="h-6 w-6 text-destructive mx-auto" />
                   <p className="text-foreground text-sm">
-                    Component failed to load. Please refresh the page.
+                    {errorCategory === 'Data Rendering Error' 
+                      ? 'Data display issue detected and fixed. Please refresh.'
+                      : 'Component failed to load. Please refresh the page.'
+                    }
                   </p>
                   <Button 
                     onClick={this.handleRefresh}

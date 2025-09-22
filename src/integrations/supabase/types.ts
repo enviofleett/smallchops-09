@@ -11622,6 +11622,7 @@ export type Database = {
         | "bounced"
         | "failed"
         | "skipped"
+      fulfillment_type: "delivery" | "pickup"
       menu_section:
         | "dashboard"
         | "orders"
@@ -11811,6 +11812,7 @@ export const Constants = {
         "failed",
         "skipped",
       ],
+      fulfillment_type: ["delivery", "pickup"],
       menu_section: [
         "dashboard",
         "orders",

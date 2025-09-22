@@ -35,6 +35,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { RequiredFieldLabel } from "@/components/ui/required-field-label";
+import { OrderCalculationService } from '@/services/OrderCalculationService';
+import { logger } from '@/lib/logger';
 interface DeliveryAddress {
   address_line_1: string;
   address_line_2?: string;
@@ -417,9 +419,63 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     return deliveryZone?.base_fee || 0;
   }, [formData.fulfillment_type, deliveryZone?.base_fee]);
 
-  // Calculate totals
-  const subtotal = getCartTotal();
-  const total = subtotal + deliveryFee;
+  // Calculate totals using OrderCalculationService for server consistency
+  const { subtotal, total: calculatedTotal } = useMemo(() => {
+    const cartSubtotal = getCartTotal();
+    const calculatedDeliveryFee = deliveryFee;
+    
+    // Use OrderCalculationService to ensure calculation consistency
+    try {
+      const calculationItems = items.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        price: item.price,
+        quantity: item.quantity,
+        vat_rate: item.vat_rate || 7.5
+      }));
+
+      const promotions = cart.promotion_code && cart.summary.applied_promotions ? 
+        cart.summary.applied_promotions.map(promo => ({
+          id: promo.id,
+          name: promo.name,
+          code: promo.code,
+          type: promo.type as 'percentage' | 'fixed_amount' | 'free_delivery',
+          value: promo.discount_amount, // Map discount_amount to value
+          discount_amount: promo.discount_amount, // Keep for compatibility
+          free_delivery: promo.free_delivery || false
+        })) : [];
+
+      const calculationResult = OrderCalculationService.calculateOrder({
+        items: calculationItems,
+        delivery_fee: calculatedDeliveryFee,
+        promotions,
+        promotion_code: cart.promotion_code,
+        calculation_source: 'client'
+      });
+
+      const finalTotal = calculationResult.total_amount;
+
+      logger.info('💰 Checkout total calculation', {
+        cartSubtotal,
+        deliveryFee: calculatedDeliveryFee,
+        promotionCode: cart.promotion_code,
+        finalTotal,
+        calculationDetails: calculationResult.calculation_breakdown
+      });
+
+      return { 
+        subtotal: cartSubtotal, 
+        total: finalTotal 
+      };
+    } catch (error) {
+      logger.error('❌ Checkout total calculation failed, using fallback', error);
+      return { 
+        subtotal: cartSubtotal, 
+        total: cartSubtotal + calculatedDeliveryFee 
+      };
+    }
+  }, [getCartTotal, deliveryFee, cart.promotion_code, cart.summary.applied_promotions, items]);
   const handleFormChange = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -556,7 +612,18 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         } : null,
         payment: {
           method: formData.payment_method || 'paystack'
-        }
+        },
+        // Include promotion info for backend validation (ENHANCED)
+        promotion: cart.promotion_code ? {
+          code: cart.promotion_code,
+          client_calculated_total: calculatedTotal, // Frontend calculated total for server validation
+          client_subtotal: subtotal,
+          client_discount: cart.summary.discount_amount,
+          client_delivery_discount: cart.summary.delivery_discount,
+          client_delivery_fee: deliveryFee
+        } : null,
+        // CRITICAL: Add top-level client total for server validation (FIXED)
+        client_calculated_total: calculatedTotal
       };
       console.log('📦 Submitting checkout data:', sanitizedData);
 
@@ -587,7 +654,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
         parsedData = {
           order_id: data?.order_id,
           order_number: data?.order_number,
-          amount: data?.amount || total,
+          amount: data?.amount || calculatedTotal,
           // Prioritize backend amount
           customer_email: sanitizedData.customer.email,
           success: true
@@ -595,9 +662,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       }
 
       // 🔧 CRITICAL: Use backend-returned amount if available
-      const authoritativeAmount = data?.amount || parsedData?.amount || total;
+      const authoritativeAmount = data?.amount || parsedData?.amount || calculatedTotal;
       console.log('💰 Amount prioritization:', {
-        client_calculated: total,
+        client_calculated: calculatedTotal,
         backend_returned: data?.amount,
         authoritative_amount: authoritativeAmount,
         items_subtotal: data?.items_subtotal,
@@ -758,7 +825,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       <GuestOrLoginChoice 
         onContinueAsGuest={handleContinueAsGuest} 
         onLogin={handleLogin} 
-        totalAmount={total} 
+        totalAmount={calculatedTotal} 
       />
     </div>;
   const renderDetailsStep = () => <div className="space-y-6">
@@ -1091,7 +1158,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
 
           {/* Mobile Order Summary */}
           <div className="md:hidden flex-shrink-0">
-            <OrderSummaryCard items={items} subtotal={subtotal} deliveryFee={deliveryFee} total={total} collapsibleOnMobile={true} />
+            <OrderSummaryCard items={items} subtotal={subtotal} deliveryFee={deliveryFee} total={calculatedTotal} collapsibleOnMobile={true} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
@@ -1105,7 +1172,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   <h2 className="text-lg font-semibold">Order Details</h2>
                 </div>
                 
-                <OrderSummaryCard items={items} subtotal={subtotal} deliveryFee={deliveryFee} total={total} collapsibleOnMobile={false} className="shadow-none border-0 bg-transparent" />
+                <OrderSummaryCard items={items} subtotal={subtotal} deliveryFee={deliveryFee} total={calculatedTotal} collapsibleOnMobile={false} className="shadow-none border-0 bg-transparent" />
               </div>
             </div>
 
@@ -1169,7 +1236,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                     ) : (!isAuthenticated && !guestSession) ? (
                       "Please choose checkout method"
                     ) : (
-                      `Proceed to Payment • ₦${total.toLocaleString()}`
+                      `Proceed to Payment • ₦${calculatedTotal.toLocaleString()}`
                     )}
                   </Button>
                   

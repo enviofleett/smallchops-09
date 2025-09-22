@@ -44,22 +44,27 @@ serve(async (req) => {
     console.log(`Reports parameters: groupBy=${groupBy}, startDate=${startDate}, endDate=${endDate}`);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       console.error("Missing environment variables");
       throw new Error("Missing Supabase environment variables");
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    // Create client with user's auth token for authentication checks
+    const supabaseWithAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
       auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+        persistSession: false,
+      },
     });
 
-    // Verify user is admin
-    const { data: userData, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    // Verify user is authenticated and admin
+    const { data: userData, error: userError } = await supabaseWithAuth.auth.getUser();
     if (userError || !userData.user) {
       console.error("Invalid token:", userError);
       return new Response(JSON.stringify({ error: "Invalid token" }), {
@@ -68,7 +73,7 @@ serve(async (req) => {
       });
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseWithAuth
       .from('profiles')
       .select('role')
       .eq('id', userData.user.id)
@@ -81,6 +86,15 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Create service role client for data queries
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     console.log(`Fetching analytics data for ${groupBy} grouping from ${startDate} to ${endDate}`);
 
@@ -283,6 +297,98 @@ serve(async (req) => {
       console.error("Error fetching recent orders:", recentOrdersError);
     }
 
+    // Get product performance analytics
+    let productPerformance = {
+      topProducts: [],
+      categoryPerformance: [],
+      revenueByProduct: []
+    };
+
+    try {
+      // Get top products by sales and revenue from order_items
+      const { data: orderItemsData, error: orderItemsError } = await supabase
+        .from('order_items')
+        .select(`
+          product_id,
+          quantity,
+          unit_price,
+          products!inner(name, category_id, categories!inner(name))
+        `)
+        .limit(500);
+
+      if (orderItemsError) {
+        console.error("Order items query error:", orderItemsError);
+      } else {
+        // Process product performance data
+        const productSummary = (orderItemsData || []).reduce((acc, item) => {
+          const productId = item.product_id;
+          const productName = item.products?.name || 'Unknown Product';
+          const categoryName = item.products?.categories?.name || 'Uncategorized';
+          const quantity = item.quantity || 0;
+          const revenue = (item.quantity || 0) * (item.unit_price || 0);
+
+          if (!acc[productId]) {
+            acc[productId] = {
+              id: productId,
+              name: productName,
+              categoryName,
+              totalSold: 0,
+              totalRevenue: 0,
+              averagePrice: 0
+            };
+          }
+
+          acc[productId].totalSold += quantity;
+          acc[productId].totalRevenue += revenue;
+          acc[productId].averagePrice = acc[productId].totalRevenue / acc[productId].totalSold;
+
+          return acc;
+        }, {} as Record<string, any>);
+
+        // Top products by revenue
+        productPerformance.topProducts = Object.values(productSummary)
+          .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue)
+          .slice(0, 10);
+
+        // Category performance
+        const categoryData = (orderItemsData || []).reduce((acc, item) => {
+          const categoryName = item.products?.categories?.name || 'Uncategorized';
+          const quantity = item.quantity || 0;
+          const revenue = (item.quantity || 0) * (item.unit_price || 0);
+
+          if (!acc[categoryName]) {
+            acc[categoryName] = {
+              category: categoryName,
+              totalSold: 0,
+              totalRevenue: 0,
+              productCount: 0
+            };
+          }
+
+          acc[categoryName].totalSold += quantity;
+          acc[categoryName].totalRevenue += revenue;
+          
+          return acc;
+        }, {} as Record<string, any>);
+
+        productPerformance.categoryPerformance = Object.values(categoryData)
+          .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue);
+
+        // Revenue by product (for charts)
+        productPerformance.revenueByProduct = productPerformance.topProducts
+          .slice(0, 8)
+          .map((product: any) => ({
+            productName: product.name,
+            revenue: product.totalRevenue,
+            quantity: product.totalSold
+          }));
+
+        console.log(`Product performance data: ${productPerformance.topProducts.length} top products, ${productPerformance.categoryPerformance.length} categories`);
+      }
+    } catch (productError) {
+      console.error("Error fetching product performance:", productError);
+    }
+
     const dashboardData = {
       stats: {
         totalProducts,
@@ -295,6 +401,7 @@ serve(async (req) => {
       topCustomersByOrders: topCustomersByOrdersFormatted,
       topCustomersBySpending: topCustomersBySpendingFormatted,
       recentOrders: recentOrders,
+      productPerformance,
       dateRange: { startDate, endDate },
       groupBy
     };
@@ -333,6 +440,11 @@ serve(async (req) => {
       topCustomersByOrders: [],
       topCustomersBySpending: [],
       recentOrders: [],
+      productPerformance: {
+        topProducts: [],
+        categoryPerformance: [],
+        revenueByProduct: []
+      },
       dateRange: { startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0] },
       groupBy: 'week'
     };

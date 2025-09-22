@@ -55,6 +55,11 @@ export async function fetchReportsData(
         topCustomersByOrders: [],
         topCustomersBySpending: [],
         recentOrders: [],
+        productPerformance: {
+          topProducts: [],
+          categoryPerformance: [],
+          revenueByProduct: []
+        },
         dateRange: { startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0] },
         groupBy: 'week'
       };
@@ -88,6 +93,11 @@ export async function fetchReportsData(
     topCustomersByOrders: [],
     topCustomersBySpending: [],
     recentOrders: [],
+    productPerformance: {
+      topProducts: [],
+      categoryPerformance: [],
+      revenueByProduct: []
+    },
     dateRange: { 
       startDate: new Date().toISOString().split('T')[0], 
       endDate: new Date().toISOString().split('T')[0] 

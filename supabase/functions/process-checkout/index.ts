@@ -139,17 +139,15 @@ serve(async (req) => {
       delivery_instructions: delivery_instructions
     } : null;
 
-    // ✅ Call database function with promotion support (FIXED: parameter order)
+    // ✅ Call database function
     const { data: orderId, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", {
       p_customer_id: customerId,
       p_fulfillment_type: requestBody.fulfillment.type,
-      p_items: orderItems,
       p_delivery_address: enhanced_delivery_address,
       p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
       p_delivery_zone_id: requestBody.fulfillment.delivery_zone_id || null,
       p_guest_session_id: null,
-      p_promotion_code: requestBody.promotion?.code || null,
-      p_client_total: requestBody.client_calculated_total || null // FIXED: Use correct field name
+      p_items: orderItems,
     });
 
     if (orderError) {

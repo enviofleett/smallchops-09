@@ -151,20 +151,20 @@ export default function PromotionsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      <div className="container mx-auto px-3 py-4 sm:px-6 lg:px-8 sm:py-6">
+      <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* Header Section */}
-        <div className="mb-6 sm:mb-8">
+        <div className="mb-8">
           <div className="flex flex-col space-y-4 sm:flex-row sm:items-start sm:justify-between sm:space-y-0">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500">
-                  <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500">
+                  <Trophy className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl lg:text-3xl">
+                  <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
                     Promotions
                   </h1>
-                  <p className="text-xs text-gray-600 sm:text-sm lg:text-base">
+                  <p className="text-sm text-gray-600 sm:text-base">
                     Manage your discounts and special offers
                   </p>
                 </div>
@@ -173,59 +173,59 @@ export default function PromotionsPage() {
             <Button 
               size="lg" 
               onClick={() => setDialogOpen(true)} 
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 h-12 text-base font-medium"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
             >
-              <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+              <PlusCircle className="w-5 h-5 mr-2" />
               Create Promotion
             </Button>
           </div>
 
           {/* Stats Cards */}
-          <div className="mt-4 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm font-medium text-blue-600 truncate">Total</p>
-                    <p className="text-lg sm:text-2xl font-bold text-blue-900">{data.length}</p>
+                  <div>
+                    <p className="text-sm font-medium text-blue-600">Total Promotions</p>
+                    <p className="text-2xl font-bold text-blue-900">{data.length}</p>
                   </div>
-                  <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
+                  <BarChart3 className="h-8 w-8 text-blue-600" />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm font-medium text-emerald-600 truncate">Active</p>
-                    <p className="text-lg sm:text-2xl font-bold text-emerald-900">{activePromotions}</p>
+                  <div>
+                    <p className="text-sm font-medium text-emerald-600">Active</p>
+                    <p className="text-2xl font-bold text-emerald-900">{activePromotions}</p>
                   </div>
-                  <Target className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600 flex-shrink-0" />
+                  <Target className="h-8 w-8 text-emerald-600" />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm font-medium text-purple-600 truncate">Usage</p>
-                    <p className="text-lg sm:text-2xl font-bold text-purple-900">{totalUsage}</p>
+                  <div>
+                    <p className="text-sm font-medium text-purple-600">Total Usage</p>
+                    <p className="text-2xl font-bold text-purple-900">{totalUsage}</p>
                   </div>
-                  <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 flex-shrink-0" />
+                  <Calendar className="h-8 w-8 text-purple-600" />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm font-medium text-orange-600 truncate">Month</p>
-                    <p className="text-lg sm:text-2xl font-bold text-orange-900">{Math.floor(totalUsage * 0.6)}</p>
+                  <div>
+                    <p className="text-sm font-medium text-orange-600">This Month</p>
+                    <p className="text-2xl font-bold text-orange-900">{Math.floor(totalUsage * 0.6)}</p>
                   </div>
-                  <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600 flex-shrink-0" />
+                  <Trophy className="h-8 w-8 text-orange-600" />
                 </div>
               </CardContent>
             </Card>
@@ -272,7 +272,7 @@ export default function PromotionsPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
                 {data.map((promo) => (
                   <PromotionCard 
                     key={promo.id}
@@ -290,10 +290,10 @@ export default function PromotionsPage() {
 
       {/* Create Promotion Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-full max-w-[95vw] sm:max-w-[85vw] md:max-w-3xl lg:max-w-4xl h-[95vh] sm:h-[90vh] md:h-[85vh] p-0 flex flex-col overflow-hidden border-0 shadow-2xl mx-auto rounded-xl sm:rounded-2xl">
-          <DialogHeader className="p-4 sm:p-5 md:p-6 pb-3 sm:pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50 flex-shrink-0 sticky top-0 z-10 backdrop-blur-sm">
-            <DialogTitle className="text-lg sm:text-xl md:text-2xl font-semibold flex items-center gap-2 text-foreground">
-              <PlusCircle className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+        <DialogContent className="max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] p-0 flex flex-col overflow-hidden border-0 shadow-2xl">
+          <DialogHeader className="p-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 flex-shrink-0">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <PlusCircle className="w-6 h-6 text-blue-600" />
               Create New Promotion
             </DialogTitle>
           </DialogHeader>

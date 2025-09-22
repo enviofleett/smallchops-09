@@ -9,7 +9,6 @@ import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import ReportTabs from "@/components/ReportTabs";
 import { RevenueBreakdown } from "@/components/reports/RevenueBreakdown";
-import { ProductPerformanceAnalytics } from "@/components/reports/ProductPerformanceAnalytics";
 import { fetchReportsData } from "@/api/reports";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -309,11 +308,6 @@ export default function Reports() {
         <div className="xl:col-span-1 order-1 xl:order-2">
           <ReportTabs reportsData={data} isLoading={isLoading} />
         </div>
-      </div>
-
-      {/* Product Performance Analytics */}
-      <div className="mt-6 lg:mt-8">
-        <ProductPerformanceAnalytics data={data} isLoading={isLoading} />
       </div>
     </div>
   );

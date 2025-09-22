@@ -25,6 +25,9 @@ serve(async (req) => {
       });
     }
 
+    const token = authHeader.replace('Bearer ', '');
+    console.log('🔍 Attempting to authenticate with token length:', token.length);
+
     // Parse request body for parameters
     let requestBody = {};
     if (req.method === "POST") {
@@ -45,55 +48,71 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
       console.error("Missing environment variables");
       throw new Error("Missing Supabase environment variables");
     }
 
-    // Create client with user's auth token for authentication checks
-    const supabaseWithAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    // Create a temporary client with the user's JWT for user context
+    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: {
         headers: {
-          Authorization: authHeader,
+          Authorization: `Bearer ${token}`,
         },
-      },
-      auth: {
-        persistSession: false,
       },
     });
 
-    // Verify user is authenticated and admin
-    const { data: userData, error: userError } = await supabaseWithAuth.auth.getUser();
-    if (userError || !userData.user) {
-      console.error("Invalid token:", userError);
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
+    // Get user from token using the user context client
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
+      console.log('⚠️ Invalid token or user not found:', userError?.message || 'No user data');
+      return new Response(JSON.stringify({ error: "Invalid token or user not found" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data: profile } = await supabaseWithAuth
+    console.log('✅ User authenticated:', { userId: user.id, email: user.email });
+
+    // Create service role client for data queries and admin verification
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
+    // Check if user is admin via profiles table using service role client
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role')
-      .eq('id', userData.user.id)
+      .select('role, is_active')
+      .eq('id', user.id)
       .single();
 
-    if (!profile || profile.role !== 'admin') {
-      console.error("User is not admin");
+    if (profileError || !profile) {
+      console.log('⚠️ Profile not found or error:', profileError?.message);
+      return new Response(JSON.stringify({ error: "User profile not found" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (profile.role !== 'admin' || !profile.is_active) {
+      console.log('⚠️ Access denied:', { role: profile.role, isActive: profile.is_active });
       return new Response(JSON.stringify({ error: "Admin access required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Create service role client for data queries
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+    console.log('✅ Admin authentication successful:', {
+      userId: user.id,
+      email: user.email,
+      role: profile.role,
+      authMethod: 'profiles_table',
+      timestamp: new Date().toISOString()
     });
 
     console.log(`Fetching analytics data for ${groupBy} grouping from ${startDate} to ${endDate}`);

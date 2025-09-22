@@ -90,7 +90,7 @@ class ErrorSafeImportManager {
     options: any = {}
   ): Promise<void> {
     try {
-      const adminToastMessages = await this.safeImport('@/utils/adminToastMessages');
+      const adminToastMessages = await this.safeImport('@/utils/adminToastMessages.tsx');
       
       if (adminToastMessages?.showAdminToast) {
         adminToastMessages.showAdminToast(toastFn, messageType, options);
@@ -112,7 +112,7 @@ class ErrorSafeImportManager {
     options: any = {}
   ): Promise<void> {
     try {
-      const adminToastMessages = await this.safeImport('@/utils/adminToastMessages');
+      const adminToastMessages = await this.safeImport('@/utils/adminToastMessages.tsx');
       
       if (adminToastMessages?.showAdminErrorToast) {
         adminToastMessages.showAdminErrorToast(toastFn, error, options);
@@ -183,7 +183,7 @@ class ErrorSafeImportManager {
       description = 'The operation took too long. Please try again.';
     }
 
-    toastFn(title, {
+    toastFn.error(title, {
       description,
       action: options.onRetry ? {
         label: 'Retry',

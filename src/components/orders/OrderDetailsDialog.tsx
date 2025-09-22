@@ -34,17 +34,24 @@ import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 interface OrderDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  order: OrderWithItems;
+  order: OrderWithItems | null; // Allow null for safety
 }
 const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   isOpen,
   onClose,
   order
 }) => {
+  // Critical safety check for production
+  if (!order) {
+    console.warn('OrderDetailsDialog: order is null, closing dialog');
+    if (isOpen) {
+      onClose();
+    }
+    return null;
+  }
+
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(order.status);
   const [assignedRider, setAssignedRider] = useState<string | null>(order.assigned_rider_id);
@@ -184,7 +191,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           : 'Order updated successfully.'
       });
       queryClient.invalidateQueries({
-        queryKey: ['orders']
+        queryKey: ['orders-new']
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['order-details', order.id]
       });
       onClose();
     },

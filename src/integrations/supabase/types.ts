@@ -243,6 +243,104 @@ export type Database = {
         }
         Relationships: []
       }
+      alert_notifications: {
+        Row: {
+          alert_rule_id: string | null
+          created_at: string | null
+          delivered_at: string | null
+          delivery_status: string | null
+          id: string
+          message: string
+          response_body: string | null
+          response_code: number | null
+          retry_count: number | null
+          severity: string
+          webhook_url: string | null
+        }
+        Insert: {
+          alert_rule_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
+          id?: string
+          message: string
+          response_body?: string | null
+          response_code?: number | null
+          retry_count?: number | null
+          severity: string
+          webhook_url?: string | null
+        }
+        Update: {
+          alert_rule_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
+          id?: string
+          message?: string
+          response_body?: string | null
+          response_code?: number | null
+          retry_count?: number | null
+          severity?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_notifications_alert_rule_id_fkey"
+            columns: ["alert_rule_id"]
+            isOneToOne: false
+            referencedRelation: "alert_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alert_rules: {
+        Row: {
+          check_interval_seconds: number | null
+          condition_sql: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          rule_name: string
+          severity: string | null
+          threshold_value: number | null
+          trigger_count: number | null
+          updated_at: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          check_interval_seconds?: number | null
+          condition_sql: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          rule_name: string
+          severity?: string | null
+          threshold_value?: number | null
+          trigger_count?: number | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          check_interval_seconds?: number | null
+          condition_sql?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          rule_name?: string
+          severity?: string | null
+          threshold_value?: number | null
+          trigger_count?: number | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       api_metrics: {
         Row: {
           dimensions: Json | null
@@ -1066,6 +1164,48 @@ export type Database = {
         }
         Relationships: []
       }
+      circuit_breaker_state: {
+        Row: {
+          created_at: string | null
+          failure_count: number | null
+          failure_threshold: number | null
+          id: string
+          last_failure_time: string | null
+          last_success_time: string | null
+          next_retry_time: string | null
+          service_name: string
+          state: string
+          timeout_seconds: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          failure_count?: number | null
+          failure_threshold?: number | null
+          id?: string
+          last_failure_time?: string | null
+          last_success_time?: string | null
+          next_retry_time?: string | null
+          service_name: string
+          state?: string
+          timeout_seconds?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          failure_count?: number | null
+          failure_threshold?: number | null
+          id?: string
+          last_failure_time?: string | null
+          last_success_time?: string | null
+          next_retry_time?: string | null
+          service_name?: string
+          state?: string
+          timeout_seconds?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       communication_event_warnings: {
         Row: {
           attempted_recipient_email: string | null
@@ -1305,42 +1445,6 @@ export type Database = {
           template_variables?: Json | null
           updated_at?: string
           variables?: Json | null
-        }
-        Relationships: []
-      }
-      communication_events_collision_log: {
-        Row: {
-          admin_session_ids: string[] | null
-          collision_count: number | null
-          event_type: string | null
-          first_collision_at: string | null
-          id: string
-          last_collision_at: string | null
-          order_id: string | null
-          original_dedupe_key: string
-          resolution_strategy: string | null
-        }
-        Insert: {
-          admin_session_ids?: string[] | null
-          collision_count?: number | null
-          event_type?: string | null
-          first_collision_at?: string | null
-          id?: string
-          last_collision_at?: string | null
-          order_id?: string | null
-          original_dedupe_key: string
-          resolution_strategy?: string | null
-        }
-        Update: {
-          admin_session_ids?: string[] | null
-          collision_count?: number | null
-          event_type?: string | null
-          first_collision_at?: string | null
-          id?: string
-          last_collision_at?: string | null
-          order_id?: string | null
-          original_dedupe_key?: string
-          resolution_strategy?: string | null
         }
         Relationships: []
       }
@@ -4877,6 +4981,42 @@ export type Database = {
         }
         Relationships: []
       }
+      order_audit: {
+        Row: {
+          action_type: string | null
+          admin_id: string
+          admin_name: string | null
+          created_at: string | null
+          id: string
+          new_status: Database["public"]["Enums"]["order_status"] | null
+          notes: string | null
+          old_status: Database["public"]["Enums"]["order_status"] | null
+          order_id: string
+        }
+        Insert: {
+          action_type?: string | null
+          admin_id: string
+          admin_name?: string | null
+          created_at?: string | null
+          id?: string
+          new_status?: Database["public"]["Enums"]["order_status"] | null
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["order_status"] | null
+          order_id: string
+        }
+        Update: {
+          action_type?: string | null
+          admin_id?: string
+          admin_name?: string | null
+          created_at?: string | null
+          id?: string
+          new_status?: Database["public"]["Enums"]["order_status"] | null
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["order_status"] | null
+          order_id?: string
+        }
+        Relationships: []
+      }
       order_audit_log: {
         Row: {
           action: string
@@ -5088,6 +5228,44 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items_new: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_id: string | null
+          product_name: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          product_name: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          product_name?: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_new_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_new"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_modifications: {
         Row: {
           created_at: string
@@ -5242,45 +5420,117 @@ export type Database = {
           },
         ]
       }
-      order_update_locks: {
+      order_status_notifications: {
         Row: {
-          acquired_at: string
-          acquired_by: string
           created_at: string
-          expires_at: string
+          customer_email: string | null
+          customer_name: string | null
+          error_message: string | null
           id: string
-          lock_key: string
+          new_status: string
+          old_status: string | null
           order_id: string
-          release_reason: string | null
-          released_at: string | null
-          renewal_count: number | null
-          renewed_at: string | null
+          order_number: string | null
+          processed_at: string | null
+          retry_count: number
+          template_key: string | null
+          template_variables: Json | null
         }
         Insert: {
-          acquired_at?: string
-          acquired_by: string
           created_at?: string
-          expires_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          error_message?: string | null
           id?: string
-          lock_key: string
+          new_status: string
+          old_status?: string | null
           order_id: string
-          release_reason?: string | null
-          released_at?: string | null
-          renewal_count?: number | null
-          renewed_at?: string | null
+          order_number?: string | null
+          processed_at?: string | null
+          retry_count?: number
+          template_key?: string | null
+          template_variables?: Json | null
         }
         Update: {
-          acquired_at?: string
-          acquired_by?: string
           created_at?: string
-          expires_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          error_message?: string | null
           id?: string
-          lock_key?: string
+          new_status?: string
+          old_status?: string | null
           order_id?: string
-          release_reason?: string | null
-          released_at?: string | null
-          renewal_count?: number | null
-          renewed_at?: string | null
+          order_number?: string | null
+          processed_at?: string | null
+          retry_count?: number
+          template_key?: string | null
+          template_variables?: Json | null
+        }
+        Relationships: []
+      }
+      order_update_metrics: {
+        Row: {
+          admin_user_id: string | null
+          cache_cleared: boolean | null
+          cache_hit: boolean | null
+          concurrent_admin_sessions: Json | null
+          conflict_resolution_method: string | null
+          correlation_id: string | null
+          database_query_time_ms: number | null
+          duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          id: number
+          lock_acquired: boolean | null
+          lock_wait_time_ms: number | null
+          operation: string
+          order_id: string | null
+          retry_attempts: number | null
+          status: string
+          timestamp: string | null
+          total_processing_time_ms: number | null
+        }
+        Insert: {
+          admin_user_id?: string | null
+          cache_cleared?: boolean | null
+          cache_hit?: boolean | null
+          concurrent_admin_sessions?: Json | null
+          conflict_resolution_method?: string | null
+          correlation_id?: string | null
+          database_query_time_ms?: number | null
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: number
+          lock_acquired?: boolean | null
+          lock_wait_time_ms?: number | null
+          operation: string
+          order_id?: string | null
+          retry_attempts?: number | null
+          status: string
+          timestamp?: string | null
+          total_processing_time_ms?: number | null
+        }
+        Update: {
+          admin_user_id?: string | null
+          cache_cleared?: boolean | null
+          cache_hit?: boolean | null
+          concurrent_admin_sessions?: Json | null
+          conflict_resolution_method?: string | null
+          correlation_id?: string | null
+          database_query_time_ms?: number | null
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: number
+          lock_acquired?: boolean | null
+          lock_wait_time_ms?: number | null
+          operation?: string
+          order_id?: string | null
+          retry_attempts?: number | null
+          status?: string
+          timestamp?: string | null
+          total_processing_time_ms?: number | null
         }
         Relationships: []
       }
@@ -5601,6 +5851,66 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      orders_new: {
+        Row: {
+          created_at: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address: Json | null
+          id: string
+          order_number: string
+          order_type: Database["public"]["Enums"]["order_type"] | null
+          payment_reference: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          special_instructions: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          total_amount: number
+          updated_at: string | null
+          updated_by: string | null
+          updated_by_name: string | null
+          version: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address?: Json | null
+          id?: string
+          order_number: string
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          payment_reference?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          total_amount?: number
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_name?: string | null
+          version?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string
+          delivery_address?: Json | null
+          id?: string
+          order_number?: string
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          payment_reference?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          total_amount?: number
+          updated_at?: string | null
+          updated_by?: string | null
+          updated_by_name?: string | null
+          version?: number | null
         }
         Relationships: []
       }
@@ -7443,39 +7753,6 @@ export type Database = {
         }
         Relationships: []
       }
-      request_cache: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          expires_at: string
-          id: string
-          idempotency_key: string
-          request_data: Json
-          response_data: Json | null
-          status: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          expires_at?: string
-          id?: string
-          idempotency_key: string
-          request_data: Json
-          response_data?: Json | null
-          status?: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          expires_at?: string
-          id?: string
-          idempotency_key?: string
-          request_data?: Json
-          response_data?: Json | null
-          status?: string
-        }
-        Relationships: []
-      }
       review_media: {
         Row: {
           alt_text: string | null
@@ -8870,6 +9147,48 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_deliveries: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          delivery_attempts: number | null
+          id: string
+          last_attempt_at: string | null
+          payload: Json
+          response_body: string | null
+          response_code: number | null
+          status: string | null
+          throttled_until: string | null
+          webhook_url: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          delivery_attempts?: number | null
+          id?: string
+          last_attempt_at?: string | null
+          payload: Json
+          response_body?: string | null
+          response_code?: number | null
+          status?: string | null
+          throttled_until?: string | null
+          webhook_url: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          delivery_attempts?: number | null
+          id?: string
+          last_attempt_at?: string | null
+          payload?: Json
+          response_body?: string | null
+          response_code?: number | null
+          status?: string | null
+          throttled_until?: string | null
+          webhook_url?: string
+        }
+        Relationships: []
+      }
       webhook_events: {
         Row: {
           created_at: string | null
@@ -9071,6 +9390,21 @@ export type Database = {
         }
         Relationships: []
       }
+      conflict_resolution_metrics: {
+        Row: {
+          avg_duration_ms: number | null
+          avg_lock_wait_ms: number | null
+          avg_retry_attempts: number | null
+          conflict_count: number | null
+          conflict_rate_percent: number | null
+          error_count: number | null
+          error_rate_percent: number | null
+          minute: string | null
+          success_count: number | null
+          total_operations: number | null
+        }
+        Relationships: []
+      }
       email_queue_health: {
         Row: {
           failed_count: number | null
@@ -9185,6 +9519,10 @@ export type Database = {
         Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
+      admin_update_order_status_enhanced_notifications: {
+        Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
       admin_update_order_status_lock_first: {
         Args: {
           p_admin_user_id?: string
@@ -9205,6 +9543,12 @@ export type Database = {
       }
       admin_update_order_status_secure: {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
+      admin_update_order_status_simple: {
+        Args:
+          | { new_status_param: string; order_id_param: string }
+          | { p_admin_id: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
       archive_old_communication_events: {
@@ -9354,6 +9698,10 @@ export type Database = {
           p_operation: string
           p_window_minutes?: number
         }
+        Returns: Json
+      }
+      check_alert_rules: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       check_api_rate_limit: {
@@ -9610,6 +9958,10 @@ export type Database = {
         Args: Record<PropertyKey, never> | { p_minutes_threshold?: number }
         Returns: Json
       }
+      clear_all_pending_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       clear_production_data: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -9702,16 +10054,35 @@ export type Database = {
         Returns: Json
       }
       create_order_with_items: {
-        Args: {
-          p_customer_id: string
-          p_delivery_address?: Json
-          p_delivery_zone_id?: string
-          p_fulfillment_type: string
-          p_guest_session_id?: string
-          p_items?: Json
-          p_pickup_point_id?: string
-        }
-        Returns: string
+        Args:
+          | {
+              p_client_calculated_total?: number
+              p_customer_email: string
+              p_customer_name: string
+              p_customer_phone: string
+              p_delivery_address: string
+              p_delivery_fee: number
+              p_delivery_instructions: string
+              p_items: Json
+              p_order_time: string
+              p_order_type: Database["public"]["Enums"]["order_type"]
+              p_promotion_code?: string
+              p_promotion_discount?: number
+              p_subtotal: number
+              p_total: number
+            }
+          | {
+              p_client_total?: number
+              p_customer_id: string
+              p_delivery_address?: Json
+              p_delivery_zone_id?: string
+              p_fulfillment_type: string
+              p_guest_session_id?: string
+              p_items: Json
+              p_pickup_point_id?: string
+              p_promotion_code?: string
+            }
+        Returns: Json
       }
       create_payment_intent: {
         Args: { p_amount: number; p_currency?: string; p_order_id: string }
@@ -10046,6 +10417,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_email_queue_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_email_system_config_summary: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -10066,6 +10441,10 @@ export type Database = {
         }[]
       }
       get_email_system_production_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_enhanced_system_health_metrics: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
@@ -10482,6 +10861,28 @@ export type Database = {
         }
         Returns: undefined
       }
+      log_order_update_metric: {
+        Args: {
+          p_admin_user_id: string
+          p_cache_cleared?: boolean
+          p_cache_hit?: boolean
+          p_concurrent_admin_sessions?: Json
+          p_conflict_resolution_method?: string
+          p_correlation_id?: string
+          p_database_query_time_ms?: number
+          p_duration_ms: number
+          p_error_code?: string
+          p_error_message?: string
+          p_lock_acquired?: boolean
+          p_lock_wait_time_ms?: number
+          p_operation: string
+          p_order_id: string
+          p_retry_attempts?: number
+          p_status: string
+          p_total_processing_time_ms?: number
+        }
+        Returns: string
+      }
       log_payment_access: {
         Args: {
           p_access_reason?: string
@@ -10658,6 +11059,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      migrate_orders_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       migrate_pay_to_txn_reference: {
         Args: { pay_ref: string }
         Returns: string
@@ -10714,7 +11119,7 @@ export type Database = {
       }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
-        Returns: number
+        Returns: Json
       }
       production_cleanup: {
         Args: Record<PropertyKey, never>
@@ -10907,6 +11312,10 @@ export type Database = {
       }
       toggle_user_favorite: {
         Args: { p_product_id: string }
+        Returns: Json
+      }
+      trigger_email_processing: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       trigger_order_emails: {

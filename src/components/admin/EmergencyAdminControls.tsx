@@ -76,7 +76,7 @@ export const EmergencyAdminControls: React.FC<EmergencyAdminControlsProps> = ({
   // Fetch active locks
   const fetchActiveLocks = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      const { data, error } = await supabase.functions.invoke('order-manager', {
         body: { action: 'get_active_locks' }
       });
 
@@ -97,13 +97,13 @@ export const EmergencyAdminControls: React.FC<EmergencyAdminControlsProps> = ({
       
       // Step 1: Clear expired locks
       setBatchCleanupProgress(25);
-      await supabase.functions.invoke('admin-orders-manager', {
+      await supabase.functions.invoke('order-manager', {
         body: { action: 'clear_expired_locks' }
       });
 
       // Step 2: Clear stale cache entries
       setBatchCleanupProgress(50);
-      await supabase.functions.invoke('admin-orders-manager', {
+      await supabase.functions.invoke('order-manager', {
         body: { action: 'clear_stale_cache' }
       });
 
@@ -132,10 +132,10 @@ export const EmergencyAdminControls: React.FC<EmergencyAdminControlsProps> = ({
     setEmergencyBypassActive(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      const { data, error } = await supabase.functions.invoke('order-manager', {
         body: {
           action: 'emergency_override',
-          orderId,
+          order_id: orderId,
           reason: 'emergency_admin_bypass'
         }
       });

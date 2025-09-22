@@ -50,11 +50,11 @@ export const useEnhancedOrderStatusUpdate = () => {
 
   const updateMutation = useMutation({
     mutationFn: async ({ orderId, newStatus, idempotencyKey, adminUserId }: IdempotentUpdateRequest) => {
-      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      const { data, error } = await supabase.functions.invoke('order-manager', {
         body: {
-          action: 'update',
-          orderId,
-          updates: { status: newStatus },
+          action: 'update_status',
+          order_id: orderId,
+          new_status: newStatus,
           admin_user_id: adminUserId,
           idempotency_key: idempotencyKey
         }
@@ -91,9 +91,9 @@ export const useEnhancedOrderStatusUpdate = () => {
         });
       }
 
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['order', variables.orderId] });
+      // Invalidate relevant queries  
+      queryClient.invalidateQueries({ queryKey: ['orders-new'] });
+      queryClient.invalidateQueries({ queryKey: ['order-details', variables.orderId] });
     },
     onError: (error: any, variables) => {
       // Remove from pending updates
@@ -182,10 +182,10 @@ export const useEnhancedOrderStatusUpdate = () => {
   // Enhanced lock holder detection with real-time status checking
   const checkLockStatus = useCallback(async (orderId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      const { data, error } = await supabase.functions.invoke('order-manager', {
         body: {
           action: 'check_lock_status',
-          orderId,
+          order_id: orderId,
           admin_user_id: adminUserId
         }
       });
@@ -203,10 +203,10 @@ export const useEnhancedOrderStatusUpdate = () => {
     try {
       console.log(`🧹 Proactive cleanup for order ${orderId}, reason: ${reason}`);
       
-      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      const { data, error } = await supabase.functions.invoke('order-manager', {
         body: {
-          action: 'proactive_cleanup',
-          orderId,
+          action: 'cleanup',
+          order_id: orderId,
           reason,
           admin_user_id: adminUserId
         }
@@ -257,12 +257,13 @@ export const useEnhancedOrderStatusUpdate = () => {
     setShow409Error(null); // Clear the error state
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+      const { data, error } = await supabase.functions.invoke('order-manager', {
         body: {
-          action: 'bypass_and_update',
-          orderId,
-          updates: { status: newStatus },
-          admin_user_id: adminUserId
+          action: 'update_status',
+          order_id: orderId,
+          new_status: newStatus,
+          admin_user_id: adminUserId,
+          bypass_cache: true
         }
       });
 
@@ -281,8 +282,8 @@ export const useEnhancedOrderStatusUpdate = () => {
       }
       
         // Invalidate relevant queries
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+        queryClient.invalidateQueries({ queryKey: ['orders-new'] });
+        queryClient.invalidateQueries({ queryKey: ['order-details', orderId] });
 
         return data;
     } catch (error: any) {

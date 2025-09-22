@@ -61,10 +61,10 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      await supabase.functions.invoke('admin-orders-manager', {
+      await supabase.functions.invoke('order-manager', {
         body: {
           action: 'log_admin_error',
-          orderId: this.props.orderId,
+          order_id: this.props.orderId,
           errorType: 'order_management_component_error',
           error: {
             message: error.message,

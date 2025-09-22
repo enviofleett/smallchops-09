@@ -127,33 +127,64 @@ export async function performProactiveCleanup(orderId?: string, reason = 'manual
 }
 
 /**
- * Log order status update metrics for monitoring
+ * Log enhanced order update metrics for 409 conflict monitoring
  */
 export async function logOrderUpdateMetric(
   orderId: string,
   operation: string,
   success: boolean,
   responseTimeMs?: number,
-  errorDetails?: any
+  errorDetails?: any,
+  conflictData?: {
+    lockWaitTime?: number;
+    retryAttempts?: number;
+    conflictResolutionMethod?: string;
+    cacheCleared?: boolean;
+    lockAcquired?: boolean;
+    concurrentAdminSessions?: any;
+  }
 ) {
   try {
+    // Enhanced logging to order_update_metrics table
+    await supabase.rpc('log_order_update_metric', {
+      p_operation: operation,
+      p_order_id: orderId,
+      p_admin_user_id: null, // Will be set by RLS context
+      p_duration_ms: responseTimeMs || 0,
+      p_status: success ? 'success' : 'error',
+      p_error_code: errorDetails?.code || null,
+      p_error_message: errorDetails?.message || null,
+      p_correlation_id: `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      p_lock_wait_time_ms: conflictData?.lockWaitTime || null,
+      p_retry_attempts: conflictData?.retryAttempts || 0,
+      p_conflict_resolution_method: conflictData?.conflictResolutionMethod || null,
+      p_concurrent_admin_sessions: conflictData?.concurrentAdminSessions || null,
+      p_lock_acquired: conflictData?.lockAcquired || false,
+      p_cache_cleared: conflictData?.cacheCleared || false,
+      p_cache_hit: null, // Could be tracked from cache operations
+      p_database_query_time_ms: null,
+      p_total_processing_time_ms: responseTimeMs || null
+    });
+
+    // Also log to audit_logs for backwards compatibility
     await supabase.from('audit_logs').insert([{
-      action: 'order_status_update_metric',
+      action: 'order_status_update_metric_enhanced',
       category: 'Performance Monitoring',
-      message: `Order update metric: ${operation}`,
+      message: `Enhanced order update metric: ${operation}`,
       entity_id: orderId,
       new_values: {
         operation,
         success,
         response_time_ms: responseTimeMs,
         error_details: errorDetails,
+        conflict_data: conflictData,
         timestamp: new Date().toISOString(),
-        user_agent: navigator.userAgent
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'server'
       }
     }]);
   } catch (error) {
     // Don't throw - this is just monitoring
-    console.warn('⚠️ Failed to log order update metric:', error);
+    console.warn('⚠️ Failed to log enhanced order update metric:', error);
   }
 }
 

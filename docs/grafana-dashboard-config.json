@@ -1,0 +1,103 @@
+{
+  "dashboard": {
+    "title": "409 Conflict Resolution Monitor",
+    "tags": ["production", "monitoring", "conflicts"],
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "Conflict Rate %",
+        "type": "stat",
+        "targets": [
+          {
+            "rawSql": "SELECT ROUND(COUNT(CASE WHEN status = 'conflict' THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0) * 100, 2) as conflict_rate FROM order_update_metrics WHERE timestamp >= NOW() - INTERVAL '1 hour'"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Average Conflict Resolution Time",
+        "type": "stat", 
+        "targets": [
+          {
+            "rawSql": "SELECT AVG(duration_ms) FROM order_update_metrics WHERE conflict_resolution_method IS NOT NULL AND timestamp >= NOW() - INTERVAL '1 hour'"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 2000},
+                {"color": "red", "value": 5000}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Lock Contention Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "rawSql": "SELECT timestamp, COUNT(*) as active_locks FROM order_update_locks WHERE released_at IS NULL GROUP BY DATE_TRUNC('minute', timestamp) ORDER BY timestamp"
+          }
+        ]
+      },
+      {
+        "title": "Conflict Resolution Methods",
+        "type": "piechart",
+        "targets": [
+          {
+            "rawSql": "SELECT conflict_resolution_method, COUNT(*) FROM order_update_metrics WHERE conflict_resolution_method IS NOT NULL AND timestamp >= NOW() - INTERVAL '24 hours' GROUP BY conflict_resolution_method"
+          }
+        ]
+      },
+      {
+        "title": "Cache Performance",
+        "type": "timeseries",
+        "targets": [
+          {
+            "rawSql": "SELECT DATE_TRUNC('5 minutes', timestamp) as time, AVG(CASE WHEN cache_hit THEN 1.0 ELSE 0.0 END) * 100 as hit_rate FROM order_update_metrics WHERE timestamp >= NOW() - INTERVAL '4 hours' GROUP BY time ORDER BY time"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate Trend",
+        "type": "timeseries",
+        "targets": [
+          {
+            "rawSql": "SELECT DATE_TRUNC('5 minutes', timestamp) as time, COUNT(CASE WHEN status = 'error' THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0) * 100 as error_rate FROM order_update_metrics WHERE timestamp >= NOW() - INTERVAL '4 hours' GROUP BY time ORDER BY time"
+          }
+        ]
+      }
+    ],
+    "alerting": {
+      "rules": [
+        {
+          "name": "High Conflict Rate Alert",
+          "condition": "SELECT conflict_rate FROM (SELECT ROUND(COUNT(CASE WHEN status = 'conflict' THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0) * 100, 2) as conflict_rate FROM order_update_metrics WHERE timestamp >= NOW() - INTERVAL '10 minutes') t WHERE conflict_rate > 15",
+          "severity": "critical",
+          "notification": "slack-webhook"
+        },
+        {
+          "name": "Slow Conflict Resolution Alert", 
+          "condition": "SELECT avg_time FROM (SELECT AVG(duration_ms) as avg_time FROM order_update_metrics WHERE conflict_resolution_method IS NOT NULL AND timestamp >= NOW() - INTERVAL '10 minutes') t WHERE avg_time > 5000",
+          "severity": "warning",
+          "notification": "email"
+        }
+      ]
+    }
+  }
+}

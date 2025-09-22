@@ -7,7 +7,7 @@ import { Package, MapPin, User, Clock, AlertTriangle } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
 import { OrderWithItems } from '@/api/orders';
-import { format } from 'date-fns';
+import { safeFormatDate } from '@/utils/safeDateFormat';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 
@@ -82,7 +82,7 @@ export const MobileOrderTabs = ({
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold text-sm truncate">#{order.order_number}</h3>
               <p className="text-xs text-muted-foreground">
-                {format(new Date(order.created_at), 'MMM dd, HH:mm')}
+                {safeFormatDate(order.created_at, 'MMM dd, HH:mm')}
               </p>
             </div>
             <div className="flex flex-col gap-1.5 items-end shrink-0 ml-3">
@@ -128,7 +128,7 @@ export const MobileOrderTabs = ({
             <>
               <MobileCardRow 
                 label="Delivery Date" 
-                value={<span className="text-sm">{format(new Date(schedule.delivery_date), 'MMM dd, yyyy')}</span>} 
+                value={<span className="text-sm">{safeFormatDate(schedule.delivery_date, 'MMM dd, yyyy')}</span>} 
               />
               <MobileCardRow 
                 label="Time Window" 

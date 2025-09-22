@@ -38,7 +38,7 @@ import PublicHome from "./pages/PublicHome";
 
 // Lazy load admin components with optimized loading
 const Orders = withLazyLoading(() => import("./pages/Orders"), undefined, false, 10000);
-const AdminOrders = withLazyLoading(() => import("./pages/admin/AdminOrders"), undefined, false, 10000);
+const AdminOrders = withLazyLoading(() => import("./pages/admin/AdminOrders"), undefined, false, 25000, 3);
 const AdminOrderDetails = withLazyLoading(() => import("./pages/admin/AdminOrderDetails"), undefined, false, 10000);
 const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"), undefined, false, 10000);
 const Products = withLazyLoading(() => import("./pages/Products"), undefined, false, 10000);

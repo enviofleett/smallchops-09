@@ -10082,6 +10082,22 @@ export type Database = {
               p_pickup_point_id?: string
               p_promotion_code?: string
             }
+          | {
+              p_customer_address: string
+              p_customer_email: string
+              p_customer_name: string
+              p_customer_phone: string
+              p_delivery_fee: number
+              p_delivery_instructions: string
+              p_delivery_zone_id?: string
+              p_fulfillment_type: string
+              p_items: Json
+              p_payment_method: string
+              p_scheduled_delivery_time?: string
+              p_subtotal: number
+              p_total_amount: number
+              p_vat_amount: number
+            }
         Returns: Json
       }
       create_payment_intent: {

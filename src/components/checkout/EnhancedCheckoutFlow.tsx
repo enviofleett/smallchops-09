@@ -36,6 +36,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { RequiredFieldLabel } from "@/components/ui/required-field-label";
 import { OrderCalculationService } from '@/services/OrderCalculationService';
+import { CheckoutStateManager } from '@/utils/checkoutStateManager';
+import { useSecurePayment } from '@/hooks/useSecurePayment';
+import { validatePromotionCode } from '@/api/promotionValidation';
+import { PromotionNormalizer } from '@/services/PromotionNormalizer';
+import { ServerAuthoritativeCalculationService } from '@/services/ServerAuthoritativeCalculationService';
+import { useEnhancedPromotions } from '@/hooks/useEnhancedPromotions';
+import { CheckoutErrorRecovery } from '@/services/CheckoutErrorRecovery';
 import { logger } from '@/lib/logger';
 interface DeliveryAddress {
   address_line_1: string;
@@ -715,46 +722,62 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       console.error('🚨 Checkout submission error:', error);
       setIsSubmitting(false);
 
-      // 🔧 CIRCUIT BREAKER: Increment failure count and activate if needed
-      const newFailedAttempts = failedAttempts + 1;
-      setFailedAttempts(newFailedAttempts);
-      if (newFailedAttempts >= 3) {
-        setCircuitBreakerActive(true);
-        // Reset circuit breaker after 5 minutes
-        setTimeout(() => {
-          setCircuitBreakerActive(false);
-          setFailedAttempts(0);
-        }, 5 * 60 * 1000);
-      }
-
-      // Enhanced error handling with safe message extraction
-      const errorMessage = safeErrorMessage(error);
-
-      // Map specific errors to user-friendly messages
-      let userFriendlyMessage: string;
-      if (errorMessage.includes('ORDER_CREATION_FAILED') || errorMessage.includes('INVALID_ORDER_DATA')) {
-        userFriendlyMessage = 'Order creation failed. Please check your details and try again.';
-      } else if (errorMessage.includes('CUSTOMER_ERROR')) {
-        userFriendlyMessage = 'There was an issue with customer information. Please verify your details.';
-      } else if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
-        userFriendlyMessage = 'Payment system configuration issue. Please contact support.';
-      } else if (errorMessage.includes('Payment URL not available')) {
-        userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
-      } else {
-        // Generate user-friendly error with safe fallback
-        const validationResult = validatePaymentInitializationData({
-          success: false,
-          error: errorMessage
-        });
-        userFriendlyMessage = generateUserFriendlyErrorMessage(validationResult);
-      }
-      setLastPaymentError(userFriendlyMessage);
-      logPaymentAttempt(null, 'failure');
-      toast({
-        title: "Checkout Error",
-        description: userFriendlyMessage,
-        variant: "destructive"
+      // Analyze error and determine recovery strategy using the new service
+      const checkoutError = CheckoutErrorRecovery.analyzeError(error);
+      const recoveryStrategy = CheckoutErrorRecovery.getRecoveryStrategy(checkoutError);
+      
+      // Track error for monitoring
+      CheckoutErrorRecovery.trackError(checkoutError, {
+        step: checkoutStep,
+        customer_email: formData.customer_email,
+        items_count: items.length
       });
+
+      // 🔧 CIRCUIT BREAKER: Increment failure count for non-recoverable errors
+      if (!checkoutError.recoverable) {
+        const newFailedAttempts = failedAttempts + 1;
+        setFailedAttempts(newFailedAttempts);
+        if (newFailedAttempts >= 3) {
+          setCircuitBreakerActive(true);
+          // Reset circuit breaker after 5 minutes
+          setTimeout(() => {
+            setCircuitBreakerActive(false);
+            setFailedAttempts(0);
+          }, 5 * 60 * 1000);
+        }
+      }
+
+      // Get user-friendly error message
+      const userFriendlyMessage = CheckoutErrorRecovery.getUserFriendlyMessage(checkoutError);
+      setLastPaymentError(userFriendlyMessage);
+
+      // Execute recovery strategy if applicable
+      if (recoveryStrategy.canRecover && recoveryStrategy.action === 'retry' && recoveryStrategy.delay && recoveryStrategy.delay > 0) {
+        toast({
+          title: "Retrying checkout...",
+          description: `${recoveryStrategy.message} Retrying automatically...`,
+          variant: "default",
+        });
+
+        // Auto-retry with delay for recoverable errors
+        setTimeout(() => {
+          handleFormSubmit(); // Recursive retry
+        }, recoveryStrategy.delay);
+      } else {
+        // Show error to user
+        toast({
+          title: checkoutError.recoverable ? "Checkout Error" : "Checkout Failed",
+          description: userFriendlyMessage,
+          variant: "destructive"
+        });
+
+        // Execute other recovery actions if needed
+        if (recoveryStrategy.action !== 'retry') {
+          CheckoutErrorRecovery.executeRecovery(recoveryStrategy);
+        }
+      }
+
+      logPaymentAttempt(null, 'failure');
     }
   };
   const handlePaymentSuccess = useCallback((reference: string) => {

@@ -25,11 +25,13 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Initialize requestBody variable outside try block for error handler access
+  let requestBody = null;
+
   try {
     console.log("🛒 Processing checkout request...");
 
     // ✅ Parse and validate request body
-    let requestBody;
     try {
       requestBody = await req.json();
     } catch (parseError) {
@@ -538,14 +540,22 @@ serve(async (req) => {
     // ✅ Enhanced error handling with logging and user-friendly messages
     const errorId = `ERR_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // Safely access requestBody with fallback for cases where it's undefined
+    let safeRequestBody;
+    try {
+      safeRequestBody = requestBody;
+    } catch {
+      safeRequestBody = null;
+    }
+    
     console.error(`❌ Checkout processing error [${errorId}]:`, {
       message: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString(),
       request_data: {
-        customer_email: requestBody?.customer?.email,
-        fulfillment_type: requestBody?.fulfillment?.type,
-        items_count: requestBody?.items?.length
+        customer_email: safeRequestBody?.customer?.email || 'unknown',
+        fulfillment_type: safeRequestBody?.fulfillment?.type || 'unknown',
+        items_count: safeRequestBody?.items?.length || 0
       }
     });
 

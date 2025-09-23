@@ -10592,6 +10592,23 @@ export type Database = {
         }
         Returns: Json
       }
+      handle_successful_payment_enhanced: {
+        Args: {
+          p_authorization_code?: string
+          p_bank?: string
+          p_card_type?: string
+          p_channel?: string
+          p_exp_month?: number
+          p_exp_year?: number
+          p_fees?: number
+          p_gateway_response: string
+          p_last4?: string
+          p_paid_at: string
+          p_reference: string
+          p_webhook_event_id?: string
+        }
+        Returns: Json
+      }
       has_email_consent: {
         Args: { consent_type?: string; email_address: string }
         Returns: boolean

@@ -64,17 +64,25 @@ verify_jwt = false
 [functions.track-promotion-usage]
 verify_jwt = true
 
+# Production Security: Enable JWT Authentication for payment functions
 [functions.verify-payment]
+verify_jwt = true
+
+[functions.enhanced-payment-templates]
 verify_jwt = false
 
-[functions.paystack-secure]
+[functions.real-time-webhook-processor]
 verify_jwt = false
+
+# Secure payment functions requiring authentication
+[functions.paystack-secure]
+verify_jwt = true
 
 [functions.payment-callback]
 verify_jwt = false
 
 [functions.admin-orders-manager]
-verify_jwt = false
+verify_jwt = true
 
 [functions.user-journey-automation]
 verify_jwt = false
@@ -94,8 +102,9 @@ verify_jwt = false
 [functions.smtp-health-check]
 verify_jwt = false
 
+# Process checkout requires authentication for security
 [functions.process-checkout]
-verify_jwt = false
+verify_jwt = true
 
 [analytics]
 enabled = false

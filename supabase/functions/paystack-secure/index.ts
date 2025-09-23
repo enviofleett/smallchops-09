@@ -36,20 +36,9 @@ serve(async (req) => {
   try {
     console.log(`🔄 Paystack secure function called [${VERSION}]`)
     
-    // Get and validate JWT token
+    // Get auth header - Supabase automatically validates JWT when verify_jwt=true
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Authorization required',
-        code: 'UNAUTHORIZED'
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const jwt = authHeader.replace('Bearer ', '')
+    console.log('🔍 Auth header present:', !!authHeader)
     
     // Initialize Supabase clients
     const supabaseAdmin = createClient(
@@ -62,38 +51,51 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: {
-            Authorization: authHeader
-          }
+          headers: authHeader ? { Authorization: authHeader } : {}
         }
       }
     )
 
-    // Determine if this is an internal service call (service role token)
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const isInternal = jwt === serviceRoleKey
-
-    // Verify user authentication unless internal
+    // Get authenticated user - JWT already validated by Supabase when verify_jwt=true
     let user: any = null
-    if (isInternal) {
+    let isInternal = false
+    
+    if (authHeader && authHeader.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')) {
       console.log('🛡️ Internal service call authorized via service role')
       user = { id: 'service-role', email: 'internal@service.local' }
+      isInternal = true
     } else {
-      const { data: userData, error: authError } = await supabaseClient.auth.getUser(jwt)
-      if (authError || !userData?.user) {
-        console.error('❌ Authentication failed:', authError)
+      // When verify_jwt=true, user is already authenticated by Supabase
+      // We still need to get user details for authorization
+      try {
+        const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser()
+        if (authError || !authUser) {
+          console.error('❌ Failed to get authenticated user:', authError)
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Authentication required - please log in',
+            code: 'AUTH_REQUIRED',
+            details: authError?.message
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+        
+        user = authUser
+        console.log('✅ User authenticated:', user.id)
+      } catch (error) {
+        console.error('❌ Authentication error:', error)
         return new Response(JSON.stringify({
           success: false,
-          error: 'Invalid authentication token',
-          code: 'AUTH_INVALID'
+          error: 'Authentication error',
+          code: 'AUTH_ERROR',
+          details: error.message
         }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
-
-      user = userData.user
-      console.log('✅ User authenticated:', user.id)
     }
 
     // Get environment-specific Paystack configuration

@@ -120,8 +120,14 @@ class PaystackService {
         order_id: requestPayload.order_id
       });
 
+      // Ensure we have a valid session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Authentication required. Please log in.');
+      }
+
       const response = await supabase.functions.invoke('paystack-secure', {
-        body: requestPayload,
+        body: requestPayload
       });
 
       console.log('📦 Backend response received:', { 
@@ -165,6 +171,12 @@ class PaystackService {
         throw new Error('Invalid reference format for verification');
       }
 
+      // Ensure authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Authentication required. Please log in.');
+      }
+
       // Use the new secure endpoint
       const response = await supabase.functions.invoke('paystack-secure', {
         body: {
@@ -203,6 +215,12 @@ class PaystackService {
     metadata?: Record<string, any>;
   }) {
     try {
+      // Ensure authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Authentication required. Please log in.');
+      }
+
       // Use the new secure endpoint
       const response = await supabase.functions.invoke('paystack-secure', {
         body: {

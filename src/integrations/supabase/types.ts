@@ -9778,6 +9778,15 @@ export type Database = {
         }
         Returns: Json
       }
+      check_rate_limit_secure: {
+        Args: {
+          p_identifier: string
+          p_limit_type: string
+          p_max_requests: number
+          p_window_minutes: number
+        }
+        Returns: Json
+      }
       check_rate_limit_with_reputation: {
         Args: { p_identifier: string; p_identifier_type?: string }
         Returns: Json
@@ -11443,6 +11452,16 @@ export type Database = {
           payment_amount?: number
           payment_gateway_response?: Json
           payment_ref: string
+        }
+        Returns: Json
+      }
+      verify_and_update_payment_status_enhanced: {
+        Args: {
+          new_status: string
+          payment_amount: number
+          payment_gateway_response: Json
+          payment_ref: string
+          processing_context?: Json
         }
         Returns: Json
       }

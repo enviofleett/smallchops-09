@@ -244,33 +244,48 @@ serve(async (req) => {
     console.log("💰 Order details:", order);
 
     // ✅ Initialize payment with service role for internal authorization
-    // Let paystack-secure handle callback URL construction to avoid duplication
     console.log("💳 Initializing payment via paystack-secure...");
-    const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
+    
+    // Use direct fetch for service-to-service call with proper authentication
+    const functionUrl = `${SUPABASE_URL}/functions/v1/paystack-secure`;
+    const paymentPayload = {
+      action: "initialize",
+      email: order.customer_email,
+      amount: order.total_amount,
+      metadata: {
+        order_id: order.id,
+        customer_name: requestBody.customer.name,
+        order_number: order.order_number,
+        fulfillment_type: requestBody.fulfillment.type,
+        items_subtotal: order.total_amount - deliveryFee,
+        delivery_fee: deliveryFee,
+        client_total: order.total_amount,
+        authoritative_total: order.total_amount,
+      }
+    };
+
+    const paymentResponse = await fetch(functionUrl, {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "x-internal-caller": "process-checkout"
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'x-internal-caller': 'process-checkout'
       },
-      body: {
-        action: "initialize",
-        email: order.customer_email,
-        amount: order.total_amount,
-        metadata: {
-          order_id: order.id,
-          customer_name: requestBody.customer.name,
-          order_number: order.order_number,
-          fulfillment_type: requestBody.fulfillment.type,
-          items_subtotal: order.total_amount - deliveryFee,
-          delivery_fee: deliveryFee,
-          client_total: order.total_amount,
-          authoritative_total: order.total_amount,
-        }
-      },
+      body: JSON.stringify(paymentPayload)
     });
 
-    if (paymentError) {
-      console.error("❌ Payment initialization failed:", paymentError);
-      throw new Error(`Payment initialization failed: ${paymentError.message}`);
+    if (!paymentResponse.ok) {
+      const errorText = await paymentResponse.text();
+      console.error("❌ Payment function call failed:", paymentResponse.status, errorText);
+      throw new Error(`Payment initialization failed: ${errorText}`);
+    }
+
+    const paymentData = await paymentResponse.json();
+
+    if (!paymentData.success) {
+      console.error("❌ Payment initialization failed:", paymentData.error);
+      throw new Error(`Payment initialization failed: ${paymentData.error}`);
     }
 
     console.log("🔍 Raw paymentData:", paymentData);

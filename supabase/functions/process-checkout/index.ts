@@ -95,9 +95,14 @@ serve(async (req: Request) => {
       total_amount: finalTotal,
       status: 'pending',
       payment_status: 'pending',
-      delivery_method: deliveryData.method || 'pickup',
-      delivery_location: deliveryData.location || 'Main Store',
-      delivery_address: deliveryData.address || '',
+      // Map delivery data to existing schema columns
+      pickup_point_id: fulfillment.pickup_point_id || null,
+      delivery_address: deliveryData.address ? {
+        address: deliveryData.address,
+        method: deliveryData.method || 'delivery',
+        location: deliveryData.location || 'Customer Address'
+      } : null,
+      special_instructions: fulfillment.special_instructions || delivery.notes || '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       idempotency_key: idempotency_key || `checkout_${timestamp}_${randomId}`

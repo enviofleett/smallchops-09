@@ -289,7 +289,30 @@ const PublicHome = () => {
       <section className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 items-center">
-            {/* Hero content removed - ready for dynamic content */}
+            {/* Column 1 - Hero Content */}
+            <div className="text-center lg:text-left order-2 lg:order-1">
+              <div className="space-y-4 sm:space-y-6">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
+                  LIVE . LOVE . SHARE
+                </h1>
+                <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 sm:px-0">Small Chops is <strong>ALWAYS</strong> a good idea..</p>
+                <div className="pt-2">
+                  <Button onClick={() => navigate('/products')} className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg">
+                    Order Now & Enjoy!
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 2 - Hero Carousel */}
+            <div className="flex justify-center order-1 lg:order-2">
+              <HeroCarousel className="w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96" />
+            </div>
+            
+            {/* Column 3 - Budget Baller Card */}
+            <div className="flex justify-center lg:justify-start order-3">
+              <BudgetBallerSection className="w-full max-w-sm" />
+            </div>
           </div>
         </div>
       </section>

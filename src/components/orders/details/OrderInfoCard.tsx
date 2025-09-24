@@ -7,6 +7,7 @@ import { StatCard } from './StatCard';
 import { DeliveryScheduleDisplay } from '../DeliveryScheduleDisplay';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
+import { formatAddress } from '@/utils/formatAddress';
 
 interface OrderInfoCardProps {
   orderNumber: string;
@@ -208,8 +209,10 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                             </Badge>
                             <span className="font-semibold max-w-48 text-sm break-words">
                               {orderType === 'pickup' 
-                                ? (pickupPoint?.address || pickupPoint?.name || 'Pickup Point')
-                                : (deliveryAddress || 'Address not provided')
+                                ? (pickupPoint?.address 
+                                    ? formatAddress(pickupPoint.address) 
+                                    : pickupPoint?.name || 'Pickup Point')
+                                : formatAddress(deliveryAddress) || 'Address not provided'
                               }
                             </span>
                           </div>

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { SectionHeading } from './SectionHeading';
 import { StatCard } from './StatCard';
 import { DeliveryScheduleDisplay } from '../DeliveryScheduleDisplay';
+import { PickupScheduleUpdate } from '../PickupScheduleUpdate';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
 import { formatAddress } from '@/utils/formatAddress';
@@ -162,87 +163,14 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
           ) : deliverySchedule ? (
             // Production Schedule Display - Works for both Delivery and Pickup
             <div className="space-y-3">
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                {orderType === 'pickup' ? (
-                  // Production-Ready Pickup Schedule Fulfillment Section
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <Package className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-primary mb-4">
-                        Pickup Schedule Fulfillment
-                      </h4>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        {/* Channel */}
-                        <div className="space-y-1">
-                          <span className="text-xs text-muted-foreground font-medium">Channel:</span>
-                          <div className="font-semibold text-primary">Pickup</div>
-                        </div>
-                        
-                        {/* Order Status */}
-                        <div className="space-y-1">
-                          <span className="text-xs text-muted-foreground font-medium">Order Status:</span>
-                          <div className="font-semibold text-primary uppercase">{status.replace(/_/g, ' ')}</div>
-                        </div>
-                        
-                        {/* Pickup Date */}
-                        <div className="space-y-1">
-                          <span className="text-xs text-muted-foreground font-medium">Pickup Date:</span>
-                          <div className="font-semibold">
-                            {deliverySchedule?.delivery_date ? (
-                              format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy') === format(new Date(), 'MMM d, yyyy') 
-                                ? 'Today' 
-                                : format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')
-                            ) : 'Today'}
-                          </div>
-                        </div>
-                        
-                        {/* Pickup Time Window */}
-                        <div className="space-y-1">
-                          <span className="text-xs text-muted-foreground font-medium">Pickup Time Window:</span>
-                          <div className="font-semibold">
-                            {deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end ? (
-                              <>
-                                {format(new Date(`1970-01-01T${deliverySchedule.delivery_time_start}`), 'h:mm a')} – {format(new Date(`1970-01-01T${deliverySchedule.delivery_time_end}`), 'h:mm a')}
-                                <span className="ml-2">⏰ Upcoming window</span>
-                              </>
-                            ) : (
-                              <>
-                                4:00 PM – 5:00 PM
-                                <span className="ml-2">⏰ Upcoming window</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Business Day */}
-                        <div className="space-y-1 col-span-2">
-                          <span className="text-xs text-muted-foreground font-medium">Business Day:</span>
-                          <div className="font-semibold">
-                            {deliverySchedule?.delivery_date ? 
-                              format(new Date(deliverySchedule.delivery_date), 'EEEE') : 
-                              format(new Date(), 'EEEE')
-                            }
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Data Sources */}
-                      <div className="flex flex-wrap gap-1 mt-4 pt-3 border-t border-primary/10">
-                        <Badge variant="secondary" className="text-xs">
-                          <Database className="w-3 h-3 mr-1" />
-                          order_delivery_schedule
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs">
-                          <Database className="w-3 h-3 mr-1" />
-                          orders.status
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
+              {/* Import the PickupScheduleUpdate component */}
+              {orderType === 'pickup' ? (
+                <PickupScheduleUpdate 
+                  orderId={orderNumber} 
+                  currentSchedule={deliverySchedule}
+                  onUpdate={onRecoveryAttempt}
+                />
+              ) : (
                   // Complete Fulfillment Information for Delivery Orders
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-0.5">
@@ -392,7 +320,6 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                     </div>
                   </div>
                 )}
-              </div>
             </div>
           ) : (
               // Fallback: Schedule creation required  

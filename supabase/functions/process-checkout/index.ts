@@ -23,47 +23,18 @@ serve(async (req: Request) => {
     const body = await req.json()
     console.log('📦 Checkout request:', JSON.stringify(body, null, 2))
 
-    // Handle both old and new data structures
     const {
       items = [],
       customer = {},
       delivery = {},
-      fulfillment = {},
       total_amount,
       idempotency_key
     } = body
 
-    // Map fulfillment to delivery for backward compatibility
-    const deliveryData = Object.keys(delivery).length > 0 ? delivery : {
-      method: fulfillment.type === 'pickup' ? 'pickup' : 'delivery',
-      location: fulfillment.pickup_point_id ? 'Pickup Point' : fulfillment.address || 'Main Store',
-      address: fulfillment.address || '',
-      fee: fulfillment.fee || 0
-    }
-
     // Validate required fields
     if (!items.length) throw new Error('No items in cart')
     if (!customer.email) throw new Error('Customer email is required')
-
-    // Calculate total_amount if missing (new structure)
-    let calculatedTotalAmount = total_amount
-    if (!calculatedTotalAmount || calculatedTotalAmount <= 0) {
-      // Calculate from items - handle both unit_price and price fields
-      const subtotal = items.reduce((sum: number, item: any) => {
-        const itemPrice = item.price || item.unit_price || 0
-        const itemQuantity = item.quantity || 1
-        return sum + (itemPrice * itemQuantity)
-      }, 0)
-      
-      const deliveryFee = deliveryData.fee || 0
-      calculatedTotalAmount = subtotal + deliveryFee
-      
-      console.log('💰 Calculated total:', { subtotal, deliveryFee, calculatedTotalAmount })
-    }
-
-    if (!calculatedTotalAmount || calculatedTotalAmount <= 0) {
-      throw new Error('Invalid total amount - please check your cart items')
-    }
+    if (!total_amount || total_amount <= 0) throw new Error('Invalid total amount')
 
     // Generate consistent payment reference
     const timestamp = Date.now()
@@ -72,14 +43,11 @@ serve(async (req: Request) => {
     
     console.log('🏷️ Generated payment reference:', paymentReference)
 
-    // Calculate amounts using production-ready logic
-    const subtotal = items.reduce((sum: number, item: any) => {
-      const itemPrice = item.price || item.unit_price || 0
-      const itemQuantity = item.quantity || 1
-      return sum + (itemPrice * itemQuantity)
-    }, 0)
-    const deliveryFee = deliveryData.fee || 0
-    const finalTotal = calculatedTotalAmount // Use the validated total amount
+    // Calculate amounts
+    const subtotal = items.reduce((sum: number, item: any) => 
+      sum + (item.price * item.quantity), 0)
+    const deliveryFee = delivery.fee || 0
+    const calculatedTotal = subtotal + deliveryFee
 
     // Create order data with BOTH references
     const orderData = {
@@ -92,17 +60,12 @@ serve(async (req: Request) => {
       items: items,
       subtotal: subtotal,
       delivery_fee: deliveryFee,
-      total_amount: finalTotal,
+      total_amount: calculatedTotal,
       status: 'pending',
       payment_status: 'pending',
-      // Map delivery data to existing schema columns
-      pickup_point_id: fulfillment.pickup_point_id || null,
-      delivery_address: deliveryData.address ? {
-        address: deliveryData.address,
-        method: deliveryData.method || 'delivery',
-        location: deliveryData.location || 'Customer Address'
-      } : null,
-      special_instructions: fulfillment.special_instructions || delivery.notes || '',
+      delivery_method: delivery.method || 'pickup',
+      delivery_location: delivery.location || 'Main Store',
+      delivery_address: delivery.address || '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       idempotency_key: idempotency_key || `checkout_${timestamp}_${randomId}`
@@ -166,7 +129,7 @@ serve(async (req: Request) => {
 
     const paystackPayload = {
       email: customer.email,
-      amount: finalTotal * 100, // Convert to kobo
+      amount: calculatedTotal * 100, // Convert to kobo
       reference: paymentReference, // Use consistent reference
       callback_url: `https://startersmallchops.com/payment/callback?trxref=${paymentReference}&reference=${paymentReference}`,
       metadata: {
@@ -231,7 +194,7 @@ serve(async (req: Request) => {
         id: orderResult?.id || orderData.id,
         reference: paymentReference,
         payment_reference: paymentReference,
-        total_amount: finalTotal,
+        total_amount: calculatedTotal,
         status: 'pending'
       },
       payment: {

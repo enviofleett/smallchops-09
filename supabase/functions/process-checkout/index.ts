@@ -83,7 +83,7 @@ serve(async (req: Request) => {
       customer_name: customer.name,
       customer_email: customer.email,
       customer_phone: customer.phone,
-      guest_session_id: customer.guest_session_id || null,
+      guest_session_id: customer.guest_session_id && customer.guest_session_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? customer.guest_session_id : null,
       order_type: fulfillment.type === 'pickup' ? 'pickup' : 'delivery',
       status: 'pending',
       payment_status: 'pending',
@@ -94,7 +94,7 @@ serve(async (req: Request) => {
       payment_method: payment.method || 'paystack',
       payment_reference: paymentReference,
       paystack_reference: paymentReference,
-      pickup_point_id: fulfillment.pickup_point_id || null,
+      pickup_point_id: fulfillment.pickup_point_id && fulfillment.pickup_point_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? fulfillment.pickup_point_id : null,
       delivery_address: fulfillment.type === 'delivery' ? {
         address: fulfillment.address || '',
         location: fulfillment.location || '',

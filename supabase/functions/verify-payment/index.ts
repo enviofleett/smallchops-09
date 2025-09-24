@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { getPaystackConfig, logPaystackConfigStatus } from "../_shared/paystack-config.ts"
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://startersmallchops.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
@@ -19,6 +20,10 @@ serve(async (req: Request) => {
   try {
     console.log('🔍 Payment verification started')
     
+    // Initialize request tracking ID for better debugging
+    const requestId = crypto.randomUUID()
+    console.log('🆔 Request ID:', requestId)
+    
     // Use service role key for database operations (no user authentication needed for webhooks)
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -32,11 +37,13 @@ serve(async (req: Request) => {
                      url.searchParams.get('txn_ref')
     
     let requestData: any = {}
+    let paystackSignature: string | null = null
     
-    // Try to get data from request body
+    // Try to get data from request body and signature
     try {
       if (req.body) {
         requestData = await req.json()
+        paystackSignature = req.headers.get('x-paystack-signature')
       }
     } catch (e) {
       console.log('No JSON body, using query params only')
@@ -44,23 +51,76 @@ serve(async (req: Request) => {
     
     const paymentReference = reference || requestData.reference || requestData.trxref
     
-    console.log('📋 Processing payment reference:', paymentReference)
+    console.log('📋 Processing payment reference:', paymentReference, 'Request ID:', requestId)
     
     if (!paymentReference) {
       console.error('❌ No payment reference provided')
       return new Response(JSON.stringify({
         success: false,
-        error: 'Payment reference is required'
+        error: 'Payment reference is required',
+        request_id: requestId
       }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
       })
     }
 
-    // Verify with Paystack
-    const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!PAYSTACK_SECRET_KEY) {
-      throw new Error('Paystack secret key not configured')
+    // Get Paystack configuration with environment detection
+    let paystackConfig
+    try {
+      paystackConfig = getPaystackConfig(req)
+      logPaystackConfigStatus(paystackConfig)
+    } catch (configError) {
+      console.error('❌ Paystack configuration error:', configError)
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Payment system configuration error',
+        request_id: requestId
+      }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      })
+    }
+
+    // Check for duplicate processing (idempotency)
+    console.log('🔄 Checking for existing transaction...')
+    const { data: existingTransaction, error: existingError } = await supabase
+      .from('payment_transactions')
+      .select('id, status, order_id, created_at')
+      .eq('reference', paymentReference)
+      .maybeSingle()
+
+    if (existingError && existingError.code !== 'PGRST116') {
+      console.error('❌ Database error checking existing transaction:', existingError)
+      throw new Error(`Database error: ${existingError.message}`)
+    }
+
+    if (existingTransaction) {
+      console.log('ℹ️ Payment transaction already exists:', existingTransaction.id, 'Status:', existingTransaction.status)
+      
+      // If transaction exists and is successful, return cached result
+      if (existingTransaction.status === 'completed') {
+        const { data: order } = await supabase
+          .from('orders')
+          .select('id, status, payment_status, total_amount')
+          .eq('id', existingTransaction.order_id)
+          .single()
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Payment already verified (cached)',
+          order_id: existingTransaction.order_id,
+          payment_status: existingTransaction.status,
+          order_status: order?.status,
+          amount: order?.total_amount,
+          reference: paymentReference,
+          request_id: requestId,
+          cached: true
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        })
+      }
     }
 
     console.log('🔐 Verifying payment with Paystack...')
@@ -70,14 +130,16 @@ serve(async (req: Request) => {
       {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Authorization': `Bearer ${paystackConfig.secretKey}`,
           'Content-Type': 'application/json'
         }
       }
     )
 
     if (!paystackResponse.ok) {
-      throw new Error(`Paystack API error: ${paystackResponse.status}`)
+      const errorText = await paystackResponse.text()
+      console.error('❌ Paystack API error:', paystackResponse.status, errorText)
+      throw new Error(`Paystack API error: ${paystackResponse.status} - ${errorText}`)
     }
 
     const verificationData = await paystackResponse.json()
@@ -85,39 +147,59 @@ serve(async (req: Request) => {
       status: verificationData.status,
       data_status: verificationData.data?.status,
       reference: verificationData.data?.reference,
-      amount: verificationData.data?.amount
+      amount: verificationData.data?.amount,
+      request_id: requestId
     })
 
     if (!verificationData.status || !verificationData.data) {
-      throw new Error(`Payment verification failed: ${verificationData.message}`)
+      console.error('❌ Invalid Paystack response structure:', verificationData)
+      throw new Error(`Payment verification failed: ${verificationData.message || 'Invalid response structure'}`)
     }
 
     const paymentData = verificationData.data
 
-    // Find the order by payment reference
+    // Find the order by payment reference with better error handling
     console.log('🔍 Finding order with reference:', paymentReference)
     
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('*')
       .eq('payment_reference', paymentReference)
-      .single()
+      .maybeSingle()
 
-    if (orderError || !order) {
-      console.error('❌ Order not found:', orderError)
+    if (orderError) {
+      console.error('❌ Database error finding order:', orderError)
+      throw new Error(`Database error: ${orderError.message}`)
+    }
+
+    if (!order) {
+      console.error('❌ Order not found for reference:', paymentReference)
       throw new Error('Order not found for payment reference')
     }
 
-    console.log('📋 Found order:', order.id, 'Status:', paymentData.status)
+    console.log('📋 Found order:', order.id, 'Current status:', order.status, 'Paystack status:', paymentData.status)
 
-    // Map Paystack status to our database enums with proper validation
+    // Validate status mapping with enhanced error handling
     let orderStatus: string
     let paymentStatus: string
+
+    // Validate payment amounts match (security check)
+    const expectedAmount = Math.round(order.total_amount * 100) // Convert to kobo
+    const receivedAmount = paymentData.amount
+    
+    if (Math.abs(expectedAmount - receivedAmount) > 1) { // Allow 1 kobo tolerance
+      console.error('❌ Amount mismatch:', {
+        expected: expectedAmount,
+        received: receivedAmount,
+        order_total: order.total_amount
+      })
+      throw new Error('Payment amount mismatch - possible fraud attempt')
+    }
 
     switch (paymentData.status) {
       case 'success':
         orderStatus = 'confirmed'
-        paymentStatus = 'completed'  // Use 'completed' instead of 'paid'
+        paymentStatus = 'completed'
         break
       case 'failed':
         orderStatus = 'cancelled'
@@ -129,6 +211,7 @@ serve(async (req: Request) => {
         paymentStatus = 'failed'
         break
       default:
+        console.warn('⚠️ Unknown Paystack status:', paymentData.status)
         orderStatus = 'pending'
         paymentStatus = 'pending'
     }
@@ -136,22 +219,18 @@ serve(async (req: Request) => {
     console.log('🎯 Status mapping:', {
       paystack: paymentData.status,
       order_status: orderStatus,
-      payment_status: paymentStatus
+      payment_status: paymentStatus,
+      amount_verified: true,
+      request_id: requestId
     })
 
-    // Check if payment transaction already exists
-    const { data: existingTransaction } = await supabase
-      .from('payment_transactions')
-      .select('id')
-      .eq('reference', paymentReference)
-      .single()
-
+    // Handle transaction creation/update with proper error handling
     let transactionId = existingTransaction?.id
 
     if (!existingTransaction) {
       console.log('💾 Creating payment transaction record...')
       
-      // Create payment transaction with proper status values
+      // Create payment transaction with enhanced data validation
       const { data: transaction, error: transactionError } = await supabase
         .from('payment_transactions')
         .insert({
@@ -160,10 +239,12 @@ serve(async (req: Request) => {
           reference: paymentReference,
           amount: paymentData.amount / 100, // Convert from kobo to naira
           currency: paymentData.currency || 'NGN',
-          status: paymentStatus, // Use mapped status
+          status: paymentStatus, // Use validated status
           provider: 'paystack',
           provider_response: paymentData,
-          gateway_response: paymentData.gateway_response || '',
+          gateway_response: paymentData.gateway_response || paymentData.message || '',
+          channel: paymentData.channel || 'card',
+          fees: paymentData.fees ? (paymentData.fees / 100) : null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -173,10 +254,13 @@ serve(async (req: Request) => {
       if (transactionError) {
         console.error('❌ Transaction creation failed:', transactionError)
         
-        // Log the specific constraint error for debugging
+        // Enhanced error logging for debugging
         if (transactionError.code === '23514') {
-          console.error('❌ Status constraint violation. Attempted status:', paymentStatus)
-          console.error('❌ Valid statuses should be: pending, completed, failed, cancelled')
+          console.error('❌ Status constraint violation details:', {
+            attempted_status: paymentStatus,
+            valid_statuses: 'pending, initialized, paid, failed, cancelled, refunded, orphaned, mismatch, superseded, authorized, completed',
+            paystack_status: paymentData.status
+          })
         }
         
         throw new Error(`Failed to create payment transaction: ${transactionError.message}`)
@@ -185,10 +269,29 @@ serve(async (req: Request) => {
       transactionId = transaction?.id
       console.log('✅ Payment transaction created:', transactionId)
     } else {
-      console.log('ℹ️ Payment transaction already exists:', transactionId)
+      console.log('ℹ️ Payment transaction already exists, updating status...', transactionId)
+      
+      // Update existing transaction if status changed
+      if (existingTransaction.status !== paymentStatus) {
+        const { error: updateError } = await supabase
+          .from('payment_transactions')
+          .update({
+            status: paymentStatus,
+            provider_response: paymentData,
+            gateway_response: paymentData.gateway_response || paymentData.message || '',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingTransaction.id)
+
+        if (updateError) {
+          console.error('❌ Transaction update failed:', updateError)
+          throw new Error(`Failed to update payment transaction: ${updateError.message}`)
+        }
+        console.log('✅ Payment transaction updated')
+      }
     }
 
-    // Update order status
+    // Update order status with enhanced validation
     console.log('🔄 Updating order status...')
     
     const { error: orderUpdateError } = await supabase
@@ -208,18 +311,53 @@ serve(async (req: Request) => {
 
     console.log('✅ Order updated successfully')
 
-    // Return success response
+    // Queue email notification for successful payments
+    if (paymentStatus === 'completed' && order.customer_email) {
+      try {
+        const { error: emailError } = await supabase
+          .from('communication_events')
+          .insert({
+            event_type: 'order_status_update',
+            recipient_email: order.customer_email,
+            template_key: 'order_confirmed',
+            template_variables: {
+              customer_name: order.customer_name || 'Customer',
+              order_number: order.order_number,
+              total_amount: order.total_amount
+            },
+            status: 'queued',
+            order_id: order.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+
+        if (emailError) {
+          console.warn('⚠️ Failed to queue confirmation email:', emailError)
+          // Don't fail the payment verification for email issues
+        } else {
+          console.log('📧 Confirmation email queued')
+        }
+      } catch (emailErr) {
+        console.warn('⚠️ Email queuing error:', emailErr)
+      }
+    }
+
+    // Return comprehensive success response
     const response = {
       success: true,
-      message: 'Payment verified and order updated',
+      message: 'Payment verified and order updated successfully',
       order_id: order.id,
       payment_status: paymentStatus,
       order_status: orderStatus,
       amount: paymentData.amount / 100,
-      reference: paymentReference
+      reference: paymentReference,
+      transaction_id: transactionId,
+      channel: paymentData.channel,
+      request_id: requestId,
+      verified_at: new Date().toISOString()
     }
 
-    console.log('✅ Payment verification completed:', response)
+    console.log('✅ Payment verification completed successfully:', response)
 
     return new Response(JSON.stringify(response), {
       status: 200,
@@ -229,13 +367,30 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('❌ Payment verification error:', error)
     
-    return new Response(JSON.stringify({
+    // Enhanced error response with debugging information
+    const errorResponse = {
       success: false,
       error: 'Payment verification failed',
       details: error.message,
-      timestamp: new Date().toISOString()
-    }), {
-      status: 500,
+      timestamp: new Date().toISOString(),
+      request_id: crypto.randomUUID() // Fallback request ID
+    }
+
+    // Add specific error codes for common issues
+    if (error.message.includes('Order not found')) {
+      errorResponse.error_code = 'ORDER_NOT_FOUND'
+    } else if (error.message.includes('Paystack API error')) {
+      errorResponse.error_code = 'PAYSTACK_API_ERROR'
+    } else if (error.message.includes('Database error')) {
+      errorResponse.error_code = 'DATABASE_ERROR'
+    } else if (error.message.includes('amount mismatch')) {
+      errorResponse.error_code = 'AMOUNT_MISMATCH'
+    }
+    
+    const statusCode = error.message.includes('Order not found') ? 404 : 500
+    
+    return new Response(JSON.stringify(errorResponse), {
+      status: statusCode,
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     })
   }

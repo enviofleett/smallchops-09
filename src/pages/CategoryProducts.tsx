@@ -58,15 +58,39 @@ const CategoryProductsContent = () => {
   const currentCategory = categories.find(cat => cat.id === categoryId);
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
-  // Filter and sort products by price (lowest to highest by default) - Production Ready
+  // Production-ready day-based product arrangement logic
+  const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'weekend'];
+  
+  const getDayPriority = (productName: string): number => {
+    const name = productName.toLowerCase();
+    for (let i = 0; i < DAY_ORDER.length; i++) {
+      if (name.includes(DAY_ORDER[i])) {
+        return i;
+      }
+    }
+    return DAY_ORDER.length; // Non-day products come after day-based ones
+  };
+
   const filteredAndSortedProducts = products
-    .filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter(product => {
+      if (!product?.name) return false; // Safety check
+      return (
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    })
     .sort((a, b) => {
-      const priceA = a.discounted_price || a.price;
-      const priceB = b.discounted_price || b.price;
+      // First, sort by day priority (Monday -> Tuesday -> Wednesday -> Thursday -> Weekend)
+      const dayPriorityA = getDayPriority(a.name);
+      const dayPriorityB = getDayPriority(b.name);
+      
+      if (dayPriorityA !== dayPriorityB) {
+        return dayPriorityA - dayPriorityB;
+      }
+      
+      // If both products have the same day priority, sort by price (lowest first)
+      const priceA = a.discounted_price || a.price || 0;
+      const priceB = b.discounted_price || b.price || 0;
       return priceA - priceB;
     });
 

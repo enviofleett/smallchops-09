@@ -17,6 +17,8 @@ import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
+import { useThermalPrint } from '@/hooks/useThermalPrint';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 // Import our new components
@@ -58,6 +60,12 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
   // Job order print hook
   const { printJobOrder } = useJobOrderPrint();
+  
+  // Thermal print hook
+  const { printThermalReceipt } = useThermalPrint();
+  
+  // Get current admin user
+  const { user: adminUser } = useAuth();
 
   // Use detailed order data to get product features and full information
   const {
@@ -315,8 +323,8 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     });
   };
 
-  // Admin receipt print handler (Monday only)
-  const handleAdminReceiptPrint = () => {
+  // Admin thermal receipt print handler (Monday only)
+  const handleAdminReceiptPrint = async () => {
     const today = new Date();
     const isMonday = today.getDay() === 1;
     
@@ -329,15 +337,28 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       return;
     }
 
-    const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
     const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
     
-    // Enhanced admin receipt with Monday verification
-    printJobOrder(order, items, schedule, pickupPoint);
+    // Get admin name for receipt
+    const adminName = (adminUser as any)?.user_metadata?.full_name || 
+                     adminUser?.email?.split('@')[0] || 
+                     'Admin User';
+    
+    // Enhanced business info with admin details
+    const businessInfo = {
+      name: 'STARTERS SMALL CHOPS',
+      admin_notification_email: 'store@startersmallchops.com',
+      whatsapp_support_number: '0807 301 1100',
+      printed_by: adminName,
+      printed_on: format(today, 'EEEE, MMMM do, yyyy \'at\' h:mm a')
+    };
+    
+    // Print thermal receipt with 80mm formatting
+    await printThermalReceipt(order, schedule, businessInfo);
     
     toast({
-      title: 'Admin Receipt Generated',
-      description: `Receipt printed on ${format(today, 'EEEE, MMMM do, yyyy')} - Admin authorization verified.`,
+      title: 'Thermal Receipt Printed',
+      description: `80mm receipt generated on ${format(today, 'EEEE, MMMM do')} by ${adminName}`,
     });
   };
 

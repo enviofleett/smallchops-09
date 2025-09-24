@@ -10,6 +10,8 @@ interface ThermalPrintReceiptProps {
     admin_notification_email?: string;
     whatsapp_support_number?: string;
     logo_url?: string;
+    printed_by?: string;
+    printed_on?: string;
   };
 }
 
@@ -218,6 +220,18 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           )}
           {businessInfo?.admin_notification_email && (
             <div>Email: {businessInfo.admin_notification_email}</div>
+          )}
+          
+          <div className="divider">================================</div>
+          
+          {/* Admin Print Information */}
+          {businessInfo?.printed_by && (
+            <div className="admin-print-info" style={{ fontSize: '7px', marginTop: '4px' }}>
+              <div style={{ fontWeight: 'bold' }}>Printed by: {businessInfo.printed_by}</div>
+              {businessInfo.printed_on && (
+                <div>On: {businessInfo.printed_on}</div>
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -148,6 +148,13 @@
     font-size: 7px !important;
   }
   
+  .admin-print-info {
+    font-size: 7px !important;
+    margin-top: 4px !important;
+    text-align: center !important;
+    font-weight: bold !important;
+  }
+  
   .text-center {
     text-align: center !important;
   }

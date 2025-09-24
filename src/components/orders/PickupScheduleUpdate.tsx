@@ -324,15 +324,57 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
           <span className="text-xs text-muted-foreground font-medium">Pickup Time Window:</span>
           <div className="font-semibold">
             {currentSchedule?.delivery_time_start && currentSchedule?.delivery_time_end ? (
-              <>
-                {formatTimeForDisplay(currentSchedule.delivery_time_start)} – {formatTimeForDisplay(currentSchedule.delivery_time_end)}
-                <span className="ml-2">⏰ Upcoming window</span>
-              </>
+              (() => {
+                const now = new Date();
+                const scheduleDate = currentSchedule.delivery_date ? new Date(currentSchedule.delivery_date) : new Date();
+                const startTime = new Date(`${format(scheduleDate, 'yyyy-MM-dd')}T${currentSchedule.delivery_time_start}`);
+                const endTime = new Date(`${format(scheduleDate, 'yyyy-MM-dd')}T${currentSchedule.delivery_time_end}`);
+                
+                const isExpired = now > endTime;
+                const isActive = now >= startTime && now <= endTime;
+                const isUpcoming = now < startTime;
+                
+                return (
+                  <>
+                    {formatTimeForDisplay(currentSchedule.delivery_time_start)} – {formatTimeForDisplay(currentSchedule.delivery_time_end)}
+                    {isExpired && (
+                      <span className="ml-2 text-destructive">⏰ Expired window</span>
+                    )}
+                    {isActive && (
+                      <span className="ml-2 text-green-600">⏰ Active window</span>
+                    )}
+                    {isUpcoming && (
+                      <span className="ml-2">⏰ Upcoming window</span>
+                    )}
+                  </>
+                );
+              })()
             ) : (
-              <>
-                4:00 PM – 5:00 PM
-                <span className="ml-2">⏰ Default window</span>
-              </>
+              (() => {
+                const now = new Date();
+                const today = new Date();
+                const defaultStart = new Date(`${format(today, 'yyyy-MM-dd')}T16:00`);
+                const defaultEnd = new Date(`${format(today, 'yyyy-MM-dd')}T17:00`);
+                
+                const isExpired = now > defaultEnd;
+                const isActive = now >= defaultStart && now <= defaultEnd;
+                const isUpcoming = now < defaultStart;
+                
+                return (
+                  <>
+                    4:00 PM – 5:00 PM
+                    {isExpired && (
+                      <span className="ml-2 text-destructive">⏰ Expired window</span>
+                    )}
+                    {isActive && (
+                      <span className="ml-2 text-green-600">⏰ Active window</span>
+                    )}
+                    {isUpcoming && (
+                      <span className="ml-2">⏰ Default window</span>
+                    )}
+                  </>
+                );
+              })()
             )}
           </div>
         </div>

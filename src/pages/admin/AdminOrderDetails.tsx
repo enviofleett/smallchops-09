@@ -169,6 +169,13 @@ const AdminOrderDetails: React.FC = () => {
               isLoadingSchedule={false}
               recoveryError={false}
               onRecoveryAttempt={() => {}}
+              order={{
+                id: order.id,
+                order_type: order.order_type as 'pickup' | 'delivery',
+                pickup_time: order.pickup_time,
+                special_instructions: order.special_instructions,
+                created_at: order.created_at
+              }}
             />
             
             {delivery_schedule && (

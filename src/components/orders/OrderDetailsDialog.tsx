@@ -476,7 +476,14 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 onRecoveryAttempt={() => attemptScheduleRecovery(order.id)} 
                 recoveryPending={isRecovering} 
                 recoveryError={!!detailsError} 
-                recoveryStatus={recoveryStatus} 
+                recoveryStatus={recoveryStatus}
+                order={{
+                  id: order.id,
+                  order_type: order.order_type as 'pickup' | 'delivery',
+                  pickup_time: order.pickup_time,
+                  special_instructions: order.special_instructions,
+                  created_at: order.created_at
+                }}
               />
             </section>
 

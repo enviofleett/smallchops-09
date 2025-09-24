@@ -33,6 +33,13 @@ interface OrderInfoCardProps {
     isRecovering: boolean;
     lastAttempt?: number;
   };
+  order?: {
+    id: string;
+    order_type: 'pickup' | 'delivery';
+    pickup_time?: string;
+    special_instructions?: string;
+    created_at: string;
+  };
 }
 
 export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
@@ -51,7 +58,8 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
   onRecoveryAttempt,
   recoveryPending,
   recoveryError,
-  recoveryStatus
+  recoveryStatus,
+  order
 }) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
@@ -168,6 +176,7 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                 <PickupScheduleUpdate 
                   orderId={orderNumber} 
                   currentSchedule={deliverySchedule}
+                  order={order}
                   onUpdate={onRecoveryAttempt}
                 />
               ) : (

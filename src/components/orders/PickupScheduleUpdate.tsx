@@ -15,15 +15,25 @@ interface DeliverySchedule {
   updated_at: string;
 }
 
+interface Order {
+  id: string;
+  order_type: 'pickup' | 'delivery';
+  pickup_time?: string;
+  special_instructions?: string;
+  created_at: string;
+}
+
 interface PickupScheduleUpdateProps {
   orderId: string;
   currentSchedule?: DeliverySchedule;
+  order?: Order;
   onUpdate?: () => void;
 }
 
 export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
   orderId,
   currentSchedule,
+  order,
   onUpdate
 }) => {
   const formatTimeForDisplay = (time: string) => {
@@ -34,29 +44,63 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
     }
   };
 
+  // For pickup orders, use pickup_time from order if no delivery schedule exists
+  const getScheduleData = () => {
+    if (currentSchedule) {
+      return {
+        date: currentSchedule.delivery_date,
+        timeStart: currentSchedule.delivery_time_start,
+        timeEnd: currentSchedule.delivery_time_end,
+        isFlexible: currentSchedule.is_flexible,
+        specialInstructions: currentSchedule.special_instructions,
+        requestedAt: currentSchedule.requested_at
+      };
+    }
+    
+    // Fallback to pickup_time for pickup orders
+    if (order?.pickup_time) {
+      const pickupDate = new Date(order.pickup_time);
+      return {
+        date: format(pickupDate, 'yyyy-MM-dd'),
+        timeStart: format(pickupDate, 'HH:mm:ss'),
+        timeEnd: null, // Pickup times are usually single points, not ranges
+        isFlexible: false,
+        specialInstructions: order.special_instructions,
+        requestedAt: order.created_at
+      };
+    }
+    
+    return null;
+  };
+
+  const scheduleData = getScheduleData();
+  const isPickupOrder = order?.order_type === 'pickup';
+
   return (
     <div className="space-y-3 border border-primary/20 rounded-lg p-4 bg-primary/5">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-primary">
-          {currentSchedule ? 'Delivery Schedule Fulfillment' : 'Schedule Fulfillment'}
+          {isPickupOrder ? 'Pickup Schedule' : 'Delivery Schedule'}
         </h4>
       </div>
       
       <div className="grid grid-cols-2 gap-4 text-sm">
-        {/* Pickup Date */}
+        {/* Date */}
         <div className="space-y-1">
-          <span className="text-xs text-muted-foreground font-medium">Date:</span>
+          <span className="text-xs text-muted-foreground font-medium">
+            {isPickupOrder ? 'Pickup Date:' : 'Date:'}
+          </span>
           <div className="font-semibold">
-            {currentSchedule?.delivery_date ? (
+            {scheduleData?.date ? (
               <div className="space-y-1">
                 <div>
-                  {format(new Date(currentSchedule.delivery_date), 'MMM d, yyyy') === format(new Date(), 'MMM d, yyyy') 
+                  {format(new Date(scheduleData.date), 'MMM d, yyyy') === format(new Date(), 'MMM d, yyyy') 
                     ? 'Today' 
-                    : format(new Date(currentSchedule.delivery_date), 'MMM d, yyyy')
+                    : format(new Date(scheduleData.date), 'MMM d, yyyy')
                   }
                 </div>
                 <div className="text-xs text-muted-foreground font-normal">
-                  {format(new Date(currentSchedule.delivery_date), 'EEEE, MMMM do, yyyy')}
+                  {format(new Date(scheduleData.date), 'EEEE, MMMM do, yyyy')}
                 </div>
               </div>
             ) : (
@@ -69,22 +113,27 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
         
         {/* Time Window */}
         <div className="space-y-1">
-          <span className="text-xs text-muted-foreground font-medium">Time Window:</span>
+          <span className="text-xs text-muted-foreground font-medium">
+            {isPickupOrder ? 'Pickup Time:' : 'Time Window:'}
+          </span>
           <div className="font-semibold">
-            {currentSchedule?.delivery_time_start && currentSchedule?.delivery_time_end ? (
+            {scheduleData?.timeStart ? (
               (() => {
                 const now = new Date();
-                const scheduleDate = currentSchedule.delivery_date ? new Date(currentSchedule.delivery_date) : new Date();
-                const startTime = new Date(`${format(scheduleDate, 'yyyy-MM-dd')}T${currentSchedule.delivery_time_start}`);
-                const endTime = new Date(`${format(scheduleDate, 'yyyy-MM-dd')}T${currentSchedule.delivery_time_end}`);
+                const scheduleDate = scheduleData.date ? new Date(scheduleData.date) : new Date();
+                const startTime = new Date(`${format(scheduleDate, 'yyyy-MM-dd')}T${scheduleData.timeStart}`);
+                const endTime = scheduleData.timeEnd 
+                  ? new Date(`${format(scheduleDate, 'yyyy-MM-dd')}T${scheduleData.timeEnd}`)
+                  : startTime; // For pickup times without end time
                 
-                const isExpired = now > endTime;
+                const isExpired = now > (scheduleData.timeEnd ? endTime : startTime);
                 const isActive = now >= startTime && now <= endTime;
                 const isUpcoming = now < startTime;
                 
                 return (
                   <>
-                    {formatTimeForDisplay(currentSchedule.delivery_time_start)} – {formatTimeForDisplay(currentSchedule.delivery_time_end)}
+                    {formatTimeForDisplay(scheduleData.timeStart)}
+                    {scheduleData.timeEnd && ` – ${formatTimeForDisplay(scheduleData.timeEnd)}`}
                     {isExpired && (
                       <span className="ml-2 text-destructive">⏰ Expired</span>
                     )}
@@ -99,18 +148,18 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
               })()
             ) : (
               <Badge variant="outline" className="text-xs">
-                No time window set
+                No time set
               </Badge>
             )}
           </div>
         </div>
         
-        {/* Business Day */}
+        {/* Day */}
         <div className="space-y-1">
           <span className="text-xs text-muted-foreground font-medium">Day:</span>
           <div className="font-semibold">
-            {currentSchedule?.delivery_date ? 
-              format(new Date(currentSchedule.delivery_date), 'EEEE') : 
+            {scheduleData?.date ? 
+              format(new Date(scheduleData.date), 'EEEE') : 
               <Badge variant="outline" className="text-xs">
                 Not scheduled
               </Badge>
@@ -118,13 +167,13 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
           </div>
         </div>
 
-        {/* Flexibility Status */}
+        {/* Schedule Type */}
         <div className="space-y-1">
           <span className="text-xs text-muted-foreground font-medium">Schedule Type:</span>
           <div className="font-semibold">
-            {currentSchedule ? (
-              <Badge variant={currentSchedule.is_flexible ? "secondary" : "default"} className="text-xs">
-                {currentSchedule.is_flexible ? 'Flexible' : 'Fixed Time'}
+            {scheduleData ? (
+              <Badge variant={scheduleData.isFlexible ? "secondary" : "default"} className="text-xs">
+                {scheduleData.isFlexible ? 'Flexible' : (isPickupOrder ? 'Fixed Pickup' : 'Fixed Time')}
               </Badge>
             ) : (
               <Badge variant="outline" className="text-xs">
@@ -136,21 +185,21 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
       </div>
 
       {/* Special Instructions */}
-      {currentSchedule?.special_instructions && (
+      {scheduleData?.specialInstructions && (
         <div className="pt-3 border-t border-primary/10">
           <div className="space-y-1">
             <span className="text-xs text-muted-foreground font-medium">Special Instructions:</span>
             <div className="text-sm p-2 bg-background/50 rounded border text-muted-foreground">
-              {currentSchedule.special_instructions}
+              {scheduleData.specialInstructions}
             </div>
           </div>
         </div>
       )}
 
       {/* Schedule Requested Time */}
-      {currentSchedule?.requested_at && (
+      {scheduleData?.requestedAt && (
         <div className="pt-2 text-xs text-muted-foreground">
-          Scheduled on {format(new Date(currentSchedule.requested_at), 'MMM d, yyyy \'at\' h:mm a')}
+          Scheduled on {format(new Date(scheduleData.requestedAt), 'MMM d, yyyy \'at\' h:mm a')}
         </div>
       )}
     </div>

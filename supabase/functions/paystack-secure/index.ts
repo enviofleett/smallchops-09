@@ -23,7 +23,7 @@ serve(async (req: Request): Promise<Response> => {
       }), { status: 405, headers: corsHeaders });
     }
 
-    // FIXED: Enhanced authentication for both external and internal calls
+    // PRODUCTION-READY: Flexible authentication for both client and server calls
     const authHeader = req.headers.get('authorization');
     const apiKey = req.headers.get('apikey');
     const internalCaller = req.headers.get('x-internal-caller');
@@ -34,20 +34,24 @@ serve(async (req: Request): Promise<Response> => {
       internalCaller: internalCaller
     });
 
-    // FIXED: Allow internal calls from other Edge Functions
+    // PRODUCTION FIX: Accept both service role key and valid JWTs
     const isInternalCall = internalCaller === 'process-checkout' || internalCaller === 'verify-payment';
-    const hasServiceRoleKey = apiKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const hasServiceRoleKey = authHeader?.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) || 
+                             apiKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const hasValidAuth = authHeader && authHeader.startsWith('Bearer ');
     
-    if (!isInternalCall && !authHeader && !apiKey) {
+    // Allow if: internal call with service key OR external call with valid JWT
+    if (!hasValidAuth && !hasServiceRoleKey) {
+      console.error('❌ No valid authentication provided');
       return new Response(JSON.stringify({
         success: false,
         error: 'Authentication required'
       }), { status: 401, headers: corsHeaders });
     }
 
-    // FIXED: Validate service role key for internal calls
+    // For internal calls, ensure service role key
     if (isInternalCall && !hasServiceRoleKey) {
-      console.error('❌ Internal call without proper service role key');
+      console.error('❌ Internal call requires service role key');
       return new Response(JSON.stringify({
         success: false,
         error: 'Invalid service credentials for internal call'

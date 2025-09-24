@@ -268,8 +268,9 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Use service role key for Edge Function calls
-        'x-internal-caller': 'process-checkout'
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Service role for internal calls
+        'apikey': SUPABASE_SERVICE_ROLE_KEY, // Additional auth header
+        'x-internal-caller': 'process-checkout' // Identify internal call
       },
       body: JSON.stringify(paymentPayload)
     });

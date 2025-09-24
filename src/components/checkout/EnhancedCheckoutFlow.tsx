@@ -802,7 +802,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 placeholder={isAuthenticated ? "Loading your name..." : "Enter your full name"} 
                 required 
                 className={cn(
-                  "h-10",
+                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
                   isAuthenticated && formData.customer_name && "bg-muted border-green-200",
                   isAuthenticated && !formData.customer_name && "animate-pulse"
                 )}
@@ -830,7 +830,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 placeholder={isAuthenticated ? "Loading your email..." : "Enter your email"} 
                 required 
                 className={cn(
-                  "h-10",
+                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
                   isAuthenticated && formData.customer_email && "bg-muted border-green-200",
                   isAuthenticated && !formData.customer_email && "animate-pulse"
                 )}
@@ -858,7 +858,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
                 required
                 className={cn(
-                  "h-10",
+                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
                   isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
                   isAuthenticated && !formData.customer_phone && "animate-pulse"
                 )}
@@ -969,21 +969,21 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             <CardContent className="space-y-3">
               <div>
                 <RequiredFieldLabel htmlFor="address_line_1" required>Street Address</RequiredFieldLabel>
-                <Input id="address_line_1" value={formData.delivery_address.address_line_1} onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} placeholder="Enter street address" required className="h-10" />
+                <Input id="address_line_1" value={formData.delivery_address.address_line_1} onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} placeholder="Enter street address" required className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
               </div>
               <div>
                 <RequiredFieldLabel htmlFor="address_line_2">Apartment, suite, etc.</RequiredFieldLabel>
-                <Input id="address_line_2" value={formData.delivery_address.address_line_2} onChange={e => handleFormChange('delivery_address.address_line_2', e.target.value)} placeholder="Apartment, suite, etc." className="h-10" />
+                <Input id="address_line_2" value={formData.delivery_address.address_line_2} onChange={e => handleFormChange('delivery_address.address_line_2', e.target.value)} placeholder="Apartment, suite, etc." className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
               </div>
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <RequiredFieldLabel htmlFor="city" required>City</RequiredFieldLabel>
-                  <Input id="city" value={formData.delivery_address.city} onChange={e => handleFormChange('delivery_address.city', e.target.value)} placeholder="City" required className="h-10" />
+                  <Input id="city" value={formData.delivery_address.city} onChange={e => handleFormChange('delivery_address.city', e.target.value)} placeholder="City" required className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
                 </div>
               </div>
               <div>
                 <RequiredFieldLabel htmlFor="landmark">Landmark</RequiredFieldLabel>
-                <Input id="landmark" value={formData.delivery_address.landmark} onChange={e => handleFormChange('delivery_address.landmark', e.target.value)} placeholder="Nearby landmark" className="h-10" />
+                <Input id="landmark" value={formData.delivery_address.landmark} onChange={e => handleFormChange('delivery_address.landmark', e.target.value)} placeholder="Nearby landmark" className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
               </div>
               <div>
                 <RequiredFieldLabel htmlFor="delivery_instructions">Delivery Instructions</RequiredFieldLabel>
@@ -991,7 +991,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   <Input id="delivery_instructions" value={formData.special_instructions || ''} onChange={e => {
                 const value = e.target.value.slice(0, 160); // Limit to 160 characters
                 handleFormChange('special_instructions', value);
-              }} placeholder="Gate code, building entrance, floor, special handling notes..." maxLength={160} className="h-10" />
+              }} placeholder="Gate code, building entrance, floor, special handling notes..." maxLength={160} className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
                   <div className="flex justify-between mt-1">
                     <span className="text-xs text-muted-foreground">
                       Help our drivers find you and deliver your order smoothly

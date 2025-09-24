@@ -58,13 +58,33 @@ const CategoryProductsContent = () => {
   const currentCategory = categories.find(cat => cat.id === categoryId);
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
-  // Filter and sort products by price (lowest to highest by default) - Production Ready
+  // Helper function to get lunch box priority
+  const getLunchBoxPriority = (productName: string): number => {
+    const name = productName.toLowerCase();
+    if (name.includes('monday') && name.includes('lunch')) return 1;
+    if (name.includes('tuesday') && name.includes('lunch')) return 2;
+    if (name.includes('wednesday') && name.includes('lunch')) return 3;
+    if (name.includes('thursday') && name.includes('lunch')) return 4;
+    if (name.includes('weekend') && name.includes('lunch')) return 5;
+    return 999; // Non-lunch box items go last
+  };
+
+  // Filter and sort products - Lunch boxes first in specific order, then by price - Production Ready
   const filteredAndSortedProducts = products
     .filter(product => 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
+      // First, sort by lunch box priority
+      const priorityA = getLunchBoxPriority(a.name);
+      const priorityB = getLunchBoxPriority(b.name);
+      
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      // If same priority (both lunch boxes or both non-lunch boxes), sort by price
       const priceA = a.discounted_price || a.price;
       const priceB = b.discounted_price || b.price;
       return priceA - priceB;

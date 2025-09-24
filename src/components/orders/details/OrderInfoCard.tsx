@@ -174,12 +174,19 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                           <span className="font-medium">{new Date(deliverySchedule.delivery_date).toLocaleDateString()}</span>
                         </div>
                       )}
-                      {deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Time:</span>
-                          <span className="font-medium">{deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</span>
+                          <span className="font-medium">
+                            {deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end 
+                              ? `${deliverySchedule.delivery_time_start.substring(0, 5)} - ${deliverySchedule.delivery_time_end.substring(0, 5)}`
+                              : deliverySchedule.delivery_time_start?.substring(0, 5) || 'TBD'
+                            }
+                          </span>
                         </div>
-                      )}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Channel:</span>
+                        <span className="font-medium capitalize">{orderType}</span>
+                      </div>
                       {deliverySchedule.is_flexible && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Flexibility:</span>
@@ -198,28 +205,58 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
               </div>
             </div>
           ) : (
-              // Enhanced fallback: Try multiple approaches to find schedule data
+              // Fallback: Schedule creation required  
               <div className="space-y-3">
-                {/* Primary Warning Card */}
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-950 dark:border-amber-800">
+                {/* Schedule Creation Card */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 dark:bg-blue-950 dark:border-blue-800">
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-0.5">
                       {orderType === 'delivery' ? (
-                        <Truck className="w-4 h-4 text-amber-600" />
+                        <Truck className="w-4 h-4 text-blue-600" />
                       ) : (
-                        <Package className="w-4 h-4 text-amber-600" />
+                        <Package className="w-4 h-4 text-blue-600" />
                       )}
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                        {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Schedule Missing
+                      <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                        {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Schedule Required
                       </h4>
-                      <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
-                        {orderType === 'delivery' 
-                          ? 'This order does not have a delivery schedule assigned yet. This may happen for orders that were placed before schedule creation was implemented.'
-                          : 'This order does not have a pickup schedule assigned yet. The pickup details will be confirmed manually.'
-                        }
-                      </p>
+                      
+                      {/* Expected fulfillment data display */}
+                      <div className="space-y-2 text-sm">
+                        <div className="grid grid-cols-2 gap-4 text-blue-700 dark:text-blue-300">
+                          <div>
+                            <span className="font-medium">Date:</span>
+                            <span className="ml-1 text-muted-foreground">To be scheduled</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Time:</span>
+                            <span className="ml-1 text-muted-foreground">To be confirmed</span>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-blue-700 dark:text-blue-300">
+                          <div>
+                            <span className="font-medium">Channel:</span>
+                            <span className="ml-1 capitalize">{orderType}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Status:</span>
+                            <span className="ml-1 capitalize">{status.replace(/_/g, ' ')}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Instructions placeholder */}
+                        <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
+                          <span className="font-medium text-blue-700 dark:text-blue-300">Instructions:</span>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            {orderType === 'delivery' 
+                              ? 'Delivery details will be confirmed once scheduled'
+                              : 'Pickup instructions will be provided upon confirmation'
+                            }
+                          </p>
+                        </div>
+                      </div>
                       
                       {/* Enhanced Status Info */}
                       <div className="bg-amber-100 dark:bg-amber-900 rounded p-2 mb-2">

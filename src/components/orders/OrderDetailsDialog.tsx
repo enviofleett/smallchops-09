@@ -393,7 +393,38 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <h2 id="order-info-heading" className={cn("text-lg font-semibold text-foreground mb-4", "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2")}>
                 Order Details
               </h2>
-              <OrderInfoCard orderNumber={safeFallback(order.order_number)} orderTime={order.order_time} orderType={order.order_type as 'delivery' | 'pickup'} status={order.status} paymentStatus={order.payment_status} paymentReference={safeFallback(order.payment_reference)} totalAmount={order.total_amount} deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule} isLoadingSchedule={isLoadingDetails || isLoadingSchedule} onRecoveryAttempt={() => attemptScheduleRecovery(order.id)} recoveryPending={isRecovering} recoveryError={!!detailsError} recoveryStatus={recoveryStatus} />
+              <OrderInfoCard 
+                orderNumber={safeFallback(order.order_number)} 
+                orderTime={order.order_time} 
+                orderType={order.order_type as 'delivery' | 'pickup'} 
+                status={order.status} 
+                paymentStatus={order.payment_status} 
+                paymentReference={safeFallback(order.payment_reference)} 
+                totalAmount={order.total_amount} 
+                deliverySchedule={
+                  detailedOrderData?.delivery_schedule || 
+                  deliverySchedule || 
+                  // Fallback to order's own schedule data
+                  (order.pickup_time || order.delivery_time || order.estimated_delivery_date) ? {
+                    delivery_date: order.order_type === 'pickup' 
+                      ? order.pickup_time?.split('T')[0] 
+                      : order.delivery_time?.split('T')[0] || order.estimated_delivery_date?.split('T')[0],
+                    delivery_time_start: order.order_type === 'pickup' 
+                      ? order.pickup_time?.split('T')[1]?.substring(0, 8)
+                      : order.delivery_time?.split('T')[1]?.substring(0, 8) || '09:00:00',
+                    delivery_time_end: order.order_type === 'pickup' 
+                      ? order.pickup_time?.split('T')[1]?.substring(0, 8)
+                      : order.delivery_time?.split('T')[1]?.substring(0, 8) || '17:00:00',
+                    is_flexible: false,
+                    special_instructions: order.special_instructions || null
+                  } : null
+                } 
+                isLoadingSchedule={isLoadingDetails || isLoadingSchedule} 
+                onRecoveryAttempt={() => attemptScheduleRecovery(order.id)} 
+                recoveryPending={isRecovering} 
+                recoveryError={!!detailsError} 
+                recoveryStatus={recoveryStatus} 
+              />
             </section>
 
             {/* Delivery Schedule Section - Removed duplicate display since OrderInfoCard now shows it */}

@@ -20,6 +20,7 @@ interface OrderInfoCardProps {
   deliverySchedule?: any;
   pickupPoint?: any;
   deliveryAddress?: string;
+  specialInstructions?: string;
   isLoadingSchedule?: boolean;
   onRecoveryAttempt?: () => void;
   recoveryPending?: boolean;
@@ -44,6 +45,7 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
   deliverySchedule,
   pickupPoint,
   deliveryAddress,
+  specialInstructions,
   isLoadingSchedule,
   onRecoveryAttempt,
   recoveryPending,
@@ -170,26 +172,23 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                     )}
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-sm font-medium text-primary mb-3">
-                      {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Scheduled
+                    <h4 className="text-sm font-medium text-primary mb-4">
+                      Complete Fulfillment Information
                     </h4>
                     
-                    {/* Fulfillment Information with Data Sources */}
                     <div className="space-y-4 text-sm">
-                      {/* Order Type */}
-                      <div className="flex flex-col gap-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground font-medium">Order Type:</span>
+                      {/* 1. Fulfillment Type */}
+                      <div className="bg-secondary/20 rounded-lg p-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-muted-foreground font-medium">Fulfillment Type:</span>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
-                              Available
-                            </Badge>
-                            <span className="font-semibold capitalize">
+                            <Badge variant="outline" className="text-xs">Available</Badge>
+                            <span className="font-semibold capitalize text-primary">
                               {orderType}
                             </span>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-1 ml-auto">
+                        <div className="flex flex-wrap gap-1">
                           <Badge variant="secondary" className="text-xs">
                             <Database className="w-3 h-3 mr-1" />
                             orders.order_type
@@ -197,38 +196,37 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                         </div>
                       </div>
 
-                      {/* Delivery/Pickup Address */}
-                      <div className="flex flex-col gap-2">
-                        <div className="flex justify-between items-start">
+                      {/* 2. Address Information (Conditional) */}
+                      <div className="bg-secondary/20 rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-2">
                           <span className="text-muted-foreground font-medium">
                             {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Address:
                           </span>
                           <div className="flex items-start gap-2 text-right">
                             <Badge variant="outline" className="text-xs">
-                              Available
+                              {(orderType === 'pickup' && pickupPoint) || (orderType === 'delivery' && deliveryAddress) ? 'Available' : 'Missing'}
                             </Badge>
                             <span className="font-semibold max-w-48 text-sm break-words">
                               {orderType === 'pickup' 
                                 ? (pickupPoint?.address 
                                     ? formatAddress(pickupPoint.address) 
-                                    : pickupPoint?.name || 'Pickup Point')
-                                : formatAddress(deliveryAddress) || 'Address not provided'
+                                    : pickupPoint?.name || 'Pickup Point Not Set')
+                                : formatAddress(deliveryAddress) || 'Delivery Address Not Set'
                               }
                             </span>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-1 ml-auto">
+                        {orderType === 'pickup' && pickupPoint?.operating_hours && (
+                          <div className="mb-2 text-xs text-muted-foreground">
+                            Hours: {pickupPoint.operating_hours}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-1">
                           {orderType === 'pickup' ? (
-                            <>
-                              <Badge variant="secondary" className="text-xs">
-                                <Database className="w-3 h-3 mr-1" />
-                                pickup_points table
-                              </Badge>
-                              <Badge variant="secondary" className="text-xs">
-                                <Database className="w-3 h-3 mr-1" />
-                                delivery_schedule table
-                              </Badge>
-                            </>
+                            <Badge variant="secondary" className="text-xs">
+                              <Database className="w-3 h-3 mr-1" />
+                              pickup_points table
+                            </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">
                               <Database className="w-3 h-3 mr-1" />
@@ -238,58 +236,98 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                         </div>
                       </div>
 
-                      {/* Scheduled Time */}
-                      <div className="flex flex-col gap-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground font-medium">Scheduled Time:</span>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={deliverySchedule.delivery_date ? "outline" : "destructive"} className="text-xs">
-                              {deliverySchedule.delivery_date ? "Available" : "Missing"}
-                            </Badge>
-                            <span className="font-semibold">
-                              {deliverySchedule.delivery_date 
-                                ? `${format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')} ${
-                                    deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end 
-                                      ? `${deliverySchedule.delivery_time_start.substring(0, 5)} - ${deliverySchedule.delivery_time_end.substring(0, 5)}`
-                                      : deliverySchedule.delivery_time_start?.substring(0, 5) || 'TBD'
-                                  }`
-                                : 'Not scheduled'
-                              }
-                            </span>
+                      {/* 3. Special Instructions (Two-Level System) */}
+                      <div className="bg-secondary/20 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-muted-foreground font-medium">Special Instructions:</span>
+                          <Badge variant="outline" className="text-xs">
+                            {(specialInstructions || deliverySchedule?.special_instructions) ? 'Available' : 'None'}
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          {/* Order-Level Instructions */}
+                          <div className="border border-muted rounded-lg p-2">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium text-muted-foreground">ORDER INSTRUCTIONS:</span>
+                              <Badge variant="secondary" className="text-xs">
+                                <Database className="w-3 h-3 mr-1" />
+                                orders.special_instructions
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-foreground">
+                              {specialInstructions || 'No order-level instructions provided'}
+                            </p>
+                          </div>
+
+                          {/* Delivery Schedule Instructions */}
+                          <div className="border border-muted rounded-lg p-2">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium text-muted-foreground">SCHEDULE INSTRUCTIONS:</span>
+                              <Badge variant="secondary" className="text-xs">
+                                <Database className="w-3 h-3 mr-1" />
+                                order_delivery_schedule.special_instructions
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-foreground">
+                              {deliverySchedule?.special_instructions || 'No schedule-specific instructions provided'}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-1 ml-auto">
-                          <Badge variant="secondary" className="text-xs">
-                            <Database className="w-3 h-3 mr-1" />
-                            delivery_schedule.scheduled_date
+                      </div>
+
+                      {/* 4. Delivery Schedule Data */}
+                      <div className="bg-secondary/20 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-muted-foreground font-medium">Delivery Schedule:</span>
+                          <Badge variant={deliverySchedule?.delivery_date ? "outline" : "destructive"} className="text-xs">
+                            {deliverySchedule?.delivery_date ? "Scheduled" : "Pending"}
                           </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="font-medium text-muted-foreground">Date:</span>
+                            <p className="font-semibold">
+                              {deliverySchedule?.delivery_date 
+                                ? format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')
+                                : 'Not scheduled'
+                              }
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Time Window:</span>
+                            <p className="font-semibold">
+                              {deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end 
+                                ? `${deliverySchedule.delivery_time_start.substring(0, 5)} - ${deliverySchedule.delivery_time_end.substring(0, 5)}`
+                                : deliverySchedule?.delivery_time_start?.substring(0, 5) || 'TBD'
+                              }
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Flexibility:</span>
+                            <p className="font-semibold">
+                              {deliverySchedule?.is_flexible ? 'Flexible' : 'Fixed'}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Requested:</span>
+                            <p className="font-semibold">
+                              {deliverySchedule?.requested_at 
+                                ? format(new Date(deliverySchedule.requested_at), 'MMM d, HH:mm')
+                                : 'N/A'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-1 mt-2">
                           <Badge variant="secondary" className="text-xs">
                             <Database className="w-3 h-3 mr-1" />
-                            Calculated fallback
+                            order_delivery_schedule table
                           </Badge>
                         </div>
                       </div>
-                      
-                      {/* Additional Info */}
-                      {deliverySchedule.is_flexible && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground font-medium">Flexibility:</span>
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                            Flexible timing
-                          </span>
-                        </div>
-                      )}
-                      
-                      {deliverySchedule.special_instructions && (
-                        <div className="mt-3 pt-3 border-t border-primary/20">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-muted-foreground font-medium text-xs">Special Instructions:</span>
-                            <span className="text-xs bg-muted px-2 py-1 rounded">
-                              {deliverySchedule.special_instructions}
-                            </span>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

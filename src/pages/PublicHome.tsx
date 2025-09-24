@@ -295,7 +295,7 @@ const PublicHome = () => {
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
                   LIVE . LOVE . SHARE
                 </h1>
-                <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 sm:px-0">Small Chops is always a good idea..</p>
+                <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 sm:px-0">Small Chops is <strong>ALWAYS</strong> a good idea..</p>
                 <div className="pt-2">
                   <Button onClick={() => navigate('/products')} className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg">
                     Order Now & Enjoy!

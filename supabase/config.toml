@@ -106,6 +106,16 @@ verify_jwt = false
 [functions.process-checkout]
 verify_jwt = true
 
+# Production Phase 2 Functions - Monitoring and Security
+[functions.payment-timeout-handler]
+verify_jwt = false
+
+[functions.production-environment-validator]
+verify_jwt = false
+
+[functions.production-monitoring-alerts]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

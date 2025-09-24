@@ -164,77 +164,61 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                     )}
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-sm font-medium text-primary mb-2">
+                    <h4 className="text-sm font-medium text-primary mb-3">
                       {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Scheduled
                     </h4>
                     
-                    {/* Comprehensive fulfillment data display */}
-                    <div className="space-y-3">
-                      {/* Primary Schedule Info */}
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        {deliverySchedule.delivery_date && (
-                          <div className="flex flex-col">
-                            <span className="text-muted-foreground font-medium">Date:</span>
-                            <span className="text-foreground font-semibold">
-                              {format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex flex-col">
-                          <span className="text-muted-foreground font-medium">Time Window:</span>
-                          <span className="text-foreground font-semibold">
-                            {deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end 
-                              ? `${deliverySchedule.delivery_time_start.substring(0, 5)} - ${deliverySchedule.delivery_time_end.substring(0, 5)}`
-                              : deliverySchedule.delivery_time_start?.substring(0, 5) || 'TBD'
-                            }
-                          </span>
-                        </div>
+                    {/* Order Data Display */}
+                    <div className="space-y-2 text-sm">
+                      {/* Date */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground font-medium">Date:</span>
+                        <span className="font-semibold">
+                          {deliverySchedule.delivery_date 
+                            ? format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')
+                            : 'Not scheduled'
+                          }
+                        </span>
                       </div>
                       
-                      {/* Channel and Status */}
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="flex flex-col">
-                          <span className="text-muted-foreground font-medium">Channel:</span>
-                          <span className="text-foreground font-semibold capitalize">{orderType}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-muted-foreground font-medium">Status:</span>
-                          <span className="text-foreground font-semibold capitalize">
-                            {status.replace(/_/g, ' ')}
-                          </span>
-                        </div>
+                      {/* Time Window */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground font-medium">Time Window:</span>
+                        <span className="font-semibold">
+                          {deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end 
+                            ? `${deliverySchedule.delivery_time_start.substring(0, 5)} - ${deliverySchedule.delivery_time_end.substring(0, 5)}`
+                            : deliverySchedule.delivery_time_start?.substring(0, 5) 
+                            ? deliverySchedule.delivery_time_start.substring(0, 5)
+                            : 'TBD'
+                          }
+                        </span>
                       </div>
                       
-                      {/* Flexibility Badge */}
+                      {/* Channel */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground font-medium">Channel:</span>
+                        <span className="font-semibold capitalize">
+                          {orderType === 'delivery' ? 'Delivery' : 'Pickup'}
+                        </span>
+                      </div>
+                      
+                      {/* Additional Info */}
                       {deliverySchedule.is_flexible && (
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-3 h-3 text-primary" />
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                            Flexible Timing Available
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground font-medium">Flexibility:</span>
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                            Flexible timing
                           </span>
                         </div>
                       )}
                       
-                      {/* Special Instructions */}
                       {deliverySchedule.special_instructions && (
                         <div className="mt-3 pt-3 border-t border-primary/20">
-                          <div className="flex items-start gap-2">
-                            <span className="text-xs text-muted-foreground font-medium min-w-fit">
-                              Instructions:
-                            </span>
-                            <span className="text-xs text-foreground bg-muted px-2 py-1 rounded">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-muted-foreground font-medium text-xs">Special Instructions:</span>
+                            <span className="text-xs bg-muted px-2 py-1 rounded">
                               {deliverySchedule.special_instructions}
                             </span>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Schedule Metadata */}
-                      {deliverySchedule.created_at && (
-                        <div className="mt-3 pt-3 border-t border-primary/10">
-                          <div className="flex justify-between items-center text-xs text-muted-foreground">
-                            <span>Scheduled:</span>
-                            <span>{format(new Date(deliverySchedule.created_at), 'MMM d, h:mm a')}</span>
                           </div>
                         </div>
                       )}

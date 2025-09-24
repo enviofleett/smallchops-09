@@ -333,18 +333,6 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
           </div>
         </div>
       </div>
-      
-      {/* Data Sources */}
-      <div className="flex flex-wrap gap-1 pt-3 border-t border-primary/10">
-        <Badge variant="secondary" className="text-xs">
-          <Calendar className="w-3 h-3 mr-1" />
-          order_delivery_schedule
-        </Badge>
-        <Badge variant="secondary" className="text-xs">
-          <Clock className="w-3 h-3 mr-1" />
-          Validated & Secured
-        </Badge>
-      </div>
     </div>
   );
 };

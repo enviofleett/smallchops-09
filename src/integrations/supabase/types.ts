@@ -4984,7 +4984,7 @@ export type Database = {
       order_audit: {
         Row: {
           action_type: string | null
-          admin_id: string
+          admin_id: string | null
           admin_name: string | null
           created_at: string | null
           id: string
@@ -4992,10 +4992,11 @@ export type Database = {
           notes: string | null
           old_status: Database["public"]["Enums"]["order_status"] | null
           order_id: string
+          system_source: string | null
         }
         Insert: {
           action_type?: string | null
-          admin_id: string
+          admin_id?: string | null
           admin_name?: string | null
           created_at?: string | null
           id?: string
@@ -5003,10 +5004,11 @@ export type Database = {
           notes?: string | null
           old_status?: Database["public"]["Enums"]["order_status"] | null
           order_id: string
+          system_source?: string | null
         }
         Update: {
           action_type?: string | null
-          admin_id?: string
+          admin_id?: string | null
           admin_name?: string | null
           created_at?: string | null
           id?: string
@@ -5014,6 +5016,7 @@ export type Database = {
           notes?: string | null
           old_status?: Database["public"]["Enums"]["order_status"] | null
           order_id?: string
+          system_source?: string | null
         }
         Relationships: []
       }

@@ -53,6 +53,7 @@ function AdminOrdersContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
   const [showDeliveryReport, setShowDeliveryReport] = useState(false);
+  const [useSimpleMode, setUseSimpleMode] = useState(false);
   
   // Production-safe schedule recovery with circuit breaker
   const { attemptScheduleRecovery, getRecoveryStatus } = useOrderScheduleRecovery();
@@ -658,6 +659,16 @@ function AdminOrdersContent() {
                   />
                 </div>
                 <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant={useSimpleMode ? "default" : "outline"} 
+                    size="sm"
+                    onClick={() => setUseSimpleMode(!useSimpleMode)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">{useSimpleMode ? 'Simple' : 'Advanced'}</span>
+                  </Button>
                   <Button type="submit" variant="outline" className="flex-1 sm:flex-none">
                     <Search className="w-4 h-4 mr-2" />
                     <span className="hidden sm:inline">Search</span>
@@ -790,6 +801,7 @@ function AdminOrdersContent() {
               onOrderSelect={handleOrderClick}
               deliverySchedules={deliverySchedules}
               orderCounts={orderCounts}
+              useSimpleMode={useSimpleMode}
             />
           ) : (
             <TabsContent value={activeTab} className="space-y-4">
@@ -887,6 +899,7 @@ function AdminOrdersContent() {
                           order={order} 
                           deliverySchedule={deliverySchedules[order.id]} 
                           onOrderSelect={handleOrderClick}
+                          useSimpleMode={useSimpleMode}
                         />
                       </div>
                       {/* Print Receipt Button */}

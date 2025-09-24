@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { OrderWithItems } from '@/api/orders';
 import { AdminOrderStatusManager } from './AdminOrderStatusManager';
+import { SimpleOrderStatusUpdater } from './SimpleOrderStatusUpdater';
 import { SecureOrderStatusUpdater } from './SecureOrderStatusUpdater';
 import ProductionOrderErrorBoundary from './ProductionOrderErrorBoundary';
 import { format } from 'date-fns';
@@ -28,6 +29,7 @@ export interface EnhancedOrderCardProps {
   onOrderSelect?: (order: OrderWithItems) => void;
   showAdvancedControls?: boolean;
   showSecurityBadge?: boolean;
+  useSimpleMode?: boolean;
 }
 
 export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({ 
@@ -35,7 +37,8 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
   deliverySchedule, 
   onOrderSelect,
   showAdvancedControls = false,
-  showSecurityBadge = false
+  showSecurityBadge = false,
+  useSimpleMode = false
 }) => {
   const isOverdue = deliverySchedule && 
     isOrderOverdue(deliverySchedule.delivery_date, deliverySchedule.delivery_time_end);
@@ -94,12 +97,21 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
             </div>
 
             {!showAdvancedControls && (
-              <AdminOrderStatusManager
-                orderId={order.id}
-                currentStatus={order.status}
-                orderNumber={order.order_number}
-                size="sm"
-              />
+              useSimpleMode ? (
+                <SimpleOrderStatusUpdater
+                  orderId={order.id}
+                  currentStatus={order.status}
+                  orderNumber={order.order_number}
+                  size="sm"
+                />
+              ) : (
+                <AdminOrderStatusManager
+                  orderId={order.id}
+                  currentStatus={order.status}
+                  orderNumber={order.order_number}
+                  size="sm"
+                />
+              )
             )}
           </div>
         </CardHeader>

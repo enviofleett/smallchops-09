@@ -10,6 +10,8 @@ import { OrderWithItems } from '@/api/orders';
 import { format } from 'date-fns';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
+import { AdminOrderStatusManager } from '../AdminOrderStatusManager';
+import { SimpleOrderStatusUpdater } from '../SimpleOrderStatusUpdater';
 
 interface MobileOrderTabsProps {
   orders: OrderWithItems[];
@@ -26,6 +28,7 @@ interface MobileOrderTabsProps {
     delivered: number;
     overdue: number;
   };
+  useSimpleMode?: boolean;
 }
 
 export const MobileOrderTabs = ({ 
@@ -34,7 +37,8 @@ export const MobileOrderTabs = ({
   onTabChange, 
   onOrderSelect,
   deliverySchedules,
-  orderCounts
+  orderCounts,
+  useSimpleMode = false
 }: MobileOrderTabsProps) => {
   const isMobile = useIsMobile();
 
@@ -167,23 +171,23 @@ export const MobileOrderTabs = ({
         </MobileCardContent>
 
         <MobileCardActions>
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" onClick={() => onOrderSelect?.(order)}>
             View Details
           </Button>
-          {order.status === 'confirmed' && (
-            <Button size="sm">
-              Start Preparing
-            </Button>
-          )}
-          {order.status === 'preparing' && (
-            <Button size="sm">
-              Mark Ready
-            </Button>
-          )}
-          {order.status === 'ready' && (
-            <Button size="sm">
-              Out for Delivery
-            </Button>
+          {useSimpleMode ? (
+            <SimpleOrderStatusUpdater
+              orderId={order.id}
+              currentStatus={order.status}
+              orderNumber={order.order_number}
+              size="sm"
+            />
+          ) : (
+            <AdminOrderStatusManager
+              orderId={order.id}
+              currentStatus={order.status}
+              orderNumber={order.order_number}
+              size="sm"
+            />
           )}
         </MobileCardActions>
       </MobileCard>

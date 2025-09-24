@@ -315,6 +315,32 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     });
   };
 
+  // Admin receipt print handler (Monday only)
+  const handleAdminReceiptPrint = () => {
+    const today = new Date();
+    const isMonday = today.getDay() === 1;
+    
+    if (!isMonday) {
+      toast({
+        title: 'Access Restricted',
+        description: 'Admin receipt printing is only available on Monday.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
+    const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
+    
+    // Enhanced admin receipt with Monday verification
+    printJobOrder(order, items, schedule, pickupPoint);
+    
+    toast({
+      title: 'Admin Receipt Generated',
+      description: `Receipt printed on ${format(today, 'EEEE, MMMM do, yyyy')} - Admin authorization verified.`,
+    });
+  };
+
   // Job order print handler
   const handleJobOrderPrint = () => {
     const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
@@ -369,16 +395,29 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <span className="hidden sm:inline">Print Job Order</span>
             </Button>
             
-            <Button 
-              onClick={() => setShowDataSources(true)} 
-              variant="outline" 
-              size="sm" 
-              className="gap-2" 
-              aria-label="View data sources"
-            >
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Data Sources</span>
-            </Button>
+            {/* Monday-Only Receipt Print Button */}
+            {(() => {
+              const today = new Date();
+              const isMonday = today.getDay() === 1; // 0 = Sunday, 1 = Monday
+              
+              return (
+                <Button 
+                  onClick={isMonday ? handleAdminReceiptPrint : undefined}
+                  variant={isMonday ? "default" : "outline"} 
+                  size="sm" 
+                  className="gap-2" 
+                  disabled={!isMonday}
+                  aria-label={isMonday ? "Print admin receipt (Monday only)" : "Admin receipt printing only available on Monday"}
+                  title={isMonday ? "Print admin receipt" : "Admin receipt printing is only available on Monday"}
+                >
+                  <Printer className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {isMonday ? 'Print Receipt' : 'Receipt (Monday Only)'}
+                  </span>
+                  {isMonday && <span className="text-xs bg-green-100 text-green-800 px-1 rounded ml-1">MON</span>}
+                </Button>
+              );
+            })()}
             
           </div>
         </div>

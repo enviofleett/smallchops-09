@@ -918,7 +918,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   className={cn(
                     "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
                     "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
+                    "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-lg peer-checked:ring-2 peer-checked:ring-green-200"
                   )}
                 >
                   <Truck className="w-8 h-8 mb-3 text-primary" />
@@ -941,7 +941,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   className={cn(
                     "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
                     "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
+                    "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-lg peer-checked:ring-2 peer-checked:ring-green-200"
                   )}
                 >
                   <MapPin className="w-8 h-8 mb-3 text-primary" />
@@ -1146,7 +1146,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               {checkoutStep === 'details' && <div className="flex-shrink-0 p-3 md:p-6 border-t bg-background/80 backdrop-blur-sm">
                   {/* Terms and Conditions */}
                   {termsRequired && <div className="mb-3 flex items-start gap-2">
-                      <input type="checkbox" id="terms-checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
+                      <input type="checkbox" id="terms-checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} className="mt-1 h-4 w-4 accent-green-500 checked:ring-2 checked:ring-green-200 checked:ring-offset-1" />
                       <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
                         I agree to the{' '}
                         <button type="button" onClick={() => setShowTermsDialog(true)} className="text-primary hover:underline font-medium">

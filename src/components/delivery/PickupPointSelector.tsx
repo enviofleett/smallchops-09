@@ -148,7 +148,7 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
               p-4 border-2 rounded-lg cursor-pointer transition-all duration-200
               hover:border-primary/20 hover:bg-accent/5 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
               ${isSelected 
-                ? 'border-primary bg-primary/5 shadow-md' 
+                ? 'border-green-500 bg-green-50 shadow-lg ring-2 ring-green-200' 
                 : 'border-border'
               }
               ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
@@ -158,7 +158,7 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
               <h3 className="font-semibold text-base">{point.name}</h3>
               <div className="flex items-center gap-2">
                 {isSelected && (
-                  <div className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                  <div className="w-5 h-5 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
                     ✓
                   </div>
                 )}

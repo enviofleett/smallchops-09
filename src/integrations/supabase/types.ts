@@ -11520,6 +11520,10 @@ export type Database = {
         }
         Returns: Json
       }
+      verify_paystack_signature: {
+        Args: { payload: string; secret: string; signature: string }
+        Returns: boolean
+      }
       verify_webhook_signature: {
         Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
@@ -11565,6 +11569,7 @@ export type Database = {
         | "failed"
         | "refunded"
         | "partially_refunded"
+        | "completed"
       permission_level: "none" | "view" | "edit"
       product_status: "active" | "archived" | "draft" | "discontinued"
       promotion_status: "active" | "inactive" | "expired" | "scheduled"
@@ -11756,6 +11761,7 @@ export const Constants = {
         "failed",
         "refunded",
         "partially_refunded",
+        "completed",
       ],
       permission_level: ["none", "view", "edit"],
       product_status: ["active", "archived", "draft", "discontinued"],

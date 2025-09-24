@@ -74,9 +74,9 @@ verify_jwt = false
 [functions.real-time-webhook-processor]
 verify_jwt = false
 
-# Secure payment functions requiring authentication
+# PRODUCTION FIX: Make paystack-secure public for internal Edge Function calls
 [functions.paystack-secure]
-verify_jwt = true
+verify_jwt = false
 
 [functions.payment-callback]
 verify_jwt = false

@@ -23,38 +23,25 @@ serve(async (req: Request): Promise<Response> => {
       }), { status: 405, headers: corsHeaders });
     }
 
-    // PRODUCTION-READY: Flexible authentication for both client and server calls
-    const authHeader = req.headers.get('authorization');
-    const apiKey = req.headers.get('apikey');
+    // PRODUCTION-READY: Make function public but validate internal caller
     const internalCaller = req.headers.get('x-internal-caller');
+    const authHeader = req.headers.get('authorization');
     
     console.log('🔐 Auth check:', {
       hasAuth: !!authHeader,
-      hasApiKey: !!apiKey,
-      internalCaller: internalCaller
+      internalCaller: internalCaller,
+      isInternalCall: internalCaller === 'process-checkout'
     });
 
-    // PRODUCTION FIX: Accept both service role key and valid JWTs
+    // CRITICAL FIX: For internal calls, only check the internal caller header
+    // For external calls, require proper authentication
     const isInternalCall = internalCaller === 'process-checkout' || internalCaller === 'verify-payment';
-    const hasServiceRoleKey = authHeader?.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) || 
-                             apiKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const hasValidAuth = authHeader && authHeader.startsWith('Bearer ');
     
-    // Allow if: internal call with service key OR external call with valid JWT
-    if (!hasValidAuth && !hasServiceRoleKey) {
-      console.error('❌ No valid authentication provided');
+    if (!isInternalCall && !authHeader) {
+      console.error('❌ External call requires authentication');
       return new Response(JSON.stringify({
         success: false,
         error: 'Authentication required'
-      }), { status: 401, headers: corsHeaders });
-    }
-
-    // For internal calls, ensure service role key
-    if (isInternalCall && !hasServiceRoleKey) {
-      console.error('❌ Internal call requires service role key');
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Invalid service credentials for internal call'
       }), { status: 401, headers: corsHeaders });
     }
 

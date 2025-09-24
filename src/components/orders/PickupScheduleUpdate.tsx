@@ -297,10 +297,25 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
           <span className="text-xs text-muted-foreground font-medium">Pickup Date:</span>
           <div className="font-semibold">
             {currentSchedule?.delivery_date ? (
-              format(new Date(currentSchedule.delivery_date), 'MMM d, yyyy') === format(new Date(), 'MMM d, yyyy') 
-                ? 'Today' 
-                : format(new Date(currentSchedule.delivery_date), 'MMM d, yyyy')
-            ) : 'Today'}
+              <div className="space-y-1">
+                <div>
+                  {format(new Date(currentSchedule.delivery_date), 'MMM d, yyyy') === format(new Date(), 'MMM d, yyyy') 
+                    ? 'Today' 
+                    : format(new Date(currentSchedule.delivery_date), 'MMM d, yyyy')
+                  }
+                </div>
+                <div className="text-xs text-muted-foreground font-normal">
+                  {format(new Date(currentSchedule.delivery_date), 'EEEE, MMMM do, yyyy')}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div>Today</div>
+                <div className="text-xs text-muted-foreground font-normal">
+                  {format(new Date(), 'EEEE, MMMM do, yyyy')}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         

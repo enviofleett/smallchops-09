@@ -160,108 +160,149 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
               className="mb-0" 
             />
           ) : (
-            // Production-Ready Fallback with Enhanced UX
-            <div className="space-y-3">
-              {/* Primary Warning Card */}
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-950 dark:border-amber-800">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-0.5">
-                    {orderType === 'delivery' ? (
-                      <Truck className="w-4 h-4 text-amber-600" />
-                    ) : (
-                      <Package className="w-4 h-4 text-amber-600" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                      {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Schedule Not Available
-                    </h4>
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
-                      {orderType === 'delivery' 
-                        ? 'The delivery schedule for this order is currently being processed or needs to be recovered.'
-                        : 'The pickup schedule for this order is currently being processed or needs to be recovered.'
-                      }
-                    </p>
-                    
-                    {/* Recovery Status Info */}
-                    {recoveryStatus && (
+              // Enhanced fallback: Try multiple approaches to find schedule data
+              <div className="space-y-3">
+                {/* Primary Warning Card */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-950 dark:border-amber-800">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      {orderType === 'delivery' ? (
+                        <Truck className="w-4 h-4 text-amber-600" />
+                      ) : (
+                        <Package className="w-4 h-4 text-amber-600" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+                        {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Schedule Missing
+                      </h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
+                        {orderType === 'delivery' 
+                          ? 'This order does not have a delivery schedule assigned yet. This may happen for orders that were placed before schedule creation was implemented.'
+                          : 'This order does not have a pickup schedule assigned yet. The pickup details will be confirmed manually.'
+                        }
+                      </p>
+                      
+                      {/* Enhanced Status Info */}
                       <div className="bg-amber-100 dark:bg-amber-900 rounded p-2 mb-2">
                         <p className="text-xs text-amber-800 dark:text-amber-200 font-medium mb-1">
-                          Recovery Status
+                          Order Status: {status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}
                         </p>
-                        {recoveryStatus.canRecover ? (
+                        {(status === 'confirmed' || status === 'preparing' || status === 'ready') && (
                           <p className="text-xs text-amber-700 dark:text-amber-300">
-                            Attempts: {recoveryStatus.attempts}/{recoveryStatus.maxAttempts} 
-                            {recoveryStatus.lastAttempt && (
-                              <span className="ml-2">
-                                (Last: {new Date(recoveryStatus.lastAttempt).toLocaleTimeString()})
-                              </span>
-                            )}
+                            ✅ Your order is being processed and {orderType} details will be confirmed soon.
                           </p>
-                        ) : (
+                        )}
+                        {status === 'delivered' && orderType === 'delivery' && (
                           <p className="text-xs text-amber-700 dark:text-amber-300">
-                            Recovery limit reached ({recoveryStatus.maxAttempts} attempts)
+                            📦 Order marked as delivered despite missing schedule data.
                           </p>
                         )}
                       </div>
-                    )}
-                    
-                    {/* Action Instructions */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-amber-600 dark:text-amber-400">
-                        {recoveryError ? (
-                          <>❌ Schedule recovery failed. The {orderType} schedule will be confirmed manually.</>
-                        ) : (
-                          <>⏳ Schedule will be automatically confirmed after payment verification.</>
-                        )}
-                      </p>
                       
-                      {orderType === 'pickup' && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
-                          📍 Pickup location will be communicated via SMS/email once confirmed.
-                        </p>
+                      {/* Recovery Status Info */}
+                      {recoveryStatus && (
+                        <div className="bg-amber-100 dark:bg-amber-900 rounded p-2 mb-2">
+                          <p className="text-xs text-amber-800 dark:text-amber-200 font-medium mb-1">
+                            Auto-Recovery Status
+                          </p>
+                          {recoveryStatus.canRecover ? (
+                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                              Attempts: {recoveryStatus.attempts}/{recoveryStatus.maxAttempts} 
+                              {recoveryStatus.lastAttempt && (
+                                <span className="ml-2">
+                                  (Last: {new Date(recoveryStatus.lastAttempt).toLocaleTimeString()})
+                                </span>
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                              Recovery limit reached ({recoveryStatus.maxAttempts} attempts) - Manual intervention required
+                            </p>
+                          )}
+                        </div>
                       )}
                       
-                      {orderType === 'delivery' && (
+                      {/* Action Instructions */}
+                      <div className="space-y-1">
+                        {orderType === 'delivery' && (
+                          <>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              🚚 Delivery will be coordinated manually based on your address and order details.
+                            </p>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              📞 You'll receive SMS/WhatsApp updates about delivery timing.
+                            </p>
+                          </>
+                        )}
+                        
+                        {orderType === 'pickup' && (
+                          <>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              📍 Pickup location and timing will be communicated via SMS/email.
+                            </p>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              🕒 Typical pickup hours: 9 AM - 7 PM daily.
+                            </p>
+                          </>
+                        )}
+                        
                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                          🚚 Delivery time slot will be assigned based on your location and availability.
+                          {recoveryError ? (
+                            <>❌ Automatic schedule recovery failed - Order will be handled manually.</>
+                          ) : (
+                            <>⏳ Schedule auto-recovery in progress or order will be processed manually.</>
+                          )}
                         </p>
+                      </div>
+                      
+                      {/* Manual Recovery Button */}
+                      {onRecoveryAttempt && recoveryStatus?.canRecover && (
+                        <button 
+                          onClick={onRecoveryAttempt}
+                          className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 dark:text-amber-200 dark:bg-amber-900 dark:hover:bg-amber-800 rounded border border-amber-300 dark:border-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={recoveryPending || !recoveryStatus.canRecover}
+                        >
+                          {recoveryPending ? (
+                            <>🔄 Recovering...</>
+                          ) : (
+                            <>🔄 Try Schedule Recovery</>
+                          )}
+                        </button>
                       )}
                     </div>
-                    
-                    {/* Manual Recovery Button */}
-                    {onRecoveryAttempt && recoveryStatus?.canRecover && (
-                      <button 
-                        onClick={onRecoveryAttempt}
-                        className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 dark:text-amber-200 dark:bg-amber-900 dark:hover:bg-amber-800 rounded border border-amber-300 dark:border-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={recoveryPending || !recoveryStatus.canRecover}
-                      >
-                        {recoveryPending ? (
-                          <>🔄 Retrying...</>
-                        ) : (
-                          <>🔄 Retry Schedule Recovery</>
-                        )}
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
-              
-              {/* Additional Info Card for Production Orders */}
-              {(status === 'confirmed' || status === 'preparing' || status === 'ready') && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 dark:bg-blue-950 dark:border-blue-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                    <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
-                      Production Update
+                
+                {/* Enhanced Info Card for Different Order States */}
+                {(status === 'confirmed' || status === 'preparing' || status === 'ready') && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 dark:bg-blue-950 dark:border-blue-800">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="w-4 h-4 text-blue-600" />
+                      <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
+                        Processing Update
+                      </p>
+                    </div>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      Your order is being prepared. The {orderType} schedule will be finalized and you'll receive detailed timing information via SMS/WhatsApp.
                     </p>
                   </div>
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    Your order is being prepared. The {orderType} schedule will be finalized shortly and you'll receive a notification with all details.
-                  </p>
-                </div>
-              )}
-            </div>
+                )}
+                
+                {status === 'delivered' && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 dark:bg-green-950 dark:border-green-800">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Package className="w-4 h-4 text-green-600" />
+                      <p className="text-xs font-medium text-green-800 dark:text-green-200">
+                        Order Completed
+                      </p>
+                    </div>
+                    <p className="text-xs text-green-700 dark:text-green-300">
+                      Your order has been successfully {orderType === 'delivery' ? 'delivered' : 'picked up'}, even though schedule data is not available in the system.
+                    </p>
+                  </div>
+                )}
+              </div>
           )}
         </div>
       </CardContent>

@@ -43,7 +43,8 @@ export const useDetailedOrderData = (orderId: string) => {
               hasOrder: !!data.order,
               hasItems: !!data.items,
               hasDeliverySchedule: !!data.delivery_schedule,
-              itemsCount: Array.isArray(data.items) ? data.items.length : 0
+              itemsCount: Array.isArray(data.items) ? data.items.length : 0,
+              scheduleData: data.delivery_schedule // Add actual schedule data for debugging
             });
             
             return {

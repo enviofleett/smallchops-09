@@ -1,15 +1,30 @@
-// supabase/functions/process-checkout/index.ts - Updated to fix reference mismatch
+// supabase/functions/process-checkout/index.ts - Production-ready checkout function
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://startersmallchops.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-  'Access-Control-Max-Age': '86400',
+// Enhanced CORS configuration with origin validation
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigins = [
+    'https://startersmallchops.com',
+    'https://preview--smallchops-09.lovable.app'
+  ]
+  
+  const isAllowed = origin && allowedOrigins.some(allowed => 
+    origin === allowed || origin.includes('lovable.app')
+  )
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://startersmallchops.com',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+    'Access-Control-Max-Age': '86400',
+  }
 }
 
 serve(async (req: Request) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders })
   }
@@ -28,100 +43,142 @@ serve(async (req: Request) => {
     const {
       items = [],
       customer = {},
-      delivery = {},
-      total_amount,
+      fulfillment = {},
+      delivery_schedule = {},
+      payment = {},
       idempotency_key
     } = body
 
-    // Validate required fields
-    if (!items.length) throw new Error('No items in cart')
-    if (!customer.email) throw new Error('Customer email is required')
-    if (!total_amount || total_amount <= 0) throw new Error('Invalid total amount')
-
-    // Generate consistent payment reference
-    const timestamp = Date.now()
-    const randomId = Math.random().toString(36).substr(2, 9)
-    const paymentReference = `txn_${timestamp}_${randomId}`
-    
-    console.log('🏷️ Generated payment reference:', paymentReference)
+    // Input validation
+    if (!items?.length) throw new Error('No items in cart')
+    if (!customer?.email) throw new Error('Customer email is required')
+    if (!customer?.name) throw new Error('Customer name is required')
+    if (!customer?.phone) throw new Error('Customer phone is required')
 
     // Calculate amounts
     const subtotal = items.reduce((sum: number, item: any) => 
-      sum + (item.price * item.quantity), 0)
-    const deliveryFee = delivery.fee || 0
-    const calculatedTotal = subtotal + deliveryFee
+      sum + ((item.unit_price || item.price) * item.quantity), 0)
+    const deliveryFee = fulfillment?.type === 'delivery' ? (fulfillment.delivery_fee || 0) : 0
+    const taxAmount = 0 // Add tax calculation if needed
+    const totalAmount = subtotal + deliveryFee + taxAmount
+    
+    console.log('💰 Calculated totals:', { subtotal, deliveryFee, taxAmount, totalAmount })
 
-    // Create order data with BOTH references
+    // Generate order number and payment reference
+    const timestamp = Date.now()
+    const randomId = Math.random().toString(36).substr(2, 9)
+    const orderNumber = `ORD-${timestamp}-${randomId}`
+    const paymentReference = `txn_${timestamp}_${randomId}`
+    
+    console.log('🏷️ Generated identifiers:', { orderNumber, paymentReference })
+
+    // Start database transaction
+    const orderId = crypto.randomUUID()
+    const orderTime = new Date().toISOString()
+
+    // Create order data matching actual schema
     const orderData = {
-      id: crypto.randomUUID(),
-      reference: paymentReference, // Use same reference for both
-      payment_reference: paymentReference, // Critical: Store payment reference
+      id: orderId,
+      order_number: orderNumber,
+      customer_name: customer.name,
       customer_email: customer.email,
-      customer_name: customer.name || 'Guest Customer',
-      customer_phone: customer.phone || '',
-      items: items,
-      subtotal: subtotal,
-      delivery_fee: deliveryFee,
-      total_amount: calculatedTotal,
+      customer_phone: customer.phone,
+      guest_session_id: customer.guest_session_id || null,
+      order_type: fulfillment.type === 'pickup' ? 'pickup' : 'delivery',
       status: 'pending',
       payment_status: 'pending',
-      delivery_method: delivery.method || 'pickup',
-      delivery_location: delivery.location || 'Main Store',
-      delivery_address: delivery.address || '',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      idempotency_key: idempotency_key || `checkout_${timestamp}_${randomId}`
+      subtotal: subtotal,
+      tax_amount: taxAmount,
+      delivery_fee: deliveryFee,
+      total_amount: totalAmount,
+      payment_method: payment.method || 'paystack',
+      payment_reference: paymentReference,
+      paystack_reference: paymentReference,
+      pickup_point_id: fulfillment.pickup_point_id || null,
+      delivery_address: fulfillment.type === 'delivery' ? {
+        address: fulfillment.address || '',
+        location: fulfillment.location || '',
+        zone_id: fulfillment.delivery_zone_id || null
+      } : null,
+      delivery_zone_id: fulfillment.delivery_zone_id || null,
+      pickup_time: fulfillment.type === 'pickup' ? new Date(delivery_schedule.delivery_date + 'T' + delivery_schedule.delivery_time_start).toISOString() : null,
+      delivery_time: fulfillment.type === 'delivery' ? new Date(delivery_schedule.delivery_date + 'T' + delivery_schedule.delivery_time_start).toISOString() : null,
+      special_instructions: delivery_schedule.special_instructions || '',
+      order_time: orderTime,
+      created_at: orderTime,
+      updated_at: orderTime
     }
 
-    console.log('💾 Creating order with references:', {
-      order_id: orderData.id,
-      reference: orderData.reference,
-      payment_reference: orderData.payment_reference
-    })
+    console.log('💾 Creating order with schema-aligned data')
 
-    // Insert order with upsert to handle duplicates
+    // Create order record
     const { data: orderResult, error: orderError } = await supabase
       .from('orders')
-      .upsert(orderData, { 
-        onConflict: 'idempotency_key',
-        ignoreDuplicates: false 
-      })
+      .insert(orderData)
       .select()
       .single()
 
     if (orderError) {
-      console.error('❌ Database error:', orderError)
+      console.error('❌ Order creation error:', orderError)
       
-      if (orderError.code === '23505') {
-        // Handle duplicate - fetch existing order
+      // Handle duplicate order attempts
+      if (orderError.code === '23505' && idempotency_key) {
         const { data: existingOrder } = await supabase
           .from('orders')
           .select('*')
-          .eq('idempotency_key', orderData.idempotency_key)
+          .eq('payment_reference', paymentReference)
           .single()
         
         if (existingOrder) {
-          console.log('♻️ Using existing order:', existingOrder.id)
-          
-          // Ensure existing order has payment_reference
-          if (!existingOrder.payment_reference) {
-            await supabase
-              .from('orders')
-              .update({ payment_reference: paymentReference })
-              .eq('id', existingOrder.id)
-          }
-          
-          // Continue with existing order
-          orderResult = existingOrder
+          console.log('♻️ Found existing order:', existingOrder.order_number)
+          return new Response(JSON.stringify({
+            success: true,
+            order: existingOrder,
+            payment: {
+              authorization_url: `https://checkout.paystack.com/${existingOrder.paystack_reference}`,
+              reference: existingOrder.payment_reference
+            },
+            message: 'Order already exists'
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          })
         }
       }
       
-      if (!orderResult) {
-        throw new Error(`Database error: ${orderError.message}`)
-      }
+      throw new Error(`Order creation failed: ${orderError.message}`)
     }
 
-    console.log('✅ Order created/found:', orderResult?.id)
+    console.log('✅ Order created successfully:', orderResult.order_number)
+
+    // Create order items
+    console.log('📝 Creating order items...')
+    const orderItemsData = items.map((item: any, index: number) => ({
+      id: crypto.randomUUID(),
+      order_id: orderId,
+      product_id: item.product_id,
+      product_name: item.product_name || item.name,
+      quantity: item.quantity,
+      unit_price: item.unit_price || item.price,
+      total_price: (item.unit_price || item.price) * item.quantity,
+      customizations: item.customizations || null,
+      special_instructions: item.special_instructions || null,
+      created_at: orderTime,
+      updated_at: orderTime
+    }))
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItemsData)
+
+    if (itemsError) {
+      console.error('❌ Order items creation error:', itemsError)
+      // Cleanup: Delete the order if items creation fails
+      await supabase.from('orders').delete().eq('id', orderId)
+      throw new Error(`Order items creation failed: ${itemsError.message}`)
+    }
+
+    console.log('✅ Order items created successfully')
 
     // Initialize Paystack payment
     const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
@@ -131,14 +188,14 @@ serve(async (req: Request) => {
 
     const paystackPayload = {
       email: customer.email,
-      amount: calculatedTotal * 100, // Convert to kobo
-      reference: paymentReference, // Use consistent reference
+      amount: totalAmount * 100, // Convert to kobo
+      reference: paymentReference,
       callback_url: `https://startersmallchops.com/payment/callback?trxref=${paymentReference}&reference=${paymentReference}`,
       metadata: {
-        order_id: orderResult?.id || orderData.id,
+        order_id: orderId,
+        order_number: orderNumber,
         customer_name: customer.name,
-        items_count: items.length,
-        order_reference: paymentReference
+        items_count: items.length
       }
     }
 
@@ -158,46 +215,23 @@ serve(async (req: Request) => {
     })
 
     const paystackData = await paystackResponse.json()
-    console.log('💳 Paystack response status:', paystackResponse.ok, paystackData.status)
+    console.log('💳 Paystack response:', paystackResponse.ok ? '✅' : '❌', paystackData.status)
 
     if (!paystackResponse.ok || !paystackData.status) {
       throw new Error(`Paystack error: ${paystackData.message || 'Payment initialization failed'}`)
     }
 
-    // Update order with payment info - CRITICAL STEP
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({
-        payment_reference: paymentReference, // Ensure this is set
-        payment_url: paystackData.data.authorization_url,
-        paystack_access_code: paystackData.data.access_code,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderResult?.id || orderData.id)
-
-    if (updateError) {
-      console.error('⚠️ Payment info update warning:', updateError)
-    }
-
     console.log('✅ Checkout process completed successfully')
-
-    // Verify the order was saved with correct reference
-    const { data: verifyOrder } = await supabase
-      .from('orders')
-      .select('id, reference, payment_reference')
-      .eq('id', orderResult?.id || orderData.id)
-      .single()
-
-    console.log('🔍 Order verification:', verifyOrder)
 
     return new Response(JSON.stringify({
       success: true,
       order: {
-        id: orderResult?.id || orderData.id,
-        reference: paymentReference,
+        id: orderId,
+        order_number: orderNumber,
         payment_reference: paymentReference,
-        total_amount: calculatedTotal,
-        status: 'pending'
+        total_amount: totalAmount,
+        status: 'pending',
+        items_count: items.length
       },
       payment: {
         authorization_url: paystackData.data.authorization_url,

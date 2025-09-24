@@ -2,9 +2,22 @@ import React from 'react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
+interface DeliverySchedule {
+  id: string;
+  order_id: string;
+  delivery_date: string;
+  delivery_time_start: string;
+  delivery_time_end: string;
+  requested_at: string;
+  is_flexible: boolean;
+  special_instructions?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface PickupScheduleUpdateProps {
   orderId: string;
-  currentSchedule?: any;
+  currentSchedule?: DeliverySchedule;
   onUpdate?: () => void;
 }
 
@@ -21,30 +34,18 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
     }
   };
 
-  const getBusinessDay = (dateStr: string) => {
-    try {
-      return format(new Date(dateStr), 'EEEE');
-    } catch {
-      return 'Invalid Date';
-    }
-  };
-
   return (
     <div className="space-y-3 border border-primary/20 rounded-lg p-4 bg-primary/5">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-primary">Pickup Schedule Fulfillment</h4>
+        <h4 className="text-sm font-medium text-primary">
+          {currentSchedule ? 'Delivery Schedule Fulfillment' : 'Schedule Fulfillment'}
+        </h4>
       </div>
       
       <div className="grid grid-cols-2 gap-4 text-sm">
-        {/* Channel */}
-        <div className="space-y-1">
-          <span className="text-xs text-muted-foreground font-medium">Channel:</span>
-          <div className="font-semibold text-primary">Pickup</div>
-        </div>
-        
         {/* Pickup Date */}
         <div className="space-y-1">
-          <span className="text-xs text-muted-foreground font-medium">Pickup Date:</span>
+          <span className="text-xs text-muted-foreground font-medium">Date:</span>
           <div className="font-semibold">
             {currentSchedule?.delivery_date ? (
               <div className="space-y-1">
@@ -60,15 +61,15 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
               </div>
             ) : (
               <Badge variant="outline" className="text-xs">
-                No schedule set
+                No date scheduled
               </Badge>
             )}
           </div>
         </div>
         
-        {/* Pickup Time Window */}
+        {/* Time Window */}
         <div className="space-y-1">
-          <span className="text-xs text-muted-foreground font-medium">Pickup Time Window:</span>
+          <span className="text-xs text-muted-foreground font-medium">Time Window:</span>
           <div className="font-semibold">
             {currentSchedule?.delivery_time_start && currentSchedule?.delivery_time_end ? (
               (() => {
@@ -85,13 +86,13 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
                   <>
                     {formatTimeForDisplay(currentSchedule.delivery_time_start)} – {formatTimeForDisplay(currentSchedule.delivery_time_end)}
                     {isExpired && (
-                      <span className="ml-2 text-destructive">⏰ Expired window</span>
+                      <span className="ml-2 text-destructive">⏰ Expired</span>
                     )}
                     {isActive && (
-                      <span className="ml-2 text-green-600">⏰ Active window</span>
+                      <span className="ml-2 text-green-600">⏰ Active</span>
                     )}
                     {isUpcoming && (
-                      <span className="ml-2">⏰ Upcoming window</span>
+                      <span className="ml-2 text-blue-600">⏰ Upcoming</span>
                     )}
                   </>
                 );
@@ -106,7 +107,7 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
         
         {/* Business Day */}
         <div className="space-y-1">
-          <span className="text-xs text-muted-foreground font-medium">Business Day:</span>
+          <span className="text-xs text-muted-foreground font-medium">Day:</span>
           <div className="font-semibold">
             {currentSchedule?.delivery_date ? 
               format(new Date(currentSchedule.delivery_date), 'EEEE') : 
@@ -116,7 +117,42 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
             }
           </div>
         </div>
+
+        {/* Flexibility Status */}
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground font-medium">Schedule Type:</span>
+          <div className="font-semibold">
+            {currentSchedule ? (
+              <Badge variant={currentSchedule.is_flexible ? "secondary" : "default"} className="text-xs">
+                {currentSchedule.is_flexible ? 'Flexible' : 'Fixed Time'}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs">
+                Not set
+              </Badge>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Special Instructions */}
+      {currentSchedule?.special_instructions && (
+        <div className="pt-3 border-t border-primary/10">
+          <div className="space-y-1">
+            <span className="text-xs text-muted-foreground font-medium">Special Instructions:</span>
+            <div className="text-sm p-2 bg-background/50 rounded border text-muted-foreground">
+              {currentSchedule.special_instructions}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Requested Time */}
+      {currentSchedule?.requested_at && (
+        <div className="pt-2 text-xs text-muted-foreground">
+          Scheduled on {format(new Date(currentSchedule.requested_at), 'MMM d, yyyy \'at\' h:mm a')}
+        </div>
+      )}
     </div>
   );
 };

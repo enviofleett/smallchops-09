@@ -179,8 +179,8 @@ export const SMTPHealthMonitor: React.FC = () => {
             <h4 className="font-semibold mb-2">SMTP Configuration Status</h4>
             <div className="text-sm space-y-1">
               <p>✅ SMTP Function Secrets have been configured</p>
-              <p>⚠️ Please verify your Gmail App Password is correct (16 characters)</p>
-              <p>⚠️ Ensure 2-Step Verification is enabled on your Gmail account</p>
+              <p>⚠️ Please verify your email provider credentials are correct</p>
+              <p>⚠️ Check your email provider's authentication requirements</p>
               <p>📧 Test the connection before processing the email queue</p>
             </div>
           </div>

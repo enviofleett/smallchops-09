@@ -269,7 +269,7 @@ If you received this email, SMTP is working correctly!
       if (error.message.includes('Authentication')) {
         toast({
           title: "💡 Troubleshooting Tip",
-          description: "Check Gmail App Password (16 chars) and 2-Step Verification is enabled",
+          description: "Check your email provider credentials and setup requirements",
           variant: "default"
         });
       } else if (error.message.includes('Configuration')) {

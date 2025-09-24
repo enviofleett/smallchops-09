@@ -28,6 +28,7 @@ import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
+import { JobOrderDataSources } from './JobOrderDataSources';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const [verifying, setVerifying] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [verifyState, setVerifyState] = useState<'idle' | 'success' | 'failed' | 'pending'>('idle');
+  const [showDataSources, setShowDataSources] = useState(false);
 
   // Print ref for react-to-print
   const printRef = useRef<HTMLDivElement>(null);
@@ -367,6 +369,17 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <span className="hidden sm:inline">Print Job Order</span>
             </Button>
             
+            <Button 
+              onClick={() => setShowDataSources(true)} 
+              variant="outline" 
+              size="sm" 
+              className="gap-2" 
+              aria-label="View data sources"
+            >
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Data Sources</span>
+            </Button>
+            
           </div>
         </div>
 
@@ -490,6 +503,24 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Data Sources Modal */}
+      <AdaptiveDialog 
+        open={showDataSources} 
+        onOpenChange={setShowDataSources} 
+        title="Job Order Data Sources" 
+        size="xl"
+        className="max-w-4xl"
+      >
+        <JobOrderDataSources
+          order={order}
+          items={detailedOrderData?.items || enrichedItems || order.order_items || []}
+          deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+          pickupPoint={pickupPoint}
+          detailedOrderData={detailedOrderData}
+          enrichedItems={enrichedItems}
+        />
+      </AdaptiveDialog>
     </AdaptiveDialog>;
 };
 export default OrderDetailsDialog;

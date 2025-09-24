@@ -102,11 +102,12 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
         
         {/* Delivery/Pickup Schedule */}
         <div className="schedule-info">
-          <div className="section-header">{getOrderTypeDisplay().toUpperCase()}/PICKUP SCHEDULE:</div>
+          <div className="section-header">{getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
           {deliverySchedule && (
             <>
               <div>Date: {format(new Date(deliverySchedule.delivery_date), 'yyyy-MM-dd')}</div>
               <div>Time: {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
+              {deliverySchedule.is_flexible && <div>Flexible: Yes</div>}
               {deliveryInfo?.address && <div>Address: {deliveryInfo.address}</div>}
               {deliveryInfo?.instructions && <div>Instructions: {deliveryInfo.instructions}</div>}
               {deliverySchedule.special_instructions && (
@@ -116,6 +117,9 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           )}
           {!deliverySchedule && order.order_type === 'delivery' && deliveryInfo?.address && (
             <div>Address: {deliveryInfo.address}</div>
+          )}
+          {order.order_type === 'pickup' && !deliverySchedule && (
+            <div>Ready for pickup - Call for details</div>
           )}
         </div>
         

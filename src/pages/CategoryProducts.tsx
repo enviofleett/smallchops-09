@@ -40,19 +40,7 @@ const CategoryProductsContent = () => {
   const [moqAdjustments, setMoqAdjustments] = useState<any[]>([]);
   const [moqPricingImpact, setMoqPricingImpact] = useState<any>(null);
   const [isValidatingMOQ, setIsValidatingMOQ] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<string>('all');
   const itemsPerPage = 12;
-
-  const daysOfWeek = [
-    { value: 'all', label: 'All Days' },
-    { value: 'monday', label: 'Monday' },
-    { value: 'tuesday', label: 'Tuesday' },
-    { value: 'wednesday', label: 'Wednesday' },
-    { value: 'thursday', label: 'Thursday' },
-    { value: 'friday', label: 'Friday' },
-    { value: 'saturday', label: 'Saturday' },
-    { value: 'sunday', label: 'Sunday' }
-  ];
 
   // Fetch products for this category
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
@@ -70,21 +58,12 @@ const CategoryProductsContent = () => {
   const currentCategory = categories.find(cat => cat.id === categoryId);
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
-  // Filter and sort products by price and day availability
+  // Filter and sort products by price (lowest to highest by default) - Production Ready
   const filteredAndSortedProducts = products
-    .filter(product => {
-      // Search filter
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Day filter - check if product is available on selected day
-      const productAvailableDays = (product as any).available_days;
-      const matchesDay = selectedDay === 'all' || 
-        (productAvailableDays && productAvailableDays.includes(selectedDay)) ||
-        !productAvailableDays; // Show all products if no day restrictions
-      
-      return matchesSearch && matchesDay;
-    })
+    .filter(product => 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
     .sort((a, b) => {
       const priceA = a.discounted_price || a.price;
       const priceB = b.discounted_price || b.price;
@@ -294,7 +273,7 @@ const CategoryProductsContent = () => {
               )}
               
               {/* Search */}
-              <div className="max-w-md mx-auto lg:mx-0 mb-4">
+              <div className="max-w-md mx-auto lg:mx-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
@@ -304,25 +283,6 @@ const CategoryProductsContent = () => {
                     className="pl-10 py-3 text-base"
                   />
                 </div>
-              </div>
-              
-              {/* Day Filter */}
-              <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
-                {daysOfWeek.map((day) => (
-                  <Button
-                    key={day.value}
-                    variant={selectedDay === day.value ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedDay(day.value)}
-                    className={`text-xs sm:text-sm ${
-                      selectedDay === day.value 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'hover:bg-primary/10'
-                    }`}
-                  >
-                    {day.label}
-                  </Button>
-                ))}
               </div>
             </div>
 

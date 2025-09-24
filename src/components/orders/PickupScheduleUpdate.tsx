@@ -59,12 +59,9 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="space-y-1">
-                <div>Today</div>
-                <div className="text-xs text-muted-foreground font-normal">
-                  {format(new Date(), 'EEEE, MMMM do, yyyy')}
-                </div>
-              </div>
+              <Badge variant="outline" className="text-xs">
+                No schedule set
+              </Badge>
             )}
           </div>
         </div>
@@ -100,31 +97,9 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
                 );
               })()
             ) : (
-              (() => {
-                const now = new Date();
-                const today = new Date();
-                const defaultStart = new Date(`${format(today, 'yyyy-MM-dd')}T16:00`);
-                const defaultEnd = new Date(`${format(today, 'yyyy-MM-dd')}T17:00`);
-                
-                const isExpired = now > defaultEnd;
-                const isActive = now >= defaultStart && now <= defaultEnd;
-                const isUpcoming = now < defaultStart;
-                
-                return (
-                  <>
-                    4:00 PM – 5:00 PM
-                    {isExpired && (
-                      <span className="ml-2 text-destructive">⏰ Expired window</span>
-                    )}
-                    {isActive && (
-                      <span className="ml-2 text-green-600">⏰ Active window</span>
-                    )}
-                    {isUpcoming && (
-                      <span className="ml-2">⏰ Default window</span>
-                    )}
-                  </>
-                );
-              })()
+              <Badge variant="outline" className="text-xs">
+                No time window set
+              </Badge>
             )}
           </div>
         </div>
@@ -135,7 +110,9 @@ export const PickupScheduleUpdate: React.FC<PickupScheduleUpdateProps> = ({
           <div className="font-semibold">
             {currentSchedule?.delivery_date ? 
               format(new Date(currentSchedule.delivery_date), 'EEEE') : 
-              format(new Date(), 'EEEE')
+              <Badge variant="outline" className="text-xs">
+                Not scheduled
+              </Badge>
             }
           </div>
         </div>

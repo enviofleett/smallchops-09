@@ -268,7 +268,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader, // Forward user's JWT, not service role key
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Use service role key for Edge Function calls
         'x-internal-caller': 'process-checkout'
       },
       body: JSON.stringify(paymentPayload)

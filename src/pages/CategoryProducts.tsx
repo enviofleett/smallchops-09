@@ -34,6 +34,7 @@ const CategoryProductsContent = () => {
   const { validateMOQWithPricing, autoAdjustQuantities, showMOQViolationDialog } = useEnhancedMOQValidation();
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDay, setSelectedDay] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [showCustomizationBuilder, setShowCustomizationBuilder] = useState(false);
   const [showMOQAdjustmentModal, setShowMOQAdjustmentModal] = useState(false);
@@ -41,6 +42,18 @@ const CategoryProductsContent = () => {
   const [moqPricingImpact, setMoqPricingImpact] = useState<any>(null);
   const [isValidatingMOQ, setIsValidatingMOQ] = useState(false);
   const itemsPerPage = 12;
+
+  const daysOfWeek = [
+    { key: 'all', label: 'All Days' },
+    { key: 'monday', label: 'Monday' },
+    { key: 'tuesday', label: 'Tuesday' },
+    { key: 'wednesday', label: 'Wednesday' },
+    { key: 'thursday', label: 'Thursday' },
+    { key: 'friday', label: 'Friday' },
+    { key: 'saturday', label: 'Saturday' },
+    { key: 'sunday', label: 'Sunday' },
+    { key: 'weekend', label: 'Weekend' }
+  ];
 
   // Fetch products for this category
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
@@ -58,12 +71,24 @@ const CategoryProductsContent = () => {
   const currentCategory = categories.find(cat => cat.id === categoryId);
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
-  // Filter and sort products by price (lowest to highest by default) - Production Ready
+  // Filter and sort products by day and price - Production Ready
   const filteredAndSortedProducts = products
-    .filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter(product => {
+      // Filter by search term
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Filter by selected day
+      if (selectedDay === 'all') {
+        return matchesSearch;
+      }
+      
+      // Check if product name contains the selected day
+      const productName = product.name.toLowerCase();
+      const dayToMatch = selectedDay.toLowerCase();
+      
+      return matchesSearch && productName.includes(dayToMatch);
+    })
     .sort((a, b) => {
       const priceA = a.discounted_price || a.price;
       const priceB = b.discounted_price || b.price;
@@ -272,6 +297,27 @@ const CategoryProductsContent = () => {
                 <p className="text-muted-foreground mb-4 sm:mb-6">{currentCategory.description}</p>
               )}
               
+              {/* Day Filter */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium mb-3">Filter by Day</h3>
+                <div className="flex flex-wrap gap-2">
+                  {daysOfWeek.map((day) => (
+                    <Button
+                      key={day.key}
+                      variant={selectedDay === day.key ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setSelectedDay(day.key);
+                        setCurrentPage(1); // Reset to first page when filter changes
+                      }}
+                      className="text-xs"
+                    >
+                      {day.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               {/* Search */}
               <div className="max-w-md mx-auto lg:mx-0">
                 <div className="relative">

@@ -163,6 +163,8 @@ const AdminOrderDetails: React.FC = () => {
               paymentReference={order.payment_reference}
               totalAmount={order.total_amount}
               deliverySchedule={delivery_schedule}
+              pickupPoint={undefined}
+              deliveryAddress={order.delivery_address}
               isLoadingSchedule={false}
               recoveryError={false}
               onRecoveryAttempt={() => {}}

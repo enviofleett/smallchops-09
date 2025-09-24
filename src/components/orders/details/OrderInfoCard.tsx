@@ -1,6 +1,7 @@
 import React from 'react';
-import { Hash, Calendar, Clock, CreditCard, Truck, Package } from 'lucide-react';
+import { Hash, Calendar, Clock, CreditCard, Truck, Package, Database } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { SectionHeading } from './SectionHeading';
 import { StatCard } from './StatCard';
 import { DeliveryScheduleDisplay } from '../DeliveryScheduleDisplay';
@@ -16,6 +17,8 @@ interface OrderInfoCardProps {
   paymentReference?: string;
   totalAmount: number;
   deliverySchedule?: any;
+  pickupPoint?: any;
+  deliveryAddress?: string;
   isLoadingSchedule?: boolean;
   onRecoveryAttempt?: () => void;
   recoveryPending?: boolean;
@@ -38,6 +41,8 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
   paymentReference,
   totalAmount,
   deliverySchedule,
+  pickupPoint,
+  deliveryAddress,
   isLoadingSchedule,
   onRecoveryAttempt,
   recoveryPending,
@@ -168,38 +173,98 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                       {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Scheduled
                     </h4>
                     
-                    {/* Order Data Display */}
-                    <div className="space-y-2 text-sm">
-                      {/* Date */}
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground font-medium">Date:</span>
-                        <span className="font-semibold">
-                          {deliverySchedule.delivery_date 
-                            ? format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')
-                            : 'Not scheduled'
-                          }
-                        </span>
+                    {/* Fulfillment Information with Data Sources */}
+                    <div className="space-y-4 text-sm">
+                      {/* Order Type */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground font-medium">Order Type:</span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              Available
+                            </Badge>
+                            <span className="font-semibold capitalize">
+                              {orderType}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1 ml-auto">
+                          <Badge variant="secondary" className="text-xs">
+                            <Database className="w-3 h-3 mr-1" />
+                            orders.order_type
+                          </Badge>
+                        </div>
                       </div>
-                      
-                      {/* Time Window */}
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground font-medium">Time Window:</span>
-                        <span className="font-semibold">
-                          {deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end 
-                            ? `${deliverySchedule.delivery_time_start.substring(0, 5)} - ${deliverySchedule.delivery_time_end.substring(0, 5)}`
-                            : deliverySchedule.delivery_time_start?.substring(0, 5) 
-                            ? deliverySchedule.delivery_time_start.substring(0, 5)
-                            : 'TBD'
-                          }
-                        </span>
+
+                      {/* Delivery/Pickup Address */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-start">
+                          <span className="text-muted-foreground font-medium">
+                            {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Address:
+                          </span>
+                          <div className="flex items-start gap-2 text-right">
+                            <Badge variant="outline" className="text-xs">
+                              Available
+                            </Badge>
+                            <span className="font-semibold max-w-48 text-sm break-words">
+                              {orderType === 'pickup' 
+                                ? (pickupPoint?.address || pickupPoint?.name || 'Pickup Point')
+                                : (deliveryAddress || 'Address not provided')
+                              }
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1 ml-auto">
+                          {orderType === 'pickup' ? (
+                            <>
+                              <Badge variant="secondary" className="text-xs">
+                                <Database className="w-3 h-3 mr-1" />
+                                pickup_points table
+                              </Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                <Database className="w-3 h-3 mr-1" />
+                                delivery_schedule table
+                              </Badge>
+                            </>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              <Database className="w-3 h-3 mr-1" />
+                              orders.delivery_address
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      
-                      {/* Channel */}
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground font-medium">Channel:</span>
-                        <span className="font-semibold capitalize">
-                          {orderType === 'delivery' ? 'Delivery' : 'Pickup'}
-                        </span>
+
+                      {/* Scheduled Time */}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground font-medium">Scheduled Time:</span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={deliverySchedule.delivery_date ? "outline" : "destructive"} className="text-xs">
+                              {deliverySchedule.delivery_date ? "Available" : "Missing"}
+                            </Badge>
+                            <span className="font-semibold">
+                              {deliverySchedule.delivery_date 
+                                ? `${format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')} ${
+                                    deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end 
+                                      ? `${deliverySchedule.delivery_time_start.substring(0, 5)} - ${deliverySchedule.delivery_time_end.substring(0, 5)}`
+                                      : deliverySchedule.delivery_time_start?.substring(0, 5) || 'TBD'
+                                  }`
+                                : 'Not scheduled'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1 ml-auto">
+                          <Badge variant="secondary" className="text-xs">
+                            <Database className="w-3 h-3 mr-1" />
+                            delivery_schedule.scheduled_date
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            <Database className="w-3 h-3 mr-1" />
+                            Calculated fallback
+                          </Badge>
+                        </div>
                       </div>
                       
                       {/* Additional Info */}

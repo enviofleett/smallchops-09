@@ -466,7 +466,7 @@ serve(async (req) => {
 
     const amountNaira = amountKobo / 100;
 
-    // PHASE 3: Atomic payment processing
+    // PHASE 3: Atomic payment processing with fallback lookup
     const dbStart = Date.now();
     try {
       const processResult = await processPaymentAtomically(supabase, reference, paystackData.data, amountNaira, context);
@@ -475,7 +475,102 @@ serve(async (req) => {
       const result = Array.isArray(processResult) ? processResult[0] : processResult;
       
       if (!result || result.success === false) {
-        throw new Error(result?.error || 'Payment processing failed');
+        // 🔧 FALLBACK: Try finding order by metadata if payment_reference lookup failed
+        const errorMessage = result?.error || 'Payment processing failed';
+        if (errorMessage.includes('Order not found') && paystackData.data?.metadata?.order_id) {
+          console.log('🔄 Attempting fallback order lookup via metadata...');
+          
+          try {
+            // Find order by metadata order_id and update with payment reference
+            const orderId = paystackData.data.metadata.order_id;
+            
+            const { data: fallbackOrder, error: findError } = await supabase
+              .from('orders')
+              .select('id, order_number, status, payment_status, total_amount, customer_email')
+              .eq('id', orderId)
+              .eq('status', 'pending')
+              .single();
+
+            if (findError || !fallbackOrder) {
+              console.error('❌ Fallback order lookup failed:', findError);
+              throw new Error(errorMessage);
+            }
+
+            console.log('✅ Found order via fallback metadata lookup:', fallbackOrder.id);
+
+            // Update order with payment reference and confirm payment
+            const { error: updateError } = await supabase
+              .from('orders')
+              .update({
+                payment_reference: reference,
+                payment_status: 'paid',
+                status: 'confirmed',
+                paid_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', orderId);
+
+            if (updateError) {
+              console.error('❌ Fallback order update failed:', updateError);
+              throw new Error(errorMessage);
+            }
+
+            console.log('✅ Fallback payment processing successful');
+
+            // Create successful result for fallback
+            const fallbackResult = {
+              success: true,
+              order_id: fallbackOrder.id,
+              order_number: fallbackOrder.order_number,
+              total_amount: fallbackOrder.total_amount,
+              customer_email: fallbackOrder.customer_email
+            };
+
+            // Continue with success flow using fallback result
+            await logSecurityEvent(supabase, 'fallback_success', 'medium', {
+              reference,
+              order_id: fallbackResult.order_id,
+              amount: amountNaira,
+              original_error: errorMessage
+            }, context);
+
+            const fallbackResponse = {
+              success: true,
+              status: 'success',
+              amount: amountNaira,
+              order_id: fallbackResult.order_id,
+              order_number: fallbackResult.order_number,
+              customer_email: fallbackResult.customer_email,
+              payment_status: 'paid',
+              order_status: 'confirmed',
+              reference,
+              channel: paystackData.data.channel,
+              paid_at: paystackData.data.paid_at,
+              message: 'Payment verified and order confirmed',
+              data: {
+                order_id: fallbackResult.order_id,
+                order_number: fallbackResult.order_number,
+                amount: amountNaira,
+                status: 'success',
+                customer: paystackData.data.customer,
+                reference,
+                fallback_used: true,
+                verified_at: new Date().toISOString()
+              }
+            };
+
+            return new Response(JSON.stringify(fallbackResponse), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+
+          } catch (fallbackError) {
+            console.error('❌ Fallback processing failed:', fallbackError);
+            throw new Error(errorMessage);
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       // Log successful verification

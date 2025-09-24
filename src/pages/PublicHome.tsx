@@ -286,66 +286,39 @@ const PublicHome = () => {
       <PublicHeader />
 
       {/* Hero Section */}
-      <section className="bg-gray-50 py-12 sm:py-16 lg:py-20 min-h-[600px] flex items-center">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-            {/* Left Content */}
-            <div className="lg:col-span-4 text-left">
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-4">
-                    LIVE . LOVE .
-                    <br />
-                    <span className="text-gray-900">SHARE</span>
-                  </h1>
-                  <p className="text-lg sm:text-xl text-gray-600 mb-8">
-                    Small Chops is <span className="font-semibold text-gray-900">ALWAYS</span> a good idea..
-                  </p>
-                </div>
-                
-                <div>
-                  <Button 
-                    size="lg" 
-                    className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-full text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover-scale"
-                    onClick={() => document.getElementById('products-section')?.scrollIntoView({ behavior: 'smooth' })}
-                  >
+      <section className="bg-white py-8 sm:py-12 lg:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 items-center">
+            {/* Column 1 - Hero Content */}
+            <div className="text-center lg:text-left order-2 lg:order-1">
+              <div className="space-y-4 sm:space-y-6">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
+                  LIVE . LOVE . SHARE
+                </h1>
+                <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 sm:px-0">Small Chops is <strong>ALWAYS</strong> a good idea..</p>
+                <div className="pt-2">
+                  <Button onClick={() => navigate('/products')} className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg">
                     Order Now & Enjoy!
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Center Content - Hero Image */}
-            <div className="lg:col-span-4 flex justify-center">
-              <div className="relative animate-fade-in">
-                <HeroCarousel className="w-full max-w-md mx-auto h-80 sm:h-96 lg:h-[400px]" />
-              </div>
+            {/* Column 2 - Hero Carousel */}
+            <div className="flex justify-center order-1 lg:order-2">
+              <HeroCarousel className="w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96" />
             </div>
-
-            {/* Right Content - Promise Badge */}
-            <div className="lg:col-span-4 flex justify-center lg:justify-end">
-              <div className="text-center lg:text-right space-y-4 animate-fade-in delay-200">
-                <div className="inline-block">
-                  <div className="bg-orange-400 hover:bg-orange-500 text-white px-8 py-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover-scale cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                        <div className="w-3 h-3 bg-red-600 rounded-full"></div>
-                      </div>
-                      <span className="font-semibold text-lg">Our promise</span>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-gray-600 font-medium text-lg">
-                  Perfect for Every Occasion
-                </p>
-              </div>
+            
+            {/* Column 3 - Budget Baller Card */}
+            <div className="flex justify-center lg:justify-start order-3">
+              <BudgetBallerSection className="w-full max-w-sm" />
             </div>
           </div>
         </div>
       </section>
 
       {/* Products Section */}
-      <section id="products-section" className="bg-white py-8 sm:py-12 lg:py-16">
+      <section className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
             {/* Left Sidebar - Categories - Hidden on mobile */}

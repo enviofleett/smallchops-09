@@ -298,25 +298,6 @@ serve(async (req) => {
     console.log("💳 Payment reference:", paymentReference);
     console.log("🌐 Authorization URL:", authorizationUrl);
 
-    // 🔧 CRITICAL FIX: Save payment reference to order for callback verification
-    if (paymentReference) {
-      console.log("💾 Saving payment reference to order:", orderId);
-      const { error: updateError } = await supabaseAdmin
-        .from("orders")
-        .update({ 
-          payment_reference: paymentReference,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", orderId);
-
-      if (updateError) {
-        console.error("❌ Failed to save payment reference:", updateError);
-        // Don't fail the entire flow, but log the issue
-      } else {
-        console.log("✅ Payment reference saved successfully");
-      }
-    }
-
     // ✅ Success response
     return new Response(
       JSON.stringify({

@@ -289,13 +289,92 @@ const PublicHome = () => {
       <section className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 items-center">
-            {/* Hero content removed - ready for dynamic content */}
+            {/* Left Content */}
+            <div className="col-span-1 lg:col-span-2 order-2 lg:order-1">
+              <div className="text-center lg:text-left">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 leading-tight mb-4 sm:mb-6">
+                  Delicious Food,
+                  <br />
+                  <span className="text-red-600">Fast Delivery</span>
+                </h1>
+                <p className="text-lg sm:text-xl text-gray-600 mb-6 sm:mb-8 max-w-2xl mx-auto lg:mx-0">
+                  Fresh ingredients, amazing taste, and lightning-fast delivery to your door. 
+                  Experience the best food ordering service in town.
+                </p>
+                
+                {/* Search Bar */}
+                <div className="relative max-w-md mx-auto lg:mx-0 mb-6">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Search for your favorite food..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-3 w-full rounded-full border-gray-200 focus:border-red-500 focus:ring-red-500"
+                  />
+                </div>
+
+                {/* CTA Buttons */}
+                <div className="flex flex-col sm:flex-row gap-4 items-center justify-center lg:justify-start mb-6 sm:mb-8">
+                  <Button 
+                    size="lg" 
+                    className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                    onClick={() => document.getElementById('products-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  >
+                    Order Now
+                  </Button>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex">
+                      {renderStars(5)}
+                    </div>
+                    <span className="text-sm font-medium">4.9/5 from 1000+ reviews</span>
+                  </div>
+                </div>
+
+                {/* Trust Signals */}
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>Free delivery over ₦5,000</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span>30min average delivery</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <span>Fresh ingredients daily</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Content - Hero Image */}
+            <div className="col-span-1 order-1 lg:order-2 relative">
+              <div className="relative">
+                <HeroCarousel className="w-full max-w-md mx-auto h-80 sm:h-96 lg:h-[500px]" />
+                {/* Rating Badge */}
+                <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl p-4 shadow-xl border border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="flex">
+                      {renderStars(5)}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-gray-900">4.9</div>
+                      <div className="text-xs text-gray-500">1000+ reviews</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Products Section */}
-      <section className="bg-white py-8 sm:py-12 lg:py-16">
+      <section id="products-section" className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
             {/* Left Sidebar - Categories - Hidden on mobile */}

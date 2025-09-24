@@ -102,7 +102,7 @@ serve(async (req: Request) => {
       if (existingTransaction.status === 'completed') {
         const { data: order } = await supabase
           .from('orders')
-          .select('id, status, payment_status, total_amount')
+          .select('id, order_number, status, payment_status, total_amount')
           .eq('id', existingTransaction.order_id)
           .single()
 
@@ -110,6 +110,7 @@ serve(async (req: Request) => {
           success: true,
           message: 'Payment already verified (cached)',
           order_id: existingTransaction.order_id,
+          order_number: order?.order_number,
           payment_status: existingTransaction.status,
           order_status: order?.status,
           amount: order?.total_amount,
@@ -163,7 +164,7 @@ serve(async (req: Request) => {
     
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('*')
+      .select('id, order_number, customer_name, customer_email, total_amount, status, payment_status, payment_reference')
       .eq('payment_reference', paymentReference)
       .maybeSingle()
 
@@ -342,11 +343,12 @@ serve(async (req: Request) => {
       }
     }
 
-    // Return comprehensive success response
+    // Return comprehensive success response with order_number for guest tracking
     const response = {
       success: true,
       message: 'Payment verified and order updated successfully',
       order_id: order.id,
+      order_number: order.order_number,
       payment_status: paymentStatus,
       order_status: orderStatus,
       amount: paymentData.amount / 100,

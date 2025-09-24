@@ -29,14 +29,19 @@ export const getRecentGuestOrder = (maxAgeMinutes: number = 5): GuestOrderResult
     const recentPaymentSuccess = sessionStorage.getItem('paymentSuccess');
     if (recentPaymentSuccess) {
       const paymentData: OrderTrackingData = JSON.parse(recentPaymentSuccess);
-      const orderIdentifier = paymentData.orderNumber || paymentData.order_number || paymentData.orderId || paymentData.order_id;
+      // PRODUCTION FIX: Prioritize formatted order_number, avoid UUID
+      const orderIdentifier = paymentData.order_number || paymentData.orderNumber;
       
-      if (orderIdentifier) {
+      // Validate it's not a UUID (production safety check)
+      if (orderIdentifier && !orderIdentifier.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        console.log('✅ Using formatted order number from session:', orderIdentifier);
         return {
           orderIdentifier,
           source: 'session',
           shouldCleanup: true
         };
+      } else if (orderIdentifier) {
+        console.warn('⚠️ Found UUID instead of formatted order number:', orderIdentifier);
       }
     }
 
@@ -44,21 +49,25 @@ export const getRecentGuestOrder = (maxAgeMinutes: number = 5): GuestOrderResult
     const lastPaymentSuccess = localStorage.getItem('lastPaymentSuccess');
     if (lastPaymentSuccess) {
       const paymentData: OrderTrackingData = JSON.parse(lastPaymentSuccess);
-      const orderIdentifier = paymentData.orderNumber || paymentData.order_number || paymentData.orderId || paymentData.order_id;
+      // PRODUCTION FIX: Prioritize formatted order_number, avoid UUID
+      const orderIdentifier = paymentData.order_number || paymentData.orderNumber;
       
-      // Only return if payment was within the specified time window
+      // Only return if payment was within the specified time window and not a UUID
       const paymentTime = paymentData.paidAt || paymentData.timestamp;
-      if (orderIdentifier && paymentTime) {
+      if (orderIdentifier && paymentTime && !orderIdentifier.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
         const timeDiff = Date.now() - new Date(paymentTime).getTime();
         const maxAge = maxAgeMinutes * 60 * 1000;
         
         if (timeDiff < maxAge) {
+          console.log('✅ Using formatted order number from localStorage:', orderIdentifier);
           return {
             orderIdentifier,
             source: 'localStorage',
             shouldCleanup: true
           };
         }
+      } else if (orderIdentifier) {
+        console.warn('⚠️ Found UUID instead of formatted order number:', orderIdentifier);
       }
     }
 

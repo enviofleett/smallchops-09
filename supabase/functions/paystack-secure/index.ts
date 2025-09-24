@@ -64,14 +64,23 @@ serve(async (req: Request): Promise<Response> => {
       amount: requestData.amount
     });
 
-    // Validate required fields
-    const { action, email, amount, metadata } = requestData;
+    // Validate required fields based on action
+    const { action, email, amount, metadata, reference } = requestData;
     
-    if (!email || !amount) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Missing required fields: email, amount'
-      }), { status: 400, headers: corsHeaders });
+    if (action === 'verify') {
+      if (!reference) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Reference is required for verification'
+        }), { status: 400, headers: corsHeaders });
+      }
+    } else {
+      if (!email || !amount) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Missing required fields: email, amount'
+        }), { status: 400, headers: corsHeaders });
+      }
     }
 
     // Get Paystack secret key
@@ -84,7 +93,56 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Handle different actions
-    if (action === 'initialize' || !action) {
+    if (action === 'verify') {
+      console.log('🔍 Verifying Paystack transaction...');
+      
+      try {
+        const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!paystackResponse.ok) {
+          const errorText = await paystackResponse.text();
+          console.error('❌ Paystack verification error:', errorText);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Payment verification failed'
+          }), { status: 502, headers: corsHeaders });
+        }
+
+        const verificationData = await paystackResponse.json();
+        
+        if (!verificationData.status || !verificationData.data) {
+          console.error('❌ Invalid Paystack verification response:', verificationData);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Invalid verification response'
+          }), { status: 502, headers: corsHeaders });
+        }
+
+        console.log('✅ Paystack verification successful:', {
+          reference: verificationData.data.reference,
+          status: verificationData.data.status,
+          amount: verificationData.data.amount
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          data: verificationData.data
+        }), { status: 200, headers: corsHeaders });
+
+      } catch (verifyError) {
+        console.error('❌ Paystack verification network error:', verifyError);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Payment verification service unavailable'
+        }), { status: 503, headers: corsHeaders });
+      }
+    } else if (action === 'initialize' || !action) {
       console.log('💳 Initializing Paystack transaction...');
       
       // Generate reference if not provided

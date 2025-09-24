@@ -1,11 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+interface BudgetBallerItem {
+  name: string;
+  included: boolean;
+}
+
 interface BudgetBallerContent {
   id: string;
   title: string;
   description?: string;
-  items: any; // JSONB field from database
+  items: BudgetBallerItem[]; // Properly typed items array
   background_color?: string;
   text_color?: string;
   is_active: boolean;
@@ -19,7 +24,7 @@ export const BudgetBallerSection = ({
   className = "w-full max-w-sm"
 }: BudgetBallerSectionProps) => {
   // Fetch budget baller content
-  const { data: budgetBaller } = useQuery({
+  const { data: budgetBaller, isLoading } = useQuery({
     queryKey: ['budget-baller-content-public'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -34,27 +39,25 @@ export const BudgetBallerSection = ({
         console.error('Error fetching budget baller content:', error);
         return null;
       }
-      return data ? { ...data, items: data.items || [] } : null;
+      return data;
     },
   });
 
-  // Fallback content if nothing is configured
-  const defaultContent = {
-    title: 'The Budget Baller',
-    description: undefined,
-    items: [
-      { name: '5 Samosa', included: true },
-      { name: '5 Spring Rolls', included: true },
-      { name: '5 Stick Meat', included: true },
-      { name: '20 Poff-Poff', included: true },
-    ],
-    background_color: '#f59e0b',
-    text_color: '#1f2937',
-  };
+  // Hide component if no admin-configured content or still loading
+  if (isLoading || !budgetBaller) {
+    return null;
+  }
 
-  const content = budgetBaller || defaultContent;
-  const items = Array.isArray(content.items) ? content.items : defaultContent.items;
-  const includedItems = items.filter((item: any) => item.included);
+  // Ensure items is an array and filter for included items
+  const items = Array.isArray(budgetBaller.items) ? budgetBaller.items : [];
+  const includedItems = items.filter((item: any) => 
+    item && typeof item === 'object' && item.included && typeof item.name === 'string'
+  );
+
+  // Hide component if no items to display
+  if (includedItems.length === 0) {
+    return null;
+  }
 
   return (
     <div className={className}>
@@ -63,7 +66,7 @@ export const BudgetBallerSection = ({
           <div 
             className="px-4 sm:px-8 py-2 sm:py-3 rounded-full flex items-center space-x-2 sm:space-x-3"
             style={{ 
-              background: `linear-gradient(135deg, ${content.background_color || '#f59e0b'}, ${content.background_color || '#f59e0b'}dd)`
+              background: `linear-gradient(135deg, ${budgetBaller.background_color || '#f59e0b'}, ${budgetBaller.background_color || '#f59e0b'}dd)`
             }}
           >
             <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-600 rounded-full flex items-center justify-center">
@@ -73,21 +76,21 @@ export const BudgetBallerSection = ({
             </div>
             <h3 
               className="text-base sm:text-xl font-bold"
-              style={{ color: content.text_color || '#1f2937' }}
+              style={{ color: budgetBaller.text_color || '#1f2937' }}
             >
-              {content.title}
+              {budgetBaller.title}
             </h3>
           </div>
         </div>
         
-        {content.description && (
+        {budgetBaller.description && (
           <p className="text-center text-sm mb-4 text-gray-700">
-            {content.description}
+            {budgetBaller.description}
           </p>
         )}
         
         <div className="space-y-2 sm:space-y-3">
-          {includedItems.map((item, index) => (
+          {includedItems.map((item: any, index) => (
             <span 
               key={index}
               className="text-sm text-center block pb-1 border-b border-dotted border-gray-400 text-gray-700"

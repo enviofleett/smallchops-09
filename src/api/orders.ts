@@ -192,6 +192,14 @@ export const updateOrder = async (
         }
       });
 
+      // Debug logging for production troubleshooting
+      console.log('🔍 Rider assignment result:', {
+        assignmentResult,
+        assignmentError,
+        statusOk: assignmentResult?.success,
+        errorDetails: assignmentError
+      });
+
       if (assignmentError || !assignmentResult?.success) {
         // Enhanced error handling with structured error response
         let errorMsg = 'Failed to assign rider';

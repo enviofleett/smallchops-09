@@ -20,13 +20,10 @@ import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, Aler
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
-import { useOverdueOrdersLogic } from '@/hooks/useOverdueOrdersLogic';
-import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
 import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
-import { isOrderOverdue } from '@/utils/scheduleTime';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
@@ -34,7 +31,6 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFilter';
 import { DeliveryDateFilter } from '@/components/admin/orders/DeliveryDateFilter';
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
-import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
 import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
 import { filterOrdersByDate, getFilterDescription, getFilterStats, DeliveryFilterType } from '@/utils/dateFilterUtils';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
@@ -48,7 +44,7 @@ function AdminOrdersContent() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus | 'overdue'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilterType>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
@@ -62,8 +58,6 @@ function AdminOrdersContent() {
   const [selectedDay, setSelectedDay] = useState<'today' | 'tomorrow' | null>(null);
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   
-  // Overdue date filter state for overdue tab
-  const [selectedOverdueDateFilter, setSelectedOverdueDateFilter] = useState<string | null>(null);
   
   const isMobile = useIsMobile();
   const { toast } = useToast();
@@ -106,17 +100,13 @@ function AdminOrdersContent() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, debouncedSearchQuery, deliveryFilter, selectedDay, selectedHour, selectedOverdueDateFilter]);
+  }, [statusFilter, debouncedSearchQuery, deliveryFilter, selectedDay, selectedHour]);
 
   // Reset hourly filters when changing tabs (except for confirmed tab)
   useEffect(() => {
     if (activeTab !== 'confirmed') {
       setSelectedDay(null);
       setSelectedHour(null);
-    }
-    // Reset overdue filters when changing tabs (except for overdue tab)
-    if (activeTab !== 'overdue') {
-      setSelectedOverdueDateFilter(null);
     }
   }, [activeTab]);
 
@@ -131,7 +121,7 @@ function AdminOrdersContent() {
     queryFn: () => getOrders({
       page: currentPage,
       pageSize: 20,
-      status: statusFilter === 'all' || statusFilter === 'overdue' ? undefined : statusFilter,
+      status: statusFilter === 'all' ? undefined : statusFilter,
       searchQuery: debouncedSearchQuery || undefined
     }),
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -142,12 +132,6 @@ function AdminOrdersContent() {
   const totalCount = ordersData?.count || 0;
   const totalPages = Math.ceil(totalCount / 20);
 
-  // Use the overdue orders logic hook
-  const {
-    overdueOrders,
-    overdueStats,
-    isLoading: isOverdueLoading
-  } = useOverdueOrdersLogic();
 
   // Extract delivery schedules from orders (now included in admin function)
   const deliverySchedules = useMemo(() => {
@@ -160,36 +144,9 @@ function AdminOrdersContent() {
     return scheduleMap;
   }, [orders]);
 
-  // Priority sort and filter orders
+  // Priority sort and filter orders for production
   const prioritySortedOrders = useMemo(() => {
     let ordersCopy = [...orders];
-    
-    // Filter for overdue orders
-    if (statusFilter === 'overdue') {
-      ordersCopy = orders.filter(order => {
-        const schedule = deliverySchedules[order.id];
-        if (!schedule) return false;
-        
-        // Only show paid orders that are overdue and haven't been delivered
-        return order.payment_status === 'paid' && 
-               isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
-               ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status);
-      });
-      
-      // Sort overdue orders by how long they've been overdue (most critical first)
-      ordersCopy.sort((a, b) => {
-        const scheduleA = deliverySchedules[a.id];
-        const scheduleB = deliverySchedules[b.id];
-        
-        if (!scheduleA || !scheduleB) return 0;
-        
-        const deadlineA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_end}`);
-        const deadlineB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_end}`);
-        
-        // Most overdue orders come first (earlier deadlines first)
-        return deadlineA.getTime() - deadlineB.getTime();
-      });
-    }
     
     // Filter and sort confirmed orders - ONLY PAID ORDERS
     if (statusFilter === 'confirmed') {
@@ -214,14 +171,8 @@ function AdminOrdersContent() {
         if (aIsToday && !bIsToday) return -1;
         if (!aIsToday && bIsToday) return 1;
         
-        // Among today's orders, overdue ones get highest priority
+        // Among today's orders, sort by time slot (earliest first)
         if (aIsToday && bIsToday) {
-          const aOverdue = scheduleA && isOrderOverdue(scheduleA.delivery_date, scheduleA.delivery_time_end);
-          const bOverdue = scheduleB && isOrderOverdue(scheduleB.delivery_date, scheduleB.delivery_time_end);
-          
-          if (aOverdue && !bOverdue) return -1;
-          if (!aOverdue && bOverdue) return 1;
-          
           // Both today - sort by time slot
           if (scheduleA && scheduleB) {
             const timeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
@@ -251,53 +202,19 @@ function AdminOrdersContent() {
   }, [orders, deliverySchedules, statusFilter]);
 
   // Filter orders by delivery schedule with defensive date handling + hourly filtering
-  // Filter overdue orders by date range
-  const filteredOverdueOrders = useMemo(() => {
-    if (!selectedOverdueDateFilter) return overdueOrders;
-
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const lastWeek = new Date(today);
-    lastWeek.setDate(lastWeek.getDate() - 7);
-
-    switch (selectedOverdueDateFilter) {
-      case 'today':
-        return overdueOrders.filter(order => 
-          new Date(order.created_at).toDateString() === today.toDateString()
-        );
-      case 'yesterday':
-        return overdueOrders.filter(order => 
-          new Date(order.created_at).toDateString() === yesterday.toDateString()
-        );
-      case 'last_week':
-        return overdueOrders.filter(order => {
-          const orderDate = new Date(order.created_at);
-          return orderDate >= lastWeek && orderDate < yesterday;
-        });
-      case 'older':
-        return overdueOrders.filter(order => {
-          const orderDate = new Date(order.created_at);
-          return orderDate < lastWeek;
-        });
-      default:
-        return overdueOrders;
-    }
-  }, [overdueOrders, selectedOverdueDateFilter]);
 
   // Production-ready filtering with performance optimizations
   const filteredOrders = useMemo(() => {
-    // Use overdue orders for the overdue tab, regular orders for others  
-    let result = statusFilter === 'overdue' ? filteredOverdueOrders : prioritySortedOrders;
+    let result = prioritySortedOrders;
     
     // Apply comprehensive delivery/pickup date filter using utility functions
-    if (deliveryFilter !== 'all' && (statusFilter as string) !== 'overdue') {
+    if (deliveryFilter !== 'all') {
       try {
         result = filterOrdersByDate(result, deliveryFilter, deliverySchedules);
       } catch (error) {
         console.error('Error applying date filter:', error);
         // Fallback to showing all orders if filtering fails
-        result = statusFilter === 'overdue' ? filteredOverdueOrders : prioritySortedOrders;
+        result = prioritySortedOrders;
       }
     }
     
@@ -361,7 +278,7 @@ function AdminOrdersContent() {
     }
     
     return result;
-  }, [prioritySortedOrders, filteredOverdueOrders, deliverySchedules, deliveryFilter, statusFilter, selectedDay, selectedHour]);
+  }, [prioritySortedOrders, deliverySchedules, deliveryFilter, selectedDay, selectedHour]);
 
   // Calculate hourly order counts for confirmed orders
   const hourlyOrderCounts = useMemo(() => {
@@ -430,35 +347,6 @@ function AdminOrdersContent() {
   }, [prioritySortedOrders, deliverySchedules, activeTab]);
 
   // Calculate overdue order counts by date ranges
-  const overdueOrderCounts = useMemo(() => {
-    if (!overdueOrders.length) {
-      return { today: 0, yesterday: 0, lastWeek: 0, older: 0 };
-    }
-
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const lastWeek = new Date(today);
-    lastWeek.setDate(lastWeek.getDate() - 7);
-
-    return {
-      today: overdueOrders.filter(order => 
-        new Date(order.created_at).toDateString() === today.toDateString()
-      ).length,
-      yesterday: overdueOrders.filter(order => 
-        new Date(order.created_at).toDateString() === yesterday.toDateString()
-      ).length,
-      lastWeek: overdueOrders.filter(order => {
-        const orderDate = new Date(order.created_at);
-        return orderDate >= lastWeek && orderDate < yesterday;
-      }).length,
-      older: overdueOrders.filter(order => {
-        const orderDate = new Date(order.created_at);
-        return orderDate < lastWeek;
-      }).length,
-    };
-  }, [overdueOrders]);
-
   // Get order counts by status for tab badges
   const orderCounts = useMemo(() => {
     return {
@@ -467,10 +355,9 @@ function AdminOrdersContent() {
       preparing: orders.filter(o => o.status === 'preparing').length,
       ready: orders.filter(o => o.status === 'ready').length,
       out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
-      delivered: orders.filter(o => o.status === 'delivered').length,
-      overdue: overdueOrders.length // Use hook data for overdue count
+      delivered: orders.filter(o => o.status === 'delivered').length
     };
-  }, [orders, totalCount, overdueOrders]);
+  }, [orders, totalCount]);
 
   const handleOrderClick = (order: OrderWithItems) => {
     setSelectedOrder(order);
@@ -484,7 +371,7 @@ function AdminOrdersContent() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    setStatusFilter(value as 'all' | OrderStatus | 'overdue');
+    setStatusFilter(value as 'all' | OrderStatus);
     // currentPage reset is handled by useEffect above
   };
 
@@ -623,14 +510,11 @@ function AdminOrdersContent() {
                   </p>
                   <p className="text-sm text-green-600">Delivered Today</p>
                 </div>
-                <div className="text-center p-4 bg-orange-50 rounded-lg">
-                  <p className="text-2xl font-bold text-orange-600">
-                    {filteredOrders.filter(o => {
-                      const schedule = deliverySchedules[o.id];
-                      return schedule && isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end);
-                    }).length}
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <p className="text-2xl font-bold text-gray-600">
+                    {filteredOrders.filter(o => o.status === 'ready').length}
                   </p>
-                  <p className="text-sm text-orange-600">Overdue Deliveries</p>
+                  <p className="text-sm text-gray-600">Ready for Pickup</p>
                 </div>
               </div>
               <div className="mt-4 p-4 bg-muted rounded-lg">
@@ -701,14 +585,10 @@ function AdminOrdersContent() {
                     <Calendar className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">
-                        {getFilterDescription(deliveryFilter, filteredOrders.length, 
-                          statusFilter === 'overdue' ? filteredOverdueOrders.length : prioritySortedOrders.length
-                        ).split(':')[0]}
+                        {getFilterDescription(deliveryFilter, filteredOrders.length, prioritySortedOrders.length).split(':')[0]}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {getFilterDescription(deliveryFilter, filteredOrders.length, 
-                          statusFilter === 'overdue' ? filteredOverdueOrders.length : prioritySortedOrders.length
-                        )}
+                        {getFilterDescription(deliveryFilter, filteredOrders.length, prioritySortedOrders.length)}
                       </p>
                       {filteredOrders.length === 0 && (
                         <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
@@ -766,7 +646,7 @@ function AdminOrdersContent() {
             
             {/* Desktop: Full grid layout */}
             <div className="hidden md:block">
-              <TabsList className="grid w-full grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
+              <TabsList className="grid w-full grid-cols-6 gap-1 p-1 bg-muted rounded-lg">
                 <TabsTrigger value="all" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   All Orders ({orderCounts.all})
                 </TabsTrigger>
@@ -784,9 +664,6 @@ function AdminOrdersContent() {
                 </TabsTrigger>
                 <TabsTrigger value="delivered" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   Delivered ({orderCounts.delivered})
-                </TabsTrigger>
-                <TabsTrigger value="overdue" className="text-sm px-2 py-2 text-destructive data-[state=active]:bg-background">
-                  Overdue ({orderCounts.overdue})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -827,37 +704,6 @@ function AdminOrdersContent() {
               )}
 
               {/* Overdue Date Filter - Only show for overdue tab */}
-            {activeTab === 'overdue' && (
-              <Card className="mb-6">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-destructive" />
-                    Overdue Orders - Paid but Not Delivered
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Orders that have been paid but missed their delivery window and are not yet delivered.
-                    {overdueStats.total > 0 ? (
-                      <span className="block mt-1 font-medium text-foreground">
-                        Found {overdueStats.total} overdue order{overdueStats.total !== 1 ? 's' : ''}: 
-                        {overdueStats.critical > 0 && <span className="text-destructive"> {overdueStats.critical} critical</span>}
-                        {overdueStats.moderate > 0 && <span className="text-orange-600"> {overdueStats.moderate} moderate</span>}
-                        {overdueStats.recent > 0 && <span className="text-yellow-600"> {overdueStats.recent} recent</span>}
-                      </span>
-                    ) : (
-                      <span className="block mt-1 text-green-600">No overdue orders found.</span>
-                    )}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <OverdueDateFilter
-                    selectedDateFilter={selectedOverdueDateFilter}
-                    onDateFilterChange={setSelectedOverdueDateFilter}
-                    overdueOrderCounts={overdueOrderCounts}
-                  />
-                </CardContent>
-              </Card>
-            )}
-
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
@@ -1053,11 +899,6 @@ function AdminOrderCard({
     enabled: !!order.delivery_zone_id
   });
 
-  const {
-    data: detailedOrderData,
-    isLoading: isLoadingDetails
-  } = useDetailedOrderData(order.id);
-
   const [showProductDetails, setShowProductDetails] = useState(false);
 
   const formatCurrency = (amount: number) => {
@@ -1226,21 +1067,10 @@ function AdminOrderCard({
         {/* Product Details Expansion */}
         {showProductDetails && (
           <div className="mt-4 border-t pt-4">
-            {isLoadingDetails ? (
-              <div className="space-y-2">
-                <div className="h-4 bg-muted animate-pulse rounded" />
-                <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
-              </div>
-            ) : detailedOrderData?.items ? (
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm mb-2">Product Details</h4>
-                {detailedOrderData.items.map((item: any) => (
-                  <ProductDetailCard key={item.id} item={item} showReorderButton={false} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Product details not available</p>
-            )}
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm mb-2">Product Details</h4>
+              <p className="text-sm text-muted-foreground">Product details available in full order view</p>
+            </div>
           </div>
         )}
 

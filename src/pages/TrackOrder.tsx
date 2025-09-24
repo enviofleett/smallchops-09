@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,25 +20,30 @@ import {
   MapPin,
   Phone,
   User,
-  Navigation
+  Navigation,
+  Share2,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function TrackOrder() {
   const [searchParams] = useSearchParams();
+  const { orderNumber } = useParams();
   const [orderIdentifier, setOrderIdentifier] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const { tracking, loading, error, trackOrder } = useDeliveryTracking();
 
-  // Auto-populate search field from URL parameters
+  // Auto-populate search field from URL parameters and route params
   useEffect(() => {
-    const orderFromUrl = searchParams.get('order') || searchParams.get('id') || searchParams.get('reference');
+    const orderFromUrl = searchParams.get('order') || searchParams.get('id') || searchParams.get('reference') || orderNumber;
     if (orderFromUrl && !searchValue) {
       setSearchValue(orderFromUrl);
       setOrderIdentifier(orderFromUrl);
       trackOrder(orderFromUrl);
     }
-  }, [searchParams, trackOrder, searchValue]);
+  }, [searchParams, orderNumber, trackOrder, searchValue]);
 
   // Get delivery schedule if order is found
   const { data: deliverySchedule } = useQuery({
@@ -52,6 +57,36 @@ export default function TrackOrder() {
     if (searchValue.trim()) {
       setOrderIdentifier(searchValue.trim());
       trackOrder(searchValue.trim());
+      // Update URL without page reload for better UX
+      window.history.replaceState({}, '', `/track-order?order=${encodeURIComponent(searchValue.trim())}`);
+    }
+  };
+
+  const handleShareTrackingLink = async () => {
+    if (!tracking) return;
+    
+    const shareUrl = `${window.location.origin}/track/${tracking.orderNumber}`;
+    
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `Track Order ${tracking.orderNumber}`,
+          text: `Track your order ${tracking.orderNumber} in real-time`,
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (error) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      toast.success('Link copied to clipboard!');
     }
   };
 
@@ -83,11 +118,32 @@ export default function TrackOrder() {
     }
   };
 
+  // Generate dynamic meta tags for order-specific pages
+  const pageTitle = tracking 
+    ? `Track Order ${tracking.orderNumber} - Real-time Updates`
+    : 'Track Your Order - Real-time Delivery Updates';
+  
+  const pageDescription = tracking
+    ? `Track order ${tracking.orderNumber} - Status: ${tracking.status}. Get real-time delivery updates and rider information.`
+    : 'Track your order in real-time. Get live updates on your delivery status, estimated arrival time, and rider information.';
+
   return (
     <>
       <Helmet>
-        <title>Track Your Order - Real-time Delivery Updates</title>
-        <meta name="description" content="Track your order in real-time. Get live updates on your delivery status, estimated arrival time, and rider information." />
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        {tracking && (
+          <>
+            <meta property="og:title" content={`Order ${tracking.orderNumber} - ${tracking.status}`} />
+            <meta property="og:description" content={pageDescription} />
+            <meta property="og:url" content={`${window.location.origin}/track/${tracking.orderNumber}`} />
+            <meta property="og:type" content="website" />
+            <meta name="twitter:card" content="summary" />
+            <meta name="twitter:title" content={`Order ${tracking.orderNumber} - ${tracking.status}`} />
+            <meta name="twitter:description" content={pageDescription} />
+            <link rel="canonical" href={`${window.location.origin}/track/${tracking.orderNumber}`} />
+          </>
+        )}
       </Helmet>
 
       <PublicHeader />
@@ -150,9 +206,20 @@ export default function TrackOrder() {
                       {getStatusIcon(tracking.status)}
                       Order #{tracking.orderNumber}
                     </CardTitle>
-                    <Badge className={getStatusColor(tracking.status)}>
-                      {tracking.status.replace('_', ' ').toUpperCase()}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getStatusColor(tracking.status)}>
+                        {tracking.status.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleShareTrackingLink}
+                        className="flex items-center gap-1"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        Share
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -164,7 +231,11 @@ export default function TrackOrder() {
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Order ID:</span>
-                            <span className="font-mono">{tracking.orderId}</span>
+                            <span className="font-mono text-xs">{tracking.orderId}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Order Number:</span>
+                            <span className="font-mono">{tracking.orderNumber}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Status:</span>
@@ -176,6 +247,18 @@ export default function TrackOrder() {
                               <span>{format(new Date(tracking.estimatedDeliveryTime), 'PPp')}</span>
                             </div>
                           )}
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Tracking Link:</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleShareTrackingLink}
+                              className="h-auto p-1 text-xs text-primary hover:text-primary/80"
+                            >
+                              <Copy className="w-3 h-3 mr-1" />
+                              Copy Link
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -238,61 +321,115 @@ export default function TrackOrder() {
                 />
               )}
 
-              {/* Order Timeline */}
+              {/* Enhanced Order Timeline */}
               <Card>
                 <CardHeader>
                   <CardTitle>Order Timeline</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {/* This would be populated with actual order events in a real implementation */}
                     <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                      <div className="w-3 h-3 bg-green-600 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-2 h-2 text-white" />
+                      </div>
                       <div className="flex-1">
                         <p className="font-medium">Order Placed</p>
-                        <p className="text-sm text-muted-foreground">Your order has been received</p>
+                        <p className="text-sm text-muted-foreground">Your order has been received and is being processed</p>
                       </div>
+                      <span className="text-xs text-muted-foreground">✓</span>
                     </div>
                     
                     {tracking.status !== 'pending' && (
                       <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                        <div className="w-3 h-3 bg-green-600 rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-2 h-2 text-white" />
+                        </div>
                         <div className="flex-1">
                           <p className="font-medium">Order Confirmed</p>
                           <p className="text-sm text-muted-foreground">Payment verified and order confirmed</p>
                         </div>
+                        <span className="text-xs text-muted-foreground">✓</span>
                       </div>
                     )}
 
                     {['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(tracking.status) && (
                       <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                        <div className={`w-3 h-3 rounded-full flex items-center justify-center ${
+                          tracking.status === 'preparing' ? 'bg-orange-500' : 'bg-green-600'
+                        }`}>
+                          {tracking.status === 'preparing' ? (
+                            <Clock className="w-2 h-2 text-white" />
+                          ) : (
+                            <CheckCircle className="w-2 h-2 text-white" />
+                          )}
+                        </div>
                         <div className="flex-1">
                           <p className="font-medium">Preparing Order</p>
-                          <p className="text-sm text-muted-foreground">Your order is being prepared</p>
+                          <p className="text-sm text-muted-foreground">Your delicious order is being carefully prepared</p>
                         </div>
+                        <span className="text-xs text-muted-foreground">
+                          {tracking.status === 'preparing' ? '🔄' : '✓'}
+                        </span>
                       </div>
                     )}
 
                     {['out_for_delivery', 'delivered'].includes(tracking.status) && (
                       <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                        <div className={`w-3 h-3 rounded-full flex items-center justify-center ${
+                          tracking.status === 'out_for_delivery' ? 'bg-blue-500' : 'bg-green-600'
+                        }`}>
+                          {tracking.status === 'out_for_delivery' ? (
+                            <Truck className="w-2 h-2 text-white" />
+                          ) : (
+                            <CheckCircle className="w-2 h-2 text-white" />
+                          )}
+                        </div>
                         <div className="flex-1">
                           <p className="font-medium">Out for Delivery</p>
-                          <p className="text-sm text-muted-foreground">Your order is on the way</p>
+                          <p className="text-sm text-muted-foreground">Your order is on the way to you</p>
                         </div>
+                        <span className="text-xs text-muted-foreground">
+                          {tracking.status === 'out_for_delivery' ? '🚛' : '✓'}
+                        </span>
                       </div>
                     )}
 
                     {tracking.status === 'delivered' && (
                       <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                        <div className="flex-1">
-                          <p className="font-medium">Delivered</p>
-                          <p className="text-sm text-muted-foreground">Order successfully delivered</p>
+                        <div className="w-3 h-3 bg-green-600 rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-2 h-2 text-white" />
                         </div>
+                        <div className="flex-1">
+                          <p className="font-medium">Delivered Successfully! 🎉</p>
+                          <p className="text-sm text-muted-foreground">Your order has been delivered. Enjoy your meal!</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground">✓</span>
                       </div>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Help & Support Section */}
+              <Card className="bg-muted/50">
+                <CardContent className="pt-6">
+                  <div className="text-center space-y-2">
+                    <h3 className="font-semibold">Need Help?</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Having issues with your order? We're here to help.
+                    </p>
+                    <div className="flex justify-center gap-2">
+                      <Button variant="outline" size="sm" asChild>
+                        <a href="/contact" target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-4 h-4 mr-1" />
+                          Contact Support
+                        </a>
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleShareTrackingLink}>
+                        <Share2 className="w-4 h-4 mr-1" />
+                        Share Order
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

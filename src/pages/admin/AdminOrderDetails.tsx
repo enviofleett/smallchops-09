@@ -165,6 +165,7 @@ const AdminOrderDetails: React.FC = () => {
               deliverySchedule={delivery_schedule}
               pickupPoint={undefined}
               deliveryAddress={order.delivery_address}
+              specialInstructions={order.special_instructions}
               isLoadingSchedule={false}
               recoveryError={false}
               onRecoveryAttempt={() => {}}

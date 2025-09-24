@@ -434,6 +434,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 } 
                 pickupPoint={pickupPoint}
                 deliveryAddress={safeFallback(order.delivery_address)}
+                specialInstructions={order.special_instructions}
                 isLoadingSchedule={isLoadingDetails || isLoadingSchedule}
                 onRecoveryAttempt={() => attemptScheduleRecovery(order.id)} 
                 recoveryPending={isRecovering} 

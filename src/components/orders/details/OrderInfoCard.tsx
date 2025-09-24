@@ -218,7 +218,14 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                         </div>
                         {orderType === 'pickup' && pickupPoint?.operating_hours && (
                           <div className="mb-2 text-xs text-muted-foreground">
-                            Hours: {pickupPoint.operating_hours}
+                            Hours: {typeof pickupPoint.operating_hours === 'string' 
+                              ? pickupPoint.operating_hours
+                              : typeof pickupPoint.operating_hours === 'object'
+                              ? Object.entries(pickupPoint.operating_hours)
+                                  .map(([day, hours]) => `${day}: ${typeof hours === 'object' ? JSON.stringify(hours) : hours}`)
+                                  .join(', ')
+                              : 'Contact for hours'
+                            }
                           </div>
                         )}
                         <div className="flex flex-wrap gap-1">

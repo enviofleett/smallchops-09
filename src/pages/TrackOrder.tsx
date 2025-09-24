@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { getRecentGuestOrder, cleanupGuestOrderTracking, logGuestTrackingEvent } from '@/utils/guestCheckoutTracker';
 
 export default function TrackOrder() {
   const [searchParams] = useSearchParams();
@@ -35,13 +36,55 @@ export default function TrackOrder() {
   const [searchValue, setSearchValue] = useState('');
   const { tracking, loading, error, trackOrder } = useDeliveryTracking();
 
-  // Auto-populate search field from URL parameters and route params
+  // Auto-populate search field from URL parameters, route params, and recent guest checkout
   useEffect(() => {
     const orderFromUrl = searchParams.get('order') || searchParams.get('id') || searchParams.get('reference') || orderNumber;
+    
     if (orderFromUrl && !searchValue) {
       setSearchValue(orderFromUrl);
       setOrderIdentifier(orderFromUrl);
       trackOrder(orderFromUrl);
+      return;
+    }
+
+    // Production-ready: Auto-populate for recent guest checkout completions
+    if (!orderFromUrl && !searchValue) {
+      const guestOrder = getRecentGuestOrder(5); // 5 minute window
+      
+      if (guestOrder.orderIdentifier) {
+        setSearchValue(guestOrder.orderIdentifier);
+        setOrderIdentifier(guestOrder.orderIdentifier);
+        trackOrder(guestOrder.orderIdentifier);
+        
+        // Show user-friendly notification
+        const message = guestOrder.source === 'session' 
+          ? `Auto-loaded your recent order: ${guestOrder.orderIdentifier}`
+          : `Found your recent order: ${guestOrder.orderIdentifier}`;
+        
+        const description = guestOrder.source === 'session'
+          ? 'Tracking your order from checkout'
+          : 'Continue tracking your delivery';
+          
+        toast.success(message, { description });
+        
+        // Production logging and cleanup
+        logGuestTrackingEvent('auto_populated', {
+          orderIdentifier: guestOrder.orderIdentifier,
+          source: guestOrder.source
+        });
+        
+        if (guestOrder.shouldCleanup) {
+          cleanupGuestOrderTracking(guestOrder.source!);
+        }
+        
+        return;
+      }
+      
+      // Log monitoring data for debugging
+      logGuestTrackingEvent('storage_check', {
+        hasSessionStorage: !!sessionStorage.getItem('paymentSuccess'),
+        hasLocalStorage: !!localStorage.getItem('lastPaymentSuccess')
+      });
     }
   }, [searchParams, orderNumber, trackOrder, searchValue]);
 

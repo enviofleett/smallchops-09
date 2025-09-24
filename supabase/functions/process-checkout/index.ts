@@ -1,18 +1,16 @@
 // supabase/functions/process-checkout/index.ts - Updated to fix reference mismatch
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://startersmallchops.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-  'Access-Control-Max-Age': '86400',
-}
+import { getCorsHeaders, handleCorsPreflightResponse } from "../_shared/cors.ts"
 
 serve(async (req: Request) => {
+  const origin = req.headers.get('Origin')
+  
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders })
+    return handleCorsPreflightResponse(origin)
   }
+
+  const corsHeaders = getCorsHeaders(origin)
 
   try {
     console.log('🚀 Starting checkout process...')

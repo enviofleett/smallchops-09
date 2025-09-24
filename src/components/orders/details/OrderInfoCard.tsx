@@ -153,12 +153,50 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
             </div>
           ) : deliverySchedule ? (
             // Production Schedule Display - Works for both Delivery and Pickup
-            <DeliveryScheduleDisplay 
-              schedule={deliverySchedule}
-              orderType={orderType}
-              orderStatus={status}
-              className="mb-0" 
-            />
+            <div className="space-y-3">
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {orderType === 'delivery' ? (
+                      <Truck className="w-4 h-4 text-primary" />
+                    ) : (
+                      <Package className="w-4 h-4 text-primary" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-primary mb-2">
+                      {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Scheduled
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2 text-sm">
+                      {deliverySchedule.delivery_date && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Date:</span>
+                          <span className="font-medium">{new Date(deliverySchedule.delivery_date).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Time:</span>
+                          <span className="font-medium">{deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</span>
+                        </div>
+                      )}
+                      {deliverySchedule.is_flexible && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Flexibility:</span>
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Flexible timing</span>
+                        </div>
+                      )}
+                      {deliverySchedule.special_instructions && (
+                        <div className="mt-2 pt-2 border-t border-primary/10">
+                          <span className="text-xs text-muted-foreground block mb-1">Special Instructions:</span>
+                          <span className="text-xs">{deliverySchedule.special_instructions}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
               // Enhanced fallback: Try multiple approaches to find schedule data
               <div className="space-y-3">

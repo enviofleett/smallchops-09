@@ -916,9 +916,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 <Label 
                   htmlFor="delivery" 
                   className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
-                    "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-lg peer-checked:ring-2 peer-checked:ring-green-200"
+                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all duration-300",
+                    "hover:border-primary/30 hover:bg-accent/10 hover:shadow-md",
+                    "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-xl peer-checked:ring-4 peer-checked:ring-green-200 peer-checked:scale-[1.02]",
+                    formData.fulfillment_type === 'delivery' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200 scale-[1.02]"
                   )}
                 >
                   <Truck className="w-8 h-8 mb-3 text-primary" />
@@ -939,9 +940,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 <Label 
                   htmlFor="pickup" 
                   className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
-                    "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-lg peer-checked:ring-2 peer-checked:ring-green-200"
+                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all duration-300",
+                    "hover:border-primary/30 hover:bg-accent/10 hover:shadow-md",
+                    "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-xl peer-checked:ring-4 peer-checked:ring-green-200 peer-checked:scale-[1.02]",
+                    formData.fulfillment_type === 'pickup' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200 scale-[1.02]"
                   )}
                 >
                   <MapPin className="w-8 h-8 mb-3 text-primary" />

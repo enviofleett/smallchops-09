@@ -289,13 +289,70 @@ const PublicHome = () => {
       <section className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 items-center">
-            {/* Hero content removed - ready for dynamic content */}
+            {/* Hero Content */}
+            <div className="lg:col-span-2 space-y-6">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+                Delicious Food
+                <span className="block text-red-600">Delivered Fast</span>
+              </h1>
+              <p className="text-lg sm:text-xl text-gray-600 max-w-2xl">
+                Order from our wide selection of fresh, quality meals. Fast delivery, great taste, and amazing value - delivered right to your door.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    type="text"
+                    placeholder="Search for food..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-12 text-base border-2 border-gray-200 focus:border-red-500"
+                  />
+                </div>
+                <Button 
+                  size="lg" 
+                  className="h-12 px-8 bg-red-600 hover:bg-red-700 text-white font-semibold"
+                  onClick={() => {
+                    const productsSection = document.querySelector('#products-section');
+                    productsSection?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  Order Now
+                </Button>
+              </div>
+              <div className="flex items-center gap-6 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Free delivery over ₦2000</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span>30min average delivery</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Hero Image */}
+            <div className="lg:col-span-1">
+              <div className="relative">
+                <OptimizedImage
+                  src="/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png"
+                  alt="Delicious food delivery"
+                  className="w-full h-auto rounded-lg shadow-2xl"
+                  sizes="(max-width: 1024px) 100vw, 33vw"
+                />
+                <div className="absolute -bottom-4 -right-4 bg-red-600 text-white p-4 rounded-lg shadow-lg">
+                  <p className="text-sm font-semibold">⭐ 4.8/5 Rating</p>
+                  <p className="text-xs opacity-90">1000+ Happy Customers</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Products Section */}
-      <section className="bg-white py-8 sm:py-12 lg:py-16">
+      <section id="products-section" className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
             {/* Left Sidebar - Categories - Hidden on mobile */}

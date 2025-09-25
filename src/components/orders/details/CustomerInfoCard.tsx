@@ -263,12 +263,21 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Delivery Date:</span>
                   <span className="text-sm text-foreground">
-                    {deliverySchedule?.delivery_date ? 
-                      format(new Date(deliverySchedule.delivery_date), 'PPP') : 
-                      deliverySchedule?.scheduled_date ?
-                      format(new Date(deliverySchedule.scheduled_date), 'PPP') :
-                      'To be scheduled'
-                    }
+                    {(() => {
+                      // Prioritize customer-selected delivery date from checkout
+                      const customerSelectedDate = deliverySchedule?.delivery_date || deliverySchedule?.scheduled_date;
+                      
+                      if (customerSelectedDate) {
+                        try {
+                          return format(new Date(customerSelectedDate), 'EEEE, MMMM d, yyyy');
+                        } catch (error) {
+                          console.error('Error formatting delivery date:', error);
+                          return customerSelectedDate; // Fallback to raw date string
+                        }
+                      }
+                      
+                      return 'To be scheduled';
+                    })()}
                   </span>
                 </div>
                 

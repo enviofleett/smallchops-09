@@ -121,160 +121,222 @@ export const CreateAdminDialog = ({
     }
   };
   return <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
+          <DialogTitle className="flex items-center gap-3 text-lg font-semibold">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Shield className="h-5 w-5 text-primary" />
+            </div>
             Create Admin User
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Email Address
-              </Label>
-              <Input id="email" type="email" placeholder="admin@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="role" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Role
-              </Label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="user">User</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Username Configuration */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4" />
-                  Auto-generate Username
-                </Label>
-                <Switch checked={useAutoUsername} onCheckedChange={setUseAutoUsername} />
-              </div>
-
-              {useAutoUsername && <div className="space-y-2">
-                  <Label htmlFor="username-format">Username Format</Label>
-                  <Select value={usernameFormat} onValueChange={(value: 'full' | 'initials' | 'firstname') => setUsernameFormat(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full">Full (john.doe)</SelectItem>
-                      <SelectItem value="firstname">First Name (john)</SelectItem>
-                      <SelectItem value="initials">Initials (jd)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>}
-
-              {!useAutoUsername && <div className="space-y-2">
-                  <Label htmlFor="username">Custom Username</Label>
-                  <Input id="username" type="text" placeholder="Enter username" value={username} onChange={e => setUsername(e.target.value)} />
-                </div>}
-
-              {username && <div className="flex items-center gap-2">
-                  <Badge variant="outline">Username: {username}</Badge>
-                </div>}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Access Options */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base font-medium">Immediate Access</Label>
-                <p className="text-sm text-muted-foreground">
-                  Create user with password and auto-verify email for immediate login
-                </p>
-              </div>
-              <Switch checked={useImmediateAccess} onCheckedChange={setUseImmediateAccess} />
-            </div>
-
-            {useImmediateAccess}
-
-            {useImmediateAccess && <div className="space-y-4">
-                {/* Password Template Selection */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    Password Template
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-3">
+                  <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    Email Address
                   </Label>
-                  <Select value={passwordTemplate} onValueChange={handleTemplateChange}>
-                    <SelectTrigger>
-                      <SelectValue />
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="admin@example.com" 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)} 
+                    className="h-11"
+                    required 
+                  />
+                </div>
+                
+                <div className="space-y-3">
+                  <Label htmlFor="role" className="flex items-center gap-2 text-sm font-medium">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    Role
+                  </Label>
+                  <Select value={role} onValueChange={setRole}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {passwordTemplates.map(template => <SelectItem key={template.id} value={template.id}>
-                          <div className="flex flex-col">
-                            <span>{template.name}</span>
-                            <span className="text-xs text-muted-foreground">{template.description}</span>
-                          </div>
-                        </SelectItem>)}
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="user">User</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
 
-                {/* Password Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="flex items-center gap-2">
-                    <Key className="h-4 w-4" />
-                    Password
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input id="password" type="text" placeholder="Enter or generate password" value={immediatePassword} onChange={e => setImmediatePassword(e.target.value)} className="font-mono" />
-                    <Button type="button" variant="outline" onClick={handleGeneratePassword}>
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Password Change Requirement */}
+              {/* Username Configuration */}
+              <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">Require Password Change</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Force user to change password on first login
+                  <Label className="flex items-center gap-2 text-sm font-medium">
+                    <UserPlus className="h-4 w-4 text-muted-foreground" />
+                    Auto-generate Username
+                  </Label>
+                  <Switch checked={useAutoUsername} onCheckedChange={setUseAutoUsername} />
+                </div>
+
+                {useAutoUsername && (
+                  <div className="space-y-3">
+                    <Label htmlFor="username-format" className="text-sm font-medium">Username Format</Label>
+                    <Select value={usernameFormat} onValueChange={(value: 'full' | 'initials' | 'firstname') => setUsernameFormat(value)}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="full">Full (john.doe)</SelectItem>
+                        <SelectItem value="firstname">First Name (john)</SelectItem>
+                        <SelectItem value="initials">Initials (jd)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {!useAutoUsername && (
+                  <div className="space-y-3">
+                    <Label htmlFor="username" className="text-sm font-medium">Custom Username</Label>
+                    <Input 
+                      id="username" 
+                      type="text" 
+                      placeholder="Enter username" 
+                      value={username} 
+                      onChange={e => setUsername(e.target.value)} 
+                      className="h-11"
+                    />
+                  </div>
+                )}
+
+                {username && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <Badge variant="outline" className="bg-background">
+                      Username: {username}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator className="my-6" />
+
+            {/* Access Options */}
+            <div className="space-y-6">
+              <div className="p-4 bg-muted/30 rounded-lg space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1 flex-1">
+                    <Label className="text-base font-medium">Immediate Access</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Create user with password and auto-verify email for immediate login
                     </p>
                   </div>
-                  <Switch checked={requiresPasswordChange} onCheckedChange={setRequiresPasswordChange} />
+                  <Switch checked={useImmediateAccess} onCheckedChange={setUseImmediateAccess} />
                 </div>
 
-                {requiresPasswordChange}
-              </div>}
+                {useImmediateAccess && (
+                  <div className="space-y-4 pt-4 border-t">
+                    {/* Password Template Selection */}
+                    <div className="space-y-3">
+                      <Label className="flex items-center gap-2 text-sm font-medium">
+                        <Settings className="h-4 w-4 text-muted-foreground" />
+                        Password Template
+                      </Label>
+                      <Select value={passwordTemplate} onValueChange={handleTemplateChange}>
+                        <SelectTrigger className="h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {passwordTemplates.map(template => (
+                            <SelectItem key={template.id} value={template.id}>
+                              <div className="flex flex-col text-left">
+                                <span className="font-medium">{template.name}</span>
+                                <span className="text-xs text-muted-foreground">{template.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base font-medium">Send Welcome Email</Label>
-                <p className="text-sm text-muted-foreground">
-                  Send credentials and instructions via email
-                </p>
+                    {/* Password Input */}
+                    <div className="space-y-3">
+                      <Label htmlFor="password" className="flex items-center gap-2 text-sm font-medium">
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                        Password
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          id="password" 
+                          type="text" 
+                          placeholder="Enter or generate password" 
+                          value={immediatePassword} 
+                          onChange={e => setImmediatePassword(e.target.value)} 
+                          className="font-mono h-11 flex-1"
+                        />
+                        <Button type="button" variant="outline" onClick={handleGeneratePassword} className="h-11 px-3">
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Password Change Requirement */}
+                    <div className="flex items-start justify-between gap-4 pt-2">
+                      <div className="space-y-1 flex-1">
+                        <Label className="text-sm font-medium">Require Password Change</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Force user to change password on first login
+                        </p>
+                      </div>
+                      <Switch checked={requiresPasswordChange} onCheckedChange={setRequiresPasswordChange} />
+                    </div>
+                  </div>
+                )}
               </div>
-              <Switch checked={sendEmail} onCheckedChange={setSendEmail} />
+
+              <div className="p-4 bg-muted/30 rounded-lg">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1 flex-1">
+                    <Label className="text-base font-medium">Send Welcome Email</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Send credentials and instructions via email
+                    </p>
+                  </div>
+                  <Switch checked={sendEmail} onCheckedChange={setSendEmail} />
+                </div>
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isCreating}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!email?.trim() || !role || (useImmediateAccess && !immediatePassword?.trim()) || isCreating}>
-              {isCreating ? 'Creating Admin...' : 'Create Admin User'}
-            </Button>
+          <DialogFooter className="px-6 py-4 border-t bg-muted/30 mt-auto">
+            <div className="flex flex-col-reverse sm:flex-row gap-3 w-full">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => onOpenChange(false)} 
+                disabled={isCreating}
+                className="flex-1 sm:flex-initial h-11"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={!email?.trim() || !role || (useImmediateAccess && !immediatePassword?.trim()) || isCreating}
+                className="flex-1 sm:flex-initial h-11 font-medium"
+              >
+                {isCreating ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Admin...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Create Admin User
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

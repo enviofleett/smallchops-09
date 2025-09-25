@@ -640,7 +640,6 @@ function AdminOrdersContent() {
           order={previewOrder}
           deliverySchedule={previewDeliverySchedule}
           businessInfo={previewBusinessInfo}
-          isPrinting={isPrinting}
         />
       </div>
             
@@ -829,7 +828,6 @@ function AdminOrdersContent() {
           order={previewOrder}
           deliverySchedule={previewDeliverySchedule}
           businessInfo={previewBusinessInfo}
-          isPrinting={isPrinting}
         />
       </div>
     </>

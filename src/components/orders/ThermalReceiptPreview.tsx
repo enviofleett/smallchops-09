@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Printer, X, FileText } from 'lucide-react';
 import { OrderWithItems } from '@/api/orders';
-import { Printer, X, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { generateReceiptContent } from '@/utils/receiptGenerator';
 
 interface BusinessInfo {
@@ -11,6 +10,10 @@ interface BusinessInfo {
   admin_notification_email?: string;
   whatsapp_support_number?: string;
   logo_url?: string;
+  printed_by?: string;
+  printed_on?: string;
+  printer_type?: string;
+  print_quality?: string;
 }
 
 interface ThermalReceiptPreviewProps {
@@ -20,7 +23,6 @@ interface ThermalReceiptPreviewProps {
   order: OrderWithItems | null;
   deliverySchedule?: any;
   businessInfo?: BusinessInfo | null;
-  isPrinting?: boolean;
 }
 
 export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
@@ -29,290 +31,280 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
   onPrint,
   order,
   deliverySchedule,
-  businessInfo,
-  isPrinting = false
+  businessInfo
 }) => {
-  const [pickupPoint, setPickupPoint] = useState<any>(null);
-  
-  // Fetch pickup point details if order is pickup type
-  useEffect(() => {
-    const fetchPickupPoint = async () => {
-      if (order?.order_type === 'pickup' && order?.pickup_point_id) {
-        try {
-          const { data } = await supabase
-            .from('pickup_points')
-            .select('*')
-            .eq('id', order.pickup_point_id)
-            .single();
-          setPickupPoint(data);
-        } catch (error) {
-          console.warn('Failed to fetch pickup point details:', error);
-        }
-      } else {
-        setPickupPoint(null);
-      }
-    };
-    
-    if (isOpen && order) {
-      fetchPickupPoint();
-    }
-  }, [isOpen, order]);
-
   if (!order) return null;
 
-  // Generate receipt content using shared utility
+  // Generate receipt content
   const receiptContent = generateReceiptContent({
     order,
     deliverySchedule,
     businessInfo,
-    pickupPoint
+    pickupPoint: (order as any).pickup_point
   });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Printer className="h-4 w-4" />
-            Thermal Receipt Preview
+            <FileText className="h-5 w-5" />
+            80mm Thermal Receipt Preview
           </DialogTitle>
         </DialogHeader>
         
-        <div className="max-h-[500px] overflow-y-auto">
-          {/* Receipt Preview */}
-          <div className="bg-white text-black font-mono text-xs leading-tight p-4 border-2 border-dashed border-gray-300 rounded-lg">
-            <div className="w-full max-w-[280px] mx-auto">
+        <div className="space-y-4">
+          {/* Preview Info */}
+          <div className="bg-blue-50 p-3 rounded-md border">
+            <p className="text-sm text-blue-800">
+              <strong>📄 Preview Mode:</strong> This shows exactly how your receipt will look when printed on 80mm thermal paper.
+            </p>
+          </div>
+          
+          {/* Receipt Preview Container - Simulates 80mm paper width */}
+          <div className="bg-white border-2 border-gray-300 rounded-md p-4 shadow-lg" style={{ width: '302px', maxWidth: '100%' }}>
+            <div className="thermal-receipt-preview" style={{ fontFamily: 'Courier New, monospace', fontSize: '11px', lineHeight: '1.3', color: 'black' }}>
+              
               {/* Business Header */}
               <div className="text-center mb-2">
-                <div className="font-bold text-sm uppercase">
+                <div style={{ fontWeight: '900', fontSize: '14px', textTransform: 'uppercase', marginBottom: '3px', letterSpacing: '1px' }}>
                   {receiptContent.businessName}
                 </div>
                 {receiptContent.contactNumber && (
-                  <div className="text-xs">
-                    Contact: {receiptContent.contactNumber}
+                  <div style={{ fontSize: '11px', fontWeight: 'bold' }}>
+                    📞 {receiptContent.contactNumber}
                   </div>
                 )}
               </div>
               
-              <div className="text-center text-xs my-1">
+              <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
                 ================================
               </div>
               
               {/* Order Info */}
-              <div className="mb-2">
-                <div>ORDER #: {order.order_number}</div>
-                <div>Date: {receiptContent.formattedDate}</div>
-                <div>Type: {receiptContent.getOrderTypeDisplay()}</div>
-                <div>Status: {order.status?.replace('_', ' ').toUpperCase()}</div>
+              <div style={{ marginBottom: '3px', fontSize: '11px', fontWeight: 'bold' }}>
+                <div><strong>ORDER #:</strong> {order.order_number}</div>
+                <div><strong>Date:</strong> {receiptContent.formattedDate}</div>
+                <div><strong>Type:</strong> {receiptContent.getOrderTypeDisplay().toUpperCase()}</div>
+                <div><strong>Status:</strong> {order.status?.replace('_', ' ').toUpperCase()}</div>
               </div>
               
-              <div className="text-center text-xs my-1">
+              <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
                 ================================
               </div>
               
               {/* Customer Info */}
-              <div className="mb-2">
-                <div className="font-bold">CUSTOMER INFO:</div>
-                <div>Name: {order.customer_name}</div>
-                {order.customer_phone && <div>Phone: {order.customer_phone}</div>}
-                {order.customer_email && <div>Email: {order.customer_email}</div>}
+              <div style={{ marginBottom: '3px', fontSize: '11px', fontWeight: 'bold' }}>
+                <div style={{ fontSize: '12px', fontWeight: '900', marginBottom: '2px', textTransform: 'uppercase' }}>
+                  👤 CUSTOMER INFO:
+                </div>
+                <div><strong>Name:</strong> {order.customer_name}</div>
+                {order.customer_phone && <div><strong>Phone:</strong> {order.customer_phone}</div>}
+                {order.customer_email && <div><strong>Email:</strong> {order.customer_email}</div>}
               </div>
               
-              <div className="text-center text-xs my-1">
+              <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
                 ================================
               </div>
               
-              {/* Delivery/Pickup Schedule */}
-              <div className="mb-2">
-                <div className="font-bold">{receiptContent.getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
-                
-                {order.order_type === 'delivery' && (
-                  <>
-                    {deliverySchedule && (
+              {/* Schedule Info */}
+              {(deliverySchedule || receiptContent.deliveryInfo?.address) && (
+                <>
+                  <div style={{ marginBottom: '3px', fontSize: '11px', fontWeight: 'bold' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '900', marginBottom: '2px', textTransform: 'uppercase' }}>
+                      {receiptContent.getOrderTypeDisplay().toUpperCase()} SCHEDULE:
+                    </div>
+                    
+                    {order.order_type === 'delivery' && (
                       <>
-                        <div>Scheduled Date: {receiptContent.formattedScheduleDate}</div>
-                        <div>Time Window: {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
-                        {deliverySchedule.is_flexible && (
-                          <div>Flexible: Yes</div>
+                        {deliverySchedule && (
+                          <>
+                            <div><strong>📅 Scheduled Date:</strong> {receiptContent.formattedScheduleDate}</div>
+                            <div><strong>⏰ Time Window:</strong> {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
+                            {deliverySchedule.is_flexible ? (
+                              <div><strong>🔄 Flexible:</strong> YES</div>
+                            ) : (
+                              <div><strong>⏰ Fixed Window:</strong> YES</div>
+                            )}
+                          </>
                         )}
-                        {deliverySchedule.special_instructions && (
-                          <div>Special Notes: {deliverySchedule.special_instructions}</div>
+                        {receiptContent.deliveryInfo?.address && (
+                          <div><strong>📍 Delivery Address:</strong><br />{receiptContent.deliveryInfo.address}</div>
                         )}
                       </>
                     )}
-                    {receiptContent.deliveryInfo?.address && (
-                      <div>Delivery Address: {receiptContent.deliveryInfo.address}</div>
-                    )}
-                    {receiptContent.deliveryInfo?.instructions && (
-                      <div>Delivery Instructions: {receiptContent.deliveryInfo.instructions}</div>
-                    )}
-                    {!deliverySchedule && receiptContent.deliveryInfo?.address && (
-                      <div>⚠️ No scheduled delivery window</div>
-                    )}
-                  </>
-                )}
-                
-                {order.order_type === 'pickup' && (
-                  <>
-                    {deliverySchedule && (
+                    
+                    {order.order_type === 'pickup' && (
                       <>
-                        <div>Scheduled Date: {receiptContent.formattedScheduleDate}</div>
-                        <div>Pickup Window: {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
-                        {deliverySchedule.is_flexible && (
-                          <div>Flexible: Yes</div>
+                        {deliverySchedule && (
+                          <>
+                            <div><strong>📅 Scheduled Date:</strong> {receiptContent.formattedScheduleDate}</div>
+                            <div><strong>⏰ Pickup Window:</strong> {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
+                            {deliverySchedule.is_flexible ? (
+                              <div><strong>🔄 Flexible:</strong> YES</div>
+                            ) : (
+                              <div><strong>⏰ Fixed Window:</strong> YES</div>
+                            )}
+                          </>
                         )}
-                        {deliverySchedule.special_instructions && (
-                          <div>Special Notes: {deliverySchedule.special_instructions}</div>
+                        {(order as any).pickup_point && (
+                          <>
+                            <div><strong>🏪 Pickup Location:</strong> {(order as any).pickup_point.name}</div>
+                            <div><strong>📍 Address:</strong> {(order as any).pickup_point.address}</div>
+                          </>
                         )}
                       </>
                     )}
-                    {pickupPoint && (
-                      <>
-                        <div>Pickup Location: {pickupPoint.name}</div>
-                        <div>Location Address: {pickupPoint.address}</div>
-                        {pickupPoint.contact_phone && (
-                          <div>Location Phone: {pickupPoint.contact_phone}</div>
-                        )}
-                        {receiptContent.pickupPointHours && (
-                          <div>Operating Hours: {receiptContent.pickupPointHours}</div>
-                        )}
-                      </>
-                    )}
-                    {!deliverySchedule && !pickupPoint && (
-                      <div>⚠️ No pickup schedule or location</div>
-                    )}
-                  </>
-                )}
-              </div>
-              
-              <div className="text-center text-xs my-1">
-                ================================
-              </div>
+                  </div>
+                  
+                  <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
+                    ================================
+                  </div>
+                </>
+              )}
               
               {/* Order Items */}
-              <div className="mb-2">
-                <div className="font-bold">ORDER ITEMS & DETAILS:</div>
-                <div className="text-center text-xs my-1">
+              <div style={{ marginBottom: '3px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '900', marginBottom: '2px', textTransform: 'uppercase' }}>
+                  🛒 ORDER ITEMS:
+                </div>
+                <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '1px 0' }}>
                   --------------------------------
                 </div>
                 
-                {order.order_items?.map((item, index) => {
-                  const itemDetails = receiptContent.getItemDetails(item);
-                  return (
-                    <div key={index} className="mb-1">
-                      <div className="flex justify-between items-start">
-                        <span className="flex-1 pr-2">{item.product_name}</span>
-                        <span className="font-bold">{receiptContent.formatCurrency(item.total_price || 0)}</span>
-                      </div>
-                      <div className="text-xs">
-                        <span>Qty: {item.quantity}</span>
-                        {item.unit_price && (
-                          <span> @ {receiptContent.formatCurrency(item.unit_price)}</span>
-                        )}
-                      </div>
-                      
-                      {itemDetails.map((detail, detailIndex) => (
-                        <div key={detailIndex} className="text-xs ml-1">
-                          {detail}
-                        </div>
-                      ))}
-                      
-                      {index < order.order_items.length - 1 && (
-                        <div className="h-1"></div>
-                      )}
+                {order.order_items?.map((item, index) => (
+                  <div key={index} style={{ marginBottom: '2px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
+                      <span><strong>{item.product_name}</strong></span>
+                      <span><strong>{receiptContent.formatCurrency(item.total_price || 0)}</strong></span>
                     </div>
-                  );
-                })}
+                    <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+                      <strong>Qty:</strong> {item.quantity}{item.unit_price && ` @ ${receiptContent.formatCurrency(item.unit_price)}`}
+                    </div>
+                    {index < order.order_items.length - 1 && (
+                      <div style={{ height: '2px' }}></div>
+                    )}
+                  </div>
+                ))}
                 
-                <div className="text-center text-xs my-1">
+                <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '1px 0' }}>
                   --------------------------------
                 </div>
               </div>
               
               {/* Order Summary */}
-              <div className="mb-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{receiptContent.formatCurrency(order.subtotal || 0)}</span>
+              <div style={{ marginBottom: '3px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '900', marginBottom: '2px', textTransform: 'uppercase' }}>
+                  💰 ORDER SUMMARY:
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginBottom: '1px' }}>
+                  <span><strong>Subtotal:</strong></span>
+                  <span><strong>{receiptContent.formatCurrency(order.subtotal || 0)}</strong></span>
                 </div>
                 {order.delivery_fee && order.delivery_fee > 0 && (
-                  <div className="flex justify-between">
-                    <span>Delivery Fee:</span>
-                    <span>{receiptContent.formatCurrency(order.delivery_fee)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginBottom: '1px' }}>
+                    <span><strong>🚚 Delivery Fee:</strong></span>
+                    <span><strong>{receiptContent.formatCurrency(order.delivery_fee)}</strong></span>
                   </div>
                 )}
                 {order.total_vat && order.total_vat > 0 && (
-                  <div className="flex justify-between">
-                    <span>VAT ({((order.total_vat / (order.subtotal || 1)) * 100).toFixed(1)}%):</span>
-                    <span>{receiptContent.formatCurrency(order.total_vat)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginBottom: '1px' }}>
+                    <span><strong>📊 VAT:</strong></span>
+                    <span><strong>{receiptContent.formatCurrency(order.total_vat)}</strong></span>
                   </div>
                 )}
                 {order.discount_amount && order.discount_amount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount:</span>
-                    <span>-{receiptContent.formatCurrency(order.discount_amount)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', marginBottom: '1px', color: '#008000' }}>
+                    <span><strong>💸 Discount:</strong></span>
+                    <span><strong>-{receiptContent.formatCurrency(order.discount_amount)}</strong></span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold border-t pt-1">
-                  <span>TOTAL:</span>
-                  <span>{receiptContent.formatCurrency(order.total_amount)}</span>
+                
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  fontWeight: '900', 
+                  fontSize: '13px', 
+                  borderTop: '3px solid black',
+                  borderBottom: '1px solid black',
+                  padding: '3px 0',
+                  margin: '3px 0',
+                  backgroundColor: '#f0f0f0'
+                }}>
+                  <span><strong>💳 TOTAL:</strong></span>
+                  <span><strong>{receiptContent.formatCurrency(order.total_amount)}</strong></span>
                 </div>
               </div>
               
-              <div className="text-center text-xs my-1">
+              <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
                 ================================
               </div>
               
               {/* Payment Info */}
-              <div className="mb-2">
-                <div className="font-bold">PAYMENT DETAILS:</div>
-                <div>Method: {order.payment_method || 'N/A'}</div>
-                <div>Status: {order.payment_status?.replace('_', ' ').toUpperCase()}</div>
-                {order.payment_reference && <div>Ref: {order.payment_reference}</div>}
+              <div style={{ marginBottom: '3px', fontSize: '11px', fontWeight: 'bold' }}>
+                <div style={{ fontSize: '12px', fontWeight: '900', marginBottom: '2px', textTransform: 'uppercase' }}>
+                  💳 PAYMENT DETAILS:
+                </div>
+                <div><strong>Method:</strong> {order.payment_method || 'N/A'}</div>
+                <div><strong>Status:</strong> {order.payment_status?.replace('_', ' ').toUpperCase()}</div>
+                {order.payment_reference && <div><strong>Reference:</strong> {order.payment_reference}</div>}
               </div>
               
-              {order.special_instructions && (
-                <>
-                  <div className="text-center text-xs my-1">
-                    ================================
-                  </div>
-                  <div className="mb-2">
-                    <div className="font-bold">PREPARATION NOTES:</div>
-                    <div className="text-xs">{order.special_instructions}</div>
-                  </div>
-                </>
-              )}
-              
-              <div className="text-center text-xs my-1">
+              <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
                 ================================
               </div>
               
               {/* Footer */}
-              <div className="text-center text-xs">
-                <div>Thank you for your order!</div>
-                <div className="font-bold">Starters Small Chops</div>
+              <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold' }}>
+                <div><strong>Thank you for your order!</strong></div>
+                <div><strong>🍽️ Starters Small Chops 🍽️</strong></div>
                 {receiptContent.adminEmail && (
-                  <div>{receiptContent.adminEmail}</div>
+                  <div>📧 {receiptContent.adminEmail}</div>
+                )}
+                
+                <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
+                  ================================
+                </div>
+                
+                {businessInfo?.printed_by && (
+                  <div style={{ 
+                    fontSize: '10px', 
+                    marginTop: '4px', 
+                    textAlign: 'center', 
+                    fontWeight: '900', 
+                    textTransform: 'uppercase',
+                    border: '1px dashed black',
+                    padding: '2px'
+                  }}>
+                    <div><strong>🖨️ PRINTED BY:</strong> {businessInfo.printed_by}</div>
+                    {businessInfo.printed_on && (
+                      <div><strong>📅 ON:</strong> {businessInfo.printed_on}</div>
+                    )}
+                    {businessInfo.printer_type && (
+                      <div><strong>🖨️ PRINTER:</strong> {businessInfo.printer_type}</div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
-        
-        <DialogFooter className="flex justify-between gap-2">
-          <Button variant="outline" onClick={onClose}>
-            <X className="h-4 w-4 mr-2" />
-            Cancel
-          </Button>
-          <Button onClick={onPrint} disabled={isPrinting}>
-            {isPrinting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
+          
+          {/* Action Buttons */}
+          <div className="flex justify-between items-center gap-3">
+            <Button onClick={onClose} variant="outline" className="flex-1">
+              <X className="h-4 w-4 mr-2" />
+              Close Preview
+            </Button>
+            <Button onClick={onPrint} className="flex-1 bg-blue-600 hover:bg-blue-700">
               <Printer className="h-4 w-4 mr-2" />
-            )}
-            {isPrinting ? 'Printing...' : 'Print to Thermal Printer'}
-          </Button>
-        </DialogFooter>
+              Print Now
+            </Button>
+          </div>
+          
+          <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+            <strong>📏 Note:</strong> This preview simulates 80mm (3.15 inch) thermal paper width with bold fonts for optimal readability on POS thermal printers.
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

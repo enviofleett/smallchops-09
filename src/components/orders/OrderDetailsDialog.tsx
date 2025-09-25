@@ -20,6 +20,7 @@ import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThermalReceiptPreview } from './ThermalReceiptPreview';
+import { JobOrderPreview } from './JobOrderPreview';
 import { cn } from '@/lib/utils';
 
 // Import our new components
@@ -55,6 +56,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [verifyState, setVerifyState] = useState<'idle' | 'success' | 'failed' | 'pending'>('idle');
   const [showDataSources, setShowDataSources] = useState(false);
+  const [showJobOrderPreview, setShowJobOrderPreview] = useState(false);
 
   // Print ref for react-to-print
   const printRef = useRef<HTMLDivElement>(null);
@@ -402,6 +404,25 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     }
   };
 
+  // Job order preview handler
+  const handleJobOrderPreview = () => {
+    setShowJobOrderPreview(true);
+  };
+
+  // Close job order preview
+  const closeJobOrderPreview = () => {
+    setShowJobOrderPreview(false);
+  };
+
+  // Print from job order preview
+  const printFromJobOrderPreview = () => {
+    const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
+    const schedule = detailedOrderData?.delivery_schedule || deliverySchedule;
+    
+    printJobOrder(order, items, schedule, pickupPoint);
+    setShowJobOrderPreview(false);
+  };
+
   // Job order print handler
   const handleJobOrderPrint = () => {
     const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
@@ -450,9 +471,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2 mb-6 p-4 sm:p-6 print:hidden bg-muted/30 border-b">
           <div className="flex flex-wrap items-center gap-2">
             
-            <Button onClick={handleJobOrderPrint} variant="outline" size="sm" className="gap-2" aria-label="Print job order">
-              <Printer className="h-4 w-4" />
-              <span className="hidden sm:inline">Print Job Order</span>
+            <Button onClick={handleJobOrderPreview} variant="outline" size="sm" className="gap-2" aria-label="Preview job order">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Preview Job Order</span>
             </Button>
             
             <Button 
@@ -644,6 +665,17 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           order={previewOrder}
           deliverySchedule={previewDeliverySchedule}
           businessInfo={previewBusinessInfo}
+        />
+        
+        {/* Job Order Preview Modal */}
+        <JobOrderPreview
+          isOpen={showJobOrderPreview}
+          onClose={closeJobOrderPreview}
+          onPrint={printFromJobOrderPreview}
+          order={order}
+          items={detailedOrderData?.items || enrichedItems || order.order_items || []}
+          deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+          pickupPoint={pickupPoint}
         />
       </AdaptiveDialog>
     </AdaptiveDialog>;

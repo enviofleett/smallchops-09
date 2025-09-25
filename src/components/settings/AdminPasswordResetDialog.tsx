@@ -191,9 +191,7 @@ export const AdminPasswordResetDialog = ({
                       </p>
                     </div>}
 
-                  <div className="text-xs text-muted-foreground">
-                    Password must be at least 8 characters long. Use the generate button for a secure password.
-                  </div>
+                  
                 </div>
               </div>}
           </div>

@@ -15,71 +15,117 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
-    if (!supabaseUrl || !supabaseServiceKey) {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
+
+    // Authenticate admin user
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'Server configuration error' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+        error: 'Missing authorization' 
+      }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
+    if (userError || !user) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Invalid authentication' 
+      }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || profile.role !== 'admin' || !profile.is_active) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Access denied - admin privileges required' 
+      }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     // Get request body
     const body = await req.json()
     console.log('[ADMIN-CREATOR] Creating admin user:', body.email)
     
-    // Basic validation
+    // Validate input
     if (!body.email || !body.role) {
       return new Response(JSON.stringify({ 
         success: false, 
         error: 'Email and role are required' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(body.email)) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        code: 'INVALID_EMAIL',
+        error: 'Invalid email format' 
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // Check if user already exists
+    try {
+      const { data: existingUsers } = await supabase.auth.admin.listUsers()
+      const userExists = existingUsers?.users?.find(u => 
+        u.email?.toLowerCase() === body.email.toLowerCase()
+      )
+      
+      if (userExists) {
+        console.log('[ADMIN-CREATOR] User already exists:', body.email)
+        return new Response(JSON.stringify({ 
+          success: false, 
+          code: 'USER_EXISTS',
+          error: 'A user with this email already exists' 
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    } catch (listError) {
+      console.warn('[ADMIN-CREATOR] Could not list users, proceeding with creation')
     }
 
     // Create user
-    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+    const createUserData = {
       email: body.email,
-      password: body.immediate_password || undefined,
-      email_confirm: !!body.immediate_password,
       user_metadata: {
         role: body.role,
         created_by_admin: true
       }
-    })
+    }
+
+    if (body.immediate_password) {
+      createUserData.password = body.immediate_password
+      createUserData.email_confirm = true
+    } else {
+      createUserData.email_confirm = false
+    }
+
+    const { data: newUser, error: createError } = await supabase.auth.admin.createUser(createUserData)
 
     if (createError) {
       console.error('[ADMIN-CREATOR] User creation failed:', createError)
       
-      // Handle duplicate email error
       if (createError.message?.includes('already') || createError.message?.includes('exists')) {
         return new Response(JSON.stringify({ 
           success: false, 
           code: 'USER_EXISTS',
           error: 'A user with this email already exists' 
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
       
       return new Response(JSON.stringify({ 
         success: false, 
         error: `Failed to create user: ${createError.message}` 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // Create profile
@@ -90,7 +136,9 @@ serve(async (req) => {
         name: body.email.split('@')[0],
         email: body.email,
         role: body.role,
-        is_active: true
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
 
     if (profileError) {
@@ -101,23 +149,44 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         success: false, 
         error: `Failed to create user profile: ${profileError.message}` 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
+
+    // Log the creation
+    await supabase
+      .from('audit_logs')
+      .insert({
+        action: 'admin_user_created',
+        category: 'Admin Management',
+        message: `Admin user created: ${body.email}`,
+        user_id: user.id,
+        entity_id: newUser.user.id,
+        new_values: {
+          email: body.email,
+          role: body.role,
+          created_by: user.id
+        }
+      })
 
     console.log('[ADMIN-CREATOR] User created successfully:', newUser.user.id)
 
+    const responseData = {
+      user_id: newUser.user.id,
+      email: body.email,
+      role: body.role,
+      immediate_access: !!body.immediate_password
+    }
+
+    if (body.immediate_password) {
+      responseData.password = body.immediate_password
+    }
+
     return new Response(JSON.stringify({
       success: true, 
-      message: 'Admin user created successfully',
-      data: {
-        user_id: newUser.user.id,
-        email: body.email,
-        role: body.role,
-        password: body.immediate_password || null
-      }
+      message: body.immediate_password 
+        ? 'Admin user created with immediate access'
+        : 'Admin user created successfully',
+      data: responseData
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

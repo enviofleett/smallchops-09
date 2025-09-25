@@ -205,35 +205,21 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                   {/* Fulfillment Type */}
                   <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                     <div className="flex items-center gap-3">
-                      {(detailedOrderData.order.fulfillment_type || orderType) === 'delivery' ? 
+                      {orderType === 'delivery' ? 
                         <Truck className="w-5 h-5 text-primary" /> : 
                         <Package className="w-5 h-5 text-primary" />
                       }
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wider">Fulfillment Type</p>
                         <p className="font-semibold capitalize text-foreground">
-                          {detailedOrderData.order.fulfillment_type || orderType || "Not specified"}
+                          {orderType || "Not specified"}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Conditional sections based on fulfillment type */}
-                  {(detailedOrderData.order.fulfillment_type || orderType) === "pickup" && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <MapPin className="w-4 h-4" />
-                        Pickup Location
-                      </h4>
-                      <div className="pl-6">
-                        <p className="font-semibold text-foreground">
-                          {detailedOrderData.order.pickup_point_id || "Location ID not assigned"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {(detailedOrderData.order.fulfillment_type || orderType) === "delivery" && (
+                  {/* Delivery Address - Always show for delivery orders */}
+                  {orderType === "delivery" && (
                     <div className="space-y-2">
                       <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <MapPin className="w-4 h-4" />
@@ -242,11 +228,29 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                       <div className="pl-6">
                         <p className="text-sm text-foreground break-words">
                           {(() => {
-                            const address = detailedOrderData.order.delivery_address || deliveryAddress;
+                            // First try the delivery address from props
+                            const address = deliveryAddress || 
+                                           (detailedOrderData?.order?.delivery_address) ||
+                                           (order as any)?.delivery_address;
+                            
                             if (!address) return "Address not provided";
                             
                             if (typeof address === "string") return address;
                             
+                            // Handle nested address object structure
+                            if (address.address) {
+                              const addr = address.address;
+                              return [
+                                addr.address_line_1,
+                                addr.address_line_2,
+                                addr.city,
+                                addr.state,
+                                addr.postal_code,
+                                addr.landmark,
+                              ].filter(Boolean).join(", ");
+                            }
+                            
+                            // Handle direct address object
                             return [
                               address.address_line_1,
                               address.address_line_2,
@@ -261,22 +265,51 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                     </div>
                   )}
 
+                  {/* Pickup Location - Show for pickup orders */}
+                  {orderType === "pickup" && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        Pickup Location
+                      </h4>
+                      <div className="pl-6">
+                        <p className="font-semibold text-foreground">
+                          {(detailedOrderData?.order?.pickup_point_id) || 
+                           (order as any)?.pickup_point_id || 
+                           "Location ID not assigned"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Schedule Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Date */}
                     <div className="space-y-2">
                       <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
-                        {(detailedOrderData.order.fulfillment_type || orderType) === 'delivery' ? 'Delivery' : 'Pickup'} Date
+                        {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Date
                       </h4>
                       <div className="pl-6">
-                        {detailedOrderData.delivery_schedule?.delivery_date ? (
-                          <p className="font-semibold text-foreground">
-                            {format(new Date(detailedOrderData.delivery_schedule.delivery_date), 'EEEE, MMM d, yyyy')}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">Not scheduled</p>
-                        )}
+                        {(() => {
+                          // Try multiple sources for date information
+                          const deliveryTime = (order as any)?.delivery_time;
+                          const pickupTime = (order as any)?.pickup_time;
+                          const scheduleDate = detailedOrderData?.delivery_schedule?.delivery_date || 
+                                            deliverySchedule?.delivery_date;
+                          
+                          const dateToShow = scheduleDate || deliveryTime || pickupTime;
+                          
+                          if (dateToShow) {
+                            return (
+                              <p className="font-semibold text-foreground">
+                                {format(new Date(dateToShow), 'EEEE, MMM d, yyyy')}
+                              </p>
+                            );
+                          }
+                          
+                          return <p className="text-sm text-muted-foreground">Not scheduled</p>;
+                        })()}
                       </div>
                     </div>
 
@@ -287,28 +320,66 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                         Time Window
                       </h4>
                       <div className="pl-6">
-                        {detailedOrderData.delivery_schedule?.delivery_time_start && detailedOrderData.delivery_schedule?.delivery_time_end ? (
-                          <p className="font-semibold text-foreground">
-                            {detailedOrderData.delivery_schedule.delivery_time_start.substring(0, 5)} – {detailedOrderData.delivery_schedule.delivery_time_end.substring(0, 5)}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">Not specified</p>
-                        )}
+                        {(() => {
+                          // Try delivery schedule first
+                          if (detailedOrderData?.delivery_schedule?.delivery_time_start && 
+                              detailedOrderData?.delivery_schedule?.delivery_time_end) {
+                            return (
+                              <p className="font-semibold text-foreground">
+                                {detailedOrderData.delivery_schedule.delivery_time_start.substring(0, 5)} – {detailedOrderData.delivery_schedule.delivery_time_end.substring(0, 5)}
+                              </p>
+                            );
+                          }
+                          
+                          // Try regular delivery schedule
+                          if (deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end) {
+                            return (
+                              <p className="font-semibold text-foreground">
+                                {deliverySchedule.delivery_time_start.substring(0, 5)} – {deliverySchedule.delivery_time_end.substring(0, 5)}
+                              </p>
+                            );
+                          }
+                          
+                          // Try delivery time or pickup time
+                          const deliveryTime = (order as any)?.delivery_time;
+                          const pickupTime = (order as any)?.pickup_time;
+                          const timeToShow = deliveryTime || pickupTime;
+                          
+                          if (timeToShow) {
+                            return (
+                              <p className="font-semibold text-foreground">
+                                {format(new Date(timeToShow), 'HH:mm')}
+                              </p>
+                            );
+                          }
+                          
+                          return <p className="text-sm text-muted-foreground">Not specified</p>;
+                        })()}
                       </div>
                     </div>
                   </div>
 
                   {/* Special Instructions */}
-                  {(detailedOrderData.delivery_schedule?.special_instructions || specialInstructions) && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium text-muted-foreground">Special Instructions</h4>
-                      <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-sm text-foreground">
-                          {detailedOrderData.delivery_schedule?.special_instructions || specialInstructions}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  {(() => {
+                    const instructions = (detailedOrderData?.delivery_schedule?.special_instructions) || 
+                                       (deliverySchedule?.special_instructions) ||
+                                       specialInstructions ||
+                                       (order as any)?.special_instructions;
+                    
+                    if (instructions) {
+                      return (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-muted-foreground">Special Instructions</h4>
+                          <div className="bg-muted/50 rounded-lg p-3">
+                            <p className="text-sm text-foreground">
+                              {instructions}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
                 </div>
               )}

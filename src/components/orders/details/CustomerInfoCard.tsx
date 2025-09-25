@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SectionHeading } from './SectionHeading';
 import { formatAddressMultiline } from '@/utils/formatAddress';
+import { getDeliveryInstructionsFromAddress } from '@/utils/deliveryInstructions';
 import { format } from 'date-fns';
 import { getFirstImage } from '@/lib/imageUtils';
 
@@ -26,9 +27,12 @@ interface CustomerInfoCardProps {
   };
   deliverySchedule?: {
     scheduled_date?: string;
+    delivery_date?: string;
     delivery_time_start?: string;
     delivery_time_end?: string;
     special_instructions?: string;
+    is_flexible?: boolean;
+    requested_at?: string;
   };
   items?: any[];
   subtotal?: number;
@@ -241,6 +245,67 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
             </div>
           )}
 
+          {/* Delivery Schedule Fulfillment (for delivery orders) */}
+          {orderType === 'delivery' && (
+            <div className="pt-3 border-t border-border space-y-3">
+              <div className="flex items-center gap-2">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Delivery Schedule Fulfillment
+                </span>
+              </div>
+              <div className="ml-6 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Channel:</span>
+                  <Badge variant="outline">Delivery</Badge>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Delivery Date:</span>
+                  <span className="text-sm text-foreground">
+                    {deliverySchedule?.delivery_date ? 
+                      format(new Date(deliverySchedule.delivery_date), 'PPP') : 
+                      deliverySchedule?.scheduled_date ?
+                      format(new Date(deliverySchedule.scheduled_date), 'PPP') :
+                      'To be scheduled'
+                    }
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Time Window:</span>
+                  <div className="text-right">
+                    <div className="text-sm text-foreground">{formatTimeWindow()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {deliverySchedule?.is_flexible ? '🔄 Flexible timing' : '⏰ Fixed window'}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Business Day:</span>
+                  <span className="text-sm text-foreground">
+                    {deliverySchedule?.delivery_date ? 
+                      format(new Date(deliverySchedule.delivery_date), 'EEEE') : 
+                      deliverySchedule?.scheduled_date ?
+                      format(new Date(deliverySchedule.scheduled_date), 'EEEE') :
+                      format(new Date(), 'EEEE')
+                    }
+                  </span>
+                </div>
+
+                {deliverySchedule?.requested_at && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Requested:</span>
+                    <span className="text-sm text-foreground">
+                      {format(new Date(deliverySchedule.requested_at), 'PPP p')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Order Items */}
           {items && items.length > 0 && (
             <div className="pt-3 border-t border-border space-y-3">
@@ -316,28 +381,46 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
           )}
 
           {/* Special Instructions */}
-          {deliverySchedule?.special_instructions && (
+          {(deliverySchedule?.special_instructions || (orderType === 'delivery' && getDeliveryInstructionsFromAddress(deliveryAddress))) && (
             <div className="pt-3 border-t border-border space-y-3">
               <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-muted-foreground" />
+                <Info className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Special Instructions
+                  {orderType === 'delivery' ? 'Delivery Instructions' : 'Special Instructions'}
                 </span>
               </div>
-              <div className="ml-6">
-                <div className="bg-orange-50/80 dark:bg-orange-950/30 p-4 rounded-lg border border-orange-200/50 dark:border-orange-800/50">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-orange-100 dark:bg-orange-900/50 rounded-full flex items-center justify-center">
-                      <span className="text-orange-600 dark:text-orange-400 text-sm">📝</span>
-                    </div>
-                    <div className="flex-1">
-                      <h5 className="text-sm font-semibold text-orange-800 dark:text-orange-200 mb-2">Customer Instructions:</h5>
-                      <p className="text-sm text-orange-700 dark:text-orange-300 leading-relaxed whitespace-pre-wrap break-words">
-                        {deliverySchedule.special_instructions}
-                      </p>
+              <div className="ml-6 space-y-3">
+                {deliverySchedule?.special_instructions && (
+                  <div className="bg-orange-50/80 dark:bg-orange-950/30 p-4 rounded-lg border border-orange-200/50 dark:border-orange-800/50">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-orange-100 dark:bg-orange-900/50 rounded-full flex items-center justify-center">
+                        <span className="text-orange-600 dark:text-orange-400 text-sm">📝</span>
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="text-sm font-semibold text-orange-800 dark:text-orange-200 mb-2">Customer Instructions:</h5>
+                        <p className="text-sm text-orange-700 dark:text-orange-300 leading-relaxed whitespace-pre-wrap break-words">
+                          {deliverySchedule.special_instructions}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+                
+                {orderType === 'delivery' && getDeliveryInstructionsFromAddress(deliveryAddress) && (
+                  <div className="bg-blue-50/80 dark:bg-blue-950/30 p-4 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">Delivery Address Notes:</h5>
+                        <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed whitespace-pre-wrap break-words">
+                          {getDeliveryInstructionsFromAddress(deliveryAddress)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

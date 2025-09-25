@@ -321,36 +321,72 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
                       </h4>
                       <div className="pl-6">
                         {(() => {
-                          // Try delivery schedule first
+                          const formatTimeWindow = (startTime: string, endTime: string) => {
+                            try {
+                              // Handle different time formats
+                              const formatTime = (time: string) => {
+                                if (time.includes('T')) {
+                                  return format(new Date(time), 'h:mm a');
+                                } else if (time.includes(':')) {
+                                  // Handle HH:mm format
+                                  const [hours, minutes] = time.split(':');
+                                  const date = new Date();
+                                  date.setHours(parseInt(hours), parseInt(minutes));
+                                  return format(date, 'h:mm a');
+                                }
+                                return time;
+                              };
+                              
+                              return `${formatTime(startTime)} – ${formatTime(endTime)}`;
+                            } catch (error) {
+                              return `${startTime} – ${endTime}`;
+                            }
+                          };
+                          
+                          // Try delivery schedule from detailed order data first
                           if (detailedOrderData?.delivery_schedule?.delivery_time_start && 
                               detailedOrderData?.delivery_schedule?.delivery_time_end) {
                             return (
                               <p className="font-semibold text-foreground">
-                                {detailedOrderData.delivery_schedule.delivery_time_start.substring(0, 5)} – {detailedOrderData.delivery_schedule.delivery_time_end.substring(0, 5)}
+                                {formatTimeWindow(
+                                  detailedOrderData.delivery_schedule.delivery_time_start,
+                                  detailedOrderData.delivery_schedule.delivery_time_end
+                                )}
                               </p>
                             );
                           }
                           
-                          // Try regular delivery schedule
+                          // Try regular delivery schedule passed as props
                           if (deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end) {
                             return (
                               <p className="font-semibold text-foreground">
-                                {deliverySchedule.delivery_time_start.substring(0, 5)} – {deliverySchedule.delivery_time_end.substring(0, 5)}
+                                {formatTimeWindow(
+                                  deliverySchedule.delivery_time_start,
+                                  deliverySchedule.delivery_time_end
+                                )}
                               </p>
                             );
                           }
                           
-                          // Try delivery time or pickup time
-                          const deliveryTime = (order as any)?.delivery_time;
-                          const pickupTime = (order as any)?.pickup_time;
-                          const timeToShow = deliveryTime || pickupTime;
+                          // Try order level time fields
+                          const orderDeliveryTime = (detailedOrderData?.order as any)?.delivery_time || (order as any)?.delivery_time;
+                          const orderPickupTime = (detailedOrderData?.order as any)?.pickup_time || (order as any)?.pickup_time;
+                          const timeToShow = orderDeliveryTime || orderPickupTime;
                           
                           if (timeToShow) {
-                            return (
-                              <p className="font-semibold text-foreground">
-                                {format(new Date(timeToShow), 'HH:mm')}
-                              </p>
-                            );
+                            try {
+                              return (
+                                <p className="font-semibold text-foreground">
+                                  {format(new Date(timeToShow), 'h:mm a')}
+                                </p>
+                              );
+                            } catch (error) {
+                              return (
+                                <p className="font-semibold text-foreground">
+                                  {timeToShow}
+                                </p>
+                              );
+                            }
                           }
                           
                           return <p className="text-sm text-muted-foreground">Not specified</p>;

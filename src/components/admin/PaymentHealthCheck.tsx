@@ -46,7 +46,7 @@ export const PaymentHealthCheck: React.FC = () => {
   useEffect(() => {
     performHealthCheck();
     // Set up auto-refresh every 30 seconds
-    const interval = setInterval(performHealthCheck, 30000);
+    const interval = setInterval(performHealthCheck, 2 * 60 * 1000); // Auto-refresh every 2 minutes for performance
     return () => clearInterval(interval);
   }, []);
 

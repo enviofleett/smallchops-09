@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { SecurityMonitor } from '@/lib/security-utils';
 
@@ -21,7 +22,8 @@ interface CustomerAuthState {
   error: string | null;
 }
 
-export const useCustomerAuth = () => {
+// Optimized customer auth hook with React Query integration
+export const useOptimizedCustomerAuth = () => {
   const [authState, setAuthState] = useState<CustomerAuthState>({
     user: null,
     session: null,
@@ -31,30 +33,51 @@ export const useCustomerAuth = () => {
     error: null,
   });
 
+  const queryClient = useQueryClient();
+
+  // React Query for customer account - prevents duplicate API calls
+  const { 
+    data: customerAccount, 
+    isLoading: isLoadingAccount,
+    error: accountError 
+  } = useQuery({
+    queryKey: ['customer-account', authState.user?.id],
+    queryFn: async () => {
+      if (!authState.user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('customer_accounts')
+        .select('*')
+        .eq('user_id', authState.user.id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching customer account:', error);
+        throw error;
+      }
+      
+      return data;
+    },
+    enabled: !!authState.user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - account data doesn't change often
+    gcTime: 10 * 60 * 1000, // 10 minutes cache
+    refetchOnWindowFocus: false, // Prevent excessive refetches
+    retry: 1 // Single retry on failure
+  });
+
+  // Update auth state when customer account data changes
+  useEffect(() => {
+    setAuthState(prev => ({
+      ...prev,
+      customerAccount,
+      isLoading: prev.isLoading && isLoadingAccount,
+      error: accountError?.message || null
+    }));
+  }, [customerAccount, isLoadingAccount, accountError]);
+
   useEffect(() => {
     let mounted = true;
     let subscription: any;
-
-    const loadCustomerAccount = async (userId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from('customer_accounts')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
-        
-        if (error) {
-          console.error('Error fetching customer account:', error);
-          return null;
-        }
-        
-        // Removed debug logging for production performance
-        return data;
-      } catch (error) {
-        console.error('Customer account fetch error:', error);
-        return null;
-      }
-    };
 
     const initializeAuth = async () => {
       try {
@@ -63,31 +86,14 @@ export const useCustomerAuth = () => {
           if (!mounted) return;
           
           if (session?.user) {
-            // Use setTimeout to prevent potential Supabase deadlocks
-            setTimeout(async () => {
-              if (!mounted) return;
-              
-              setAuthState(prev => ({ 
-                ...prev, 
-                user: session.user, 
-                session, 
-                isLoading: true,
-                error: null
-              }));
-
-              // Load customer account
-              const customerAccount = await loadCustomerAccount(session.user.id);
-              
-              if (mounted) {
-                setAuthState(prev => ({
-                  ...prev,
-                  customerAccount,
-                  isLoading: false,
-                  isAuthenticated: true, // Session exists = authenticated
-                  error: null
-                }));
-              }
-            }, 0);
+            setAuthState(prev => ({ 
+              ...prev, 
+              user: session.user, 
+              session, 
+              isLoading: false, // Let React Query handle account loading
+              isAuthenticated: true,
+              error: null
+            }));
           } else {
             setAuthState({
               user: null,
@@ -97,12 +103,15 @@ export const useCustomerAuth = () => {
               isAuthenticated: false,
               error: null,
             });
+            
+            // Clear customer account query when logging out
+            queryClient.removeQueries({ queryKey: ['customer-account'] });
           }
         });
 
         subscription = data.subscription;
 
-        // Check for existing session
+        // Check for existing session (single call)
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (!mounted) return;
@@ -112,20 +121,10 @@ export const useCustomerAuth = () => {
             ...prev, 
             user: initialSession.user, 
             session: initialSession, 
-            isLoading: true 
+            isLoading: false, // Let React Query handle account loading
+            isAuthenticated: true,
+            error: null
           }));
-
-          const customerAccount = await loadCustomerAccount(initialSession.user.id);
-          
-          if (mounted) {
-            setAuthState(prev => ({
-              ...prev,
-              customerAccount,
-              isLoading: false,
-              isAuthenticated: true, // Session exists = authenticated
-              error: null
-            }));
-          }
         } else {
           if (mounted) {
             setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -149,30 +148,20 @@ export const useCustomerAuth = () => {
       mounted = false;
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
-  const refreshAccount = async () => {
+  // Optimized refresh function using React Query
+  const refreshAccount = useCallback(async () => {
     if (!authState.session?.user) return;
     
     try {
-      const { data, error } = await supabase
-        .from('customer_accounts')
-        .select('*')
-        .eq('user_id', authState.session.user.id)
-        .maybeSingle();
-      
-      if (!error && data) {
-        setAuthState(prev => ({
-          ...prev,
-          customerAccount: data,
-          isAuthenticated: true,
-          error: null
-        }));
-      }
+      await queryClient.invalidateQueries({ 
+        queryKey: ['customer-account', authState.session.user.id] 
+      });
     } catch (error) {
       console.error('Error refreshing customer account:', error);
     }
-  };
+  }, [authState.session?.user, queryClient]);
 
   const logout = async () => {
     // Log security event for logout
@@ -196,15 +185,8 @@ export const useCustomerAuth = () => {
     localStorage.removeItem('guest_session');
     localStorage.removeItem('cart_abandonment_tracking');
     
-    // Clear React Query cache (if available)
-    try {
-      const queryClient = (window as any)?.queryClient;
-      if (queryClient && typeof queryClient.clear === 'function') {
-        queryClient.clear();
-      }
-    } catch (error) {
-      console.log('Query client not available for clearing');
-    }
+    // Clear React Query cache
+    queryClient.clear();
     
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -305,16 +287,15 @@ export const useCustomerAuth = () => {
 
     if (error) throw error;
 
-    setAuthState(prev => ({
-      ...prev,
-      customerAccount: data,
-    }));
+    // Update React Query cache
+    queryClient.setQueryData(['customer-account', authState.user?.id], data);
 
     return data;
   };
 
   return {
     ...authState,
+    isLoading: authState.isLoading || isLoadingAccount,
     logout,
     updateCustomerAccount,
     refetch: refreshAccount,

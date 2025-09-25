@@ -307,7 +307,7 @@ export const useProductionSecurity = () => {
   useEffect(() => {
     fetchSecurityMetrics();
     
-    const interval = setInterval(fetchSecurityMetrics, 30000);
+    const interval = setInterval(fetchSecurityMetrics, 5 * 60 * 1000); // Every 5 minutes for performance
     return () => clearInterval(interval);
   }, []);
 

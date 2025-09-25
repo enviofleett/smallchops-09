@@ -10,6 +10,8 @@ interface DetailedOrderData {
   fulfillment_info?: {
     type: 'pickup' | 'delivery';
     booking_window?: string;
+    pickup_time?: string;
+    delivery_date?: string;
     delivery_hours?: {
       start: string;
       end: string;
@@ -17,8 +19,14 @@ interface DetailedOrderData {
     };
     address?: string;
     special_instructions?: string;
+    delivery_instructions?: string;
+    order_instructions?: string;
+    schedule_instructions?: string;
     requested_at?: string;
     business_hours?: any;
+    pickup_point_name?: string;
+    pickup_point_phone?: string;
+    pickup_point_hours?: any;
   };
 }
 

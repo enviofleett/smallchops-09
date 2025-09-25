@@ -12,6 +12,7 @@ import { ActionsPanel } from '@/components/orders/details/ActionsPanel';
 import { FulfillmentSection } from '@/components/orders/details/FulfillmentSection';
 import { QuickStatsBar } from '@/components/orders/details/QuickStatsBar';
 import { BookingWindowDisplay } from '@/components/orders/details/BookingWindowDisplay';
+import { ComprehensiveOrderFulfillment } from '@/components/orders/details/ComprehensiveOrderFulfillment';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 import { format } from 'date-fns';
@@ -147,6 +148,12 @@ const AdminOrderDetails: React.FC = () => {
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 sm:gap-6">
           {/* Main Content */}
           <div className="xl:col-span-3 space-y-4 sm:space-y-6">
+            {/* Comprehensive Order Fulfillment Details */}
+            <ComprehensiveOrderFulfillment 
+              data={data}
+              isLoading={isLoading}
+            />
+            
             <CustomerInfoCard
               customerName={order.customer_name}
               customerPhone={order.customer_phone}

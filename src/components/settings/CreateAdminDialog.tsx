@@ -245,15 +245,7 @@ export const CreateAdminDialog = ({
                   <Switch checked={requiresPasswordChange} onCheckedChange={setRequiresPasswordChange} />
                 </div>
 
-                {requiresPasswordChange && <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-yellow-800">
-                      <Shield className="h-4 w-4" />
-                      <span className="text-sm font-medium">Password Change Required</span>
-                    </div>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      User will be prompted to change password on first login for security.
-                    </p>
-                  </div>}
+                {requiresPasswordChange}
               </div>}
 
             <div className="flex items-center justify-between">

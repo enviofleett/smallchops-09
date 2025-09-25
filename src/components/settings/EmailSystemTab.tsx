@@ -10,6 +10,7 @@ import { EmailDeliveryDashboard } from '../admin/EmailDeliveryDashboard';
 import { ComprehensiveEmailTestDashboard } from '../admin/ComprehensiveEmailTestDashboard';
 import { EmailSystemAuditDashboard } from '../admin/EmailSystemAuditDashboard';
 import { EmailProductionMonitor } from '../admin/EmailProductionMonitor';
+import { ProductionEmailAudit } from '../admin/ProductionEmailAudit';
 
 export const EmailSystemTab = () => {
   return (
@@ -21,9 +22,10 @@ export const EmailSystemTab = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="testing" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-9">
-          <TabsTrigger value="audit">Audit</TabsTrigger>
+      <Tabs defaultValue="production-audit" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-10">
+          <TabsTrigger value="production-audit">Production Audit</TabsTrigger>
+          <TabsTrigger value="audit">System Audit</TabsTrigger>
           <TabsTrigger value="production">Production</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
@@ -33,6 +35,10 @@ export const EmailSystemTab = () => {
           <TabsTrigger value="smtp">SMTP</TabsTrigger>
           <TabsTrigger value="dashboard">Legacy</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="production-audit" className="space-y-6">
+          <ProductionEmailAudit />
+        </TabsContent>
 
         <TabsContent value="audit" className="space-y-6">
           <EmailSystemAuditDashboard />

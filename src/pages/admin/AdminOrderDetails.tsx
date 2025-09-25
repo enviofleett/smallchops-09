@@ -9,6 +9,7 @@ import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDis
 import { ItemsList } from '@/components/orders/details/ItemsList';
 import { SpecialInstructions } from '@/components/orders/details/SpecialInstructions';
 import { ActionsPanel } from '@/components/orders/details/ActionsPanel';
+import { FulfillmentSection } from '@/components/orders/details/FulfillmentSection';
 import { QuickStatsBar } from '@/components/orders/details/QuickStatsBar';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
@@ -178,6 +179,16 @@ const AdminOrderDetails: React.FC = () => {
               }}
             />
             
+            <FulfillmentSection
+              order={{
+                order_type: order.order_type as 'pickup' | 'delivery',
+                status: order.status,
+                delivery_address: order.delivery_address
+              }}
+              deliverySchedule={delivery_schedule}
+              pickupPoint={undefined}
+            />
+
             {delivery_schedule && (
               <DeliveryScheduleDisplay
                 schedule={delivery_schedule}

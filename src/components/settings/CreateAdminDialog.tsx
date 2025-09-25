@@ -9,14 +9,16 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Shield, Mail, Key, Users, UserPlus, RefreshCw, Settings } from 'lucide-react';
 import { useAdminUserCreation } from '@/hooks/useAdminUserCreation';
-
 interface CreateAdminDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
-
-export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdminDialogProps) => {
+export const CreateAdminDialog = ({
+  open,
+  onOpenChange,
+  onSuccess
+}: CreateAdminDialogProps) => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('admin');
   const [username, setUsername] = useState('');
@@ -27,16 +29,14 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
   const [useAutoUsername, setUseAutoUsername] = useState(true);
   const [usernameFormat, setUsernameFormat] = useState<'full' | 'initials' | 'firstname'>('full');
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(true);
-  
-  const { 
-    createAdminUser, 
-    generateSecurePassword, 
+  const {
+    createAdminUser,
+    generateSecurePassword,
     generateUsernameFromEmailAddr,
     generatePasswordWithTemplate,
     getPasswordTemplates,
-    isCreating 
+    isCreating
   } = useAdminUserCreation();
-
   const passwordTemplates = getPasswordTemplates();
 
   // Auto-generate username when email changes
@@ -46,14 +46,16 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
       setUsername(generatedUsername);
     }
   }, [email, useAutoUsername, usernameFormat, generateUsernameFromEmailAddr]);
-
   const handleGeneratePassword = () => {
     if (passwordTemplate === 'secure_random') {
       const newPassword = generateSecurePassword();
       setImmediatePassword(newPassword);
       setRequiresPasswordChange(false);
     } else {
-      const { password, requiresChange } = generatePasswordWithTemplate(passwordTemplate, {
+      const {
+        password,
+        requiresChange
+      } = generatePasswordWithTemplate(passwordTemplate, {
         email,
         username: username || generateUsernameFromEmailAddr(email, usernameFormat)
       });
@@ -61,11 +63,13 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
       setRequiresPasswordChange(requiresChange);
     }
   };
-
   const handleTemplateChange = (templateId: string) => {
     setPasswordTemplate(templateId);
     if (useImmediateAccess && email) {
-      const { password, requiresChange } = generatePasswordWithTemplate(templateId, {
+      const {
+        password,
+        requiresChange
+      } = generatePasswordWithTemplate(templateId, {
         email,
         username: username || generateUsernameFromEmailAddr(email, usernameFormat)
       });
@@ -73,18 +77,14 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
       setRequiresPasswordChange(requiresChange);
     }
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!email || !role) {
       return;
     }
-
     if (useImmediateAccess && !immediatePassword) {
       return;
     }
-
     const result = await createAdminUser({
       email,
       role: role as 'admin' | 'user',
@@ -95,7 +95,6 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
       send_email: sendEmail,
       admin_created: true
     });
-
     if (result.success) {
       // Reset form and close dialog
       setEmail('');
@@ -112,9 +111,7 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
       onSuccess?.();
     }
   };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -131,14 +128,7 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                 <Mail className="h-4 w-4" />
                 Email Address
               </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <Input id="email" type="email" placeholder="admin@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
             </div>
             
             <div className="space-y-2">
@@ -164,14 +154,10 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                   <UserPlus className="h-4 w-4" />
                   Auto-generate Username
                 </Label>
-                <Switch
-                  checked={useAutoUsername}
-                  onCheckedChange={setUseAutoUsername}
-                />
+                <Switch checked={useAutoUsername} onCheckedChange={setUseAutoUsername} />
               </div>
 
-              {useAutoUsername && (
-                <div className="space-y-2">
+              {useAutoUsername && <div className="space-y-2">
                   <Label htmlFor="username-format">Username Format</Label>
                   <Select value={usernameFormat} onValueChange={(value: 'full' | 'initials' | 'firstname') => setUsernameFormat(value)}>
                     <SelectTrigger>
@@ -183,27 +169,16 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                       <SelectItem value="initials">Initials (jd)</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              )}
+                </div>}
 
-              {!useAutoUsername && (
-                <div className="space-y-2">
+              {!useAutoUsername && <div className="space-y-2">
                   <Label htmlFor="username">Custom Username</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                  />
-                </div>
-              )}
+                  <Input id="username" type="text" placeholder="Enter username" value={username} onChange={e => setUsername(e.target.value)} />
+                </div>}
 
-              {username && (
-                <div className="flex items-center gap-2">
+              {username && <div className="flex items-center gap-2">
                   <Badge variant="outline">Username: {username}</Badge>
-                </div>
-              )}
+                </div>}
             </div>
           </div>
 
@@ -218,26 +193,12 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                   Create user with password and auto-verify email for immediate login
                 </p>
               </div>
-              <Switch
-                checked={useImmediateAccess}
-                onCheckedChange={setUseImmediateAccess}
-              />
+              <Switch checked={useImmediateAccess} onCheckedChange={setUseImmediateAccess} />
             </div>
 
-            {useImmediateAccess && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                <div className="flex items-center gap-2 text-green-800">
-                  <Shield className="h-4 w-4" />
-                  <span className="text-sm font-medium">Immediate Access Enabled</span>
-                </div>
-                <p className="text-xs text-green-700 mt-1">
-                  Email verification will be bypassed. User can login immediately with the provided password.
-                </p>
-              </div>
-            )}
+            {useImmediateAccess}
 
-            {useImmediateAccess && (
-              <div className="space-y-4">
+            {useImmediateAccess && <div className="space-y-4">
                 {/* Password Template Selection */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
@@ -249,14 +210,12 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {passwordTemplates.map((template) => (
-                        <SelectItem key={template.id} value={template.id}>
+                      {passwordTemplates.map(template => <SelectItem key={template.id} value={template.id}>
                           <div className="flex flex-col">
                             <span>{template.name}</span>
                             <span className="text-xs text-muted-foreground">{template.description}</span>
                           </div>
-                        </SelectItem>
-                      ))}
+                        </SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -268,19 +227,8 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                     Password
                   </Label>
                   <div className="flex gap-2">
-                    <Input
-                      id="password"
-                      type="text"
-                      placeholder="Enter or generate password"
-                      value={immediatePassword}
-                      onChange={(e) => setImmediatePassword(e.target.value)}
-                      className="font-mono"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleGeneratePassword}
-                    >
+                    <Input id="password" type="text" placeholder="Enter or generate password" value={immediatePassword} onChange={e => setImmediatePassword(e.target.value)} className="font-mono" />
+                    <Button type="button" variant="outline" onClick={handleGeneratePassword}>
                       <RefreshCw className="h-4 w-4" />
                     </Button>
                   </div>
@@ -294,14 +242,10 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                       Force user to change password on first login
                     </p>
                   </div>
-                  <Switch
-                    checked={requiresPasswordChange}
-                    onCheckedChange={setRequiresPasswordChange}
-                  />
+                  <Switch checked={requiresPasswordChange} onCheckedChange={setRequiresPasswordChange} />
                 </div>
 
-                {requiresPasswordChange && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                {requiresPasswordChange && <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                     <div className="flex items-center gap-2 text-yellow-800">
                       <Shield className="h-4 w-4" />
                       <span className="text-sm font-medium">Password Change Required</span>
@@ -309,10 +253,8 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                     <p className="text-xs text-yellow-700 mt-1">
                       User will be prompted to change password on first login for security.
                     </p>
-                  </div>
-                )}
-              </div>
-            )}
+                  </div>}
+              </div>}
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -321,31 +263,19 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
                   Send credentials and instructions via email
                 </p>
               </div>
-              <Switch
-                checked={sendEmail}
-                onCheckedChange={setSendEmail}
-              />
+              <Switch checked={sendEmail} onCheckedChange={setSendEmail} />
             </div>
           </div>
 
           <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
-              disabled={isCreating}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isCreating}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={!email || !role || isCreating}
-            >
+            <Button type="submit" disabled={!email || !role || isCreating}>
               {isCreating ? 'Creating Admin...' : 'Create Admin User'}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 };

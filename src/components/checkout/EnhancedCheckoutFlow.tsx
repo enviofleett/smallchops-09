@@ -802,7 +802,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 placeholder={isAuthenticated ? "Loading your name..." : "Enter your full name"} 
                 required 
                 className={cn(
-                  "h-10",
+                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
                   isAuthenticated && formData.customer_name && "bg-muted border-green-200",
                   isAuthenticated && !formData.customer_name && "animate-pulse"
                 )}
@@ -830,7 +830,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 placeholder={isAuthenticated ? "Loading your email..." : "Enter your email"} 
                 required 
                 className={cn(
-                  "h-10",
+                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
                   isAuthenticated && formData.customer_email && "bg-muted border-green-200",
                   isAuthenticated && !formData.customer_email && "animate-pulse"
                 )}
@@ -858,7 +858,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
                 required
                 className={cn(
-                  "h-10",
+                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
                   isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
                   isAuthenticated && !formData.customer_phone && "animate-pulse"
                 )}
@@ -916,9 +916,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 <Label 
                   htmlFor="delivery" 
                   className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
-                    "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
+                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all duration-300",
+                    "hover:border-primary/30 hover:bg-accent/10 hover:shadow-md",
+                    "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-xl peer-checked:ring-4 peer-checked:ring-green-200 peer-checked:scale-[1.02]",
+                    formData.fulfillment_type === 'delivery' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200 scale-[1.02]"
                   )}
                 >
                   <Truck className="w-8 h-8 mb-3 text-primary" />
@@ -939,9 +940,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 <Label 
                   htmlFor="pickup" 
                   className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all",
-                    "hover:border-primary/20 hover:bg-accent/5",
-                    "peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md"
+                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all duration-300",
+                    "hover:border-primary/30 hover:bg-accent/10 hover:shadow-md",
+                    "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-xl peer-checked:ring-4 peer-checked:ring-green-200 peer-checked:scale-[1.02]",
+                    formData.fulfillment_type === 'pickup' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200 scale-[1.02]"
                   )}
                 >
                   <MapPin className="w-8 h-8 mb-3 text-primary" />
@@ -969,21 +971,21 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
             <CardContent className="space-y-3">
               <div>
                 <RequiredFieldLabel htmlFor="address_line_1" required>Street Address</RequiredFieldLabel>
-                <Input id="address_line_1" value={formData.delivery_address.address_line_1} onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} placeholder="Enter street address" required className="h-10" />
+                <Input id="address_line_1" value={formData.delivery_address.address_line_1} onChange={e => handleFormChange('delivery_address.address_line_1', e.target.value)} placeholder="Enter street address" required className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
               </div>
               <div>
                 <RequiredFieldLabel htmlFor="address_line_2">Apartment, suite, etc.</RequiredFieldLabel>
-                <Input id="address_line_2" value={formData.delivery_address.address_line_2} onChange={e => handleFormChange('delivery_address.address_line_2', e.target.value)} placeholder="Apartment, suite, etc." className="h-10" />
+                <Input id="address_line_2" value={formData.delivery_address.address_line_2} onChange={e => handleFormChange('delivery_address.address_line_2', e.target.value)} placeholder="Apartment, suite, etc." className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
               </div>
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <RequiredFieldLabel htmlFor="city" required>City</RequiredFieldLabel>
-                  <Input id="city" value={formData.delivery_address.city} onChange={e => handleFormChange('delivery_address.city', e.target.value)} placeholder="City" required className="h-10" />
+                  <Input id="city" value={formData.delivery_address.city} onChange={e => handleFormChange('delivery_address.city', e.target.value)} placeholder="City" required className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
                 </div>
               </div>
               <div>
                 <RequiredFieldLabel htmlFor="landmark">Landmark</RequiredFieldLabel>
-                <Input id="landmark" value={formData.delivery_address.landmark} onChange={e => handleFormChange('delivery_address.landmark', e.target.value)} placeholder="Nearby landmark" className="h-10" />
+                <Input id="landmark" value={formData.delivery_address.landmark} onChange={e => handleFormChange('delivery_address.landmark', e.target.value)} placeholder="Nearby landmark" className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
               </div>
               <div>
                 <RequiredFieldLabel htmlFor="delivery_instructions">Delivery Instructions</RequiredFieldLabel>
@@ -991,7 +993,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                   <Input id="delivery_instructions" value={formData.special_instructions || ''} onChange={e => {
                 const value = e.target.value.slice(0, 160); // Limit to 160 characters
                 handleFormChange('special_instructions', value);
-              }} placeholder="Gate code, building entrance, floor, special handling notes..." maxLength={160} className="h-10" />
+              }} placeholder="Gate code, building entrance, floor, special handling notes..." maxLength={160} className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all" />
                   <div className="flex justify-between mt-1">
                     <span className="text-xs text-muted-foreground">
                       Help our drivers find you and deliver your order smoothly
@@ -1146,7 +1148,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               {checkoutStep === 'details' && <div className="flex-shrink-0 p-3 md:p-6 border-t bg-background/80 backdrop-blur-sm">
                   {/* Terms and Conditions */}
                   {termsRequired && <div className="mb-3 flex items-start gap-2">
-                      <input type="checkbox" id="terms-checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
+                      <input type="checkbox" id="terms-checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} className="mt-1 h-4 w-4 accent-green-500 checked:ring-2 checked:ring-green-200 checked:ring-offset-1" />
                       <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
                         I agree to the{' '}
                         <button type="button" onClick={() => setShowTermsDialog(true)} className="text-primary hover:underline font-medium">

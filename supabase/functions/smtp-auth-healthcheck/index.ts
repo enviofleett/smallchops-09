@@ -42,14 +42,18 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
     const normalizedPassword = password.replace(/\s+/g, '').trim();
     const normalizedUsername = username.trim();
     
-    // Gmail-specific validation
-    if (secretHost.includes('gmail.com') && port === 587) {
-      if (!normalizedUsername.includes('@')) {
-        throw new Error('Gmail SMTP requires full email address as username');
-      }
-      if (normalizedPassword.length !== 16) {
-        throw new Error('Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
-      }
+    // Provider-agnostic validation using shared config
+    const { validateSMTPConfig } = await import('../_shared/email-provider-configs.ts');
+    const validation = validateSMTPConfig(secretHost, port, normalizedUsername, normalizedPassword);
+    
+    if (!validation.valid) {
+      const errorMsg = validation.errors.join(', ');
+      console.error('❌ SMTP Configuration validation failed:', errorMsg);
+      throw new Error(`SMTP Configuration Error: ${errorMsg}`);
+    }
+    
+    if (validation.warnings.length > 0) {
+      console.warn('⚠️ SMTP Configuration warnings:', validation.warnings.join(', '));
     }
     
     return {
@@ -96,14 +100,17 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
   const normalizedPassword = (config.smtp_pass || '').toString().replace(/\s+/g, '').trim();
   const normalizedUsername = config.smtp_user.trim();
 
-  // Gmail-specific validation for database config
-  if (config.smtp_host?.includes('gmail.com') && (config.smtp_port || 587) === 587) {
-    if (!normalizedUsername.includes('@')) {
-      throw new Error('Gmail SMTP requires full email address as username');
-    }
-    if (normalizedPassword.length !== 16 && normalizedPassword.length > 0) {
-      throw new Error('Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
-    }
+  // Provider-agnostic validation for database config
+  const { validateSMTPConfig } = await import('../_shared/email-provider-configs.ts');
+  const validation = validateSMTPConfig(
+    config.smtp_host, 
+    config.smtp_port || 587, 
+    normalizedUsername, 
+    normalizedPassword
+  );
+  
+  if (!validation.valid) {
+    throw new Error(`SMTP Configuration Error: ${validation.errors.join(', ')}`);
   }
 
   console.log('📧 Database configuration loaded');
@@ -215,17 +222,17 @@ async function testSMTPConnection(config: any) {
           authResponse: '235 Authentication successful'
         };
       } else if (authResponse.startsWith('535')) {
-        throw new Error(`Authentication failed (535): Username/password rejected. ${
-          config.host.includes('gmail.com') 
-            ? 'For Gmail: Enable 2-Step Verification → Generate App Password at https://myaccount.google.com/apppasswords → Use full Gmail address as username'
-            : 'Check your credentials in Function Secrets'
-        }`);
+        const { detectProvider } = await import('../_shared/email-provider-configs.ts');
+        const provider = detectProvider(config.host);
+        const setupHelp = provider.setupInstructions.join(' → ');
+        
+        throw new Error(`Authentication failed (535): Username/password rejected. Setup: ${setupHelp}`);
       } else {
         throw new Error(`Authentication failed: ${authResponse}`);
       }
     } catch (authError) {
-      // If AUTH PLAIN fails with 535 for Gmail, suggest AUTH LOGIN in production
-      if (authError.message.includes('535') && config.host.includes('gmail.com')) {
+      // Log authentication method for debugging
+      if (authError.message.includes('535')) {
         console.log('⚠️ AUTH PLAIN failed with 535 - production system will retry with AUTH LOGIN automatically');
       }
       

@@ -27,7 +27,7 @@ export const EmailSystemTester = () => {
       if (orderError || !order) {
         toast({
           title: "Test Order Not Found", 
-          description: "Order #ORD17571524652132db not found. Create it first or use a different order.",
+          description: "Test order not found. Create a test order first or check system configuration.",
           variant: "destructive"
         });
         return;
@@ -149,7 +149,7 @@ export const EmailSystemTester = () => {
           Email System Production Test
         </CardTitle>
         <CardDescription>
-          Test the email system using order #ORD17571524652132db as case study
+          Test the email system using the latest test order as case study
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -215,7 +215,7 @@ export const EmailSystemTester = () => {
         <div className="text-sm text-muted-foreground">
           <p><strong>Test Steps:</strong></p>
           <ol className="list-decimal list-inside space-y-1 mt-2">
-            <li>Updates order #ORD17571524652132db status to 'ready'</li>
+            <li>Updates test order status to 'ready'</li>
             <li>Verifies database trigger creates communication_event</li>
             <li>Processes email queue via instant-email-processor</li>
             <li>Checks end-to-end email delivery pipeline</li>

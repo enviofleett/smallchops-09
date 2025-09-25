@@ -1,11 +1,17 @@
 import React from 'react';
-import { Hash, Calendar, Clock, CreditCard, Truck, Package } from 'lucide-react';
+import { Hash, Calendar, Clock, CreditCard, Truck, Package, Database, MapPin, Navigation } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { SectionHeading } from './SectionHeading';
 import { StatCard } from './StatCard';
 import { DeliveryScheduleDisplay } from '../DeliveryScheduleDisplay';
+import { PickupScheduleUpdate } from '../PickupScheduleUpdate';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
+import { formatAddress } from '@/utils/formatAddress';
+import { usePickupPoint } from '@/hooks/usePickupPoints';
+import { useDeliveryZones } from '@/hooks/useDeliveryZones';
+import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 
 interface OrderInfoCardProps {
   orderNumber: string;
@@ -16,6 +22,9 @@ interface OrderInfoCardProps {
   paymentReference?: string;
   totalAmount: number;
   deliverySchedule?: any;
+  pickupPoint?: any;
+  deliveryAddress?: string;
+  specialInstructions?: string;
   isLoadingSchedule?: boolean;
   onRecoveryAttempt?: () => void;
   recoveryPending?: boolean;
@@ -27,6 +36,14 @@ interface OrderInfoCardProps {
     isRecovering: boolean;
     lastAttempt?: number;
   };
+  order?: {
+    id: string;
+    order_type: 'pickup' | 'delivery';
+    pickup_time?: string;
+    special_instructions?: string;
+    created_at: string;
+  };
+  orderId?: string;
 }
 
 export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
@@ -38,12 +55,28 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
   paymentReference,
   totalAmount,
   deliverySchedule,
+  pickupPoint,
+  deliveryAddress,
+  specialInstructions,
   isLoadingSchedule,
   onRecoveryAttempt,
   recoveryPending,
   recoveryError,
-  recoveryStatus
+  recoveryStatus,
+  order,
+  orderId
 }) => {
+  // Fetch detailed order data for fulfillment information
+  const { data: detailedOrderData, isLoading: isLoadingDetailedOrder } = useDetailedOrderData(orderId || orderNumber);
+  
+  // Hooks for fetching fulfillment data
+  const { data: pickupPointData, isLoading: isLoadingPickupPoint } = usePickupPoint(
+    orderType === 'pickup' && order ? (order as any).pickup_point_id : undefined
+  );
+  
+  const { zones } = useDeliveryZones();
+  const deliveryZoneData = zones.find(zone => zone.id === (order as any)?.delivery_zone_id);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
   };
@@ -136,132 +169,23 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
           </div>
         </div>
 
-        {/* Schedule Section - Production Ready for Both Delivery & Pickup */}
+        {/* Fulfillment Information Section - Production Ready */}
         <div>
           <SectionHeading 
-            title={`${orderType === 'delivery' ? 'Delivery' : 'Pickup'} Schedule`}
+            title="Fulfillment Information"
             icon={orderType === 'delivery' ? Truck : Package}
           />
           
-          {isLoadingSchedule || recoveryPending ? (
+          {isLoadingSchedule || recoveryPending || isLoadingPickupPoint ? (
             <div className="bg-muted rounded-lg p-4 animate-pulse">
               <div className="h-4 bg-muted-foreground/20 rounded mb-2"></div>
               <div className="h-3 bg-muted-foreground/20 rounded w-2/3"></div>
               {recoveryPending && (
-                <p className="text-xs text-primary mt-2">🔄 Attempting to recover schedule...</p>
+                <p className="text-xs text-primary mt-2">🔄 Attempting to recover data...</p>
               )}
             </div>
-          ) : deliverySchedule ? (
-            // Production Schedule Display - Works for both Delivery and Pickup
-            <DeliveryScheduleDisplay 
-              schedule={deliverySchedule}
-              orderType={orderType}
-              orderStatus={status}
-              className="mb-0" 
-            />
           ) : (
-            // Production-Ready Fallback with Enhanced UX
-            <div className="space-y-3">
-              {/* Primary Warning Card */}
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-950 dark:border-amber-800">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-0.5">
-                    {orderType === 'delivery' ? (
-                      <Truck className="w-4 h-4 text-amber-600" />
-                    ) : (
-                      <Package className="w-4 h-4 text-amber-600" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                      {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Schedule Not Available
-                    </h4>
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
-                      {orderType === 'delivery' 
-                        ? 'The delivery schedule for this order is currently being processed or needs to be recovered.'
-                        : 'The pickup schedule for this order is currently being processed or needs to be recovered.'
-                      }
-                    </p>
-                    
-                    {/* Recovery Status Info */}
-                    {recoveryStatus && (
-                      <div className="bg-amber-100 dark:bg-amber-900 rounded p-2 mb-2">
-                        <p className="text-xs text-amber-800 dark:text-amber-200 font-medium mb-1">
-                          Recovery Status
-                        </p>
-                        {recoveryStatus.canRecover ? (
-                          <p className="text-xs text-amber-700 dark:text-amber-300">
-                            Attempts: {recoveryStatus.attempts}/{recoveryStatus.maxAttempts} 
-                            {recoveryStatus.lastAttempt && (
-                              <span className="ml-2">
-                                (Last: {new Date(recoveryStatus.lastAttempt).toLocaleTimeString()})
-                              </span>
-                            )}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-amber-700 dark:text-amber-300">
-                            Recovery limit reached ({recoveryStatus.maxAttempts} attempts)
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Action Instructions */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-amber-600 dark:text-amber-400">
-                        {recoveryError ? (
-                          <>❌ Schedule recovery failed. The {orderType} schedule will be confirmed manually.</>
-                        ) : (
-                          <>⏳ Schedule will be automatically confirmed after payment verification.</>
-                        )}
-                      </p>
-                      
-                      {orderType === 'pickup' && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
-                          📍 Pickup location will be communicated via SMS/email once confirmed.
-                        </p>
-                      )}
-                      
-                      {orderType === 'delivery' && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
-                          🚚 Delivery time slot will be assigned based on your location and availability.
-                        </p>
-                      )}
-                    </div>
-                    
-                    {/* Manual Recovery Button */}
-                    {onRecoveryAttempt && recoveryStatus?.canRecover && (
-                      <button 
-                        onClick={onRecoveryAttempt}
-                        className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 dark:text-amber-200 dark:bg-amber-900 dark:hover:bg-amber-800 rounded border border-amber-300 dark:border-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={recoveryPending || !recoveryStatus.canRecover}
-                      >
-                        {recoveryPending ? (
-                          <>🔄 Retrying...</>
-                        ) : (
-                          <>🔄 Retry Schedule Recovery</>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Additional Info Card for Production Orders */}
-              {(status === 'confirmed' || status === 'preparing' || status === 'ready') && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 dark:bg-blue-950 dark:border-blue-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                    <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
-                      Production Update
-                    </p>
-                  </div>
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    Your order is being prepared. The {orderType} schedule will be finalized shortly and you'll receive a notification with all details.
-                  </p>
-                </div>
-              )}
-            </div>
+            <div></div>
           )}
         </div>
       </CardContent>

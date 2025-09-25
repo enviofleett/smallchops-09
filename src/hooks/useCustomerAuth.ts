@@ -48,7 +48,7 @@ export const useCustomerAuth = () => {
           return null;
         }
         
-        console.log('🔍 Customer account data:', data);
+        // Removed debug logging for production performance
         return data;
       } catch (error) {
         console.error('Customer account fetch error:', error);

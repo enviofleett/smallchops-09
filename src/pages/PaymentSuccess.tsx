@@ -2,13 +2,16 @@ import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, AlertTriangle, RefreshCw } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle, RefreshCw, User, Search } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useCart } from "@/hooks/useCart";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { Skeleton } from "@/components/ui/skeleton";
 import { verifyPayment } from "@/utils/paymentVerification";
+import { useUserContext } from '@/hooks/useUserContext';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { useGuestSession } from '@/hooks/useGuestSession';
 
 type PageStatus = 'loading' | 'success' | 'timeout' | 'error';
 
@@ -25,6 +28,11 @@ export default function PaymentSuccess() {
   const { clearCart } = useCart();
   const { refetch: refetchOrders } = useCustomerOrders();
   const { clearCartAfterPayment } = useOrderProcessing();
+  
+  // User context for smart navigation
+  const userContext = useUserContext();
+  const { customerAccount } = useCustomerAuth();
+  const { guestSession } = useGuestSession();
   
   const [status, setStatus] = useState<PageStatus>('loading');
   const [orderData, setOrderData] = useState<OrderData | null>(null);
@@ -193,9 +201,17 @@ export default function PaymentSuccess() {
       case 'loading':
         return 'Please wait while we confirm your payment details...';
       case 'success':
-        return orderData?.order_number 
-          ? `Order ${orderData.order_number} has been confirmed and will be processed shortly.`
-          : 'Your order has been confirmed and will be processed shortly.';
+        if (orderData?.order_number) {
+          const baseMessage = `Order ${orderData.order_number} has been confirmed and will be processed shortly.`;
+          if (userContext === 'customer') {
+            return `${baseMessage} You can track this order in your profile.`;
+          } else {
+            return `${baseMessage} Use the tracking link below to monitor your order.`;
+          }
+        }
+        return userContext === 'customer' 
+          ? 'Your order has been confirmed and saved to your account.'
+          : 'Your order has been confirmed. Keep your order details safe for tracking.';
       case 'timeout':
         return 'Payment verification is taking longer than expected. Your payment may still be successful.';
       case 'error':
@@ -205,7 +221,33 @@ export default function PaymentSuccess() {
 
   const handleContinue = () => {
     if (status === 'success') {
-      navigate('/customer-profile');
+      if (userContext === 'customer') {
+        navigate('/customer-profile');
+      } else {
+        // For guests, store tracking data and navigate to track order
+        if (orderData?.order_number || orderData?.order_id) {
+          // Store order tracking data for immediate access
+          const trackingData = {
+            orderNumber: orderData.order_number,
+            orderNumberFormatted: orderData.order_number,
+            orderIdUUID: orderData.order_id,
+            timestamp: Date.now()
+          };
+          
+          // Store in session storage for immediate access
+          sessionStorage.setItem('guestOrderTracking', JSON.stringify(trackingData));
+          
+          // Navigate with parameters for immediate tracking
+          const params = new URLSearchParams();
+          if (orderData.order_number) params.set('order', orderData.order_number);
+          else if (orderData.order_id) params.set('id', orderData.order_id);
+          
+          navigate(`/track-order?${params.toString()}`);
+        } else {
+          // Fallback if no order data
+          navigate('/track-order');
+        }
+      }
     } else {
       navigate('/');
     }
@@ -274,13 +316,46 @@ export default function PaymentSuccess() {
                 </Button>
               )}
               
-              <Button 
-                onClick={handleContinue}
-                className="w-full"
-                variant={status === 'success' ? 'default' : 'outline'}
-              >
-                {status === 'success' ? 'View My Orders' : 'Back to Home'}
-              </Button>
+              {status === 'success' ? (
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    onClick={handleContinue}
+                    className="w-full"
+                  >
+                  {userContext === 'customer' ? (
+                    <>
+                      <User className="h-4 w-4 mr-2" />
+                      View My Orders
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Track Order {orderData?.order_number ? orderData.order_number : ''}
+                    </>
+                  )}
+                  </Button>
+                  <Button 
+                    onClick={() => navigate('/')}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Continue Shopping
+                  </Button>
+                  {userContext === 'guest' && (
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      💡 <strong>Tip:</strong> Create an account to permanently save your order history
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <Button 
+                  onClick={handleContinue}
+                  className="w-full"
+                  variant="outline"
+                >
+                  Back to Home
+                </Button>
+              )}
             </div>
             
             {(status === 'timeout' || status === 'error') && (

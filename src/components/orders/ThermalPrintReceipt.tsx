@@ -10,6 +10,8 @@ interface ThermalPrintReceiptProps {
     admin_notification_email?: string;
     whatsapp_support_number?: string;
     logo_url?: string;
+    printed_by?: string;
+    printed_on?: string;
   };
 }
 
@@ -100,11 +102,12 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
         
         {/* Delivery/Pickup Schedule */}
         <div className="schedule-info">
-          <div className="section-header">{getOrderTypeDisplay().toUpperCase()}/PICKUP SCHEDULE:</div>
+          <div className="section-header">{getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
           {deliverySchedule && (
             <>
               <div>Date: {format(new Date(deliverySchedule.delivery_date), 'yyyy-MM-dd')}</div>
               <div>Time: {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
+              {deliverySchedule.is_flexible && <div>Flexible: Yes</div>}
               {deliveryInfo?.address && <div>Address: {deliveryInfo.address}</div>}
               {deliveryInfo?.instructions && <div>Instructions: {deliveryInfo.instructions}</div>}
               {deliverySchedule.special_instructions && (
@@ -114,6 +117,9 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           )}
           {!deliverySchedule && order.order_type === 'delivery' && deliveryInfo?.address && (
             <div>Address: {deliveryInfo.address}</div>
+          )}
+          {order.order_type === 'pickup' && !deliverySchedule && (
+            <div>Ready for pickup - Call for details</div>
           )}
         </div>
         
@@ -218,6 +224,18 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           )}
           {businessInfo?.admin_notification_email && (
             <div>Email: {businessInfo.admin_notification_email}</div>
+          )}
+          
+          <div className="divider">================================</div>
+          
+          {/* Admin Print Information */}
+          {businessInfo?.printed_by && (
+            <div className="admin-print-info" style={{ fontSize: '7px', marginTop: '4px' }}>
+              <div style={{ fontWeight: 'bold' }}>Printed by: {businessInfo.printed_by}</div>
+              {businessInfo.printed_on && (
+                <div>On: {businessInfo.printed_on}</div>
+              )}
+            </div>
           )}
         </div>
       </div>

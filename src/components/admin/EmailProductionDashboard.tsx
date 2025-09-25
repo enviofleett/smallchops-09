@@ -57,7 +57,7 @@ export const EmailProductionDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-    const interval = setInterval(loadDashboardData, 30000); // Refresh every 30 seconds
+    const interval = setInterval(loadDashboardData, 2 * 60 * 1000); // Refresh every 2 minutes for performance
     return () => clearInterval(interval);
   }, []);
 

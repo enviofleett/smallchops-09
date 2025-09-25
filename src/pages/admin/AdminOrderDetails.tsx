@@ -9,6 +9,7 @@ import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDis
 import { ItemsList } from '@/components/orders/details/ItemsList';
 import { SpecialInstructions } from '@/components/orders/details/SpecialInstructions';
 import { ActionsPanel } from '@/components/orders/details/ActionsPanel';
+import { FulfillmentSection } from '@/components/orders/details/FulfillmentSection';
 import { QuickStatsBar } from '@/components/orders/details/QuickStatsBar';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
@@ -152,6 +153,19 @@ const AdminOrderDetails: React.FC = () => {
               orderType={order.order_type}
               deliveryAddress={order.delivery_address}
               pickupPoint={undefined}
+              order={{
+                status: order.status,
+                payment_status: order.payment_status,
+                order_time: order.order_time,
+                order_number: order.order_number
+              }}
+              deliverySchedule={delivery_schedule}
+              items={items}
+              subtotal={order.subtotal || 0}
+              totalVat={order.total_vat || 0}
+              totalDiscount={order.discount_amount || 0}
+              deliveryFee={order.delivery_fee || 0}
+              grandTotal={order.total_amount}
             />
             
             <OrderInfoCard
@@ -163,11 +177,31 @@ const AdminOrderDetails: React.FC = () => {
               paymentReference={order.payment_reference}
               totalAmount={order.total_amount}
               deliverySchedule={delivery_schedule}
+              pickupPoint={undefined}
+              deliveryAddress={order.delivery_address}
+              specialInstructions={order.special_instructions}
               isLoadingSchedule={false}
               recoveryError={false}
               onRecoveryAttempt={() => {}}
+              order={{
+                id: order.id,
+                order_type: order.order_type as 'pickup' | 'delivery',
+                pickup_time: order.pickup_time,
+                special_instructions: order.special_instructions,
+                created_at: order.created_at
+              }}
             />
             
+            <FulfillmentSection
+              order={{
+                order_type: order.order_type as 'pickup' | 'delivery',
+                status: order.status,
+                delivery_address: order.delivery_address
+              }}
+              deliverySchedule={delivery_schedule}
+              pickupPoint={undefined}
+            />
+
             {delivery_schedule && (
               <DeliveryScheduleDisplay
                 schedule={delivery_schedule}

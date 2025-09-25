@@ -10,6 +10,8 @@ import { OrderWithItems } from '@/api/orders';
 import { format } from 'date-fns';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
+import { AdminOrderStatusManager } from '../AdminOrderStatusManager';
+import { SimpleOrderStatusUpdater } from '../SimpleOrderStatusUpdater';
 
 interface MobileOrderTabsProps {
   orders: OrderWithItems[];
@@ -24,8 +26,8 @@ interface MobileOrderTabsProps {
     ready: number;
     out_for_delivery: number;
     delivered: number;
-    overdue: number;
   };
+  useSimpleMode?: boolean;
 }
 
 export const MobileOrderTabs = ({ 
@@ -34,7 +36,8 @@ export const MobileOrderTabs = ({
   onTabChange, 
   onOrderSelect,
   deliverySchedules,
-  orderCounts
+  orderCounts,
+  useSimpleMode = false
 }: MobileOrderTabsProps) => {
   const isMobile = useIsMobile();
 
@@ -52,28 +55,11 @@ export const MobileOrderTabs = ({
 
   const getOrdersByStatus = (status: string) => {
     if (status === 'all') return orders;
-    if (status === 'overdue') {
-      return orders.filter(order => {
-        const schedule = deliverySchedules[order.id];
-        if (!schedule || !schedule.delivery_date || !schedule.delivery_time_end) return false;
-        
-        try {
-          // Only show paid orders that are overdue and haven't been delivered
-          return order.payment_status === 'paid' && 
-                 isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
-                 ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status);
-        } catch (error) {
-          console.warn('Error checking overdue status in mobile tabs:', order.id, error);
-          return false;
-        }
-      });
-    }
     return orders.filter(o => o.status === status);
   };
 
   const renderOrderCard = (order: OrderWithItems) => {
     const schedule = deliverySchedules[order.id];
-    const isOverdue = schedule && isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end);
     
     return (
       <MobileCard key={order.id} onClick={() => onOrderSelect?.(order)}>
@@ -92,12 +78,6 @@ export const MobileOrderTabs = ({
               <Badge variant={order.order_type === 'delivery' ? 'default' : 'outline'}>
                 {order.order_type}
               </Badge>
-              {isOverdue && (
-                <Badge variant="destructive" className="text-xs">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  Overdue
-                </Badge>
-              )}
             </div>
           </div>
         </MobileCardHeader>
@@ -167,23 +147,23 @@ export const MobileOrderTabs = ({
         </MobileCardContent>
 
         <MobileCardActions>
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" onClick={() => onOrderSelect?.(order)}>
             View Details
           </Button>
-          {order.status === 'confirmed' && (
-            <Button size="sm">
-              Start Preparing
-            </Button>
-          )}
-          {order.status === 'preparing' && (
-            <Button size="sm">
-              Mark Ready
-            </Button>
-          )}
-          {order.status === 'ready' && (
-            <Button size="sm">
-              Out for Delivery
-            </Button>
+          {useSimpleMode ? (
+            <SimpleOrderStatusUpdater
+              orderId={order.id}
+              currentStatus={order.status}
+              orderNumber={order.order_number}
+              size="sm"
+            />
+          ) : (
+            <AdminOrderStatusManager
+              orderId={order.id}
+              currentStatus={order.status}
+              orderNumber={order.order_number}
+              size="sm"
+            />
           )}
         </MobileCardActions>
       </MobileCard>

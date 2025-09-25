@@ -90,7 +90,7 @@ export const getOrders = async ({
     }
 
     const { data: fallbackData, error: fallbackError, count } = await query
-      .order('order_time', { ascending: false })
+      .order('created_at', { ascending: false })
       .range(from, to);
 
     // If query with delivery zones fails, try without them and manually fetch
@@ -115,7 +115,7 @@ export const getOrders = async ({
       }
 
       const { data: noZoneData, error: noZoneError, count: noZoneCount } = await fallbackQuery
-        .order('order_time', { ascending: false })
+        .order('created_at', { ascending: false })
         .range(from, to);
 
       if (noZoneError) {
@@ -192,10 +192,50 @@ export const updateOrder = async (
         }
       });
 
+      // Debug logging for production troubleshooting
+      console.log('🔍 Rider assignment result:', {
+        assignmentResult,
+        assignmentError,
+        statusOk: assignmentResult?.success,
+        errorDetails: assignmentError
+      });
+
       if (assignmentError || !assignmentResult?.success) {
-        const errorMsg = assignmentResult?.error || assignmentError?.message || 'Failed to assign rider';
+        // Enhanced error handling with structured error response
+        let errorMsg = 'Failed to assign rider';
+        
+        if (assignmentResult?.errorCode) {
+          switch (assignmentResult.errorCode) {
+            case 'RIDER_NOT_FOUND':
+              const availableRiders = assignmentResult.context?.availableRiders || [];
+              errorMsg = `Rider not found. ${availableRiders.length > 0 ? 'Available riders: ' + availableRiders.map(r => r.name).join(', ') : 'No active riders available.'}`;
+              break;
+            case 'RIDER_INACTIVE':
+              const riderName = assignmentResult.context?.riderName || 'Selected rider';
+              errorMsg = `${riderName} is currently inactive. Please select an active rider.`;
+              break;
+            case 'START_DELIVERY_FAILED':
+            case 'REASSIGN_RIDER_FAILED':
+              errorMsg = `${assignmentResult.error || 'Database operation failed'}`;
+              break;
+            case 'INVALID_ORDER_STATUS':
+              const currentStatus = assignmentResult.context?.currentStatus;
+              const validStatuses = assignmentResult.context?.validStatuses?.join(', ') || 'confirmed, preparing, ready, out_for_delivery';
+              errorMsg = `Cannot assign rider to order with status "${currentStatus}". Valid statuses: ${validStatuses}`;
+              break;
+            default:
+              errorMsg = assignmentResult.error || 'Unknown assignment error';
+          }
+        } else {
+          errorMsg = assignmentResult?.error || assignmentError?.message || 'Failed to assign rider';
+        }
+        
         if (process.env.NODE_ENV === 'development') {
-          console.error('❌ Rider assignment failed:', errorMsg);
+          console.error('❌ Rider assignment failed:', {
+            errorCode: assignmentResult?.errorCode,
+            error: errorMsg,
+            context: assignmentResult?.context
+          });
         }
         throw new Error(errorMsg);
       }
@@ -237,9 +277,10 @@ export const updateOrder = async (
     });
 
     if (error || !data.success) {
-      // Enhanced error parsing for better user feedback
+      // BULLETPROOF: Enhanced error parsing with better user feedback
       let errorMessage = 'Failed to update order';
       
+      // Handle bulletproof function responses
       if (data?.error) {
         if (typeof data.error === 'string') {
           errorMessage = data.error;
@@ -250,19 +291,38 @@ export const updateOrder = async (
         errorMessage = error.message;
       }
       
-      // Log detailed error for debugging
-      console.error('❌ Order update failed:', {
+      // Special handling for bulletproof function responses
+      if (data?.recovery_actions) {
+        console.log(`💡 Recovery actions suggested:`, data.recovery_actions);
+      }
+      
+      if (data?.retry_after_seconds) {
+        console.log(`⏱️ Retry suggested after ${data.retry_after_seconds} seconds`);
+      }
+      
+      // Enhanced logging for bulletproof diagnostics
+      console.error('❌ BULLETPROOF: Order update failed:', {
         orderId,
         updates: sanitizedUpdates,
         error: data?.error || error,
-        success: data?.success
+        success: data?.success,
+        bulletproof_response: data
       });
       
       throw new Error(errorMessage);
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Order updated successfully via admin function');
+      console.log('✅ BULLETPROOF: Order updated successfully via admin function');
+    }
+    
+    // Log bulletproof success metrics
+    if (data?.email_queued?.success) {
+      console.log('📧 Email notification queued successfully');
+    }
+    
+    if (data?.email_queued?.deduplicated) {
+      console.log('🔄 Email notification deduplicated (already queued)');
     }
     return data.order;
     
@@ -349,22 +409,48 @@ export const manuallyQueueCommunicationEvent = async (
   order: OrderWithItems,
   status: OrderStatus
 ): Promise<void> => {
-  const { error } = await supabase.from('communication_events').insert({
-    order_id: order.id,
-    event_type: 'order_status_update', // Re-using to leverage existing processor
-    payload: {
-      old_status: order.status,
-      new_status: status,
-      customer_name: order.customer_name,
-      customer_phone: order.customer_phone,
-      customer_email: order.customer_email,
-    },
-  });
+  try {
+    // Use the bulletproof RPC function to avoid duplicate key violations
+    const { data, error } = await supabase.rpc('upsert_communication_event_production', {
+      p_event_type: 'order_status_update',
+      p_recipient_email: order.customer_email || '',
+      p_template_key: `order_${status}`,
+      p_template_variables: {
+        old_status: order.status,
+        new_status: status,
+        customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        customer_email: order.customer_email,
+        order_number: order.order_number,
+        order_id: order.id
+      },
+      p_order_id: order.id,
+      p_source: 'manual_admin_action'
+    });
 
-  if (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error queueing manual communication event:', error);
+    if (error) {
+      console.error('RPC error in manual communication event:', error);
+      throw new Error(`Communication event failed: ${error.message}`);
     }
-    throw new Error(error.message);
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Manual communication event queued successfully:', data);
+    }
+
+  } catch (error: any) {
+    // Gracefully handle duplicate key errors (23505) - non-blocking
+    if (error.code === '23505' || error.message?.includes('duplicate key')) {
+      console.warn('Duplicate communication event detected (non-blocking):', {
+        order_id: order.id,
+        status,
+        error: error.message
+      });
+      // Return success - this is expected behavior for duplicate events
+      return;
+    }
+
+    // Re-throw other errors
+    console.error('Error queueing manual communication event:', error);
+    throw new Error(error.message || 'Failed to queue communication event');
   }
 };

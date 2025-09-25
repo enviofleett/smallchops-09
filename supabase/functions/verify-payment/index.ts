@@ -1,380 +1,399 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { getPaystackConfig, logPaystackConfigStatus } from "../_shared/paystack-config.ts"
 
-// Enhanced CORS headers for production reliability
-function getCorsHeaders(origin?: string): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
-    'Access-Control-Allow-Credentials': 'false',
-    'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin',
-    'Content-Type': 'application/json'
-  };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
-interface VerifyPaymentRequest {
-  reference: string;
-  idempotency_key?: string;
-}
-
-serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-
+serve(async (req: Request) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
-      status: 200,
+      status: 200, 
       headers: corsHeaders 
-    });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'Method not allowed - POST required' 
-    }), { 
-      status: 405, 
-      headers: corsHeaders 
-    });
+    })
   }
 
   try {
-    const { reference, idempotency_key }: VerifyPaymentRequest = await req.json();
+    console.log('🔍 Payment verification started')
+    
+    // Initialize request tracking ID for better debugging
+    const requestId = crypto.randomUUID()
+    console.log('🆔 Request ID:', requestId)
+    
+    // Use service role key for database operations (no user authentication needed for webhooks)
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    if (!reference) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Payment reference is required' 
+    // Get payment reference from query params or body
+    const url = new URL(req.url)
+    const reference = url.searchParams.get('reference') || 
+                     url.searchParams.get('trxref') || 
+                     url.searchParams.get('txn_ref')
+    
+    let requestData: any = {}
+    let paystackSignature: string | null = null
+    
+    // Try to get data from request body and signature
+    try {
+      if (req.body) {
+        requestData = await req.json()
+        paystackSignature = req.headers.get('x-paystack-signature')
+      }
+    } catch (e) {
+      console.log('No JSON body, using query params only')
+    }
+    
+    const paymentReference = reference || requestData.reference || requestData.trxref
+    
+    console.log('📋 Processing payment reference:', paymentReference, 'Request ID:', requestId)
+    
+    if (!paymentReference) {
+      console.error('❌ No payment reference provided')
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Payment reference is required',
+        request_id: requestId
       }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      })
     }
 
-    console.log('🔍 Verifying payment:', { reference, idempotency_key });
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get Paystack configuration
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    if (!paystackSecretKey) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Payment service not configured' 
+    // Get Paystack configuration with environment detection
+    let paystackConfig
+    try {
+      paystackConfig = getPaystackConfig(req)
+      logPaystackConfigStatus(paystackConfig)
+    } catch (configError) {
+      console.error('❌ Paystack configuration error:', configError)
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Payment system configuration error',
+        request_id: requestId
       }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+        status: 503,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      })
     }
 
-    // Check if already processed using idempotency
-    if (idempotency_key) {
-      const { data: existingOrder } = await supabase
-        .from('orders')
-        .select('id, order_number, status, total_amount, customer_email')
-        .eq('idempotency_key', idempotency_key)
-        .single();
+    // Check for duplicate processing (idempotency)
+    console.log('🔄 Checking for existing transaction...')
+    const { data: existingTransaction, error: existingError } = await supabase
+      .from('payment_transactions')
+      .select('id, status, order_id, created_at')
+      .eq('reference', paymentReference)
+      .maybeSingle()
 
-      if (existingOrder && existingOrder.status === 'confirmed') {
-        console.log('✅ Payment already verified via idempotency:', idempotency_key);
+    if (existingError && existingError.code !== 'PGRST116') {
+      console.error('❌ Database error checking existing transaction:', existingError)
+      throw new Error(`Database error: ${existingError.message}`)
+    }
+
+    if (existingTransaction) {
+      console.log('ℹ️ Payment transaction already exists:', existingTransaction.id, 'Status:', existingTransaction.status)
+      
+      // If transaction exists and is successful, return cached result
+      if (existingTransaction.status === 'completed') {
+        const { data: order } = await supabase
+          .from('orders')
+          .select('id, order_number, status, payment_status, total_amount')
+          .eq('id', existingTransaction.order_id)
+          .single()
+
         return new Response(JSON.stringify({
           success: true,
-          status: 'success',
-          amount: existingOrder.total_amount,
-          order_id: existingOrder.id,
-          order_number: existingOrder.order_number,
-          customer_email: existingOrder.customer_email,
-          message: 'Payment already verified'
+          message: 'Payment already verified (cached)',
+          order_id: existingTransaction.order_id,
+          order_number: order?.order_number,
+          payment_status: existingTransaction.status,
+          order_status: order?.status,
+          amount: order?.total_amount,
+          reference: paymentReference,
+          request_id: requestId,
+          cached: true
         }), {
           status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        })
       }
     }
 
-    // Verify with Paystack API
+    console.log('🔐 Verifying payment with Paystack...')
+    
     const paystackResponse = await fetch(
-      `https://api.paystack.co/transaction/verify/${reference}`,
+      `https://api.paystack.co/transaction/verify/${paymentReference}`, 
       {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${paystackSecretKey}`,
-          'Content-Type': 'application/json',
-        },
+          'Authorization': `Bearer ${paystackConfig.secretKey}`,
+          'Content-Type': 'application/json'
+        }
       }
-    );
+    )
 
     if (!paystackResponse.ok) {
-      console.error('❌ Paystack verification failed:', paystackResponse.statusText);
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Payment verification failed' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const errorText = await paystackResponse.text()
+      console.error('❌ Paystack API error:', paystackResponse.status, errorText)
+      throw new Error(`Paystack API error: ${paystackResponse.status} - ${errorText}`)
     }
 
-    const paystackData = await paystackResponse.json();
-    
-    console.log('📨 Paystack verification response:', {
-      status: paystackData.status,
-      paymentStatus: paystackData.data?.status,
-      amount: paystackData.data?.amount,
-      reference: paystackData.data?.reference
-    });
+    const verificationData = await paystackResponse.json()
+    console.log('💳 Paystack verification response:', {
+      status: verificationData.status,
+      data_status: verificationData.data?.status,
+      reference: verificationData.data?.reference,
+      amount: verificationData.data?.amount,
+      request_id: requestId
+    })
 
-    if (!paystackData.status || paystackData.data?.status !== 'success') {
-      return new Response(JSON.stringify({
-        success: false,
-        status: paystackData.data?.status || 'failed',
-        error: 'Payment not successful'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (!verificationData.status || !verificationData.data) {
+      console.error('❌ Invalid Paystack response structure:', verificationData)
+      throw new Error(`Payment verification failed: ${verificationData.message || 'Invalid response structure'}`)
     }
 
-    // Process successful payment with updated RPC
-    const amountNaira = paystackData.data.amount / 100; // Convert kobo to naira
+    const paymentData = verificationData.data
+
+    // Find the order by payment reference with better error handling
+    console.log('🔍 Finding order with reference:', paymentReference)
     
-    try {
-      const { data: processResult, error: processError } = await supabase
-        .rpc('verify_and_update_payment_status', {
-          payment_ref: reference,
-          new_status: 'confirmed',
-          payment_amount: amountNaira,
-          payment_gateway_response: paystackData.data
-        });
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('id, order_number, customer_name, customer_email, total_amount, status, payment_status, payment_reference')
+      .eq('payment_reference', paymentReference)
+      .maybeSingle()
 
-      if (processError) {
-        console.error('❌ Payment verification RPC failed:', processError);
-        return new Response(JSON.stringify({
-          success: false,
-          error: processError.message || 'Payment processing failed'
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+    if (orderError) {
+      console.error('❌ Database error finding order:', orderError)
+      throw new Error(`Database error: ${orderError.message}`)
+    }
 
-      // Handle RPC result (can be object or array)
-      let result;
-      if (Array.isArray(processResult)) {
-        result = processResult[0];
-      } else {
-        result = processResult;
-      }
+    if (!order) {
+      console.error('❌ Order not found for reference:', paymentReference)
+      throw new Error('Order not found for payment reference')
+    }
+
+    console.log('📋 Found order:', order.id, 'Current status:', order.status, 'Paystack status:', paymentData.status)
+
+    // Validate status mapping with enhanced error handling
+    let orderStatus: string
+    let paymentStatus: string
+
+    // Validate payment amounts match (security check)
+    const expectedAmount = Math.round(order.total_amount * 100) // Convert to kobo
+    const receivedAmount = paymentData.amount
+    
+    if (Math.abs(expectedAmount - receivedAmount) > 1) { // Allow 1 kobo tolerance
+      console.error('❌ Amount mismatch:', {
+        expected: expectedAmount,
+        received: receivedAmount,
+        order_total: order.total_amount
+      })
+      throw new Error('Payment amount mismatch - possible fraud attempt')
+    }
+
+    switch (paymentData.status) {
+      case 'success':
+        orderStatus = 'confirmed'
+        paymentStatus = 'completed'
+        break
+      case 'failed':
+        orderStatus = 'cancelled'
+        paymentStatus = 'failed'
+        break
+      case 'abandoned':
+      case 'timeout':
+        orderStatus = 'pending'
+        paymentStatus = 'failed'
+        break
+      default:
+        console.warn('⚠️ Unknown Paystack status:', paymentData.status)
+        orderStatus = 'pending'
+        paymentStatus = 'pending'
+    }
+
+    console.log('🎯 Status mapping:', {
+      paystack: paymentData.status,
+      order_status: orderStatus,
+      payment_status: paymentStatus,
+      amount_verified: true,
+      request_id: requestId
+    })
+
+    // Handle transaction creation/update with proper error handling
+    let transactionId = existingTransaction?.id
+
+    if (!existingTransaction) {
+      console.log('💾 Creating payment transaction record...')
       
-      if (!result) {
-        throw new Error('No result from payment processing');
+      // Create payment transaction with enhanced data validation
+      const { data: transaction, error: transactionError } = await supabase
+        .from('payment_transactions')
+        .insert({
+          id: crypto.randomUUID(),
+          order_id: order.id,
+          reference: paymentReference,
+          amount: paymentData.amount / 100, // Convert from kobo to naira
+          currency: paymentData.currency || 'NGN',
+          status: paymentStatus, // Use validated status
+          provider: 'paystack',
+          provider_response: paymentData,
+          gateway_response: paymentData.gateway_response || paymentData.message || '',
+          channel: paymentData.channel || 'card',
+          fees: paymentData.fees ? (paymentData.fees / 100) : null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (transactionError) {
+        console.error('❌ Transaction creation failed:', transactionError)
+        
+        // Enhanced error logging for debugging
+        if (transactionError.code === '23514') {
+          console.error('❌ Status constraint violation details:', {
+            attempted_status: paymentStatus,
+            valid_statuses: 'pending, initialized, paid, failed, cancelled, refunded, orphaned, mismatch, superseded, authorized, completed',
+            paystack_status: paymentData.status
+          })
+        }
+        
+        throw new Error(`Failed to create payment transaction: ${transactionError.message}`)
       }
 
-      // Check if RPC returned error
-      if (result.success === false) {
-        console.error('❌ Payment processing failed:', result.error);
-        return new Response(JSON.stringify({
-          success: false,
-          error: result.error || 'Payment processing failed'
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+      transactionId = transaction?.id
+      console.log('✅ Payment transaction created:', transactionId)
+    } else {
+      console.log('ℹ️ Payment transaction already exists, updating status...', transactionId)
+      
+      // Update existing transaction if status changed
+      if (existingTransaction.status !== paymentStatus) {
+        const { error: updateError } = await supabase
+          .from('payment_transactions')
+          .update({
+            status: paymentStatus,
+            provider_response: paymentData,
+            gateway_response: paymentData.gateway_response || paymentData.message || '',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingTransaction.id)
+
+        if (updateError) {
+          console.error('❌ Transaction update failed:', updateError)
+          throw new Error(`Failed to update payment transaction: ${updateError.message}`)
+        }
+        console.log('✅ Payment transaction updated')
       }
+    }
 
-      console.log('✅ Payment verified and processed successfully:', {
-        reference,
-        orderId: result.order_id,
-        orderNumber: result.order_number,
-        status: result.status,
-        payment_status: result.payment_status,
-        amount: amountNaira,
-        customer_email: paystackData.data.customer?.email
-      });
+    // Update order status with enhanced validation
+    console.log('🔄 Updating order status...')
+    
+    const { error: orderUpdateError } = await supabase
+      .from('orders')
+      .update({
+        status: orderStatus,
+        payment_status: paymentStatus,
+        payment_verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', order.id)
 
-      // ENHANCED: Use idempotent email confirmation
+    if (orderUpdateError) {
+      console.error('❌ Order update failed:', orderUpdateError)
+      throw new Error(`Failed to update order: ${orderUpdateError.message}`)
+    }
+
+    console.log('✅ Order updated successfully')
+
+    // Queue email notification for successful payments
+    if (paymentStatus === 'completed' && order.customer_email) {
       try {
-        console.log('📧 Creating payment confirmation event via RPC...');
-        const { data: emailResult, error: emailError } = await supabase
-          .rpc('upsert_payment_confirmation_event', {
-            p_reference: reference,
-            p_recipient_email: paystackData.data.customer?.email || 'unknown@example.com',
-            p_order_id: result.order_id,
-            p_template_variables: {
-              customerName: paystackData.data.customer?.first_name || 'Customer',
-              orderNumber: result.order_number,
-              amount: amountNaira.toFixed(2),
-              paymentMethod: paystackData.data.channel || 'Online Payment',
-              paidAt: paystackData.data.paid_at
-            }
-          });
+        const { error: emailError } = await supabase
+          .from('communication_events')
+          .insert({
+            event_type: 'order_status_update',
+            recipient_email: order.customer_email,
+            template_key: 'order_confirmed',
+            template_variables: {
+              customer_name: order.customer_name || 'Customer',
+              order_number: order.order_number,
+              total_amount: order.total_amount
+            },
+            status: 'queued',
+            order_id: order.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
 
         if (emailError) {
-          console.warn('⚠️  Email confirmation RPC failed (non-blocking):', emailError);
-        } else if (emailResult?.existing) {
-          console.log('📧 Email confirmation already exists (idempotent success)');
+          console.warn('⚠️ Failed to queue confirmation email:', emailError)
+          // Don't fail the payment verification for email issues
         } else {
-          console.log('📧 Email confirmation created successfully');
+          console.log('📧 Confirmation email queued')
         }
-      } catch (emailError) {
-        console.warn('⚠️  Email notification error (non-blocking):', emailError);
-        // Don't fail the payment verification for email issues
+      } catch (emailErr) {
+        console.warn('⚠️ Email queuing error:', emailErr)
       }
-
-      // ENHANCED: Normalized success response with idempotency handling
-      const successResponse = {
-        success: true,
-        status: 'success',
-        amount: amountNaira,
-        order_id: result.order_id,
-        order_number: result.order_number,
-        customer: paystackData.data.customer,
-        channel: paystackData.data.channel,
-        paid_at: paystackData.data.paid_at,
-        // Enhanced data wrapper for consistency
-        data: {
-          order_id: result.order_id,
-          order_number: result.order_number,
-          amount: amountNaira,
-          status: 'success',
-          customer: paystackData.data.customer,
-          reference: reference,
-          verified_at: new Date().toISOString()
-        }
-      };
-
-      console.log('✅ Returning success response:', { 
-        reference, 
-        order_id: result.order_id,
-        amount: amountNaira 
-      });
-
-      return new Response(JSON.stringify(successResponse), {
-        status: 200,
-        headers: corsHeaders
-      });
-
-    } catch (error) {
-      console.error('❌ Critical verification error:', error);
-      
-      // ENHANCED: Check if this is a duplicate payment scenario or already processed
-      const errorMessage = error.message || '';
-      const isDuplicatePayment = errorMessage.includes('duplicate key') || 
-                                errorMessage.includes('already exists') ||
-                                errorMessage.includes('unique constraint') ||
-                                errorMessage.includes('Order not found'); // Handle missing order gracefully
-      
-      if (isDuplicatePayment || errorMessage.includes('Order not found')) {
-        console.log('🔄 Detected duplicate/processed payment scenario - checking order status');
-        
-        try {
-          // Try to fetch existing order data for this reference
-          const { data: existingOrder, error: fetchError } = await supabase
-            .from('orders')
-            .select('id, order_number, status, payment_status, total_amount, customer_email')
-            .eq('payment_reference', reference)
-            .maybeSingle();
-            
-          if (!fetchError && existingOrder) {
-            console.log('✅ Found existing order - returning success response');
-            
-            const duplicateSuccessResponse = {
-              success: true,
-              status: 'success',
-              amount: existingOrder.total_amount,
-              order_id: existingOrder.id,
-              order_number: existingOrder.order_number,
-              customer: paystackData.data.customer,
-              channel: paystackData.data.channel,
-              paid_at: paystackData.data.paid_at,
-              data: {
-                order_id: existingOrder.id,
-                order_number: existingOrder.order_number,
-                amount: existingOrder.total_amount,
-                status: 'success',
-                customer: paystackData.data.customer,
-                reference: reference,
-                duplicate_handled: true,
-                existing_order: true,
-                verified_at: new Date().toISOString()
-              }
-            };
-
-            return new Response(JSON.stringify(duplicateSuccessResponse), {
-              status: 200,
-              headers: corsHeaders
-            });
-          }
-        } catch (fetchError) {
-          console.error('Failed to fetch existing order:', fetchError);
-        }
-        
-        // Fallback success response for duplicate scenarios
-        const fallbackSuccessResponse = {
-          success: true,
-          status: 'success',
-          amount: amountNaira,
-          customer: paystackData.data.customer,
-          channel: paystackData.data.channel,
-          paid_at: paystackData.data.paid_at,
-          data: {
-            amount: amountNaira,
-            status: 'success',
-            customer: paystackData.data.customer,
-            reference: reference,
-            duplicate_handled: true,
-            fallback_response: true,
-            verified_at: new Date().toISOString()
-          }
-        };
-
-        return new Response(JSON.stringify(fallbackSuccessResponse), {
-          status: 200,
-          headers: corsHeaders
-        });
-      }
-      
-      // Log critical error
-      try {
-        await supabase.from('audit_logs').insert({
-          action: 'payment_verification_critical_error',
-          category: 'Payment Critical',
-          message: `Critical payment verification error: ${error.message}`,
-          new_values: {
-            reference,
-            amount_naira: amountNaira,
-            error: error.message,
-            paystack_data: paystackData.data,
-            is_duplicate: isDuplicatePayment
-          }
-        });
-      } catch (logError) {
-        console.error('Failed to log critical error:', logError);
-      }
-
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Critical payment processing error'
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
     }
 
+    // Return comprehensive success response with order_number for guest tracking
+    const response = {
+      success: true,
+      message: 'Payment verified and order updated successfully',
+      order_id: order.id,
+      order_number: order.order_number,
+      payment_status: paymentStatus,
+      order_status: orderStatus,
+      amount: paymentData.amount / 100,
+      reference: paymentReference,
+      transaction_id: transactionId,
+      channel: paymentData.channel,
+      request_id: requestId,
+      verified_at: new Date().toISOString()
+    }
+
+    console.log('✅ Payment verification completed successfully:', response)
+
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    })
+
   } catch (error) {
-    console.error('❌ Payment verification error:', error);
+    console.error('❌ Payment verification error:', error)
     
-    return new Response(JSON.stringify({
+    // Enhanced error response with debugging information
+    const errorResponse = {
       success: false,
-      error: error.message || 'Payment verification failed'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      error: 'Payment verification failed',
+      details: error.message,
+      timestamp: new Date().toISOString(),
+      request_id: crypto.randomUUID() // Fallback request ID
+    }
+
+    // Add specific error codes for common issues
+    if (error.message.includes('Order not found')) {
+      errorResponse.error_code = 'ORDER_NOT_FOUND'
+    } else if (error.message.includes('Paystack API error')) {
+      errorResponse.error_code = 'PAYSTACK_API_ERROR'
+    } else if (error.message.includes('Database error')) {
+      errorResponse.error_code = 'DATABASE_ERROR'
+    } else if (error.message.includes('amount mismatch')) {
+      errorResponse.error_code = 'AMOUNT_MISMATCH'
+    }
+    
+    const statusCode = error.message.includes('Order not found') ? 404 : 500
+    
+    return new Response(JSON.stringify(errorResponse), {
+      status: statusCode,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    })
   }
-});
+})

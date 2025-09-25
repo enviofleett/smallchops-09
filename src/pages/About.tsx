@@ -19,9 +19,17 @@ const About = () => {
           </div>
         </div>
         
-        {/* Banner Image */}
+        {/* Dynamic Banner Image from about_us_gallery */}
         <div className="absolute inset-0 -z-10">
-          <img src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png" alt="Golden fried finger food balls garnished with microgreens" className="w-full h-full object-cover opacity-10" />
+          <img 
+            src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/hero-carousel/hero-default.jpg" 
+            alt="Our story banner" 
+            className="w-full h-full object-cover opacity-10" 
+            onError={(e) => {
+              // Graceful fallback to a solid background if image fails
+              e.currentTarget.style.display = 'none';
+            }}
+          />
         </div>
       </section>
 
@@ -52,7 +60,15 @@ const About = () => {
                 </div>
               </div>
               <div className="order-2 md:order-1">
-                <img src="/lovable-uploads/b0faf90f-366c-461d-9966-d8fb3cd9fd20.png" alt="Golden fried finger food balls on white plate with microgreens" className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto" />
+                <img 
+                  src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/hero-carousel/story-image.jpg" 
+                  alt="Our delicious food presentation" 
+                  className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto" 
+                  onError={(e) => {
+                    // Fallback to a placeholder or hide image
+                    e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="%23f3f4f6"/><text x="200" y="150" text-anchor="middle" fill="%236b7280" font-family="Arial" font-size="16">Image Loading...</text></svg>';
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -116,7 +132,15 @@ const About = () => {
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div className="order-1 md:order-1">
-                <img src="/lovable-uploads/4eaaaa62-bc47-49d0-a366-e4de879be1b3.png" alt="Golden fried finger food balls beautifully plated with garnish" className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto" />
+                <img 
+                  src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/hero-carousel/services-image.jpg" 
+                  alt="Our premium food offerings" 
+                  className="w-full rounded-lg shadow-lg object-cover h-64 md:h-auto" 
+                  onError={(e) => {
+                    // Fallback to a placeholder
+                    e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="%23f3f4f6"/><text x="200" y="150" text-anchor="middle" fill="%236b7280" font-family="Arial" font-size="16">Services Image</text></svg>';
+                  }}
+                />
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-foreground mb-6">What We Offer</h2>

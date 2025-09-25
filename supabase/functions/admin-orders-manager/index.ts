@@ -1,10 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 
 // Import shared CORS with inline fallback for production stability
-let getCorsHeaders: (origin?: string | null) => Record<string, string>;
-let handleCorsPreflightResponse: (origin?: string | null) => Response;
-
+let getCorsHeaders;
+let handleCorsPreflightResponse;
 try {
   const corsModule = await import('../_shared/cors.ts');
   getCorsHeaders = corsModule.getCorsHeaders;
@@ -12,8 +11,6 @@ try {
   console.log('✅ Loaded shared CORS module');
 } catch (error) {
   console.warn('⚠️ Failed to load shared CORS, using inline fallback:', error);
-  
-  // Inline CORS fallback for production stability
   const FALLBACK_ALLOWED_ORIGINS = [
     'https://startersmallchops.com',
     'https://www.startersmallchops.com',
@@ -23,430 +20,588 @@ try {
     'http://localhost:3000',
     'http://localhost:5173'
   ];
-  
   const DEV_PATTERNS = [
     /^https:\/\/.*\.lovable\.app$/,
     /^https:\/\/.*\.sandbox\.lovable\.dev$/,
     /^http:\/\/localhost:\d+$/
   ];
-  
-  getCorsHeaders = (origin?: string | null) => {
+  getCorsHeaders = (origin)=>{
     const baseHeaders = {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
       'Access-Control-Allow-Credentials': 'false'
     };
-    
-    if (!origin || (
-      !FALLBACK_ALLOWED_ORIGINS.includes(origin) && 
-      !DEV_PATTERNS.some(pattern => pattern.test(origin))
-    )) {
-      return { ...baseHeaders, 'Access-Control-Allow-Origin': '*' }; // Permissive fallback
+    if (!origin || !FALLBACK_ALLOWED_ORIGINS.includes(origin) && !DEV_PATTERNS.some((pattern)=>pattern.test(origin))) {
+      return {
+        ...baseHeaders,
+        'Access-Control-Allow-Origin': '*'
+      };
     }
-    
-    return { ...baseHeaders, 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' };
+    return {
+      ...baseHeaders,
+      'Access-Control-Allow-Origin': origin,
+      'Vary': 'Origin'
+    };
   };
-  
-  handleCorsPreflightResponse = (origin?: string | null) => {
-    return new Response(null, { status: 204, headers: getCorsHeaders(origin) });
+  handleCorsPreflightResponse = (origin)=>{
+    return new Response(null, {
+      status: 204,
+      headers: getCorsHeaders(origin)
+    });
   };
 }
 
-// SIMPLIFIED: Single service role client for all operations
-const supabaseClient = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-)
+const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
-serve(async (req) => {
-  const origin = req.headers.get('origin')
-  
-  console.log(`🚀 Admin Orders Manager: ${req.method} request from origin: ${origin}`)
-
-  // Handle CORS preflight requests with proper 204 response
-  if (req.method === 'OPTIONS') {
-    console.log('🔄 Handling CORS preflight request')
-    return handleCorsPreflightResponse(origin)
-  }
-
-  const corsHeaders = getCorsHeaders(origin)
-
-  // SIMPLIFIED AUTHENTICATION: Use JWT validation with service client
+// Notification handler - with dedupe key and upsert fallback
+async function handleStatusChangeNotification(supabaseClient, orderId, order, newStatus) {
   try {
-    const authHeader = req.headers.get('authorization')
+    const validStatuses = [
+      'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery',
+      'delivered', 'cancelled', 'refunded', 'completed', 'returned'
+    ];
+    if (!newStatus || typeof newStatus !== 'string' || !validStatuses.includes(newStatus.trim())) {
+      console.error(`❌ CRITICAL: Invalid status in notification handler: "${newStatus}"`);
+      return;
+    }
+    const sanitizedStatus = newStatus.trim();
+    // ENHANCED: Collision-resistant dedupe key with timestamp and random component
+    const dedupeKey = `${orderId}_${sanitizedStatus}_order_status_update_${Date.now()}_${Math.floor(Math.random()*10000)}`;
+
+    let notificationInserted = false;
+    if (order.customer_email) {
+      // Try upsert (preferred) or fallback to insert-if-not-exists
+        try {
+        // Map status to proper template key
+        const templateKeyMap = {
+          'confirmed': 'order_confirmed',
+          'preparing': 'order_preparing', 
+          'ready': 'order_ready',
+          'out_for_delivery': 'order_out_for_delivery',
+          'delivered': 'order_delivered',
+          'cancelled': 'order_cancelled'
+        };
+        const templateKey = templateKeyMap[sanitizedStatus] || 'order_status_update';
+        
+        const templateVars = {
+          customer_name: order.customer_name || 'Customer',
+          order_number: order.order_number,
+          status: sanitizedStatus,
+          status_display: sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l=>l.toUpperCase()),
+          total_amount: order.total_amount?.toLocaleString() || '0',
+          order_date: new Date(order.order_time || new Date()).toLocaleDateString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { error: upsertError } = await supabaseClient
+          .from('communication_events')
+          .upsert([{
+            dedupe_key: dedupeKey,
+            event_type: 'order_status_update',
+            channel: 'email',
+            recipient_email: order.customer_email,
+            order_id: orderId,
+            status: 'queued',
+            template_key: templateKey,
+            template_variables: templateVars,
+            source: 'admin_update',
+            priority: 'high',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }], { onConflict: 'dedupe_key' });
+
+        if (upsertError) {
+          if (upsertError.message.includes('duplicate key')) {
+            console.log('⚠️ Duplicate notification event, skipping email insert.');
+            notificationInserted = false;
+          } else {
+            throw upsertError;
+          }
+        } else {
+          notificationInserted = true;
+          console.log('✅ Email notification queued (dedupe handled).');
+        }
+      } catch (emailError) {
+        console.log(`⚠️ Email notification upsert/insert failed: ${emailError.message}`);
+      }
+    }
+
+    if (!notificationInserted && order.customer_phone) {
+      // SMS Fallback: insert-if-not-exists using dedupe key
+      try {
+        const smsTemplateVars = {
+          customer_name: order.customer_name || 'Customer',
+          order_number: order.order_number,
+          status: sanitizedStatus,
+          message: `Hi ${order.customer_name || 'Customer'}! Your order ${order.order_number} status has been updated to: ${sanitizedStatus.replace('_', ' ').replace(/\b\w/g, l=>l.toUpperCase())}. Thank you for choosing us!`
+        };
+
+        const { error: smsInsertError } = await supabaseClient.from('communication_events').upsert([{
+          dedupe_key: `${dedupeKey}_sms`,
+          event_type: 'order_status_update',
+          channel: 'sms',
+          sms_phone: order.customer_phone,
+          template_variables: smsTemplateVars,
+          order_id: orderId,
+          status: 'queued',
+          priority: 'high',
+          source: 'admin_update_sms',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'dedupe_key' });
+
+        if (smsInsertError) {
+          if (smsInsertError.message.includes('duplicate key')) {
+            console.log('⚠️ Duplicate SMS notification event, skipping insert.');
+          } else {
+            throw smsInsertError;
+          }
+        } else {
+          console.log('✅ SMS fallback notification queued.');
+        }
+      } catch (smsError) {
+        console.log(`⚠️ SMS fallback notification failed: ${smsError.message}`);
+      }
+    }
+
+    // CRITICAL FIX: Wrap audit log insertion in try-catch
+    try {
+      await supabaseClient.from('audit_logs').insert([{
+        action: 'status_change_notification_attempted',
+        category: 'Order Management',
+        message: `Notification attempted for order ${order.order_number} status change to ${sanitizedStatus}`,
+        entity_id: orderId,
+        new_values: {
+          old_status: order.status,
+          new_status: sanitizedStatus,
+          customer_email: order.customer_email,
+          customer_phone: order.customer_phone,
+          notification_channels_attempted: [
+            order.customer_email ? 'email' : null,
+            order.customer_phone ? 'sms' : null
+          ].filter(Boolean)
+        }
+      }]);
+    } catch (auditError) {
+      console.error('⚠️ Audit log insertion failed (non-blocking):', auditError.message);
+    }
+  } catch (error) {
+    console.error(`⚠️ Complete notification failure for order ${orderId}:`, error);
+  }
+}
+
+serve(async (req)=>{
+  const origin = req.headers.get('origin');
+  console.log(`🚀 Admin Orders Manager: ${req.method} request from origin: ${origin}`);
+  if (req.method === 'OPTIONS') {
+    console.log('🔄 Handling CORS preflight request');
+    return handleCorsPreflightResponse(origin);
+  }
+  const corsHeaders = getCorsHeaders(origin);
+
+  // Authentication
+  try {
+    const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Missing authorization header')
       return new Response(JSON.stringify({
         success: false,
         error: 'Unauthorized: Missing authentication token'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
-      })
+      });
     }
-
-    const token = authHeader.replace('Bearer ', '')
-    
-    // Validate JWT token using service client
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
-    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     if (authError || !user) {
-      console.log('❌ Invalid JWT token:', authError?.message || 'No user found')
       return new Response(JSON.stringify({
         success: false,
         error: 'Unauthorized: Invalid authentication token'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401
-      })
+      });
     }
-
-    // Check admin role with single query
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('role, is_active')
-      .eq('id', user.id)
-      .single()
-
+    const { data: profile, error: profileError } = await supabaseClient.from('profiles').select('role, is_active').eq('id', user.id).single();
     if (profileError || !profile || profile.role !== 'admin' || !profile.is_active) {
-      console.log('❌ User is not an active admin:', { 
-        userId: user.id, 
-        role: profile?.role, 
-        isActive: profile?.is_active 
-      })
       return new Response(JSON.stringify({
         success: false,
         error: 'Forbidden: Admin access required'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403
-      })
+      });
     }
-
-    console.log('✅ Admin authentication successful for user:', user.id)
+    console.log('✅ Admin authentication successful for user:', user.id);
   } catch (authError) {
-    console.error('❌ Authentication error:', authError)
+    console.error('❌ Authentication error:', authError);
     return new Response(JSON.stringify({
       success: false,
       error: 'Authentication failed'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500
-    })
+    });
   }
 
   try {
-    let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
-    
-    // Phone field sanitization no longer needed - phone column removed from database
+    let { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json();
 
-    switch (action) {
+    switch(action){
       case 'list': {
-        console.log('Admin function: Listing orders', { page, pageSize, status, searchQuery, startDate, endDate })
+        console.log('Admin function: Listing orders', { page, pageSize, status, searchQuery, startDate, endDate });
+        let query = supabaseClient.from('orders').select(`
+          *,
+          order_items (*),
+          order_delivery_schedule (*),
+          delivery_zones (id, name, base_fee, is_active)
+        `, { count: 'exact' });
 
-        let query = supabaseClient
-          .from('orders')
-          .select(`*, 
-            order_items (*),
-            order_delivery_schedule!fk_order_delivery_schedule_order_id (*),
-            delivery_zones (id, name, base_fee, is_active)
-          `, { count: 'exact' })
-        // Sort by delivery date (today's orders first for confirmed status)
-        if (status === 'confirmed') {
-          query = query.order('order_time', { ascending: false })
-        } else {
-          query = query.order('order_time', { ascending: false })
-        }
+        query = query.order('order_time', { ascending: false });
 
-        // Filter based on status - for 'confirmed', only show paid orders
         if (status === 'confirmed') {
-          query = query.eq('status', status).eq('payment_status', 'paid')
-        } else if (status === 'all') {
-          // Don't filter by status
-        } else {
-          query = query.eq('status', status)
+          query = query.eq('status', status).eq('payment_status', 'paid');
+        } else if (status !== 'all') {
+          query = query.eq('status', status);
         }
 
         if (searchQuery) {
-          const searchString = `%${searchQuery}%`
-          query = query.or(
-            `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
-          )
+          const searchString = `%${searchQuery}%`;
+          query = query.or(`order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`);
         }
 
         if (startDate && endDate) {
-          query = query.gte('order_time', startDate).lte('order_time', endDate)
+          query = query.gte('order_time', startDate).lte('order_time', endDate);
         }
 
-        const from = (page - 1) * pageSize
-        const to = from + pageSize - 1
-
-        const { data, error, count } = await query.range(from, to)
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        const { data, error, count } = await query.range(from, to);
 
         if (error) {
-          console.error('Error fetching orders:', error)
-          
-          // Defensive fallback: try without embeds if embedding fails
-          if (error.code === 'PGRST200' || error.message.includes('relationship')) {
-            console.log('Retrying without embeds due to relationship error')
-            
-            let fallbackQuery = supabaseClient
-              .from('orders')
-              .select('*', { count: 'exact' })
-              
-            // Apply same filters
-            if (status === 'confirmed') {
-              fallbackQuery = fallbackQuery.eq('status', status).eq('payment_status', 'paid')
-            } else if (status !== 'all') {
-              fallbackQuery = fallbackQuery.eq('status', status)
-            }
-
-            if (searchQuery) {
-              const searchString = `%${searchQuery}%`
-              fallbackQuery = fallbackQuery.or(
-                `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
-              )
-            }
-
-            if (startDate && endDate) {
-              fallbackQuery = fallbackQuery.gte('order_time', startDate).lte('order_time', endDate)
-            }
-
-            fallbackQuery = fallbackQuery.order('order_time', { ascending: false })
-            const { data: fallbackData, error: fallbackError, count: fallbackCount } = await fallbackQuery.range(from, to)
-            
-            if (fallbackError) {
-              return new Response(JSON.stringify({
-                success: false,
-                error: fallbackError.message
-              }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500
-              })
-            }
-
-            // Fetch related data separately
-            const orderIds = fallbackData?.map(order => order.id) || []
-            
-            const [itemsResult, schedulesResult, zonesResult] = await Promise.all([
-              supabaseClient.from('order_items').select('*').in('order_id', orderIds),
-              supabaseClient.from('order_delivery_schedule').select('*').in('order_id', orderIds),
-              supabaseClient.from('delivery_zones').select('id, name, base_fee, is_active')
-            ])
-
-            // Merge the data
-            const enrichedOrders = fallbackData?.map(order => ({
-              ...order,
-              order_items: itemsResult.data?.filter(item => item.order_id === order.id) || [],
-              order_delivery_schedule: schedulesResult.data?.filter(schedule => schedule.order_id === order.id) || [],
-              delivery_zones: zonesResult.data?.find(zone => zone.id === order.delivery_zone_id) || null
-            }))
-
-            return new Response(JSON.stringify({
-              success: true,
-              orders: enrichedOrders,
-              count: fallbackCount || 0
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
+          // Fallback: only select orders, fetch relations separately
+          let fallbackQuery = supabaseClient.from('orders').select('*', { count: 'exact' });
+          if (status === 'confirmed') {
+            fallbackQuery = fallbackQuery.eq('status', status).eq('payment_status', 'paid');
+          } else if (status !== 'all') {
+            fallbackQuery = fallbackQuery.eq('status', status);
           }
-          
+          if (searchQuery) {
+            const searchString = `%${searchQuery}%`;
+            fallbackQuery = fallbackQuery.or(`order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`);
+          }
+          if (startDate && endDate) {
+            fallbackQuery = fallbackQuery.gte('order_time', startDate).lte('order_time', endDate);
+          }
+          fallbackQuery = fallbackQuery.order('order_time', { ascending: false });
+          const { data: fallbackData, error: fallbackError, count: fallbackCount } = await fallbackQuery.range(from, to);
+          if (fallbackError) {
+            return new Response(JSON.stringify({
+              success: false,
+              error: fallbackError.message
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500
+            });
+          }
+          // Fetch related data separately
+          const orderIds = fallbackData?.map(order=>order.id) || [];
+          const [itemsResult, schedulesResult, zonesResult] = await Promise.all([
+            supabaseClient.from('order_items').select('*').in('order_id', orderIds),
+            supabaseClient.from('order_delivery_schedule').select('*').in('order_id', orderIds),
+            supabaseClient.from('delivery_zones').select('id, name, base_fee, is_active')
+          ]);
+          const enrichedOrders = fallbackData?.map(order=>({
+            ...order,
+            order_items: itemsResult.data?.filter(item=>item.order_id === order.id) || [],
+            order_delivery_schedule: schedulesResult.data?.filter(schedule=>schedule.order_id === order.id) || [],
+            delivery_zones: zonesResult.data?.find(zone=>zone.id === order.delivery_zone_id) || null
+          }));
           return new Response(JSON.stringify({
-            success: false,
-            error: error.message
+            success: true,
+            orders: enrichedOrders,
+            count: fallbackCount || 0
           }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          })
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
         }
-
         return new Response(JSON.stringify({
           success: true,
           orders: data,
           count: count || 0
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-        break
+        });
       }
 
       case 'assign_rider': {
-        console.log('🎯 Admin function: Assigning rider', riderId, 'to order', orderId)
+        console.log('🎯 Admin function: Assigning rider', riderId, 'to order', orderId);
         
-        // CRITICAL: Validate rider ID before proceeding
+        // Enhanced validation with detailed logging
         if (!riderId || riderId === 'null' || riderId === '' || riderId === undefined) {
-          console.error('❌ CRITICAL: Invalid rider ID provided:', riderId)
+          console.error('❌ Rider assignment failed: Invalid rider ID', { riderId, orderId });
           return new Response(JSON.stringify({
             success: false,
-            error: 'Invalid rider ID: Rider ID cannot be null, undefined, or empty'
+            error: 'Invalid rider ID: Rider ID cannot be null, undefined, or empty',
+            errorCode: 'INVALID_RIDER_ID',
+            context: { providedRiderId: riderId, orderId }
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400
-          })
+          });
         }
-        
-        // Get order status to determine which RPC to use
-        const { data: orderCheck, error: orderCheckError } = await supabaseClient
-          .from('orders')
-          .select('id, status, order_number')
-          .eq('id', orderId)
-          .single()
 
+        // Pre-validation: Check if rider exists and is active
+        const { data: riderCheck, error: riderCheckError } = await supabaseClient
+          .from('drivers')
+          .select('id, name, is_active, vehicle_type')
+          .eq('id', riderId)
+          .single();
+
+        if (riderCheckError || !riderCheck) {
+          console.error('❌ Rider assignment failed: Rider not found', { 
+            riderId, 
+            orderId, 
+            error: riderCheckError?.message 
+          });
+          
+          // Get available active riders for suggestion
+          const { data: activeRiders } = await supabaseClient
+            .from('drivers')
+            .select('id, name, vehicle_type')
+            .eq('is_active', true)
+            .limit(5);
+
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Rider not found with ID: ${riderId}`,
+            errorCode: 'RIDER_NOT_FOUND',
+            context: { 
+              attemptedRiderId: riderId, 
+              orderId,
+              availableRiders: activeRiders || []
+            }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        if (!riderCheck.is_active) {
+          console.error('❌ Rider assignment failed: Rider is inactive', { 
+            riderId: riderCheck.id, 
+            riderName: riderCheck.name, 
+            orderId 
+          });
+          
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Rider "${riderCheck.name}" is currently inactive`,
+            errorCode: 'RIDER_INACTIVE',
+            context: { 
+              riderId: riderCheck.id,
+              riderName: riderCheck.name,
+              orderId
+            }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        const { data: orderCheck, error: orderCheckError } = await supabaseClient.from('orders').select('id, status, order_number').eq('id', orderId).single();
         if (orderCheckError || !orderCheck) {
-          console.error('❌ Order not found:', orderId, orderCheckError)
+          console.error('❌ Rider assignment failed: Order not found', { 
+            orderId, 
+            riderId, 
+            error: orderCheckError?.message 
+          });
+          
           return new Response(JSON.stringify({
             success: false,
-            error: `Order not found: ${orderId}`
+            error: `Order not found: ${orderId}`,
+            errorCode: 'ORDER_NOT_FOUND',
+            context: { orderId, riderId }
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400
-          })
+          });
         }
-
-        // Use appropriate RPC based on order status
         if (['confirmed', 'preparing', 'ready'].includes(orderCheck.status)) {
-          // Use start_delivery for new assignments
-          console.log('🚀 Using start_delivery RPC for order in status:', orderCheck.status)
+          console.log('🚀 Starting delivery for order', orderCheck.order_number, 'with rider', riderCheck.name);
           
-          const { data: result, error: rpcError } = await supabaseClient
-            .rpc('start_delivery', {
-              p_order_id: orderId,
-              p_rider_id: riderId
-            })
-
+          const { data: result, error: rpcError } = await supabaseClient.rpc('start_delivery', {
+            p_order_id: orderId,
+            p_rider_id: riderId
+          });
+          
           if (rpcError) {
-            console.error('❌ start_delivery RPC failed:', rpcError)
+            console.error('❌ start_delivery RPC failed:', { 
+              orderId, 
+              orderNumber: orderCheck.order_number,
+              orderStatus: orderCheck.status,
+              riderId: riderCheck.id, 
+              riderName: riderCheck.name,
+              riderActive: riderCheck.is_active,
+              rpcError: rpcError.message,
+              rpcCode: rpcError.code,
+              rpcDetails: rpcError.details
+            });
+            
             return new Response(JSON.stringify({
               success: false,
-              error: rpcError.message
+              error: `Failed to assign rider: ${rpcError.message}`,
+              errorCode: 'START_DELIVERY_FAILED',
+              context: {
+                orderId,
+                orderNumber: orderCheck.order_number,
+                orderStatus: orderCheck.status,
+                riderId: riderCheck.id,
+                riderName: riderCheck.name,
+                rpcError: rpcError.message,
+                rpcCode: rpcError.code
+              }
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400
-            })
+            });
           }
-
-          console.log('✅ Order started for delivery successfully')
           
-          // Fetch updated order with relations
-          const { data: updatedOrder, error: fetchError } = await supabaseClient
-            .from('orders')
-            .select(`*, 
-              order_items (*),
-              order_delivery_schedule!fk_order_delivery_schedule_order_id (*),
-              delivery_zones (id, name, base_fee, is_active)
-            `)
-            .eq('id', orderId)
-            .single()
-
+          const { data: updatedOrder } = await supabaseClient.from('orders').select(`
+            *,
+            order_items (*),
+            order_delivery_schedule (*),
+            delivery_zones (id, name, base_fee, is_active)
+          `).eq('id', orderId).single();
+          
+          console.log('✅ Rider assignment successful:', { 
+            orderId, 
+            orderNumber: orderCheck.order_number,
+            riderId: riderCheck.id, 
+            riderName: riderCheck.name 
+          });
+          
           return new Response(JSON.stringify({
             success: true,
             order: updatedOrder,
-            message: `Order ${orderCheck.order_number} started for delivery`
+            message: `Order ${orderCheck.order_number} started for delivery with rider ${riderCheck.name}`
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-
+          });
         } else if (orderCheck.status === 'out_for_delivery') {
-          // Use reassign_order_rider for reassignments
-          console.log('🔄 Using reassign_order_rider RPC for order in status:', orderCheck.status)
+          console.log('🔄 Reassigning rider for order', orderCheck.order_number, 'from current rider to', riderCheck.name);
           
-          const { data: result, error: rpcError } = await supabaseClient
-            .rpc('reassign_order_rider', {
-              p_order_id: orderId,
-              p_new_rider_id: riderId,
-              p_reason: 'Admin reassignment via dashboard'
-            })
-
+          const { data: result, error: rpcError } = await supabaseClient.rpc('reassign_order_rider', {
+            p_order_id: orderId,
+            p_new_rider_id: riderId,
+            p_reason: 'Admin reassignment via dashboard'
+          });
+          
           if (rpcError) {
-            console.error('❌ reassign_order_rider RPC failed:', rpcError)
+            console.error('❌ reassign_order_rider RPC failed:', { 
+              orderId, 
+              orderNumber: orderCheck.order_number,
+              orderStatus: orderCheck.status,
+              newRiderId: riderCheck.id, 
+              newRiderName: riderCheck.name,
+              riderActive: riderCheck.is_active,
+              rpcError: rpcError.message,
+              rpcCode: rpcError.code,
+              rpcDetails: rpcError.details
+            });
+            
             return new Response(JSON.stringify({
               success: false,
-              error: rpcError.message
+              error: `Failed to reassign rider: ${rpcError.message}`,
+              errorCode: 'REASSIGN_RIDER_FAILED',
+              context: {
+                orderId,
+                orderNumber: orderCheck.order_number,
+                orderStatus: orderCheck.status,
+                newRiderId: riderCheck.id,
+                newRiderName: riderCheck.name,
+                rpcError: rpcError.message,
+                rpcCode: rpcError.code
+              }
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400
-            })
+            });
           }
-
-          console.log('✅ Rider reassigned successfully')
           
-          // Fetch updated order with relations
-          const { data: updatedOrder, error: fetchError } = await supabaseClient
-            .from('orders')
-            .select(`*, 
-              order_items (*),
-              order_delivery_schedule!fk_order_delivery_schedule_order_id (*),
-              delivery_zones (id, name, base_fee, is_active)
-            `)
-            .eq('id', orderId)
-            .single()
-
+          const { data: updatedOrder } = await supabaseClient.from('orders').select(`
+            *,
+            order_items (*),
+            order_delivery_schedule (*),
+            delivery_zones (id, name, base_fee, is_active)
+          `).eq('id', orderId).single();
+          
+          console.log('✅ Rider reassignment successful:', { 
+            orderId, 
+            orderNumber: orderCheck.order_number,
+            newRiderId: riderCheck.id, 
+            newRiderName: riderCheck.name 
+          });
+          
           return new Response(JSON.stringify({
             success: true,
             order: updatedOrder,
-            message: `Rider reassigned for order ${orderCheck.order_number}`
+            message: `Rider reassigned to ${riderCheck.name} for order ${orderCheck.order_number}`
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-
+          });
         } else {
-          console.error('❌ Order not in assignable or reassignable status:', orderCheck.status)
+          console.error('❌ Invalid order status for rider assignment:', { 
+            orderId, 
+            orderNumber: orderCheck.order_number,
+            currentStatus: orderCheck.status,
+            validStatuses: ['confirmed', 'preparing', 'ready', 'out_for_delivery']
+          });
+          
           return new Response(JSON.stringify({
             success: false,
-            error: `Order ${orderCheck.order_number} cannot have rider assigned in status: ${orderCheck.status}`
+            error: `Order ${orderCheck.order_number} cannot have rider assigned in status: ${orderCheck.status}`,
+            errorCode: 'INVALID_ORDER_STATUS',
+            context: {
+              orderId,
+              orderNumber: orderCheck.order_number,
+              currentStatus: orderCheck.status,
+              validStatuses: ['confirmed', 'preparing', 'ready', 'out_for_delivery']
+            }
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400
-          })
+          });
         }
       }
 
       case 'update': {
-        console.log('Admin function: Updating order', orderId, 'with updates:', JSON.stringify(updates))
-
-        // Get the current order to compare status changes
-        const { data: currentOrder, error: fetchError } = await supabaseClient
-          .from('orders')
-          .select('status, customer_email, customer_name, order_number')
-          .eq('id', orderId)
-          .single()
-
+        console.log('Admin function: Updating order', orderId, 'with updates:', JSON.stringify(updates));
+        const { data: currentOrder, error: fetchError } = await supabaseClient.from('orders').select('status, customer_email, customer_name, order_number').eq('id', orderId).single();
         if (fetchError) {
-          console.error('Error fetching current order:', fetchError)
           return new Response(JSON.stringify({
             success: false,
             error: fetchError.message
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
-          })
+          });
         }
-
-        // SECURITY: Strict whitelist of allowed columns for order updates
         const allowedColumns = [
-          'status', 'customer_name', 'customer_phone', 'customer_email',
-          'delivery_address', 'delivery_instructions', 'order_notes',
-          'assigned_rider_id', 'payment_status', 'total_amount',
-          'delivery_zone_id', 'order_type', 'special_instructions',
+          'status', 'customer_name', 'customer_phone', 'customer_email', 'delivery_address',
+          'delivery_instructions', 'order_notes', 'assigned_rider_id', 'payment_status',
+          'total_amount', 'delivery_zone_id', 'order_type', 'special_instructions',
           'internal_notes', 'updated_at'
         ];
-
-        // CRITICAL: Validate status enum values to prevent database errors
         const validStatuses = [
-          'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 
+          'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery',
           'delivered', 'cancelled', 'refunded', 'completed', 'returned'
         ];
-
-        // Sanitize and validate updates
         const sanitizedUpdates = {};
-        console.log('Raw updates before sanitization:', updates);
-        
         if (updates && typeof updates === 'object') {
-          for (const [key, value] of Object.entries(updates)) {
+          for (const [key, value] of Object.entries(updates)){
             if (key === 'status') {
-              // CRITICAL: Validate status enum value - enhanced validation
               if (value === null || value === 'null' || value === '' || value === undefined || typeof value !== 'string') {
-                console.error('❌ CRITICAL: Null or invalid status value detected:', value, 'type:', typeof value);
                 return new Response(JSON.stringify({
                   success: false,
                   error: 'Status cannot be null, undefined, empty, or non-string value'
@@ -455,11 +610,8 @@ serve(async (req) => {
                   status: 400
                 });
               }
-              
-              // Trim and validate the status value
               const trimmedStatus = value.trim();
               if (!trimmedStatus || !validStatuses.includes(trimmedStatus)) {
-                console.error('❌ CRITICAL: Invalid status enum value:', value, 'trimmed:', trimmedStatus);
                 return new Response(JSON.stringify({
                   success: false,
                   error: `Invalid status value: "${value}". Valid values are: ${validStatuses.join(', ')}`
@@ -468,179 +620,99 @@ serve(async (req) => {
                   status: 400
                 });
               }
-              
               sanitizedUpdates[key] = trimmedStatus;
             } else if (key === 'assigned_rider_id') {
-              // CRITICAL: Validate rider_id - allow null for unassignment
-              if (value === 'null' || value === '') {
-                sanitizedUpdates[key] = null;
-              } else {
-                sanitizedUpdates[key] = value;
-              }
+              sanitizedUpdates[key] = (value === 'null' || value === '') ? null : value;
             } else if (allowedColumns.includes(key)) {
-              // Add allowed columns to sanitized updates
               sanitizedUpdates[key] = value;
-            } else {
-              console.warn(`⚠️ Blocked unauthorized column update attempt: ${key}`);
             }
           }
         }
-
-        // Ensure we always set updated_at for tracking
         sanitizedUpdates.updated_at = new Date().toISOString();
-        
-        console.log('Sanitized and whitelisted updates:', sanitizedUpdates);
 
-        const { data, error } = await supabaseClient
-          .from('orders')
-          .update(sanitizedUpdates)
+        const { data, error } = await supabaseClient.from('orders').update(sanitizedUpdates)
           .eq('id', orderId)
-          .select(`*, 
+          .select(`
+            *,
             order_items (*),
             delivery_zones (id, name, base_fee, is_active),
-            order_delivery_schedule!fk_order_delivery_schedule_order_id (*)
-          `)
-          .single()
-
+            order_delivery_schedule (*)
+          `).single();
         if (error) {
-          console.error('Error updating order:', error)
           return new Response(JSON.stringify({
             success: false,
             error: error.message
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
-          })
+          });
         }
-
-        // Trigger status change email if status has changed and customer has email
-        if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
+        // Background notification for status change - trigger instant processing
+        if (sanitizedUpdates.status && sanitizedUpdates.status !== currentOrder.status) {
           try {
-            console.log(`Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
+            // Queue notifications (fire-and-forget)
+            handleStatusChangeNotification(supabaseClient, orderId, currentOrder, sanitizedUpdates.status).catch(error => {
+              console.error('⚠️ Notification queuing failed (non-blocking):', error);
+            });
             
-            // Create HMAC signature for internal authentication
-            const timestamp = Math.floor(Date.now() / 1000).toString()
-            const message = `${timestamp}:user-journey-automation`
-            const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
-            
-            const encoder = new TextEncoder()
-            const keyData = await crypto.subtle.importKey(
-              'raw',
-              encoder.encode(secret),
-              { name: 'HMAC', hash: 'SHA-256' },
-              false,
-              ['sign']
-            )
-            
-            const signature = await crypto.subtle.sign(
-              'HMAC',
-              keyData,
-              encoder.encode(message)
-            )
-            
-            const signatureHex = Array.from(new Uint8Array(signature))
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('')
-            
-            const { error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
-              body: {
-                journey_type: 'order_status_change',
-                user_data: {
-                  email: currentOrder.customer_email,
-                  name: currentOrder.customer_name
-                },
-                order_data: {
-                  order_id: orderId,
-                  order_number: currentOrder.order_number,
-                  status: updates.status
-                },
-                metadata: {
-                  old_status: currentOrder.status,
-                  new_status: updates.status,
-                  updated_at: new Date().toISOString()
-                }
-              },
-              headers: {
-                'x-internal-secret': signatureHex,
-                'x-timestamp': timestamp
-              }
-            })
-
-            if (emailError) {
-              console.error('Failed to trigger status change email:', emailError)
-              // Don't fail the order update if email fails
-            } else {
-              console.log('✅ Status change email triggered successfully')
-            }
-          } catch (emailError) {
-            console.error('Error triggering status change email:', emailError)
-            // Don't fail the order update if email fails
+            // Process notifications instantly (fire-and-forget)
+            supabaseClient.functions.invoke('instant-email-processor', {
+              body: { priority: 'high', limit: 5 }
+            }).then(result => {
+              console.log('📧 Instant email processing result:', result.data);
+            }).catch(error => {
+              console.error('⚠️ Instant email processing failed (non-blocking):', error);
+            });
+          } catch (error) {
+            console.error('⚠️ Background notification setup failed (non-blocking):', error);
           }
         }
-
         return new Response(JSON.stringify({
           success: true,
           order: data
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-        break
+        });
       }
 
       case 'delete': {
-        console.log('Admin function: Deleting order', orderId)
-
-        const { error } = await supabaseClient
-          .from('orders')
-          .delete()
-          .eq('id', orderId)
-
+        console.log('Admin function: Deleting order', orderId);
+        const { error } = await supabaseClient.from('orders').delete().eq('id', orderId);
         if (error) {
-          console.error('Error deleting order:', error)
           return new Response(JSON.stringify({
             success: false,
             error: error.message
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
-          })
+          });
         }
-
         return new Response(JSON.stringify({
           success: true,
           message: 'Order deleted successfully'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-        break
+        });
       }
 
       case 'bulk_delete': {
-        console.log('Admin function: Bulk deleting orders', orderIds)
-
-        const { error } = await supabaseClient
-          .from('orders')
-          .delete()
-          .in('id', orderIds)
-
+        console.log('Admin function: Bulk deleting orders', orderIds);
+        const { error } = await supabaseClient.from('orders').delete().in('id', orderIds);
         if (error) {
-          console.error('Error bulk deleting orders:', error)
           return new Response(JSON.stringify({
             success: false,
             error: error.message
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
-          })
+          });
         }
-
         return new Response(JSON.stringify({
           success: true,
           message: 'Orders deleted successfully'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-        break
+        });
       }
 
       default:
@@ -650,18 +722,16 @@ serve(async (req) => {
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
-        })
+        });
     }
-
   } catch (error) {
-    console.error('❌ Admin orders manager error:', error)
-    
+    console.error('❌ Admin orders manager error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error.message || 'Internal server error'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
   }
-})
+});

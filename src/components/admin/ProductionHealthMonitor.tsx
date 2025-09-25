@@ -115,7 +115,7 @@ export const ProductionHealthMonitor = () => {
 
   useEffect(() => {
     fetchHealthMetrics();
-    const interval = setInterval(fetchHealthMetrics, 30000); // Update every 30 seconds
+    const interval = setInterval(fetchHealthMetrics, 2 * 60 * 1000); // Update every 2 minutes for performance
     return () => clearInterval(interval);
   }, []);
 

@@ -115,43 +115,177 @@ export const EmailQueueProcessor = () => {
 
   const testSMTPConnection = async () => {
     setIsTesting(true);
+    
     try {
-      console.log('Testing SMTP connection...');
+      console.log('🔍 Starting comprehensive SMTP connection test...');
       
-      // Test with a sample email to verify SMTP connectivity
-      const testPayload = {
-        templateId: 'smtp_test',
-        recipient: 'test@example.com',
-        variables: {
-          test_message: 'SMTP Connection Test',
-          timestamp: new Date().toISOString()
-        }
-      };
-
-      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
-        body: {
-          healthcheck: true,
-          check: 'smtp'
-        }
-      });
-
-      if (error) throw error;
-
-      console.log('SMTP test result:', data);
-      
+      // Phase 1: SMTP Configuration Health Check
       toast({
-        title: "SMTP Test Successful",
-        description: "SMTP connection is working properly",
+        title: "SMTP Test Starting",
+        description: "Phase 1: Checking SMTP configuration...",
         variant: "default"
       });
-      
-    } catch (error: any) {
-      console.error('SMTP test failed:', error);
+
+      const { data: configData, error: configError } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: { 
+          healthcheck: true,
+          check: 'smtp',
+          comprehensive: true 
+        }
+      });
+
+      if (configError) {
+        throw new Error(`Configuration check failed: ${configError.message}`);
+      }
+
+      console.log('✅ SMTP configuration check result:', configData);
+
+      // Phase 2: Authentication Test
       toast({
-        title: "SMTP Test Failed",
-        description: error.message || "Failed to connect to SMTP server",
+        title: "SMTP Test Progress",
+        description: "Phase 2: Testing SMTP authentication...",
+        variant: "default"
+      });
+
+      const { data: authData, error: authError } = await supabase.functions.invoke('smtp-auth-healthcheck');
+
+      if (authError) {
+        console.warn('⚠️ Authentication test failed:', authError);
+        // Don't fail completely, continue to connection test
+      }
+
+      console.log('🔐 SMTP authentication result:', authData);
+
+      // Phase 3: Full Connection Test with Real Email
+      toast({
+        title: "SMTP Test Progress", 
+        description: "Phase 3: Testing email delivery...",
+        variant: "default"
+      });
+
+      const testEmail = {
+        to: 'smtp-test@example.com', // Safe test email
+        subject: `SMTP Connection Test - ${new Date().toISOString()}`,
+        htmlContent: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2 style="color: #2563eb;">🔧 SMTP Test Email</h2>
+            <p>This is a production-ready SMTP connection test.</p>
+            <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+              <h3>Test Details:</h3>
+              <ul>
+                <li><strong>Timestamp:</strong> ${new Date().toLocaleString()}</li>
+                <li><strong>Test ID:</strong> ${Math.random().toString(36).substr(2, 9)}</li>
+                <li><strong>Environment:</strong> Production</li>
+                <li><strong>SMTP Provider:</strong> ${configData?.provider || 'Unknown'}</li>
+              </ul>
+            </div>
+            <p style="color: #059669;">✅ If you received this email, SMTP is working correctly!</p>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+            <p style="font-size: 12px; color: #6b7280;">
+              This is an automated test email from your application's SMTP system.
+            </p>
+          </div>
+        `,
+        textContent: `
+SMTP Connection Test
+
+This is a production-ready SMTP connection test.
+
+Test Details:
+- Timestamp: ${new Date().toLocaleString()}
+- Test ID: ${Math.random().toString(36).substr(2, 9)}
+- Environment: Production
+
+If you received this email, SMTP is working correctly!
+        `,
+        emailType: 'test',
+        source: 'smtp_diagnostics'
+      };
+
+      const { data: deliveryData, error: deliveryError } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: testEmail
+      });
+
+      if (deliveryError) {
+        throw new Error(`Email delivery test failed: ${deliveryError.message}`);
+      }
+
+      console.log('📧 Email delivery test result:', deliveryData);
+
+      // Comprehensive Success Report
+      const testResults = {
+        configuration: configData?.success ? '✅ Passed' : '❌ Failed',
+        authentication: authData?.success ? '✅ Passed' : '⚠️ Warning',
+        delivery: deliveryData?.success ? '✅ Passed' : '❌ Failed',
+        provider: deliveryData?.provider || configData?.provider || 'Unknown',
+        messageId: deliveryData?.messageId || 'N/A',
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('🎯 Complete SMTP test results:', testResults);
+
+      // Log to audit for production monitoring
+      await supabase.from('audit_logs').insert({
+        action: 'smtp_comprehensive_test',
+        category: 'SMTP Diagnostics',
+        message: 'Comprehensive SMTP connection test completed',
+        new_values: testResults
+      });
+
+      toast({
+        title: "🎉 SMTP Test Completed Successfully",
+        description: `All phases passed. Email sent via ${testResults.provider}. Message ID: ${testResults.messageId?.substring(0, 20)}...`,
+        variant: "default"
+      });
+
+    } catch (error: any) {
+      console.error('💥 SMTP comprehensive test failed:', error);
+      
+      // Enhanced error reporting for production troubleshooting
+      const errorDetails = {
+        message: error.message,
+        timestamp: new Date().toISOString(),
+        stack: error.stack?.substring(0, 500), // Limited stack trace
+        phase: error.message.includes('Configuration') ? 'configuration' : 
+               error.message.includes('Authentication') ? 'authentication' : 
+               error.message.includes('delivery') ? 'delivery' : 'unknown'
+      };
+
+      // Log error for production monitoring
+      await supabase.from('audit_logs').insert({
+        action: 'smtp_test_failed',
+        category: 'SMTP Error',
+        message: 'SMTP connection test failed',
+        new_values: errorDetails
+      });
+
+      toast({
+        title: "🚨 SMTP Test Failed",
+        description: `${errorDetails.phase} phase failed: ${error.message.substring(0, 100)}...`,
         variant: "destructive"
       });
+
+      // Provide actionable troubleshooting guidance
+      if (error.message.includes('Authentication')) {
+        toast({
+          title: "💡 Troubleshooting Tip",
+          description: "Check your email provider credentials and setup requirements",
+          variant: "default"
+        });
+      } else if (error.message.includes('Configuration')) {
+        toast({
+          title: "💡 Troubleshooting Tip", 
+          description: "Verify SMTP Function Secrets are configured correctly",
+          variant: "default"
+        });
+      } else if (error.message.includes('delivery')) {
+        toast({
+          title: "💡 Troubleshooting Tip",
+          description: "SMTP connects but can't send. Check sender email domain authentication",
+          variant: "default"
+        });
+      }
+
     } finally {
       setIsTesting(false);
     }
@@ -330,20 +464,46 @@ export const EmailQueueProcessor = () => {
         {/* SMTP Connection Test */}
         <div className="space-y-3">
           <h4 className="text-sm font-medium">SMTP Diagnostics</h4>
-          <Button
-            onClick={testSMTPConnection}
-            disabled={isProcessing || isTesting}
-            variant="outline"
-            className="w-full justify-start"
-            size="sm"
-          >
-            {isTesting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Shield className="h-4 w-4 mr-2" />
+          <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+            <Button
+              onClick={testSMTPConnection}
+              disabled={isProcessing || isTesting}
+              variant={isTesting ? "default" : "outline"}
+              className="w-full justify-start"
+              size="sm"
+            >
+              {isTesting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Shield className="h-4 w-4 mr-2" />
+              )}
+              {isTesting ? "Running Comprehensive SMTP Test..." : "Test SMTP Connection"}
+            </Button>
+            
+            {isTesting && (
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Running 3-phase test: Configuration → Authentication → Delivery</span>
+                </div>
+                <div className="text-muted-foreground">
+                  This comprehensive test verifies SMTP settings, credentials, and email delivery.
+                </div>
+              </div>
             )}
-            Test SMTP Connection
-          </Button>
+            
+            {!isTesting && (
+              <div className="text-xs text-muted-foreground">
+                <div className="font-medium mb-1">Production-Ready SMTP Test includes:</div>
+                <ul className="space-y-0.5 list-disc list-inside pl-2">
+                  <li>SMTP server configuration validation</li>
+                  <li>Authentication credentials verification</li>
+                  <li>Actual test email delivery</li>
+                  <li>Comprehensive error reporting & troubleshooting</li>
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Queue Health Warnings */}

@@ -340,7 +340,11 @@ export const ProductionEmailSimulator: React.FC = () => {
 
       if (error) throw error;
 
-      // Type assertion for the returned data
+      // Type check and assertion for the returned data
+      if (typeof data !== 'object' || data === null || typeof data === 'boolean') {
+        throw new Error('Invalid rate limit response format');
+      }
+
       const rateLimitData = data as {
         allowed: boolean;
         current_count: number;

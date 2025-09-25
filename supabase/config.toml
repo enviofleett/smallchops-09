@@ -64,9 +64,17 @@ verify_jwt = false
 [functions.track-promotion-usage]
 verify_jwt = true
 
+# Production Security: Enable JWT Authentication for payment functions
 [functions.verify-payment]
+verify_jwt = true
+
+[functions.enhanced-payment-templates]
 verify_jwt = false
 
+[functions.real-time-webhook-processor]
+verify_jwt = false
+
+# PRODUCTION FIX: Make paystack-secure public for internal Edge Function calls
 [functions.paystack-secure]
 verify_jwt = false
 
@@ -74,7 +82,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.admin-orders-manager]
-verify_jwt = false
+verify_jwt = true
 
 [functions.user-journey-automation]
 verify_jwt = false
@@ -94,7 +102,18 @@ verify_jwt = false
 [functions.smtp-health-check]
 verify_jwt = false
 
+# Process checkout requires authentication for security
 [functions.process-checkout]
+verify_jwt = true
+
+# Production Phase 2 Functions - Monitoring and Security
+[functions.payment-timeout-handler]
+verify_jwt = false
+
+[functions.production-environment-validator]
+verify_jwt = false
+
+[functions.production-monitoring-alerts]
 verify_jwt = false
 
 [analytics]

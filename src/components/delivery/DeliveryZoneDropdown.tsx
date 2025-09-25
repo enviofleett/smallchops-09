@@ -98,7 +98,10 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full h-auto min-h-[44px] justify-between bg-background border-border hover:border-primary/50 transition-colors"
+            className={cn(
+              "w-full h-auto min-h-[44px] justify-between bg-background border-border hover:border-primary/50 transition-colors",
+              selectedZone && "border-green-500 bg-green-50 ring-2 ring-green-200 shadow-lg"
+            )}
           >
             {selectedZone ? (
               <div className="flex items-center justify-between w-full py-1">

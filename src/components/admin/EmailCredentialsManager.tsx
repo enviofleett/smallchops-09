@@ -281,8 +281,8 @@ export const EmailCredentialsManager = () => {
                   <div>
                     <span className="font-medium text-foreground">{cred.name}</span>
                     <div className="text-xs text-muted-foreground">
-                      {cred.name === 'SMTP_HOST' && 'Mail server hostname (e.g., smtp.gmail.com)'}
-                      {cred.name === 'SMTP_PORT' && 'Connection port (587 for TLS, 465 for SSL)'}
+                      {cred.name === 'SMTP_HOST' && 'Mail server hostname (e.g., smtp.yourprovider.com)'}
+                      {cred.name === 'SMTP_PORT' && 'Connection port (common: 587 for TLS, 465 for SSL)'}
                       {cred.name === 'SMTP_USER' && 'Authentication username/email'}
                       {cred.name === 'SMTP_PASS' && 'Authentication password/app password'}
                     </div>
@@ -382,8 +382,8 @@ export const EmailCredentialsManager = () => {
             </div>
 
             <div className="bg-muted p-4 rounded-lg font-mono text-sm space-y-2">
-              <div><strong>SMTP_HOST:</strong> smtp.gmail.com (for Gmail)</div>
-              <div><strong>SMTP_PORT:</strong> 587 (TLS) or 465 (SSL)</div>
+              <div><strong>SMTP_HOST:</strong> Your provider's SMTP hostname</div>
+              <div><strong>SMTP_PORT:</strong> Standard ports: 587 (TLS) or 465 (SSL)</div>
               <div><strong>SMTP_USER:</strong> your-email@domain.com</div>
               <div><strong>SMTP_PASS:</strong> your-app-password</div>
             </div>
@@ -394,9 +394,9 @@ export const EmailCredentialsManager = () => {
                 size="sm" 
                 onClick={() => {
                   const commands = [
-                    'supabase secrets set SMTP_HOST=smtp.gmail.com',
+                    'supabase secrets set SMTP_HOST=smtp.yourprovider.com',
                     'supabase secrets set SMTP_PORT=587',
-                    'supabase secrets set SMTP_USER=your-email@gmail.com',
+                    'supackage secrets set SMTP_USER=your-email@provider.com',
                     'supabase secrets set SMTP_PASS=your-16-char-app-password'
                   ].join('\n');
                   navigator.clipboard.writeText(commands);
@@ -456,7 +456,7 @@ export const EmailCredentialsManager = () => {
                 <Input
                   id="smtp_port"
                   {...register('smtp_port')}
-                  placeholder="587"
+                  placeholder="587 or 465"
                 />
                 {errors.smtp_port && (
                   <p className="text-sm text-destructive mt-1">{errors.smtp_port.message}</p>

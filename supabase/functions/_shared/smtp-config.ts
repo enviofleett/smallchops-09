@@ -57,59 +57,31 @@ export function validateSMTPUser(user: string, host: string): SMTPUserValidation
 
   const hostProvider = detectProviderFromHost(host);
 
-  // Provider-specific validation rules
-  switch (hostProvider) {
-    case 'gmail':
-      if (userType !== 'email') {
-        errors.push('Gmail SMTP requires full email address as SMTP_USER');
-        suggestions.push('Use your complete Gmail address (e.g., user@gmail.com)');
-      } else if (!user.toLowerCase().includes('gmail.com')) {
-        errors.push('Gmail SMTP host requires Gmail email address');
-        suggestions.push('Use your Gmail address ending with @gmail.com');
-      }
-      break;
-
-    case 'outlook':
-      if (userType !== 'email') {
-        errors.push('Outlook/Office365 SMTP requires full email address as SMTP_USER');
-        suggestions.push('Use your complete Outlook/Hotmail/Office365 email address');
-      }
-      break;
-
-    case 'sendgrid':
-      if (userType !== 'api_key' && user.toLowerCase() !== 'apikey') {
-        errors.push('SendGrid SMTP typically uses "apikey" as SMTP_USER');
-        suggestions.push('Set SMTP_USER to "apikey" and use your API key as SMTP_PASS');
-      }
-      break;
-
-    case 'mailgun':
-      if (userType !== 'api_key' && userType !== 'username') {
-        errors.push('Mailgun SMTP requires API username or postmaster email');
-        suggestions.push('Use your Mailgun API username or postmaster@yourdomain.com');
-      }
-      break;
-
-    case 'aws_ses':
-      if (userType !== 'api_key' && userType !== 'username') {
-        errors.push('Amazon SES requires SMTP username (not email address)');
-        suggestions.push('Use your AWS SES SMTP username (20-character string starting with AKIA)');
-      }
-      break;
-
-    case 'postmark':
-      if (userType !== 'api_key') {
-        errors.push('Postmark SMTP uses API tokens, not email addresses');
-        suggestions.push('Use your Postmark SMTP token as SMTP_USER');
-      }
-      break;
-
-    default:
-      // Generic validation for unknown providers
-      if (userType === 'unknown') {
-        errors.push(`SMTP_USER format unclear for provider. Should be email, API key, or username`);
-        suggestions.push('Check your email provider documentation for correct SMTP_USER format');
-      }
+  // Generic validation that works for all providers
+  const providerConfig = getProviderConfig(host);
+  
+  // Validate based on detected provider configuration
+  if (providerConfig.usernameFormat === 'email' && userType !== 'email') {
+    errors.push(`Provider requires email address as SMTP_USER`);
+    suggestions.push('Use your complete email address as username');
+  }
+  
+  if (providerConfig.usernameFormat === 'api_key' && userType !== 'api_key') {
+    errors.push(`Provider requires API key as SMTP_USER`);
+    suggestions.push('Check provider documentation for correct API key format');
+  }
+  
+  // Check for provider-specific domain requirements (for email providers)
+  if (userType === 'email' && hostProvider !== 'generic') {
+    const userDomain = user.split('@')[1]?.toLowerCase();
+    const expectedDomain = hostProvider.includes('gmail') ? 'gmail.com' : 
+                          hostProvider.includes('outlook') ? ['outlook.com', 'hotmail.com', 'live.com'] :
+                          null;
+    
+    if (expectedDomain && typeof expectedDomain === 'string' && !userDomain?.includes(expectedDomain)) {
+      errors.push(`Email domain should match SMTP provider`);
+      suggestions.push(`Use email address that matches your SMTP provider domain`);
+    }
   }
 
   // Check for obvious placeholder/test values
@@ -164,14 +136,14 @@ export function isValidSMTPConfig(host: string, port: string, user: string, pass
   // Validate hostname format
   if (!host.includes('.') || host.startsWith('http')) {
     errors.push(`Invalid SMTP_HOST format`);
-    suggestions.push('Use a proper SMTP hostname like smtp.gmail.com');
+    suggestions.push('Use a proper SMTP hostname (e.g., smtp.yourprovider.com)');
   }
   
   // Validate port range
   const portNum = parseInt(port, 10);
   if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
     errors.push(`Invalid SMTP_PORT`);
-    suggestions.push('Use port 587 for most providers, or 465 for SSL');
+    suggestions.push('Use standard SMTP ports: 587 (TLS), 465 (SSL), or 25 (unencrypted)');
   }
   
   // Validate SMTP user with enhanced logic
@@ -199,65 +171,85 @@ export function maskSMTPConfig(config: any): any {
   };
 }
 
-export function getProviderSpecificSettings(provider: string, userType: string): {
-  defaultPort: number;
-  encryption: string;
+// Dynamic provider configuration interface
+export interface ProviderConfig {
+  host: string;
+  port: number;
+  encryption: 'TLS' | 'SSL' | 'STARTTLS';
   authMethod: string;
+  requiresAppPassword?: boolean;
+  passwordLength?: number;
+  usernameFormat: 'email' | 'api_key' | 'username';
   notes: string[];
-} {
-  const settings = {
+}
+
+// Provider detection from environment/configuration
+export function detectProviderFromHost(hostname: string): string {
+  const h = hostname.toLowerCase();
+  if (h.includes('gmail')) return 'gmail';
+  if (h.includes('outlook') || h.includes('office365') || h.includes('hotmail')) return 'outlook';
+  if (h.includes('sendgrid')) return 'sendgrid';
+  if (h.includes('mailgun')) return 'mailgun';
+  if (h.includes('ses') || h.includes('amazonses')) return 'aws_ses';
+  if (h.includes('postmark')) return 'postmark';
+  if (h.includes('yahoo')) return 'yahoo';
+  return 'generic';
+}
+
+// Generic provider settings based on detected provider
+export function getProviderConfig(hostname: string, port?: number): ProviderConfig {
+  const provider = detectProviderFromHost(hostname);
+  const defaultPort = port || 587;
+  
+  const configs: Record<string, ProviderConfig> = {
     gmail: {
-      defaultPort: 587,
-      encryption: 'TLS',
+      host: hostname,
+      port: defaultPort,
+      encryption: defaultPort === 465 ? 'SSL' : 'TLS',
       authMethod: 'app_password',
+      requiresAppPassword: true,
+      passwordLength: 16,
+      usernameFormat: 'email',
       notes: [
-        'Requires App Password (16 characters)',
-        'Enable 2FA before generating App Password',
-        'Use full Gmail address as SMTP_USER'
+        'Requires App Password for security',
+        'Enable 2-Factor Authentication first',
+        'Use complete email address as username'
       ]
     },
     outlook: {
-      defaultPort: 587,
+      host: hostname,
+      port: defaultPort,
       encryption: 'TLS',
       authMethod: 'password',
+      usernameFormat: 'email',
       notes: [
-        'Use full email address as SMTP_USER',
+        'Use full email address as username',
         'May require app-specific password'
       ]
     },
     sendgrid: {
-      defaultPort: 587,
+      host: hostname,
+      port: defaultPort,
       encryption: 'TLS',
       authMethod: 'api_key',
+      usernameFormat: 'api_key',
       notes: [
-        'Use "apikey" as SMTP_USER',
+        'Use "apikey" as username',
         'API key should start with "SG."'
       ]
     },
-    mailgun: {
-      defaultPort: 587,
-      encryption: 'TLS',
-      authMethod: 'api_key',
+    generic: {
+      host: hostname,
+      port: defaultPort,
+      encryption: defaultPort === 465 ? 'SSL' : 'TLS',
+      authMethod: 'password',
+      usernameFormat: 'email',
       notes: [
-        'Use postmaster@your-domain.com or API username',
-        'API key format varies by plan'
-      ]
-    },
-    aws_ses: {
-      defaultPort: 587,
-      encryption: 'TLS',
-      authMethod: 'iam_user',
-      notes: [
-        'Use SMTP username (20 chars starting with AKIA)',
-        'Generate SMTP credentials in SES console'
+        'Standard SMTP configuration',
+        'Check provider documentation for specifics'
       ]
     }
   };
 
-  return settings[provider as keyof typeof settings] || {
-    defaultPort: 587,
-    encryption: 'TLS',
-    authMethod: 'unknown',
-    notes: ['Check provider documentation for specific requirements']
-  };
+  return configs[provider] || configs.generic;
 }

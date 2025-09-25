@@ -58,13 +58,81 @@ const CategoryProductsContent = () => {
   const currentCategory = categories.find(cat => cat.id === categoryId);
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
-  // Filter and sort products by price (lowest to highest by default) - Production Ready
+  // Helper function to get lunch box priority
+  const getLunchBoxPriority = (productName: string): number => {
+    const name = productName.toLowerCase();
+    if (name.includes('monday') && name.includes('lunch')) return 1;
+    if (name.includes('tuesday') && name.includes('lunch')) return 2;
+    if (name.includes('wednesday') && name.includes('lunch')) return 3;
+    if (name.includes('thursday') && name.includes('lunch')) return 4;
+    if (name.includes('weekend') && name.includes('lunch')) return 5;
+    return 999; // Non-lunch box items go last
+  };
+
+  // Helper function to get platter priority
+  const getPlatterPriority = (productName: string): number => {
+    const name = productName.toLowerCase();
+    if (name.includes('budget baller')) return 1;
+    if (name.includes('small but mighty')) return 2;
+    if (name.includes('chop life box')) return 3;
+    if (name.includes('flavour parade')) return 4;
+    if (name.includes('weekend vibes')) return 5;
+    if (name.includes('premium on a budget')) return 6;
+    if (name.includes('flavour fiesta')) return 7;
+    if (name.includes('soft life')) return 8;
+    if (name.includes('pastry parade')) return 9;
+    if (name.includes('vibes on vibes')) return 10;
+    if (name.includes('boardroom bites')) return 11;
+    if (name.includes('big energy')) return 12;
+    if (name.includes('love fiesta')) return 13;
+    if (name.includes('owambe box')) return 14;
+    if (name.includes('odogwu baller')) return 15;
+    return 999; // Non-platter items go last
+  };
+
+  // Filter and sort products - Lunch boxes and platters first in specific order, then by price - Production Ready
   const filteredAndSortedProducts = products
-    .filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter(product => {
+      const searchLower = searchTerm.toLowerCase();
+      return (product.name || '').toLowerCase().includes(searchLower) ||
+        (product.description || '').toLowerCase().includes(searchLower);
+    })
     .sort((a, b) => {
+      // First, sort by lunch box priority
+      const lunchPriorityA = getLunchBoxPriority(a.name);
+      const lunchPriorityB = getLunchBoxPriority(b.name);
+      
+      // Then, sort by platter priority
+      const platterPriorityA = getPlatterPriority(a.name);
+      const platterPriorityB = getPlatterPriority(b.name);
+      
+      // If both are lunch boxes, sort by lunch box priority
+      if (lunchPriorityA < 999 && lunchPriorityB < 999) {
+        return lunchPriorityA - lunchPriorityB;
+      }
+      
+      // If both are platters, sort by platter priority
+      if (platterPriorityA < 999 && platterPriorityB < 999) {
+        return platterPriorityA - platterPriorityB;
+      }
+      
+      // If one is lunch box and other is platter, lunch boxes come first
+      if (lunchPriorityA < 999 && platterPriorityB < 999) {
+        return -1;
+      }
+      if (platterPriorityA < 999 && lunchPriorityB < 999) {
+        return 1;
+      }
+      
+      // If one is lunch box/platter and other is regular product
+      if (lunchPriorityA < 999 || platterPriorityA < 999) {
+        return -1;
+      }
+      if (lunchPriorityB < 999 || platterPriorityB < 999) {
+        return 1;
+      }
+      
+      // If both are regular products, sort by price
       const priceA = a.discounted_price || a.price;
       const priceB = b.discounted_price || b.price;
       return priceA - priceB;

@@ -76,11 +76,12 @@ const BookingManagement = () => {
     }
 
     if (searchTerm) {
-      filtered = filtered.filter(booking => 
-        booking.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.phone_number.includes(searchTerm)
-      );
+      filtered = filtered.filter(booking => {
+        const searchLower = searchTerm.toLowerCase();
+        return (booking.full_name || '').toLowerCase().includes(searchLower) ||
+          (booking.email || '').toLowerCase().includes(searchLower) ||
+          (booking.phone_number || '').includes(searchTerm);
+      });
     }
 
     setFilteredBookings(filtered);

@@ -78,51 +78,44 @@ export class ProductionOptimizer {
   }
 
   /**
-   * Detect and fix common production data issues
+   * Detect and fix common production data issues (optimized for production)
    */
   static async detectAndFixDataIssues() {
-    console.log('🔍 Scanning for data issues...');
-    
     const issues = [];
     
-    // Check for excessive API calls
+    // Check for excessive API calls (performance optimized)
     const performanceEntries = performance.getEntriesByType('resource');
     const apiCalls = performanceEntries.filter(entry => 
       entry.name.includes('supabase.co') && 
       entry.startTime > Date.now() - 30000 // Last 30 seconds
     );
     
-    if (apiCalls.length > 20) {
+    if (apiCalls.length > 50) { // Increased threshold to reduce false positives
       issues.push(`Excessive API calls detected: ${apiCalls.length} in 30s`);
-      
-      // Auto-fix: clear caches to prevent duplicate calls
       await CacheManager.clearAllCaches();
     }
     
-    // Check localStorage size
+    // Check localStorage size (performance optimized)
     const storageSize = JSON.stringify(localStorage).length;
-    if (storageSize > 5000000) { // 5MB
+    if (storageSize > 10000000) { // Increased threshold to 10MB
       issues.push(`Large localStorage detected: ${(storageSize / 1000000).toFixed(2)}MB`);
-      
-      // Auto-fix: clean up old cache entries
       CacheManager.clearAllCaches();
     }
     
+    // Only log if there are actual issues
     if (issues.length > 0) {
       console.warn('⚠️ Data issues detected and fixed:', issues);
-    } else {
-      console.log('✅ No data issues detected');
     }
   }
 }
 
-// Auto-initialize on import for production
+// Auto-initialize on import for production (optimized)
 if (typeof window !== 'undefined') {
   ProductionOptimizer.initializeForProduction();
   ProductionOptimizer.monitorPerformance();
   
-  // Schedule periodic issue detection
+  // Schedule periodic issue detection (reduced frequency for performance)
   setInterval(() => {
     ProductionOptimizer.detectAndFixDataIssues();
-  }, 60000); // Every minute
+  }, 5 * 60 * 1000); // Every 5 minutes instead of every minute
 }

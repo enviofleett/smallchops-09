@@ -24,6 +24,9 @@ interface CustomerInfoCardProps {
     payment_status: string;
     order_time: string;
     order_number: string;
+    payment_method?: string;
+    payment_reference?: string;
+    paystack_reference?: string;
   };
   deliverySchedule?: {
     scheduled_date?: string;
@@ -255,6 +258,234 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
                 </span>
               </div>
               <div className="ml-6 space-y-2">
+                {/* Comprehensive Checkout Information */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Channel:</span>
+                  <Badge variant="outline">Delivery</Badge>
+                </div>
+                
+                {/* Customer's Preferred Delivery Date */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Customer Selected Date:</span>
+                  <span className="text-sm text-foreground font-medium">
+                    {(() => {
+                      const customerSelectedDate = deliverySchedule?.delivery_date || deliverySchedule?.scheduled_date;
+                      
+                      if (customerSelectedDate) {
+                        try {
+                          return format(new Date(customerSelectedDate), 'EEEE, MMMM d, yyyy');
+                        } catch (error) {
+                          console.error('Error formatting customer selected date:', error);
+                          return customerSelectedDate;
+                        }
+                      }
+                      
+                      return 'Not selected during checkout';
+                    })()}
+                  </span>
+                </div>
+                
+                {/* Customer's Preferred Time Window */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Preferred Time Window:</span>
+                  <div className="text-right">
+                    <div className="text-sm text-foreground">{formatTimeWindow()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {deliverySchedule?.is_flexible ? '🔄 Customer chose flexible timing' : '⏰ Customer chose fixed window'}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Complete Delivery Address from Checkout */}
+                {deliveryAddress && (
+                  <div className="pt-3 border-t border-border/50 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <div className="space-y-2 flex-1">
+                        <span className="text-xs font-semibold text-primary uppercase tracking-wider block">
+                          Complete Checkout Address Details
+                        </span>
+                        
+                        {/* Primary Address Lines */}
+                        {deliveryAddress.address?.address_line_1 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Address Line 1:</span>
+                            <span className="text-sm text-foreground font-medium">
+                              {deliveryAddress.address.address_line_1}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {deliveryAddress.address?.address_line_2 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Address Line 2:</span>
+                            <span className="text-sm text-foreground">
+                              {deliveryAddress.address.address_line_2}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* City and State */}
+                        {deliveryAddress.address?.city && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">City:</span>
+                            <span className="text-sm text-foreground font-medium">
+                              {deliveryAddress.address.city}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {deliveryAddress.address?.state && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">State:</span>
+                            <span className="text-sm text-foreground">
+                              {deliveryAddress.address.state}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Postal Code */}
+                        {deliveryAddress.address?.postal_code && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Postal Code:</span>
+                            <span className="text-sm text-foreground">
+                              {deliveryAddress.address.postal_code}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Landmark for Navigation */}
+                        {deliveryAddress.address?.landmark && (
+                          <div className="flex items-start justify-between">
+                            <span className="text-xs text-muted-foreground">Landmark:</span>
+                            <span className="text-sm text-foreground text-right max-w-[60%]">
+                              {deliveryAddress.address.landmark}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Delivery Zone Information */}
+                        {deliveryAddress.zone_id && (
+                          <div className="pt-2 border-t border-border/30">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">Delivery Zone ID:</span>
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {deliveryAddress.zone_id}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Location Coordinates (if available) */}
+                        {deliveryAddress.location && deliveryAddress.location !== "" && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">GPS Coordinates:</span>
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {deliveryAddress.location}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Special Instructions from Checkout */}
+                {deliverySchedule?.special_instructions && (
+                  <div className="pt-3 border-t border-border/50 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1 flex-1">
+                        <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider block">
+                          Customer Delivery Instructions
+                        </span>
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                          <span className="text-sm text-amber-800 italic">
+                            "{deliverySchedule.special_instructions}"
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Order Timing Details */}
+                <div className="pt-3 border-t border-border/50 space-y-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Order Timing Information
+                  </span>
+                  
+                  {order?.order_time && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Order Placed:</span>
+                      <span className="text-sm text-foreground">
+                        {format(new Date(order.order_time), 'PPP p')}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {deliverySchedule?.requested_at && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Delivery Requested:</span>
+                      <span className="text-sm text-foreground">
+                        {format(new Date(deliverySchedule.requested_at), 'PPP p')}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Business Day:</span>
+                    <span className="text-sm text-foreground">
+                      {(() => {
+                        const customerSelectedDate = deliverySchedule?.delivery_date || deliverySchedule?.scheduled_date;
+                        
+                        if (customerSelectedDate) {
+                          try {
+                            return format(new Date(customerSelectedDate), 'EEEE');
+                          } catch (error) {
+                            return format(new Date(), 'EEEE');
+                          }
+                        }
+                        
+                        return format(new Date(), 'EEEE');
+                      })()}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Payment Information from Checkout */}
+                {order && (
+                  <div className="pt-3 border-t border-border/50 space-y-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Payment Details from Checkout
+                    </span>
+                    
+                    {order.payment_method && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Payment Method:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {order.payment_method.toUpperCase()}
+                        </Badge>
+                      </div>
+                    )}
+                    
+                    {order.payment_reference && (
+                      <div className="flex items-start justify-between">
+                        <span className="text-xs text-muted-foreground">Payment Reference:</span>
+                        <span className="text-xs text-foreground font-mono text-right max-w-[60%] break-all">
+                          {order.payment_reference}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Payment Status:</span>
+                      <Badge variant={getStatusBadgeVariant(order.payment_status)} className="text-xs">
+                        {order.payment_status.toUpperCase()}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Channel:</span>
                   <Badge variant="outline">Delivery</Badge>

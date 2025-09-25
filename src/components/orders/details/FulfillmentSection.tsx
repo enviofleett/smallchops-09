@@ -16,22 +16,55 @@ interface FulfillmentSectionProps {
     scheduled_time?: string;
     delivery_time_start?: string;
     delivery_time_end?: string;
+    is_flexible?: boolean;
+    special_instructions?: string;
+    requested_at?: string;
   } | null;
   pickupPoint?: {
     address?: string;
+    name?: string;
   } | null;
+  fulfillmentInfo?: {
+    type: 'pickup' | 'delivery';
+    booking_window?: string;
+    delivery_hours?: {
+      start: string;
+      end: string;
+      is_flexible: boolean;
+    };
+    address?: string;
+    special_instructions?: string;
+    requested_at?: string;
+    business_hours?: any;
+  };
 }
 
 export const FulfillmentSection: React.FC<FulfillmentSectionProps> = ({
   order,
   deliverySchedule,
-  pickupPoint
+  pickupPoint,
+  fulfillmentInfo
 }) => {
   const getDeliveryInfo = () => {
+    // Use fulfillment info if available (comprehensive data)
+    if (fulfillmentInfo) {
+      const bookingDate = fulfillmentInfo.booking_window;
+      const formattedTime = bookingDate ? 
+        format(new Date(bookingDate), 'PPP p') : 
+        'Not scheduled';
+        
+      return {
+        type: fulfillmentInfo.type === 'pickup' ? 'Pickup' : 'Delivery',
+        address: fulfillmentInfo.address || 'Address not available',
+        time: formattedTime
+      };
+    }
+    
+    // Fallback to original logic
     if (order.order_type === 'pickup' && pickupPoint) {
       return {
         type: 'Pickup',
-        address: pickupPoint.address || 'Pickup Point',
+        address: pickupPoint.address || pickupPoint.name || 'Pickup Point',
         time: deliverySchedule?.scheduled_date ? 
           format(new Date(deliverySchedule.scheduled_date), 'PPP p') : 
           'Not scheduled'
@@ -51,6 +84,25 @@ export const FulfillmentSection: React.FC<FulfillmentSectionProps> = ({
   const deliveryInfo = getDeliveryInfo();
 
   const formatTimeWindow = () => {
+    // Use fulfillment info delivery hours if available
+    if (fulfillmentInfo?.delivery_hours) {
+      try {
+        const formatTime = (timeString: string) => {
+          const [hours, minutes] = timeString.split(':');
+          const time = new Date();
+          time.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+          return format(time, 'p');
+        };
+        
+        const startTime = formatTime(fulfillmentInfo.delivery_hours.start);
+        const endTime = formatTime(fulfillmentInfo.delivery_hours.end);
+        const flexibleIndicator = fulfillmentInfo.delivery_hours.is_flexible ? ' (Flexible)' : '';
+        return `${startTime} – ${endTime}${flexibleIndicator} ⏰ Upcoming window`;
+      } catch {
+        return '4:00 PM – 5:00 PM ⏰ Upcoming window';
+      }
+    }
+    
     const scheduleDate = deliverySchedule?.scheduled_date || deliverySchedule?.delivery_date;
     
     if (scheduleDate) {
@@ -76,7 +128,8 @@ export const FulfillmentSection: React.FC<FulfillmentSectionProps> = ({
         
         const startTime = formatTime(deliverySchedule.delivery_time_start);
         const endTime = formatTime(deliverySchedule.delivery_time_end);
-        return `${startTime} – ${endTime} ⏰ Upcoming window`;
+        const flexibleIndicator = deliverySchedule.is_flexible ? ' (Flexible)' : '';
+        return `${startTime} – ${endTime}${flexibleIndicator} ⏰ Upcoming window`;
       } catch {
         return '4:00 PM – 5:00 PM ⏰ Upcoming window';
       }
@@ -86,6 +139,15 @@ export const FulfillmentSection: React.FC<FulfillmentSectionProps> = ({
   };
 
   const getBusinessDay = () => {
+    // Use fulfillment info booking window if available
+    if (fulfillmentInfo?.booking_window) {
+      try {
+        return format(new Date(fulfillmentInfo.booking_window), 'EEEE');
+      } catch {
+        return format(new Date(), 'EEEE');
+      }
+    }
+    
     const scheduleDate = deliverySchedule?.scheduled_date || deliverySchedule?.delivery_date;
     
     if (scheduleDate) {
@@ -99,6 +161,15 @@ export const FulfillmentSection: React.FC<FulfillmentSectionProps> = ({
   };
 
   const getPickupDate = () => {
+    // Use fulfillment info booking window if available
+    if (fulfillmentInfo?.booking_window) {
+      try {
+        return format(new Date(fulfillmentInfo.booking_window), 'PPP');
+      } catch {
+        return 'Today';
+      }
+    }
+    
     const scheduleDate = deliverySchedule?.scheduled_date || deliverySchedule?.delivery_date;
     
     if (scheduleDate) {

@@ -11,6 +11,7 @@ import { SpecialInstructions } from '@/components/orders/details/SpecialInstruct
 import { ActionsPanel } from '@/components/orders/details/ActionsPanel';
 import { FulfillmentSection } from '@/components/orders/details/FulfillmentSection';
 import { QuickStatsBar } from '@/components/orders/details/QuickStatsBar';
+import { BookingWindowDisplay } from '@/components/orders/details/BookingWindowDisplay';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 import { format } from 'date-fns';
@@ -152,7 +153,7 @@ const AdminOrderDetails: React.FC = () => {
               customerEmail={order.customer_email}
               orderType={order.order_type}
               deliveryAddress={order.delivery_address}
-              pickupPoint={undefined}
+              pickupPoint={data?.pickup_point}
               order={{
                 status: order.status,
                 payment_status: order.payment_status,
@@ -177,7 +178,7 @@ const AdminOrderDetails: React.FC = () => {
               paymentReference={order.payment_reference}
               totalAmount={order.total_amount}
               deliverySchedule={delivery_schedule}
-              pickupPoint={undefined}
+              pickupPoint={data?.pickup_point}
               deliveryAddress={order.delivery_address}
               specialInstructions={order.special_instructions}
               isLoadingSchedule={false}
@@ -192,6 +193,14 @@ const AdminOrderDetails: React.FC = () => {
               }}
             />
             
+            <BookingWindowDisplay
+              fulfillmentInfo={data?.fulfillment_info}
+              order={{
+                order_type: order.order_type as 'pickup' | 'delivery',
+                status: order.status
+              }}
+            />
+            
             <FulfillmentSection
               order={{
                 order_type: order.order_type as 'pickup' | 'delivery',
@@ -199,7 +208,8 @@ const AdminOrderDetails: React.FC = () => {
                 delivery_address: order.delivery_address
               }}
               deliverySchedule={delivery_schedule}
-              pickupPoint={undefined}
+              pickupPoint={data?.pickup_point}
+              fulfillmentInfo={data?.fulfillment_info}
             />
 
             {delivery_schedule && (

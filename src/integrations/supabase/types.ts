@@ -10299,6 +10299,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_comprehensive_order_fulfillment: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       get_current_logo: {
         Args: Record<PropertyKey, never>
         Returns: string

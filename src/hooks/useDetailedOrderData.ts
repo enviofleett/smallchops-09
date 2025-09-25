@@ -5,6 +5,21 @@ interface DetailedOrderData {
   order: any;
   items: any[];
   delivery_schedule?: any;
+  pickup_point?: any;
+  business_settings?: any;
+  fulfillment_info?: {
+    type: 'pickup' | 'delivery';
+    booking_window?: string;
+    delivery_hours?: {
+      start: string;
+      end: string;
+      is_flexible: boolean;
+    };
+    address?: string;
+    special_instructions?: string;
+    requested_at?: string;
+    business_hours?: any;
+  };
 }
 
 export const useDetailedOrderData = (orderId: string) => {
@@ -19,8 +34,33 @@ export const useDetailedOrderData = (orderId: string) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderId);
       
       try {
-        // If it's a UUID, use the RPC function
+        // If it's a UUID, try the comprehensive fulfillment function first
         if (isUuid) {
+          const { data: comprehensiveData, error: comprehensiveError } = await supabase.rpc('get_comprehensive_order_fulfillment', {
+            p_order_id: orderId
+          });
+
+          if (!comprehensiveError && comprehensiveData && !(comprehensiveData as any).error) {
+            console.log('✅ Comprehensive fulfillment data loaded:', {
+              hasOrder: !!(comprehensiveData as any).order,
+              hasItems: !!(comprehensiveData as any).items,
+              hasDeliverySchedule: !!(comprehensiveData as any).delivery_schedule,
+              hasPickupPoint: !!(comprehensiveData as any).pickup_point,
+              hasFulfillmentInfo: !!(comprehensiveData as any).fulfillment_info
+            });
+            
+            const data = comprehensiveData as any;
+            return {
+              order: data.order,
+              items: data.items || [],
+              delivery_schedule: data.delivery_schedule,
+              pickup_point: data.pickup_point,
+              business_settings: data.business_settings,
+              fulfillment_info: data.fulfillment_info
+            } as DetailedOrderData;
+          }
+
+          // Fallback to original RPC function
           const { data, error } = await supabase.rpc('get_detailed_order_with_products', {
             p_order_id: orderId
           });

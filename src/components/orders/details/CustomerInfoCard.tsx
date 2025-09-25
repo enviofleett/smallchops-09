@@ -294,12 +294,20 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Business Day:</span>
                   <span className="text-sm text-foreground">
-                    {deliverySchedule?.delivery_date ? 
-                      format(new Date(deliverySchedule.delivery_date), 'EEEE') : 
-                      deliverySchedule?.scheduled_date ?
-                      format(new Date(deliverySchedule.scheduled_date), 'EEEE') :
-                      format(new Date(), 'EEEE')
-                    }
+                    {(() => {
+                      const customerSelectedDate = deliverySchedule?.delivery_date || deliverySchedule?.scheduled_date;
+                      
+                      if (customerSelectedDate) {
+                        try {
+                          return format(new Date(customerSelectedDate), 'EEEE');
+                        } catch (error) {
+                          console.error('Error formatting delivery day:', error);
+                          return format(new Date(), 'EEEE');
+                        }
+                      }
+                      
+                      return format(new Date(), 'EEEE');
+                    })()}
                   </span>
                 </div>
 
@@ -307,8 +315,70 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Requested:</span>
                     <span className="text-sm text-foreground">
-                      {format(new Date(deliverySchedule.requested_at), 'PPP p')}
+                      {(() => {
+                        try {
+                          return format(new Date(deliverySchedule.requested_at), 'PPP p');
+                        } catch (error) {
+                          console.error('Error formatting requested date:', error);
+                          return deliverySchedule.requested_at;
+                        }
+                      })()}
                     </span>
+                  </div>
+                )}
+                
+                {/* Customer's Delivery Address */}
+                {deliveryAddress && (
+                  <div className="pt-2 border-t border-border/50">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1 flex-1">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">
+                          Customer Delivery Address
+                        </span>
+                        <div className="space-y-0.5">
+                          {(() => {
+                            try {
+                              const formattedAddress = formatAddressMultiline(deliveryAddress);
+                              return formattedAddress.split('\n').map((line, index) => (
+                                <div key={index} className="text-sm text-foreground">
+                                  {line}
+                                </div>
+                              ));
+                            } catch (error) {
+                              console.error('Error formatting delivery address:', error);
+                              return (
+                                <div className="text-sm text-muted-foreground italic">
+                                  Address formatting error - {typeof deliveryAddress === 'string' ? deliveryAddress : 'Invalid address data'}
+                                </div>
+                              );
+                            }
+                          })()}
+                        </div>
+                        
+                        {/* Delivery Instructions from Address */}
+                        {(() => {
+                          try {
+                            const instructions = getDeliveryInstructionsFromAddress(deliveryAddress);
+                            if (instructions && instructions.trim()) {
+                              return (
+                                <div className="mt-2 p-2 bg-muted/50 rounded-md">
+                                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1">
+                                    Delivery Notes
+                                  </span>
+                                  <span className="text-sm text-foreground italic">
+                                    "{instructions}"
+                                  </span>
+                                </div>
+                              );
+                            }
+                          } catch (error) {
+                            console.error('Error extracting delivery instructions:', error);
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

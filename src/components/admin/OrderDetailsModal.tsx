@@ -16,6 +16,8 @@ import {
   Settings
 } from 'lucide-react';
 
+// Force refresh timestamp: 1727279220
+
 interface OrderDetailsModalProps {
   order: any;
   isOpen: boolean;
@@ -82,12 +84,12 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       className="max-w-6xl h-full"
     >
       <div className="flex flex-col h-full" ref={printRef}>
-        {/* Modal Header */}
+        {/* Modal Header - NEW DESIGN ACTIVE */}
         <div className="flex-shrink-0 border-b bg-gradient-to-r from-background to-muted/20 px-6 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1">
               <h1 className="text-2xl font-bold text-foreground">
-                Order #{order.order_number}
+                📋 Order #{order.order_number}
               </h1>
               <p className="text-sm text-muted-foreground">
                 Complete order fulfillment details and management

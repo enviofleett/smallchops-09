@@ -20,7 +20,12 @@ export function Toaster() {
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
                 <ToastDescription>
-                  {typeof description === 'string' ? description : String(description || '')}
+                  {typeof description === 'string' 
+                    ? description 
+                    : typeof description === 'object' && description !== null
+                      ? JSON.stringify(description)
+                      : String(description || 'An error occurred')
+                  }
                 </ToastDescription>
               )}
             </div>

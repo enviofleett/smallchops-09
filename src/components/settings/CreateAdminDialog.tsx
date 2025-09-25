@@ -101,39 +101,57 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
         setSendEmail(true);
         onOpenChange(false);
         onSuccess?.();
-      } else if (data?.code === 'USER_EXISTS') {
+      } else {
+        // Handle all error cases properly
+        let errorMessage = data?.message || data?.error || 'Failed to create admin user';
+        let errorTitle = 'Creation Failed';
+        
+        if (data?.code === 'USER_EXISTS') {
+          errorTitle = 'User Already Exists';
+          errorMessage = 'An admin user with this email already exists. Please use a different email address or update the existing user\'s role instead.';
+        } else if (data?.code === 'INVALID_EMAIL') {
+          errorTitle = 'Invalid Email';
+          errorMessage = 'Please enter a valid email address format.';
+        } else if (data?.code === 'ACCESS_DENIED') {
+          errorTitle = 'Access Denied';
+          errorMessage = 'You do not have permission to create admin users. Please contact a system administrator.';
+        } else if (data?.code === 'SERVER_CONFIG') {
+          errorTitle = 'System Configuration Error';
+          errorMessage = 'The admin creation system is not properly configured. Please contact technical support.';
+        }
+        
         toast({
-          title: 'User Already Exists',
-          description: 'An account with this email already exists. You can set their role to admin instead.',
+          title: errorTitle,
+          description: errorMessage,
           variant: 'destructive'
         });
         return;
-      } else {
-        throw new Error(data?.error || 'Failed to create admin user');
       }
     } catch (error: any) {
       console.error('Admin creation error:', error);
       
-      // Enhanced error handling for production
+      // Enhanced error handling for production with better network error detection
       let errorTitle = 'Creation Failed';
       let errorDescription = 'Failed to create admin user. Please try again.';
       
-      if (error.message.includes('FunctionsHttpError')) {
+      // Handle network and function errors
+      if (error.message?.includes('FunctionsHttpError') || error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
+        errorTitle = 'Connection Error';
+        errorDescription = 'Unable to connect to the admin creation service. Please check your connection and try again.';
+      } else if (error.message?.includes('500') || error.message?.includes('Internal Server Error')) {
         errorTitle = 'Server Error';
-        errorDescription = 'Admin creation service is temporarily unavailable. Please try again in a moment.';
-      } else if (error.message.includes('already exists')) {
-        errorTitle = 'User Already Exists';
-        errorDescription = 'An admin user with this email already exists. Please use a different email address.';
-      } else if (error.message.includes('Invalid email')) {
-        errorTitle = 'Invalid Email';
-        errorDescription = 'Please enter a valid email address.';
-      } else if (error.message.includes('Authorization')) {
+        errorDescription = 'The server encountered an error. Please try again in a few moments.';
+      } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
         errorTitle = 'Permission Denied';
         errorDescription = 'You do not have permission to create admin users. Please contact a system administrator.';
-      } else if (error.message.includes('Server configuration')) {
-        errorTitle = 'System Configuration Error';
-        errorDescription = 'The admin creation system is not properly configured. Please contact technical support.';
+      } else if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        errorTitle = 'Authentication Required';
+        errorDescription = 'Your session has expired. Please refresh the page and try again.';
+      } else if (error.message?.includes('timeout')) {
+        errorTitle = 'Request Timeout';
+        errorDescription = 'The request took too long. Please try again.';
       } else if (error.message) {
+        // Use the original error message if it's specific
         errorDescription = error.message;
       }
       

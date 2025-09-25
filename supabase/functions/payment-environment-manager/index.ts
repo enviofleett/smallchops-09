@@ -1,7 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0/dist/module/index.js'
-import { corsHeaders } from '../_shared/cors.ts'
 import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus, detectEnvironment } from '../_shared/paystack-config.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 interface EnvironmentCheckResult {
   paystack_configured: boolean

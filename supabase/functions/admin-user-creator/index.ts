@@ -162,13 +162,40 @@ async function createAdminUser(supabase: any, body: any, createdBy: any) {
     }
   }
 
-  // Check if user already exists
-  const { data: existingUser } = await supabase.auth.admin.listUsers({
-    filter: `email.eq.${body.email}`
-  })
+  // Check if user already exists in auth.users
+  const { data: existingAuthUsers, error: listError } = await supabase.auth.admin.listUsers()
+  
+  if (listError) {
+    console.error('[ADMIN-CREATOR] Error checking existing users:', listError)
+    throw { 
+      status: 500, 
+      code: 'USER_CHECK_FAILED', 
+      message: 'Failed to check existing users' 
+    }
+  }
 
-  if (existingUser?.users?.length > 0) {
+  const userExists = existingAuthUsers?.users?.some(user => 
+    user.email?.toLowerCase() === body.email.toLowerCase()
+  )
+
+  if (userExists) {
     console.log('[ADMIN-CREATOR] User already exists:', body.email)
+    return jsonResponse({
+      success: false,
+      code: 'USER_EXISTS',
+      message: 'A user with this email already exists'
+    })
+  }
+
+  // Also check profiles table as backup verification
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('email', body.email.toLowerCase())
+    .single()
+
+  if (existingProfile) {
+    console.log('[ADMIN-CREATOR] User profile already exists:', body.email)
     return jsonResponse({
       success: false,
       code: 'USER_EXISTS',

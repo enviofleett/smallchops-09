@@ -454,6 +454,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const safeFallback = (value: any, fallback = 'Not provided') => {
     return value && value.toString().trim() ? value : fallback;
   };
+
+  // Debug log to help identify structure issues
+  console.log('OrderDetailsDialog render - isOpen:', isOpen, 'showDataSources:', showDataSources);
+  
   return (
     <>
       <AdaptiveDialog open={isOpen} onOpenChange={onClose} title={`Order Details - #${order.order_number}`} size="xl" className={cn("print:bg-white print:text-black print:shadow-none", "w-full max-w-none sm:max-w-6xl lg:max-w-7xl")}>
@@ -646,7 +650,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       </div>
     </AdaptiveDialog>
 
-    {/* Data Sources Modal */}
     <AdaptiveDialog
       open={showDataSources} 
       onOpenChange={setShowDataSources} 
@@ -682,7 +685,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
       pickupPoint={pickupPoint}
     />
-    </>
+  </>
   );
 };
-export default OrderDetailsDialog;

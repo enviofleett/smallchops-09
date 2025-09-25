@@ -6,11 +6,14 @@ import { ProductionEmailDashboard } from './ProductionEmailDashboard';
 import { EnhancedEmailProcessor } from '../admin/EnhancedEmailProcessor';
 import { EmailTemplateManager } from '../admin/EmailTemplateManager';
 import { EmailTemplateHealthCard } from './EmailTemplateHealthCard';
+import { ProductionTemplateSeeder } from '../admin/ProductionTemplateSeeder';
 import { EmailDeliveryDashboard } from '../admin/EmailDeliveryDashboard';
 import { ComprehensiveEmailTestDashboard } from '../admin/ComprehensiveEmailTestDashboard';
 import { EmailSystemAuditDashboard } from '../admin/EmailSystemAuditDashboard';
 import { EmailProductionMonitor } from '../admin/EmailProductionMonitor';
 import { ProductionEmailAudit } from '../admin/ProductionEmailAudit';
+import { ProductionEnvironmentSetup } from '../admin/ProductionEnvironmentSetup';
+import { ProductionReadinessOverview } from '../admin/ProductionReadinessOverview';
 
 export const EmailSystemTab = () => {
   return (
@@ -22,10 +25,12 @@ export const EmailSystemTab = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="production-audit" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-10">
-          <TabsTrigger value="production-audit">Production Audit</TabsTrigger>
-          <TabsTrigger value="audit">System Audit</TabsTrigger>
+      <Tabs defaultValue="production-overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-12">
+          <TabsTrigger value="production-overview">🚀 Overview</TabsTrigger>
+          <TabsTrigger value="production-audit">🚨 Audit</TabsTrigger>
+          <TabsTrigger value="production-setup">🔧 Setup</TabsTrigger>
+          <TabsTrigger value="audit">System</TabsTrigger>
           <TabsTrigger value="production">Production</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
@@ -36,8 +41,16 @@ export const EmailSystemTab = () => {
           <TabsTrigger value="dashboard">Legacy</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="production-overview" className="space-y-6">
+          <ProductionReadinessOverview />
+        </TabsContent>
+
         <TabsContent value="production-audit" className="space-y-6">
           <ProductionEmailAudit />
+        </TabsContent>
+
+        <TabsContent value="production-setup" className="space-y-6">
+          <ProductionEnvironmentSetup />
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-6">
@@ -55,6 +68,7 @@ export const EmailSystemTab = () => {
         <TabsContent value="templates" className="space-y-6">
           <EmailTemplateHealthCard />
           <EmailTemplateManager />
+          <ProductionTemplateSeeder />
         </TabsContent>
 
         <TabsContent value="delivery" className="space-y-6">

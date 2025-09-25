@@ -183,55 +183,43 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* Fulfillment Type */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-medium text-foreground">Fulfillment Type</span>
-                    <Badge variant="secondary" className="text-xs">
-                      <Database className="w-3 h-3 mr-1" />
-                      orders.order_type
-                    </Badge>
-                  </div>
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">Fulfillment Type</h4>
                   <div className="flex items-center gap-2">
                     {orderType === 'delivery' ? <Truck className="w-4 h-4 text-primary" /> : <Package className="w-4 h-4 text-primary" />}
-                    <span className="font-semibold capitalize text-primary">{orderType}</span>
+                    <span className="font-semibold capitalize text-foreground">{orderType}</span>
                   </div>
                 </div>
 
-                {/* Pickup Point ID / Delivery Zone ID */}
+                {/* Pickup Point / Delivery Zone */}
                 {orderType === 'pickup' ? (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium text-foreground">Pickup Point</span>
-                      <Badge variant="secondary" className="text-xs">
-                        <Database className="w-3 h-3 mr-1" />
-                        pickup_points via orders.pickup_point_id
-                      </Badge>
-                    </div>
-                    <div className="text-sm">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Pickup Location</h4>
+                    <div>
                       {pickupPointData ? (
-                        <div>
-                          <span className="font-semibold text-primary">{pickupPointData.name}</span>
-                          <p className="text-muted-foreground text-xs mt-1">{pickupPointData.address}</p>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-primary" />
+                            <span className="font-semibold text-foreground">{pickupPointData.name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground ml-6">{pickupPointData.address}</p>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">No pickup point assigned</span>
+                        <span className="text-sm text-muted-foreground">No pickup location assigned</span>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium text-foreground">Delivery Zone</span>
-                      <Badge variant="secondary" className="text-xs">
-                        <Database className="w-3 h-3 mr-1" />
-                        delivery_zones via orders.delivery_zone_id
-                      </Badge>
-                    </div>
-                    <div className="text-sm">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Delivery Zone</h4>
+                    <div>
                       {deliveryZoneData ? (
-                        <span className="font-semibold text-primary">{deliveryZoneData.name}</span>
+                        <div className="flex items-center gap-2">
+                          <Navigation className="w-4 h-4 text-primary" />
+                          <span className="font-semibold text-foreground">{deliveryZoneData.name}</span>
+                        </div>
                       ) : (
-                        <span className="text-muted-foreground">No delivery zone assigned</span>
+                        <span className="text-sm text-muted-foreground">No delivery zone assigned</span>
                       )}
                     </div>
                   </div>
@@ -239,111 +227,92 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
 
                 {/* Delivery Address (only for delivery orders) */}
                 {orderType === 'delivery' && (
-                  <div className="md:col-span-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium text-foreground">Delivery Address</span>
-                      <Badge variant="secondary" className="text-xs">
-                        <Database className="w-3 h-3 mr-1" />
-                        orders.delivery_address
-                      </Badge>
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-medium break-words">
-                        {formatAddress(deliveryAddress) || <span className="text-muted-foreground">No delivery address provided</span>}
-                      </span>
+                  <div className="md:col-span-2 space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Delivery Address</h4>
+                    <div>
+                      {deliveryAddress ? (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-primary mt-0.5" />
+                          <span className="text-sm text-foreground break-words">{formatAddress(deliveryAddress)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">No delivery address provided</span>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Delivery/Pickup Date */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-medium text-foreground">{orderType === 'delivery' ? 'Delivery' : 'Pickup'} Date</span>
-                    <Badge variant="secondary" className="text-xs">
-                      <Database className="w-3 h-3 mr-1" />
-                      order_delivery_schedule.delivery_date
-                    </Badge>
-                  </div>
-                  <div className="text-sm">
+                {/* Date */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">{orderType === 'delivery' ? 'Delivery' : 'Pickup'} Date</h4>
+                  <div>
                     {deliverySchedule?.delivery_date ? (
-                      <span className="font-semibold text-primary">
-                        {format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-foreground">
+                          {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMM d, yyyy')}
+                        </span>
+                      </div>
                     ) : order?.pickup_time ? (
-                      <span className="font-semibold text-primary">
-                        {format(new Date(order.pickup_time), 'MMM d, yyyy')}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-foreground">
+                          {format(new Date(order.pickup_time), 'EEEE, MMM d, yyyy')}
+                        </span>
+                      </div>
                     ) : (
-                      <span className="text-muted-foreground">Not scheduled</span>
+                      <span className="text-sm text-muted-foreground">Not scheduled</span>
                     )}
                   </div>
                 </div>
 
                 {/* Time Window */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-medium text-foreground">Time Window</span>
-                    <Badge variant="secondary" className="text-xs">
-                      <Database className="w-3 h-3 mr-1" />
-                      order_delivery_schedule.delivery_time_start/end
-                    </Badge>
-                  </div>
-                  <div className="text-sm">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">Time Window</h4>
+                  <div>
                     {deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end ? (
-                      <span className="font-semibold text-primary">
-                        {deliverySchedule.delivery_time_start.substring(0, 5)} – {deliverySchedule.delivery_time_end.substring(0, 5)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-foreground">
+                          {deliverySchedule.delivery_time_start.substring(0, 5)} – {deliverySchedule.delivery_time_end.substring(0, 5)}
+                        </span>
+                      </div>
                     ) : order?.pickup_time ? (
-                      <span className="font-semibold text-primary">
-                        {format(new Date(order.pickup_time), 'HH:mm')}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-foreground">
+                          {format(new Date(order.pickup_time), 'HH:mm')}
+                        </span>
+                      </div>
                     ) : (
-                      <span className="text-muted-foreground">Not specified</span>
+                      <span className="text-sm text-muted-foreground">Not specified</span>
                     )}
                   </div>
                 </div>
 
                 {/* Schedule Flexibility */}
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-medium text-foreground">Schedule Flexibility</span>
-                    <Badge variant="secondary" className="text-xs">
-                      <Database className="w-3 h-3 mr-1" />
-                      order_delivery_schedule.is_flexible
-                    </Badge>
-                  </div>
-                  <div className="text-sm">
-                    {deliverySchedule?.is_flexible !== undefined ? (
-                      <span className="font-semibold text-primary">
+                {deliverySchedule?.is_flexible !== undefined && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Schedule Flexibility</h4>
+                    <div>
+                      <Badge variant={deliverySchedule.is_flexible ? "default" : "secondary"}>
                         {deliverySchedule.is_flexible ? 'Flexible timing' : 'Fixed timing'}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">Not specified</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Special Instructions */}
-                <div className="md:col-span-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-medium text-foreground">Special Instructions</span>
-                    <Badge variant="secondary" className="text-xs">
-                      <Database className="w-3 h-3 mr-1" />
-                      order_delivery_schedule.special_instructions
-                    </Badge>
-                  </div>
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <div className="text-sm">
-                      {deliverySchedule?.special_instructions || order?.special_instructions || specialInstructions ? (
-                        <span className="font-medium">
-                          {deliverySchedule?.special_instructions || order?.special_instructions || specialInstructions}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">No special instructions provided</span>
-                      )}
+                      </Badge>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* Special Instructions */}
+                {(deliverySchedule?.special_instructions || order?.special_instructions || specialInstructions) && (
+                  <div className="md:col-span-2 space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Special Instructions</h4>
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-sm text-foreground">
+                        {deliverySchedule?.special_instructions || order?.special_instructions || specialInstructions}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
               </div>
             </div>

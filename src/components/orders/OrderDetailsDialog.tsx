@@ -547,7 +547,13 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 pickupPoint={pickupPoint}
               />
               <OrderInfoCard 
-                order={order}
+                order={{
+                  id: order.id,
+                  order_type: order.order_type === 'dine_in' ? 'pickup' : order.order_type,
+                  pickup_time: order.pickup_time,
+                  special_instructions: order.special_instructions,
+                  created_at: order.created_at
+                }}
                 orderNumber={order.order_number}
                 orderTime={order.created_at}
                 orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}

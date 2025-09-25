@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { formatAddress } from '@/utils/formatAddress';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useDeliveryZones } from '@/hooks/useDeliveryZones';
+import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 
 interface OrderInfoCardProps {
   orderNumber: string;
@@ -42,6 +43,7 @@ interface OrderInfoCardProps {
     special_instructions?: string;
     created_at: string;
   };
+  orderId?: string;
 }
 
 export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
@@ -61,8 +63,12 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
   recoveryPending,
   recoveryError,
   recoveryStatus,
-  order
+  order,
+  orderId
 }) => {
+  // Fetch detailed order data for fulfillment information
+  const { data: detailedOrderData, isLoading: isLoadingDetailedOrder } = useDetailedOrderData(orderId || orderNumber);
+  
   // Hooks for fetching fulfillment data
   const { data: pickupPointData, isLoading: isLoadingPickupPoint } = usePickupPoint(
     orderType === 'pickup' && order ? (order as any).pickup_point_id : undefined
@@ -180,141 +186,97 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
             </div>
           ) : (
             <div className="bg-background rounded-lg p-4 border">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* Fulfillment Type */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">Fulfillment Type</h4>
-                  <div className="flex items-center gap-2">
-                    {orderType === 'delivery' ? <Truck className="w-4 h-4 text-primary" /> : <Package className="w-4 h-4 text-primary" />}
-                    <span className="font-semibold capitalize text-foreground">{orderType}</span>
-                  </div>
-                </div>
-
-                {/* Pickup Point / Delivery Zone */}
-                {orderType === 'pickup' ? (
+              {!detailedOrderData || isLoadingDetailedOrder ? (
+                <div className="text-center text-muted-foreground">Loading fulfillment details...</div>
+              ) : (
+                <div className="space-y-4">
+                  
+                  {/* Fulfillment Type */}
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-muted-foreground">Pickup Location</h4>
-                    <div>
-                      {pickupPointData ? (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-primary" />
-                            <span className="font-semibold text-foreground">{pickupPointData.name}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground ml-6">{pickupPointData.address}</p>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No pickup location assigned</span>
-                      )}
+                    <h4 className="text-sm font-medium text-muted-foreground">Fulfillment Type</h4>
+                    <div className="flex items-center gap-2">
+                      {detailedOrderData.order.fulfillment_type === 'delivery' ? <Truck className="w-4 h-4 text-primary" /> : <Package className="w-4 h-4 text-primary" />}
+                      <span className="font-semibold capitalize text-foreground">
+                        {detailedOrderData.order.fulfillment_type || "Not provided"}
+                      </span>
                     </div>
                   </div>
-                ) : (
+
+                  {/* Pickup Point ID (only for pickup orders) */}
+                  {detailedOrderData.order.fulfillment_type === "pickup" && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-muted-foreground">Pickup Location ID</h4>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-foreground">
+                          {detailedOrderData.order.pickup_point_id || "Not provided"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delivery Address (only for delivery orders) */}
+                  {detailedOrderData.order.fulfillment_type === "delivery" && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-muted-foreground">Delivery Address</h4>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-primary mt-0.5" />
+                        <span className="text-sm text-foreground break-words">
+                          {detailedOrderData.order.delivery_address
+                            ? typeof detailedOrderData.order.delivery_address === "string"
+                              ? detailedOrderData.order.delivery_address
+                              : [
+                                  detailedOrderData.order.delivery_address.address_line_1,
+                                  detailedOrderData.order.delivery_address.address_line_2,
+                                  detailedOrderData.order.delivery_address.city,
+                                  detailedOrderData.order.delivery_address.state,
+                                  detailedOrderData.order.delivery_address.postal_code,
+                                  detailedOrderData.order.delivery_address.landmark,
+                                ].filter(Boolean).join(", ")
+                            : "Not provided"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delivery Date */}
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-muted-foreground">Delivery Zone</h4>
-                    <div>
-                      {deliveryZoneData ? (
-                        <div className="flex items-center gap-2">
-                          <Navigation className="w-4 h-4 text-primary" />
-                          <span className="font-semibold text-foreground">{deliveryZoneData.name}</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No delivery zone assigned</span>
-                      )}
+                    <h4 className="text-sm font-medium text-muted-foreground">Delivery Date</h4>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-primary" />
+                      <span className="font-semibold text-foreground">
+                        {detailedOrderData.delivery_schedule?.delivery_date 
+                          ? format(new Date(detailedOrderData.delivery_schedule.delivery_date), 'EEEE, MMM d, yyyy')
+                          : "Not provided"}
+                      </span>
                     </div>
                   </div>
-                )}
 
-                {/* Delivery Address (only for delivery orders) */}
-                {orderType === 'delivery' && (
-                  <div className="md:col-span-2 space-y-2">
-                    <h4 className="text-sm font-medium text-muted-foreground">Delivery Address</h4>
-                    <div>
-                      {deliveryAddress ? (
-                        <div className="flex items-start gap-2">
-                          <MapPin className="w-4 h-4 text-primary mt-0.5" />
-                          <span className="text-sm text-foreground break-words">{formatAddress(deliveryAddress)}</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No delivery address provided</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Date */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">{orderType === 'delivery' ? 'Delivery' : 'Pickup'} Date</h4>
-                  <div>
-                    {deliverySchedule?.delivery_date ? (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-primary" />
-                        <span className="font-semibold text-foreground">
-                          {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMM d, yyyy')}
-                        </span>
-                      </div>
-                    ) : order?.pickup_time ? (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-primary" />
-                        <span className="font-semibold text-foreground">
-                          {format(new Date(order.pickup_time), 'EEEE, MMM d, yyyy')}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Not scheduled</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Time Window */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">Time Window</h4>
-                  <div>
-                    {deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end ? (
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-primary" />
-                        <span className="font-semibold text-foreground">
-                          {deliverySchedule.delivery_time_start.substring(0, 5)} – {deliverySchedule.delivery_time_end.substring(0, 5)}
-                        </span>
-                      </div>
-                    ) : order?.pickup_time ? (
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-primary" />
-                        <span className="font-semibold text-foreground">
-                          {format(new Date(order.pickup_time), 'HH:mm')}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Not specified</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Schedule Flexibility */}
-                {deliverySchedule?.is_flexible !== undefined && (
+                  {/* Delivery Window */}
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-muted-foreground">Schedule Flexibility</h4>
-                    <div>
-                      <Badge variant={deliverySchedule.is_flexible ? "default" : "secondary"}>
-                        {deliverySchedule.is_flexible ? 'Flexible timing' : 'Fixed timing'}
-                      </Badge>
+                    <h4 className="text-sm font-medium text-muted-foreground">Delivery Window</h4>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-primary" />
+                      <span className="font-semibold text-foreground">
+                        {detailedOrderData.delivery_schedule?.delivery_time_start && detailedOrderData.delivery_schedule?.delivery_time_end
+                          ? `${detailedOrderData.delivery_schedule.delivery_time_start.substring(0, 5)} – ${detailedOrderData.delivery_schedule.delivery_time_end.substring(0, 5)}`
+                          : "Not provided"}
+                      </span>
                     </div>
                   </div>
-                )}
 
-                {/* Special Instructions */}
-                {(deliverySchedule?.special_instructions || order?.special_instructions || specialInstructions) && (
-                  <div className="md:col-span-2 space-y-2">
+                  {/* Special Instructions */}
+                  <div className="space-y-2">
                     <h4 className="text-sm font-medium text-muted-foreground">Special Instructions</h4>
                     <div className="bg-muted/50 rounded-lg p-3">
                       <p className="text-sm text-foreground">
-                        {deliverySchedule?.special_instructions || order?.special_instructions || specialInstructions}
+                        {detailedOrderData.delivery_schedule?.special_instructions || "None"}
                       </p>
                     </div>
                   </div>
-                )}
 
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>

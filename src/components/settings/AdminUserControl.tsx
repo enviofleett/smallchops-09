@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { CreateAdminDialog } from "./CreateAdminDialog";
+import { AdminPasswordResetDialog } from "./AdminPasswordResetDialog";
 import { EnhancedUserPermissionsMatrix } from "./EnhancedUserPermissionsMatrix";
 import { AdminActionsLog } from "./AdminActionsLog";
 import { AdminHealthMonitor } from "../admin/AdminHealthMonitor";
@@ -14,7 +15,7 @@ import { ProductionAdminSecurity } from "../admin/ProductionAdminSecurity";
 import { useAdminManagement } from '@/hooks/useAdminManagement';
 import { useAdminInvitation } from '@/hooks/useAdminInvitation';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { UserPlus, Shield, Activity, Trash2, Search, Download, RotateCcw, Copy, Filter, CheckCircle } from "lucide-react";
+import { UserPlus, Shield, Activity, Trash2, Search, Download, RotateCcw, Copy, Filter, CheckCircle, Key } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +50,9 @@ interface AdminInvitation {
 
 export const AdminUserControl = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [selectedUserForPasswordReset, setSelectedUserForPasswordReset] = useState<AdminUser | null>(null);
   const [activeTab, setActiveTab] = useState("users");
   const [searchQuery, setSearchQuery] = useState("");
   const [invitationSearchQuery, setInvitationSearchQuery] = useState("");
@@ -69,6 +72,12 @@ export const AdminUserControl = () => {
     isResending,
     copyInvitationLink
   } = useAdminInvitation();
+
+  // Handle user selection for password reset
+  const handlePasswordResetRequest = (user: AdminUser) => {
+    setSelectedUserForPasswordReset(user);
+    setShowPasswordResetDialog(true);
+  };
 
   // Handle user selection for permissions
   const handleViewPermissions = (user: AdminUser) => {
@@ -286,37 +295,46 @@ export const AdminUserControl = () => {
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col space-y-1 sm:flex-row sm:space-y-0 sm:space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleViewPermissions(user)}
-                                  className="w-full sm:w-auto text-xs"
-                                >
-                                  <Shield className="w-3 h-3 mr-1" />
-                                  Permissions
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs">
-                                      <Trash2 className="w-3 h-3 mr-1" />
-                                      Deactivate
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Deactivate Admin User</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to deactivate this admin user? This action will prevent them from accessing admin features.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => updateAdmin({ userId: user.id, action: 'deactivate' })} disabled={isUpdatingAdmin}>
-                                        {isUpdatingAdmin ? 'Deactivating...' : 'Deactivate'}
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
+                                 <Button
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={() => handleViewPermissions(user)}
+                                   className="w-full sm:w-auto text-xs"
+                                 >
+                                   <Shield className="w-3 h-3 mr-1" />
+                                   Permissions
+                                 </Button>
+                                 <Button
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={() => handlePasswordResetRequest(user)}
+                                   className="w-full sm:w-auto text-xs"
+                                 >
+                                   <Key className="w-3 h-3 mr-1" />
+                                   Reset Password
+                                 </Button>
+                                 <AlertDialog>
+                                   <AlertDialogTrigger asChild>
+                                     <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs">
+                                       <Trash2 className="w-3 h-3 mr-1" />
+                                       Deactivate
+                                     </Button>
+                                   </AlertDialogTrigger>
+                                   <AlertDialogContent>
+                                     <AlertDialogHeader>
+                                       <AlertDialogTitle>Deactivate Admin User</AlertDialogTitle>
+                                       <AlertDialogDescription>
+                                         Are you sure you want to deactivate this admin user? This action will prevent them from accessing admin features.
+                                       </AlertDialogDescription>
+                                     </AlertDialogHeader>
+                                     <AlertDialogFooter>
+                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                       <AlertDialogAction onClick={() => updateAdmin({ userId: user.id, action: 'deactivate' })} disabled={isUpdatingAdmin}>
+                                         {isUpdatingAdmin ? 'Deactivating...' : 'Deactivate'}
+                                       </AlertDialogAction>
+                                     </AlertDialogFooter>
+                                   </AlertDialogContent>
+                                 </AlertDialog>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -483,6 +501,21 @@ export const AdminUserControl = () => {
         <CreateAdminDialog 
           open={showCreateDialog} 
           onOpenChange={setShowCreateDialog}
+        />
+
+        <AdminPasswordResetDialog
+          open={showPasswordResetDialog}
+          onOpenChange={setShowPasswordResetDialog}
+          adminUser={selectedUserForPasswordReset ? {
+            id: selectedUserForPasswordReset.id,
+            name: selectedUserForPasswordReset.name,
+            email: selectedUserForPasswordReset.email || '',
+            role: selectedUserForPasswordReset.role
+          } : null}
+          onSuccess={() => {
+            setShowPasswordResetDialog(false);
+            setSelectedUserForPasswordReset(null);
+          }}
         />
       </div>
     </ErrorBoundary>

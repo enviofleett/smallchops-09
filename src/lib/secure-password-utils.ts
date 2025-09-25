@@ -169,12 +169,143 @@ export function sanitizePasswordInput(password: string): string {
 }
 
 /**
- * Generate a secure random password
+ * Password template configurations
  */
-export function generateSecurePassword(length: number = 16): string {
+export interface PasswordTemplate {
+  id: string;
+  name: string;
+  description: string;
+  pattern: (context?: { companyName?: string; year?: string; username?: string }) => string;
+  requiresChange: boolean;
+}
+
+export const DEFAULT_PASSWORD_TEMPLATES: PasswordTemplate[] = [
+  {
+    id: 'company_year',
+    name: 'Company + Year',
+    description: 'CompanyName2025!',
+    pattern: (context) => `${context?.companyName || 'Company'}${context?.year || new Date().getFullYear()}!`,
+    requiresChange: true
+  },
+  {
+    id: 'secure_random',
+    name: 'Secure Random',
+    description: 'Cryptographically secure random password',
+    pattern: () => generateSecureRandomPassword(16),
+    requiresChange: false
+  },
+  {
+    id: 'user_temp',
+    name: 'User Temporary',
+    description: 'Username + TempPassword123!',
+    pattern: (context) => `${context?.username || 'User'}TempPassword123!`,
+    requiresChange: true
+  },
+  {
+    id: 'admin_default',
+    name: 'Admin Default',
+    description: 'AdminAccess2025!',
+    pattern: (context) => `AdminAccess${context?.year || new Date().getFullYear()}!`,
+    requiresChange: true
+  }
+];
+
+/**
+ * Generate username from email
+ */
+export function generateUsernameFromEmail(email: string, format: 'full' | 'initials' | 'firstname' = 'full'): string {
+  const localPart = email.split('@')[0];
+  
+  switch (format) {
+    case 'initials':
+      return localPart.split(/[._-]/).map(part => part.charAt(0)).join('').toLowerCase();
+    case 'firstname':
+      return localPart.split(/[._-]/)[0].toLowerCase();
+    case 'full':
+    default:
+      return localPart.replace(/[._-]/g, '.').toLowerCase();
+  }
+}
+
+/**
+ * Generate password using template
+ */
+export function generatePasswordFromTemplate(
+  templateId: string, 
+  context?: { companyName?: string; email?: string; username?: string }
+): { password: string; requiresChange: boolean; template: PasswordTemplate } {
+  const template = DEFAULT_PASSWORD_TEMPLATES.find(t => t.id === templateId);
+  if (!template) {
+    throw new Error(`Password template '${templateId}' not found`);
+  }
+
+  const passwordContext = {
+    ...context,
+    year: new Date().getFullYear().toString(),
+    username: context?.username || (context?.email ? generateUsernameFromEmail(context.email) : 'User')
+  };
+
+  const password = template.pattern(passwordContext);
+  
+  return {
+    password,
+    requiresChange: template.requiresChange,
+    template
+  };
+}
+
+/**
+ * Generate a secure random password (internal function)
+ */
+function generateSecureRandomPassword(length: number = 16): string {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
   const array = new Uint8Array(length);
   crypto.getRandomValues(array);
   
-  return Array.from(array, byte => charset[byte % charset.length]).join('');
+  // Ensure we have at least one of each character type
+  let password = '';
+  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // Uppercase
+  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // Lowercase
+  password += '0123456789'[Math.floor(Math.random() * 10)]; // Number
+  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // Special
+  
+  // Fill the rest randomly
+  for (let i = 4; i < length; i++) {
+    password += charset[array[i] % charset.length];
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+/**
+ * Generate a secure random password (public function)
+ */
+export function generateSecurePassword(length: number = 16): string {
+  return generateSecureRandomPassword(length);
+}
+
+/**
+ * Bulk password generation for multiple users
+ */
+export function generateBulkPasswords(
+  users: Array<{ email: string; role?: string }>,
+  templateId: string = 'secure_random',
+  context?: { companyName?: string }
+): Array<{ email: string; username: string; password: string; requiresChange: boolean }> {
+  return users.map(user => {
+    const username = generateUsernameFromEmail(user.email);
+    const { password, requiresChange } = generatePasswordFromTemplate(templateId, {
+      ...context,
+      email: user.email,
+      username
+    });
+    
+    return {
+      email: user.email,
+      username,
+      password,
+      requiresChange
+    };
+  });
 }

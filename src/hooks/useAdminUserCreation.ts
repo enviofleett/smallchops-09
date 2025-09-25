@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  generatePasswordFromTemplate, 
+  generateUsernameFromEmail, 
+  DEFAULT_PASSWORD_TEMPLATES,
+  generateBulkPasswords,
+  type PasswordTemplate 
+} from '@/lib/secure-password-utils';
 
 interface CreateAdminUserParams {
   email: string;
@@ -8,6 +15,9 @@ interface CreateAdminUserParams {
   immediate_password?: string;
   send_email?: boolean;
   admin_created?: boolean;
+  username?: string;
+  password_template?: string;
+  requires_password_change?: boolean;
 }
 
 interface AdminUserCreationResponse {
@@ -149,27 +159,80 @@ export const useAdminUserCreation = () => {
   };
 
   const generateSecurePassword = (): string => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let password = '';
-    
-    // Ensure we have at least one of each type
-    password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // Uppercase
-    password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // Lowercase
-    password += '0123456789'[Math.floor(Math.random() * 10)]; // Number
-    password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // Special
-    
-    // Fill the rest randomly
-    for (let i = 4; i < 14; i++) {
-      password += chars[Math.floor(Math.random() * chars.length)];
+    return generatePasswordFromTemplate('secure_random').password;
+  };
+
+  const generateUsernameFromEmailAddr = (email: string, format: 'full' | 'initials' | 'firstname' = 'full'): string => {
+    return generateUsernameFromEmail(email, format);
+  };
+
+  const generatePasswordWithTemplate = (templateId: string, context?: { companyName?: string; email?: string; username?: string }) => {
+    return generatePasswordFromTemplate(templateId, context);
+  };
+
+  const getPasswordTemplates = (): PasswordTemplate[] => {
+    return DEFAULT_PASSWORD_TEMPLATES;
+  };
+
+  const createBulkAdminUsers = async (
+    users: Array<{ email: string; role?: 'admin' | 'user' }>,
+    options?: {
+      templateId?: string;
+      companyName?: string;
+      sendEmail?: boolean;
     }
-    
-    // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+  ): Promise<{ success: boolean; results: Array<{ email: string; success: boolean; error?: string; username?: string; password?: string }> }> => {
+    const results = [];
+    const passwords = generateBulkPasswords(
+      users,
+      options?.templateId || 'secure_random',
+      { companyName: options?.companyName }
+    );
+
+    for (let i = 0; i < users.length; i++) {
+      const user = users[i];
+      const passwordInfo = passwords[i];
+      
+      try {
+        const result = await createAdminUser({
+          email: user.email,
+          role: user.role || 'admin',
+          immediate_password: passwordInfo.password,
+          username: passwordInfo.username,
+          requires_password_change: passwordInfo.requiresChange,
+          send_email: options?.sendEmail ?? true,
+          admin_created: true
+        });
+
+        results.push({
+          email: user.email,
+          success: result.success,
+          error: result.error,
+          username: passwordInfo.username,
+          password: passwordInfo.password
+        });
+      } catch (error: any) {
+        results.push({
+          email: user.email,
+          success: false,
+          error: error.message || 'Failed to create user'
+        });
+      }
+    }
+
+    return {
+      success: results.every(r => r.success),
+      results
+    };
   };
 
   return {
     createAdminUser,
     generateSecurePassword,
+    generateUsernameFromEmailAddr,
+    generatePasswordWithTemplate,
+    getPasswordTemplates,
+    createBulkAdminUsers,
     isCreating
   };
 };

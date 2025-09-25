@@ -292,6 +292,27 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
                 </div>
                 
                 <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Customer Selected Date:</span>
+                  <span className="text-sm text-foreground font-medium">
+                    {(() => {
+                      // Show the exact date chosen by customer during checkout
+                      const customerSelectedDate = deliverySchedule?.delivery_date || deliverySchedule?.scheduled_date;
+                      
+                      if (customerSelectedDate) {
+                        try {
+                          return format(new Date(customerSelectedDate), 'EEEE, MMMM d, yyyy');
+                        } catch (error) {
+                          console.error('Error formatting customer selected date:', error);
+                          return customerSelectedDate; // Fallback to raw date string
+                        }
+                      }
+                      
+                      return 'Not selected yet';
+                    })()}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Business Day:</span>
                   <span className="text-sm text-foreground">
                     {(() => {

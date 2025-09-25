@@ -4890,6 +4890,7 @@ export type Database = {
           order_id: string
           rider_id: string
           status: string
+          updated_at: string | null
         }
         Insert: {
           accepted_at?: string | null
@@ -4904,6 +4905,7 @@ export type Database = {
           order_id: string
           rider_id: string
           status?: string
+          updated_at?: string | null
         }
         Update: {
           accepted_at?: string | null
@@ -4918,6 +4920,7 @@ export type Database = {
           order_id?: string
           rider_id?: string
           status?: string
+          updated_at?: string | null
         }
         Relationships: [
           {

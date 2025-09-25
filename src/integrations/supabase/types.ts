@@ -10764,8 +10764,8 @@ export type Database = {
       log_customer_operation: {
         Args: {
           p_admin_id?: string
-          p_changes?: Json
           p_customer_id: string
+          p_details: Json
           p_ip_address?: unknown
           p_operation: string
           p_user_agent?: string

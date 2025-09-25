@@ -55,18 +55,49 @@ export const useEnvironmentConfig = () => {
         throw new Error(error.message);
       }
 
-      if (data.success) {
+      if (data && data.success && data.data) {
         setConfig(data.data.environment);
         setPaymentIntegration(data.data.paymentIntegration);
         setActiveKeys(data.data.activeKeys);
       } else {
-        throw new Error(data.error || 'Failed to load configuration');
+        // Handle case where data structure is unexpected
+        console.warn('Environment config data structure unexpected:', data);
+        throw new Error(data?.error || 'Invalid configuration data received');
       }
     } catch (error) {
       console.error('Failed to load environment configuration:', error);
+      
+      // Set default fallback data to prevent undefined access errors
+      setConfig({
+        environment: 'development',
+        isLiveMode: false,
+        webhookUrl: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      setPaymentIntegration({
+        provider: 'paystack',
+        publicKey: '',
+        secretKey: '',
+        livePublicKey: '',
+        liveSecretKey: '',
+        webhookSecret: '',
+        liveWebhookSecret: '',
+        testMode: true,
+        connectionStatus: 'not_configured',
+        environment: 'development'
+      });
+      
+      setActiveKeys({
+        publicKey: '',
+        testMode: true,
+        environment: 'development'
+      });
+      
       toast({
         title: "Configuration Error",
-        description: "Failed to load environment configuration",
+        description: "Using fallback configuration. Please check your environment setup.",
         variant: "destructive",
       });
     } finally {

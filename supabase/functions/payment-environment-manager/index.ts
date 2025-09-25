@@ -18,7 +18,110 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Initialize Supabase client
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
+
   try {
+    // Handle GET requests - return configuration data
+    if (req.method === 'GET') {
+      console.log('[ENV-MANAGER] Getting environment configuration')
+      
+      // Get environment configuration
+      const { data: envConfig, error: envError } = await supabase
+        .from('environment_config')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      // Get payment integration configuration  
+      const { data: paymentConfig, error: paymentError } = await supabase
+        .from('payment_integrations')
+        .select('*')
+        .eq('provider', 'paystack')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      // Default configurations if none exist
+      const defaultEnvConfig = {
+        environment: 'development',
+        isLiveMode: false,
+        webhookUrl: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+
+      const defaultPaymentConfig = {
+        provider: 'paystack',
+        publicKey: '',
+        secretKey: '',
+        livePublicKey: '',
+        liveSecretKey: '',
+        webhookSecret: '',
+        liveWebhookSecret: '',
+        testMode: true,
+        connectionStatus: 'not_configured',
+        environment: 'development'
+      }
+
+      const environment = envConfig || defaultEnvConfig
+      const paymentIntegration = paymentConfig || defaultPaymentConfig
+
+      // Determine active keys based on mode
+      const isLiveMode = environment.environment === 'production'
+      const activeKeys = {
+        publicKey: isLiveMode ? paymentIntegration.livePublicKey || '' : paymentIntegration.publicKey || '',
+        testMode: !isLiveMode,
+        environment: environment.environment
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          environment,
+          paymentIntegration,
+          activeKeys
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Handle POST requests - save configuration
+    if (req.method === 'POST') {
+      console.log('[ENV-MANAGER] Saving environment configuration')
+      
+      const body = await req.json()
+      
+      // Update environment configuration
+      const { data: updatedEnv, error: envError } = await supabase
+        .from('environment_config')
+        .upsert({
+          environment: body.environment,
+          webhook_url: body.webhookUrl,
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (envError) {
+        throw new Error(`Failed to update environment config: ${envError.message}`)
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Configuration updated successfully',
+        data: updatedEnv
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Handle audit requests (default behavior)
     console.log('[ENV-MANAGER] Starting environment audit')
     
     const result: EnvironmentCheckResult = {
@@ -30,12 +133,6 @@ serve(async (req) => {
       critical_issues: [],
       warnings: []
     }
-
-    // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
 
     // Test database connectivity
     try {
@@ -181,13 +278,13 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('[ENV-MANAGER] Environment audit error:', error)
+    console.error('[ENV-MANAGER] Function error:', error)
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: 'Environment audit failed',
-        code: 'AUDIT_ERROR',
+        error: 'Function execution failed',
+        code: 'FUNCTION_ERROR',
         message: error.message
       }),
       { 

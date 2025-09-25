@@ -212,8 +212,10 @@ const PublicHome = () => {
         return false;
       }
 
-      // Search filter
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      // Search filter with null safety
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = (product.name || '').toLowerCase().includes(searchLower) || 
+        (product.description || '').toLowerCase().includes(searchLower);
 
       // Price filter
       const productPrice = product.discounted_price || product.price;

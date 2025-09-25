@@ -20,8 +20,9 @@ const CustomerFavorites = () => {
 
   // Filter favorites based on search and category
   const filteredFavorites = favorites.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = (product.name || '').toLowerCase().includes(searchLower) ||
+                         (product.description || '').toLowerCase().includes(searchLower);
     const matchesCategory = selectedCategory === 'all' || product.categories?.id === selectedCategory;
     return matchesSearch && matchesCategory;
   });

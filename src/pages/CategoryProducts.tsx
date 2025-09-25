@@ -92,10 +92,11 @@ const CategoryProductsContent = () => {
 
   // Filter and sort products - Lunch boxes and platters first in specific order, then by price - Production Ready
   const filteredAndSortedProducts = products
-    .filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter(product => {
+      const searchLower = searchTerm.toLowerCase();
+      return (product.name || '').toLowerCase().includes(searchLower) ||
+        (product.description || '').toLowerCase().includes(searchLower);
+    })
     .sort((a, b) => {
       // First, sort by lunch box priority
       const lunchPriorityA = getLunchBoxPriority(a.name);

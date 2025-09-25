@@ -454,8 +454,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const safeFallback = (value: any, fallback = 'Not provided') => {
     return value && value.toString().trim() ? value : fallback;
   };
-  return <AdaptiveDialog open={isOpen} onOpenChange={onClose} title={`Order Details - #${order.order_number}`} size="xl" className={cn("print:bg-white print:text-black print:shadow-none", "w-full max-w-none sm:max-w-6xl lg:max-w-7xl")}>
-      <div ref={printRef} className={cn("print:bg-white print:text-black print:p-8 print:font-sans", "print:max-w-none print:w-full print:shadow-none print:border-none")} id="order-details-modal-content">
+  return (
+    <>
+      <AdaptiveDialog open={isOpen} onOpenChange={onClose} title={`Order Details - #${order.order_number}`} size="xl" className={cn("print:bg-white print:text-black print:shadow-none", "w-full max-w-none sm:max-w-6xl lg:max-w-7xl")}>
+        <div ref={printRef} className={cn("print:bg-white print:text-black print:p-8 print:font-sans", "print:max-w-none print:w-full print:shadow-none print:border-none")} id="order-details-modal-content">
         {/* Print Header - Only visible in print */}
         <div className="hidden print:block print:mb-8 print:pb-4 print:border-b print:border-gray-300">
           <div className="text-center">
@@ -469,44 +471,47 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
         {/* Header Actions - Hidden in print */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2 mb-6 p-4 sm:p-6 print:hidden bg-muted/30 border-b">
-          <div className="flex flex-wrap items-center gap-2">
-            
-            <Button onClick={handleJobOrderPreview} variant="outline" size="sm" className="gap-2" aria-label="Preview job order">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Preview Job Order</span>
-            </Button>
-            
-            <Button 
-              onClick={handlePreviewThermalReceipt}
-              variant="outline" 
-              size="sm" 
-              className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50" 
-              aria-label="Preview 80mm thermal receipt"
-              title="Preview exactly how the receipt will look on 80mm thermal paper"
-            >
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">📄 Preview 80mm</span>
-              <span className="sm:hidden">Preview</span>
-            </Button>
-            
-            <Button 
-              onClick={handleAdminReceiptPrint}
-              variant="default" 
-              size="sm" 
-              className="gap-2 font-bold bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-800" 
-              aria-label="Print 80mm thermal receipt with bold, clear fonts"
-              title="Print optimized receipt for 80mm thermal printers with bold, clear fonts - Perfect for POS systems"
-            >
-              <Printer className="h-4 w-4 stroke-2" />
-              <span className="hidden sm:inline font-bold">🖨️ 80mm Thermal Print</span>
-              <span className="sm:hidden font-bold">Thermal</span>
-            </Button>
-            
-            <div className="hidden sm:flex items-center text-xs text-muted-foreground bg-blue-50 px-2 py-1 rounded border">
-              <span>📄 Compatible with 80mm thermal printers</span>
-            </div>
-            
-          </div>
+          <Button onClick={handleJobOrderPreview} variant="outline" size="sm" className="gap-2" aria-label="Preview job order">
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">Preview Job Order</span>
+          </Button>
+          
+          <Button 
+            onClick={handlePreviewThermalReceipt}
+            variant="outline" 
+            size="sm" 
+            className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50" 
+            aria-label="Preview 80mm thermal receipt"
+            title="Preview exactly how the receipt will look on 80mm thermal paper"
+          >
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">📄 Preview 80mm</span>
+            <span className="sm:hidden">Preview</span>
+          </Button>
+          
+          <Button 
+            onClick={handleAdminReceiptPrint}
+            variant="default" 
+            size="sm" 
+            className="gap-2 font-bold bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-800" 
+            aria-label="Print 80mm thermal receipt with bold, clear fonts"
+            title="Print optimized receipt for 80mm thermal printers with bold, clear fonts - Perfect for POS systems"
+          >
+            <Printer className="h-4 w-4 stroke-2" />
+            <span className="hidden sm:inline font-bold">🖨️ 80mm Thermal Print</span>
+            <span className="sm:hidden font-bold">Thermal</span>
+          </Button>
+          
+          <Button onClick={() => setShowDataSources(true)} variant="outline" size="sm" className="gap-2" aria-label="View data sources">
+            <ExternalLink className="h-4 w-4" />
+            <span className="hidden sm:inline">Data Sources</span>
+          </Button>
+          
+          <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2" aria-label="Print order details">
+            <Printer className="h-4 w-4" />
+            <span className="hidden sm:inline">Print</span>
+          </Button>
+        </div>
         </div>
 
         {/* Quick Stats Overview */}
@@ -639,45 +644,45 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           </div>
         </div>
       </div>
+    </AdaptiveDialog>
 
-      {/* Data Sources Modal */}
-      <AdaptiveDialog 
-        open={showDataSources} 
-        onOpenChange={setShowDataSources} 
-        title="Job Order Data Sources" 
-        size="xl"
-        className="max-w-4xl"
-      >
-        <JobOrderDataSources
-          order={order}
-          items={detailedOrderData?.items || enrichedItems || order.order_items || []}
-          deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
-          pickupPoint={pickupPoint}
-          detailedOrderData={detailedOrderData}
-          enrichedItems={enrichedItems}
-        />
+    {/* Data Sources Modal */}
+    <AdaptiveDialog
+      open={showDataSources} 
+      onOpenChange={setShowDataSources} 
+      title="Job Order Data Sources" 
+      size="xl"
+      className="max-w-4xl"
+    >
+      <JobOrderDataSources
+        order={order}
+        items={detailedOrderData?.items || enrichedItems || order.order_items || []}
+        deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+        pickupPoint={pickupPoint}
+        detailedOrderData={detailedOrderData}
+        enrichedItems={enrichedItems}
+      />
+    </AdaptiveDialog>
         
-        {/* 80mm Thermal Receipt Preview Modal */}
-        <ThermalReceiptPreview 
-          isOpen={isPreviewOpen}
-          onClose={closePreview}
-          onPrint={printFromPreview}
-          order={previewOrder}
-          deliverySchedule={previewDeliverySchedule}
-          businessInfo={previewBusinessInfo}
-        />
-        
-        {/* Job Order Preview Modal */}
-        <JobOrderPreview
-          isOpen={showJobOrderPreview}
-          onClose={closeJobOrderPreview}
-          onPrint={printFromJobOrderPreview}
-          order={order}
-          items={detailedOrderData?.items || enrichedItems || order.order_items || []}
-          deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
-          pickupPoint={pickupPoint}
-        />
-      </AdaptiveDialog>
-    </AdaptiveDialog>;
+    <ThermalReceiptPreview 
+      isOpen={isPreviewOpen}
+      onClose={closePreview}
+      onPrint={printFromPreview}
+      order={previewOrder}
+      deliverySchedule={previewDeliverySchedule}
+      businessInfo={previewBusinessInfo}
+    />
+    
+    <JobOrderPreview
+      isOpen={showJobOrderPreview}
+      onClose={closeJobOrderPreview}
+      onPrint={printFromJobOrderPreview}
+      order={order}
+      items={detailedOrderData?.items || enrichedItems || order.order_items || []}
+      deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+      pickupPoint={pickupPoint}
+    />
+    </>
+  );
 };
 export default OrderDetailsDialog;

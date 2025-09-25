@@ -163,10 +163,10 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
           </div>
         </div>
 
-        {/* Comprehensive Fulfillment Information - Production Ready */}
+        {/* Fulfillment Information Section - Production Ready */}
         <div>
           <SectionHeading 
-            title="Complete Fulfillment Information"
+            title="Fulfillment Information"
             icon={orderType === 'delivery' ? Truck : Package}
           />
           
@@ -179,240 +179,172 @@ export const OrderInfoCard: React.FC<OrderInfoCardProps> = ({
               )}
             </div>
           ) : (
-            <div className="space-y-4">
-              
-              {/* 1. Fulfillment Type - Always Available */}
-              <div className="bg-secondary/20 rounded-lg p-3">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-muted-foreground font-medium">Fulfillment Type:</span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {orderType === 'delivery' ? <Truck className="w-3 h-3 mr-1" /> : <Package className="w-3 h-3 mr-1" />}
-                      Available
-                    </Badge>
-                    <span className="font-semibold capitalize text-primary">
-                      {orderType}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <Badge variant="secondary" className="text-xs">
-                    <Database className="w-3 h-3 mr-1" />
-                    orders.order_type
-                  </Badge>
-                </div>
-              </div>
-
-              {/* 2. Location Information - Conditional Display */}
-              {orderType === 'pickup' ? (
-                <div className="bg-secondary/20 rounded-lg p-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-muted-foreground font-medium">Pickup Location:</span>
-                    <div className="flex items-start gap-2 text-right">
-                      <Badge variant={pickupPointData ? "outline" : "destructive"} className="text-xs">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        {pickupPointData ? 'Available' : 'Missing'}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  {pickupPointData ? (
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="font-medium text-primary">{pickupPointData.name}</span>
-                        <p className="text-xs text-muted-foreground">{pickupPointData.address}</p>
-                        {pickupPointData.contact_phone && (
-                          <p className="text-xs text-muted-foreground">📞 {pickupPointData.contact_phone}</p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-destructive">Pickup location not assigned</p>
-                  )}
-                  
-                  <div className="flex flex-wrap gap-1 mt-2">
+            <div className="bg-background rounded-lg p-4 border">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Fulfillment Type */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-medium text-foreground">Fulfillment Type</span>
                     <Badge variant="secondary" className="text-xs">
                       <Database className="w-3 h-3 mr-1" />
-                      pickup_points table via orders.pickup_point_id
+                      orders.order_type
                     </Badge>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {orderType === 'delivery' ? <Truck className="w-4 h-4 text-primary" /> : <Package className="w-4 h-4 text-primary" />}
+                    <span className="font-semibold capitalize text-primary">{orderType}</span>
+                  </div>
                 </div>
-              ) : (
-                <>
-                  {/* Delivery Address */}
-                  <div className="bg-secondary/20 rounded-lg p-3">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="text-muted-foreground font-medium">Delivery Address:</span>
-                      <div className="flex items-start gap-2 text-right">
-                        <Badge variant={deliveryAddress ? "outline" : "destructive"} className="text-xs">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {deliveryAddress ? 'Available' : 'Missing'}
-                        </Badge>
-                      </div>
+
+                {/* Pickup Point ID / Delivery Zone ID */}
+                {orderType === 'pickup' ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-medium text-foreground">Pickup Point</span>
+                      <Badge variant="secondary" className="text-xs">
+                        <Database className="w-3 h-3 mr-1" />
+                        pickup_points via orders.pickup_point_id
+                      </Badge>
                     </div>
                     <div className="text-sm">
-                      <span className="font-medium break-words">
-                        {formatAddress(deliveryAddress) || 'Delivery address not provided'}
-                      </span>
+                      {pickupPointData ? (
+                        <div>
+                          <span className="font-semibold text-primary">{pickupPointData.name}</span>
+                          <p className="text-muted-foreground text-xs mt-1">{pickupPointData.address}</p>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">No pickup point assigned</span>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-medium text-foreground">Delivery Zone</span>
+                      <Badge variant="secondary" className="text-xs">
+                        <Database className="w-3 h-3 mr-1" />
+                        delivery_zones via orders.delivery_zone_id
+                      </Badge>
+                    </div>
+                    <div className="text-sm">
+                      {deliveryZoneData ? (
+                        <span className="font-semibold text-primary">{deliveryZoneData.name}</span>
+                      ) : (
+                        <span className="text-muted-foreground">No delivery zone assigned</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Delivery Address (only for delivery orders) */}
+                {orderType === 'delivery' && (
+                  <div className="md:col-span-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-medium text-foreground">Delivery Address</span>
                       <Badge variant="secondary" className="text-xs">
                         <Database className="w-3 h-3 mr-1" />
                         orders.delivery_address
                       </Badge>
                     </div>
-                  </div>
-
-                  {/* Delivery Zone */}
-                  <div className="bg-secondary/20 rounded-lg p-3">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="text-muted-foreground font-medium">Delivery Zone:</span>
-                      <div className="flex items-start gap-2 text-right">
-                        <Badge variant={deliveryZoneData ? "outline" : "destructive"} className="text-xs">
-                          <Navigation className="w-3 h-3 mr-1" />
-                          {deliveryZoneData ? 'Available' : 'Missing'}
-                        </Badge>
-                      </div>
-                    </div>
                     <div className="text-sm">
-                      <span className="font-medium">
-                        {deliveryZoneData?.name || 'Zone not assigned'}
+                      <span className="font-medium break-words">
+                        {formatAddress(deliveryAddress) || <span className="text-muted-foreground">No delivery address provided</span>}
                       </span>
-                      {deliveryZoneData && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Status: {deliveryZoneData.is_active ? 'Active' : 'Inactive'}
-                        </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Delivery/Pickup Date */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-medium text-foreground">{orderType === 'delivery' ? 'Delivery' : 'Pickup'} Date</span>
+                    <Badge variant="secondary" className="text-xs">
+                      <Database className="w-3 h-3 mr-1" />
+                      order_delivery_schedule.delivery_date
+                    </Badge>
+                  </div>
+                  <div className="text-sm">
+                    {deliverySchedule?.delivery_date ? (
+                      <span className="font-semibold text-primary">
+                        {format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')}
+                      </span>
+                    ) : order?.pickup_time ? (
+                      <span className="font-semibold text-primary">
+                        {format(new Date(order.pickup_time), 'MMM d, yyyy')}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Not scheduled</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Time Window */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-medium text-foreground">Time Window</span>
+                    <Badge variant="secondary" className="text-xs">
+                      <Database className="w-3 h-3 mr-1" />
+                      order_delivery_schedule.delivery_time_start/end
+                    </Badge>
+                  </div>
+                  <div className="text-sm">
+                    {deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end ? (
+                      <span className="font-semibold text-primary">
+                        {deliverySchedule.delivery_time_start.substring(0, 5)} – {deliverySchedule.delivery_time_end.substring(0, 5)}
+                      </span>
+                    ) : order?.pickup_time ? (
+                      <span className="font-semibold text-primary">
+                        {format(new Date(order.pickup_time), 'HH:mm')}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Not specified</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Schedule Flexibility */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-medium text-foreground">Schedule Flexibility</span>
+                    <Badge variant="secondary" className="text-xs">
+                      <Database className="w-3 h-3 mr-1" />
+                      order_delivery_schedule.is_flexible
+                    </Badge>
+                  </div>
+                  <div className="text-sm">
+                    {deliverySchedule?.is_flexible !== undefined ? (
+                      <span className="font-semibold text-primary">
+                        {deliverySchedule.is_flexible ? 'Flexible timing' : 'Fixed timing'}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Not specified</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Special Instructions */}
+                <div className="md:col-span-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-medium text-foreground">Special Instructions</span>
+                    <Badge variant="secondary" className="text-xs">
+                      <Database className="w-3 h-3 mr-1" />
+                      order_delivery_schedule.special_instructions
+                    </Badge>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-3">
+                    <div className="text-sm">
+                      {deliverySchedule?.special_instructions || order?.special_instructions || specialInstructions ? (
+                        <span className="font-medium">
+                          {deliverySchedule?.special_instructions || order?.special_instructions || specialInstructions}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">No special instructions provided</span>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      <Badge variant="secondary" className="text-xs">
-                        <Database className="w-3 h-3 mr-1" />
-                        delivery_zones table via orders.delivery_zone_id
-                      </Badge>
-                    </div>
                   </div>
-                </>
-              )}
+                </div>
 
-              {/* 3. Schedule Information */}
-              <div className="bg-secondary/20 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-muted-foreground font-medium">{orderType === 'delivery' ? 'Delivery' : 'Pickup'} Schedule:</span>
-                  <Badge variant={deliverySchedule?.delivery_date ? "outline" : "destructive"} className="text-xs">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {deliverySchedule?.delivery_date ? "Scheduled" : "Pending"}
-                  </Badge>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="font-medium text-muted-foreground">Date:</span>
-                    <p className="font-semibold">
-                      {deliverySchedule?.delivery_date 
-                        ? format(new Date(deliverySchedule.delivery_date), 'MMM d, yyyy')
-                        : order?.pickup_time
-                        ? format(new Date(order.pickup_time), 'MMM d, yyyy')
-                        : 'Not scheduled'
-                      }
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-muted-foreground">Time Window:</span>
-                    <p className="font-semibold">
-                      {deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end 
-                        ? `${deliverySchedule.delivery_time_start.substring(0, 5)} - ${deliverySchedule.delivery_time_end.substring(0, 5)}`
-                        : order?.pickup_time
-                        ? format(new Date(order.pickup_time), 'HH:mm')
-                        : 'TBD'
-                      }
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-muted-foreground">Flexibility:</span>
-                    <p className="font-semibold">
-                      {deliverySchedule?.is_flexible !== undefined 
-                        ? (deliverySchedule.is_flexible ? 'Flexible' : 'Fixed')
-                        : 'Not specified'
-                      }
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-muted-foreground">Requested:</span>
-                    <p className="font-semibold">
-                      {deliverySchedule?.requested_at 
-                        ? format(new Date(deliverySchedule.requested_at), 'MMM d, HH:mm')
-                        : 'N/A'
-                      }
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-wrap gap-1 mt-2">
-                  <Badge variant="secondary" className="text-xs">
-                    <Database className="w-3 h-3 mr-1" />
-                    order_delivery_schedule table | orders.pickup_time
-                  </Badge>
-                </div>
-              </div>
-
-              {/* 4. Special Instructions - Comprehensive Display */}
-              <div className="bg-secondary/20 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-muted-foreground font-medium">Special Instructions:</span>
-                  <Badge variant="outline" className="text-xs">
-                    {(specialInstructions || deliverySchedule?.special_instructions || order?.special_instructions) ? 'Available' : 'None'}
-                  </Badge>
-                </div>
-                
-                <div className="space-y-3">
-                  {/* Order-Level Instructions */}
-                  <div className="border border-muted rounded-lg p-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-medium text-muted-foreground">ORDER INSTRUCTIONS:</span>
-                      <Badge variant="secondary" className="text-xs">
-                        <Database className="w-3 h-3 mr-1" />
-                        orders.special_instructions
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-foreground">
-                      {specialInstructions || order?.special_instructions || 'No order-level instructions provided'}
-                    </p>
-                  </div>
-
-                  {/* Schedule-Level Instructions */}
-                  <div className="border border-muted rounded-lg p-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-medium text-muted-foreground">SCHEDULE INSTRUCTIONS:</span>
-                      <Badge variant="secondary" className="text-xs">
-                        <Database className="w-3 h-3 mr-1" />
-                        order_delivery_schedule.special_instructions
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-foreground">
-                      {deliverySchedule?.special_instructions || 'No schedule-specific instructions provided'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 5. Production Data Summary */}
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <Database className="w-4 h-4 text-primary" />
-                  <span className="font-medium text-primary">Checkout Data Summary</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="space-y-1">
-                    <p><span className="font-medium">Fulfillment Type:</span> {orderType}</p>
-                    <p><span className="font-medium">Pickup Point ID:</span> {(order as any)?.pickup_point_id || 'N/A'}</p>
-                    <p><span className="font-medium">Delivery Zone ID:</span> {(order as any)?.delivery_zone_id || 'N/A'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p><span className="font-medium">Schedule Date:</span> {deliverySchedule?.delivery_date || 'N/A'}</p>
-                    <p><span className="font-medium">Time Start:</span> {deliverySchedule?.delivery_time_start || 'N/A'}</p>
-                    <p><span className="font-medium">Time End:</span> {deliverySchedule?.delivery_time_end || 'N/A'}</p>
-                  </div>
-                </div>
               </div>
             </div>
           )}

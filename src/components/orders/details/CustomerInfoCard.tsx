@@ -248,51 +248,132 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
             </div>
           )}
 
-          {/* Delivery Schedule Fulfillment (for delivery orders) */}
+          {/* Delivery Schedule & Fulfillment Logic */}
           {orderType === 'delivery' && (
             <div className="pt-3 border-t border-border space-y-3">
               <div className="flex items-center gap-2">
                 <Truck className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Delivery Schedule Fulfillment
+                  Complete Delivery Schedule & Fulfillment
                 </span>
               </div>
-              <div className="ml-6 space-y-2">
-                {/* Comprehensive Checkout Information */}
+              <div className="ml-6 space-y-4">
+                {/* Fulfillment Channel & Status */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Channel:</span>
-                  <Badge variant="outline">Delivery</Badge>
+                  <span className="text-sm text-muted-foreground">Fulfillment Channel:</span>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    🚚 Delivery Service
+                  </Badge>
                 </div>
-                
-                {/* Customer's Preferred Delivery Date */}
+
+                {/* Schedule Status Indicator */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Customer Selected Date:</span>
-                  <span className="text-sm text-foreground font-medium">
-                    {(() => {
-                      const customerSelectedDate = deliverySchedule?.delivery_date || deliverySchedule?.scheduled_date;
-                      
-                      if (customerSelectedDate) {
-                        try {
-                          return format(new Date(customerSelectedDate), 'EEEE, MMMM d, yyyy');
-                        } catch (error) {
-                          console.error('Error formatting customer selected date:', error);
-                          return customerSelectedDate;
+                  <span className="text-sm text-muted-foreground">Schedule Status:</span>
+                  <Badge variant={deliverySchedule ? "default" : "secondary"}>
+                    {deliverySchedule ? "✅ Scheduled" : "⏳ Pending Schedule"}
+                  </Badge>
+                </div>
+
+                {deliverySchedule && (
+                  <>
+                    {/* Schedule Request Timestamp */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Schedule Requested:</span>
+                      <span className="text-xs text-muted-foreground">
+                        {deliverySchedule.requested_at ? 
+                          format(new Date(deliverySchedule.requested_at), 'MMM d, yyyy • h:mm a') : 
+                          'During checkout'
                         }
-                      }
-                      
-                      return 'Not selected during checkout';
-                    })()}
-                  </span>
-                </div>
-                
-                {/* Customer's Preferred Time Window */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Preferred Time Window:</span>
-                  <div className="text-right">
-                    <div className="text-sm text-foreground">{formatTimeWindow()}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {deliverySchedule?.is_flexible ? '🔄 Customer chose flexible timing' : '⏰ Customer chose fixed window'}
+                      </span>
                     </div>
+
+                    {/* Customer's Selected Date */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Customer Selected Date:</span>
+                      <span className="text-sm text-foreground font-medium">
+                        {(() => {
+                          const selectedDate = deliverySchedule.delivery_date || deliverySchedule.scheduled_date;
+                          if (selectedDate) {
+                            try {
+                              const date = new Date(selectedDate);
+                              const today = new Date();
+                              const isToday = date.toDateString() === today.toDateString();
+                              const isTomorrow = date.toDateString() === new Date(today.getTime() + 86400000).toDateString();
+                              
+                              if (isToday) return `${format(date, 'EEEE, MMM d')} (Today)`;
+                              if (isTomorrow) return `${format(date, 'EEEE, MMM d')} (Tomorrow)`;
+                              return format(date, 'EEEE, MMMM d, yyyy');
+                            } catch (error) {
+                              return selectedDate;
+                            }
+                          }
+                          return 'Not specified';
+                        })()}
+                      </span>
+                    </div>
+
+                    {/* Time Window Selection */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Time Window:</span>
+                      <div className="text-right">
+                        <div className="text-sm text-foreground font-medium">{formatTimeWindow()}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          {deliverySchedule.is_flexible ? (
+                            <>🔄 Flexible timing requested</>
+                          ) : (
+                            <>⏰ Fixed window preferred</>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Business Day Info */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Business Day:</span>
+                      <span className="text-sm text-foreground">
+                        {(() => {
+                          const selectedDate = deliverySchedule.delivery_date || deliverySchedule.scheduled_date;
+                          if (selectedDate) {
+                            try {
+                              return format(new Date(selectedDate), 'EEEE');
+                            } catch (error) {
+                              return 'Unknown';
+                            }
+                          }
+                          return format(new Date(), 'EEEE');
+                        })()}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* Delivery Priority & Urgency */}
+                <div className="pt-2 border-t border-border/50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Delivery Priority:</span>
+                    <Badge variant={(() => {
+                      if (!deliverySchedule?.delivery_date) return "secondary";
+                      const deliveryDate = new Date(deliverySchedule.delivery_date);
+                      const today = new Date();
+                      const isToday = deliveryDate.toDateString() === today.toDateString();
+                      const isTomorrow = deliveryDate.toDateString() === new Date(today.getTime() + 86400000).toDateString();
+                      
+                      if (isToday) return "destructive";
+                      if (isTomorrow) return "default";
+                      return "secondary";
+                    })()} className="text-xs">
+                      {(() => {
+                        if (!deliverySchedule?.delivery_date) return "⏳ Standard";
+                        const deliveryDate = new Date(deliverySchedule.delivery_date);
+                        const today = new Date();
+                        const isToday = deliveryDate.toDateString() === today.toDateString();
+                        const isTomorrow = deliveryDate.toDateString() === new Date(today.getTime() + 86400000).toDateString();
+                        
+                        if (isToday) return "🚨 Same Day";
+                        if (isTomorrow) return "⚡ Next Day";
+                        return "📅 Scheduled";
+                      })()}
+                    </Badge>
                   </div>
                 </div>
                 

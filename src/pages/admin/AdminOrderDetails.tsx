@@ -153,6 +153,13 @@ const AdminOrderDetails: React.FC = () => {
               orderType={order.order_type}
               deliveryAddress={order.delivery_address}
               pickupPoint={undefined}
+              order={{
+                status: order.status,
+                payment_status: order.payment_status,
+                order_time: order.order_time,
+                order_number: order.order_number
+              }}
+              deliverySchedule={delivery_schedule}
             />
             
             <OrderInfoCard

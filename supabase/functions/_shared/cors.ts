@@ -125,3 +125,10 @@ export function validateOrigin(origin?: string | null): boolean {
          PAYSTACK_DOMAINS.includes(origin) ||
          (shouldCheckDevPatterns && DEV_PATTERNS.some(pattern => pattern.test(origin)));
 }
+
+// Backward compatibility: Basic CORS headers for simple cases
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+};

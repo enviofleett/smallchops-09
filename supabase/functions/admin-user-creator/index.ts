@@ -74,7 +74,7 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Check if user already exists
+    // Check if user already exists in auth and profiles
     try {
       const { data: existingUsers } = await supabase.auth.admin.listUsers()
       const userExists = existingUsers?.users?.find(u => 
@@ -83,6 +83,22 @@ serve(async (req) => {
       
       if (userExists) {
         console.log('[ADMIN-CREATOR] User already exists:', body.email)
+        return new Response(JSON.stringify({ 
+          success: false, 
+          code: 'USER_EXISTS',
+          error: 'A user with this email already exists' 
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      // Also check if profile already exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', body.email.toLowerCase())
+        .maybeSingle()
+      
+      if (existingProfile) {
+        console.log('[ADMIN-CREATOR] Profile already exists:', body.email)
         return new Response(JSON.stringify({ 
           success: false, 
           code: 'USER_EXISTS',
@@ -128,22 +144,38 @@ serve(async (req) => {
       }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Create profile
+    // Create profile with upsert to handle edge cases
     const { error: profileError } = await supabase
       .from('profiles')
-      .insert({
+      .upsert({
         id: newUser.user.id,
-        name: body.email.split('@')[0],
+        name: body.username || body.email.split('@')[0],
         email: body.email,
         role: body.role,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
       })
 
     if (profileError) {
       console.error('[ADMIN-CREATOR] Profile creation failed:', profileError)
-      // Cleanup user if profile creation fails
+      
+      // Check if it's a duplicate key error
+      if (profileError.code === '23505') {
+        console.log('[ADMIN-CREATOR] Profile already exists, cleaning up auth user')
+        await supabase.auth.admin.deleteUser(newUser.user.id)
+        
+        return new Response(JSON.stringify({ 
+          success: false, 
+          code: 'USER_EXISTS',
+          error: 'A user with this email already exists' 
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      
+      // Cleanup user if profile creation fails for other reasons
       await supabase.auth.admin.deleteUser(newUser.user.id)
       
       return new Response(JSON.stringify({ 

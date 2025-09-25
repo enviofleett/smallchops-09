@@ -79,22 +79,31 @@ export const CreateAdminDialog = ({
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !role) {
+    
+    // Enhanced validation
+    if (!email?.trim()) {
       return;
     }
-    if (useImmediateAccess && !immediatePassword) {
+    
+    if (!role) {
       return;
     }
+    
+    if (useImmediateAccess && !immediatePassword?.trim()) {
+      return;
+    }
+    
     const result = await createAdminUser({
-      email,
+      email: email.trim(),
       role: role as 'admin' | 'user',
       immediate_password: useImmediateAccess ? immediatePassword : undefined,
-      username: username || generateUsernameFromEmailAddr(email, usernameFormat),
+      username: username?.trim() || generateUsernameFromEmailAddr(email, usernameFormat),
       password_template: passwordTemplate,
       requires_password_change: requiresPasswordChange,
       send_email: sendEmail,
       admin_created: true
     });
+    
     if (result.success) {
       // Reset form and close dialog
       setEmail('');
@@ -263,7 +272,7 @@ export const CreateAdminDialog = ({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isCreating}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!email || !role || isCreating}>
+            <Button type="submit" disabled={!email?.trim() || !role || (useImmediateAccess && !immediatePassword?.trim()) || isCreating}>
               {isCreating ? 'Creating Admin...' : 'Create Admin User'}
             </Button>
           </DialogFooter>

@@ -137,12 +137,31 @@ function AdminOrdersContent() {
   const deliverySchedules = useMemo(() => {
     const scheduleMap: Record<string, any> = {};
     orders.forEach((order: any) => {
-      if (order.delivery_schedule) {
-        scheduleMap[order.id] = order.delivery_schedule;
+      // Handle both embedded and separate schedule data structures
+      const schedule = order.delivery_schedule || 
+                      (order.order_delivery_schedule?.[0]) ||
+                      order.order_delivery_schedule;
+      if (schedule) {
+        scheduleMap[order.id] = schedule;
       }
     });
     return scheduleMap;
   }, [orders]);
+
+  // Add error logging for missing schedules
+  useEffect(() => {
+    const missingSchedules = orders.filter(order => 
+      order.order_type === 'delivery' && 
+      order.status === 'confirmed' && 
+      !deliverySchedules[order.id]
+    );
+
+    if (missingSchedules.length > 0) {
+      console.warn('Orders missing delivery schedules:', 
+        missingSchedules.map(o => o.order_number || o.id)
+      );
+    }
+  }, [orders, deliverySchedules]);
 
   // Priority sort and filter orders for production
   const prioritySortedOrders = useMemo(() => {

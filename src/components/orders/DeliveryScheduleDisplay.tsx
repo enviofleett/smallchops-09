@@ -21,6 +21,21 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
   orderStatus = 'pending',
   className = "" 
 }) => {
+  // Validate schedule data
+  const isValidSchedule = (schedule: any) => {
+    return schedule && 
+           schedule.delivery_date && 
+           schedule.delivery_time_start && 
+           schedule.delivery_time_end;
+  };
+
+  if (!schedule || !isValidSchedule(schedule)) {
+    return (
+      <div className="text-gray-500 p-4 border border-gray-200 rounded-lg">
+        No delivery schedule available
+      </div>
+    );
+  }
   const { validation, loading } = useEnhancedDeliverySchedule(schedule);
   const formatTime = (timeString: string) => {
     if (!timeString) return '';

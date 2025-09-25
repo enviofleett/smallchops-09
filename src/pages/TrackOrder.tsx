@@ -47,7 +47,38 @@ export default function TrackOrder() {
       return;
     }
 
-    // Production-ready: Auto-populate for recent guest checkout completions
+    // Check for guest session tracking data first
+    if (!orderFromUrl && !searchValue) {
+      try {
+        const guestTracking = sessionStorage.getItem('guestOrderTracking');
+        if (guestTracking) {
+          const trackingData = JSON.parse(guestTracking);
+          const isRecent = Date.now() - trackingData.timestamp < 10 * 60 * 1000; // 10 minutes
+          
+          if (isRecent && trackingData.orderNumber) {
+            setSearchValue(trackingData.orderNumber);
+            setOrderIdentifier(trackingData.orderNumber);
+            trackOrder(trackingData.orderNumber);
+            
+            toast.success(`Welcome back! Tracking your order: ${trackingData.orderNumber}`, {
+              description: 'From your recent purchase'
+            });
+            
+            // Clean up session data after use
+            sessionStorage.removeItem('guestOrderTracking');
+            return;
+          } else {
+            // Clean up expired data
+            sessionStorage.removeItem('guestOrderTracking');
+          }
+        }
+      } catch (error) {
+        console.warn('Error parsing guest tracking data:', error);
+        sessionStorage.removeItem('guestOrderTracking');
+      }
+    }
+
+    // Production-ready: Auto-populate for recent guest checkout completions (fallback)
     if (!orderFromUrl && !searchValue) {
       const guestOrder = getRecentGuestOrder(5); // 5 minute window
       
@@ -210,17 +241,26 @@ export default function TrackOrder() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSearch} className="flex gap-4">
-                <Input
-                  type="text"
-                  placeholder="Enter order number (e.g., ORD-12345) or order ID"
-                  value={searchValue}
-                  onChange={(e) => setSearchValue(e.target.value)}
-                  className="flex-1"
-                />
-                <Button type="submit" disabled={loading || !searchValue.trim()}>
-                  {loading ? 'Searching...' : 'Track Order'}
-                </Button>
+              <form onSubmit={handleSearch} className="space-y-4">
+                <div className="flex gap-4">
+                  <Input
+                    type="text"
+                    placeholder="Enter order number (e.g., ORD-12345) or order ID"
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    className="flex-1"
+                    autoFocus
+                  />
+                  <Button type="submit" disabled={loading || !searchValue.trim()}>
+                    {loading ? 'Searching...' : 'Track Order'}
+                  </Button>
+                </div>
+                
+                {/* Guest Helper Text */}
+                <div className="text-sm text-muted-foreground">
+                  <p>💡 <strong>Tip:</strong> Your order number was sent to your email after payment.</p>
+                  <p>Can't find your order number? Check your email or contact support.</p>
+                </div>
               </form>
             </CardContent>
           </Card>

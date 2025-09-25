@@ -224,11 +224,29 @@ export default function PaymentSuccess() {
       if (userContext === 'customer') {
         navigate('/customer-profile');
       } else {
-        // For guests, navigate to track order with parameters
-        const params = new URLSearchParams();
-        if (orderData?.order_number) params.set('order', orderData.order_number);
-        if (orderData?.order_id) params.set('id', orderData.order_id);
-        navigate(`/track-order?${params.toString()}`);
+        // For guests, store tracking data and navigate to track order
+        if (orderData?.order_number || orderData?.order_id) {
+          // Store order tracking data for immediate access
+          const trackingData = {
+            orderNumber: orderData.order_number,
+            orderNumberFormatted: orderData.order_number,
+            orderIdUUID: orderData.order_id,
+            timestamp: Date.now()
+          };
+          
+          // Store in session storage for immediate access
+          sessionStorage.setItem('guestOrderTracking', JSON.stringify(trackingData));
+          
+          // Navigate with parameters for immediate tracking
+          const params = new URLSearchParams();
+          if (orderData.order_number) params.set('order', orderData.order_number);
+          else if (orderData.order_id) params.set('id', orderData.order_id);
+          
+          navigate(`/track-order?${params.toString()}`);
+        } else {
+          // Fallback if no order data
+          navigate('/track-order');
+        }
       }
     } else {
       navigate('/');
@@ -304,17 +322,17 @@ export default function PaymentSuccess() {
                     onClick={handleContinue}
                     className="w-full"
                   >
-                    {userContext === 'customer' ? (
-                      <>
-                        <User className="h-4 w-4 mr-2" />
-                        View My Orders
-                      </>
-                    ) : (
-                      <>
-                        <Search className="h-4 w-4 mr-2" />
-                        Track This Order
-                      </>
-                    )}
+                  {userContext === 'customer' ? (
+                    <>
+                      <User className="h-4 w-4 mr-2" />
+                      View My Orders
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Track Order {orderData?.order_number ? orderData.order_number : ''}
+                    </>
+                  )}
                   </Button>
                   <Button 
                     onClick={() => navigate('/')}

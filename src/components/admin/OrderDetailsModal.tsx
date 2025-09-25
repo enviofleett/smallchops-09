@@ -10,6 +10,7 @@ import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { ResponsiveCard } from '@/components/layout/ResponsiveCard';
 import { ResponsiveGrid } from '@/components/layout/ResponsiveGrid';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { ComprehensiveOrderFulfillment } from '@/components/orders/details/ComprehensiveOrderFulfillment';
 import { 
   MapPin, 
   Clock, 
@@ -147,7 +148,13 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Status Section - Mobile Optimized */}
+            {/* Comprehensive Order Fulfillment Details */}
+            <ComprehensiveOrderFulfillment 
+              data={detailedOrderData}
+              isLoading={isLoadingDetailed}
+            />
+
+            {/* Status Section - Mobile Optimized */}
           <div className="px-4 md:px-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Status Card */}

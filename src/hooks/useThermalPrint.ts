@@ -9,8 +9,6 @@ interface BusinessInfo {
   admin_notification_email?: string;
   whatsapp_support_number?: string;
   logo_url?: string;
-  printed_by?: string;
-  printed_on?: string;
 }
 
 export const useThermalPrint = () => {
@@ -219,16 +217,6 @@ export const useThermalPrint = () => {
             <div>Starters Small Chops</div>
             ${receiptContent.adminEmail ? 
               `<div>${receiptContent.adminEmail}</div>` : ''}
-            
-            <div class="divider">================================</div>
-            
-            ${businessInfo?.printed_by ? `
-              <div class="admin-print-info" style="font-size: 7px; margin-top: 4px;">
-                <div style="font-weight: bold;">Printed by: ${businessInfo.printed_by}</div>
-                ${businessInfo.printed_on ? 
-                  `<div>On: ${businessInfo.printed_on}</div>` : ''}
-              </div>
-            ` : ''}
           </div>
         </div>
       `;

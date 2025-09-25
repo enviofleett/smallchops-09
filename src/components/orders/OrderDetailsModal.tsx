@@ -4,7 +4,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -144,17 +143,14 @@ export function OrderDetailsModal({
             <DialogTitle className="flex items-center gap-3">
               <StatusIcon className={`h-5 w-5 ${statusConfig.iconColor}`} />
               Order #{order.order_number}
+              <Badge className={statusConfig.className}>
+                {statusConfig.label}
+              </Badge>
             </DialogTitle>
-            <DialogDescription className="sr-only">
-              View detailed information about this order including customer details, items, and payment status
-            </DialogDescription>
-            <Badge className={statusConfig.className}>
-              {statusConfig.label}
-            </Badge>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="absolute right-4 top-4">
-            <X className="h-4 w-4" />
-          </Button>
         </DialogHeader>
 
         <div className="space-y-6">

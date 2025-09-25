@@ -50,11 +50,10 @@ const Customers = () => {
   }
 
   const filteredCustomers = allCustomers.filter((customer) => {
-    // Search term filter with null safety
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = (customer.name || '').toLowerCase().includes(searchLower) ||
-      (customer.email || '').toLowerCase().includes(searchLower) ||
-      (customer.phone || '').toLowerCase().includes(searchLower);
+    // Search term filter
+    const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.phone && customer.phone.toLowerCase().includes(searchTerm.toLowerCase()));
     
     // Customer type filter
     const matchesType = customerTypeFilter === 'all' || 

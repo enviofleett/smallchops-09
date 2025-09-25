@@ -1293,7 +1293,7 @@ import { FavoritesEmptyState } from '@/components/favorites/FavoritesEmptyState'
                           <div className="bg-muted/50 p-3 rounded text-xs">
                             <pre>{`// Advanced filtering within favorites
 const filteredFavorites = favorites.filter(favorite => {
-  const matchesSearch = (favorite.name || '')
+  const matchesSearch = favorite.name
     .toLowerCase()
     .includes(searchQuery.toLowerCase());
   

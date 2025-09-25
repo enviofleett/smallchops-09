@@ -306,15 +306,19 @@ SECURITY: Never use placeholder, test, or hashed values in production.
   if (secretHost && secretUser && secretPass) {
     console.log('✅ Using production SMTP configuration from Function Secrets');
     
-    // Provider-agnostic validation using new configuration system
-    const { validateSMTPConfig } = await import('../_shared/email-provider-configs.ts');
-    const validation = validateSMTPConfig(secretHost, port, secretUser, secretPass);
+    // CRITICAL: Validate that secrets contain actual values, not hashes
+    const validation = isValidSMTPConfig(
+      secretHost, 
+      secretPort || '587', 
+      secretUser, 
+      secretPass
+    );
     
-    if (!validation.valid) {
+    if (!validation.isValid) {
       console.error('❌ INVALID SMTP CONFIGURATION DETECTED:');
       validation.errors.forEach(error => console.error(`   - ${error}`));
       console.error('🔧 SUGGESTED FIXES:');
-      validation.warnings.forEach(warning => console.error(`   → ${warning}`));
+      validation.suggestions.forEach(suggestion => console.error(`   → ${suggestion}`));
       
       const detailedError = `
 Invalid SMTP configuration detected. Please fix the following issues:
@@ -322,8 +326,18 @@ Invalid SMTP configuration detected. Please fix the following issues:
 ERRORS:
 ${validation.errors.map(error => `• ${error}`).join('\n')}
 
+SUGGESTED FIXES:
+${validation.suggestions.map(suggestion => `→ ${suggestion}`).join('\n')}
+
 SETUP GUIDE:
-${validation.provider.setupInstructions.map(instruction => `→ ${instruction}`).join('\n')}
+1. Go to Supabase Dashboard → Settings → Edge Functions
+2. Add/update Function Secrets with your real SMTP credentials:
+   - SMTP_HOST: Your provider's hostname (e.g., smtp.gmail.com)
+   - SMTP_PORT: Usually 587 or 465
+   - SMTP_USERNAME: Your email address or API username
+   - SMTP_PASSWORD: Your email password or API key
+   - SMTP_FROM_EMAIL: The email address to send from
+   - SMTP_FROM_NAME: The display name for outgoing emails
 
 Never use placeholder, test, or hashed values in production.
       `.trim();
@@ -342,22 +356,53 @@ Never use placeholder, test, or hashed values in production.
       }
     }
     
+    // Provider-specific validation for Function Secrets
+    const userValidation = validateSMTPUser(secretUser, secretHost);
     
-    // Provider-specific validation using new configuration system
-    const { detectProvider } = await import('../_shared/email-provider-configs.ts');
-    const providerConfig = detectProvider(secretHost);
+    // Gmail-specific App Password validation
+    if (userValidation.provider === 'gmail' && port === 587) {
+      const cleanPassword = secretPass.replace(/\s+/g, '');
+      if (cleanPassword.length !== 16) {
+        console.warn(`⚠️ Gmail App Password should be 16 characters. Current length: ${cleanPassword.length}. Generate one at https://myaccount.google.com/apppasswords`);
+      }
+    }
     
-    // Validate credentials against provider requirements
-    const usernameResult = providerConfig.validation.usernameValidation(secretUser);
-    const passwordResult = providerConfig.validation.passwordValidation(secretPass);
+    // SendGrid-specific validation
+    if (userValidation.provider === 'sendgrid' && secretUser.toLowerCase() === 'apikey') {
+      if (!secretPass.startsWith('SG.')) {
+        console.warn('⚠️ SendGrid API key should start with "SG." - verify your API key format');
+      }
+    }
     
-    if (!usernameResult.valid || !passwordResult.valid) {
-      const errors = [];
-      if (!usernameResult.valid && usernameResult.error) errors.push(usernameResult.error);
-      if (!passwordResult.valid && passwordResult.error) errors.push(passwordResult.error);
-      
-      console.warn(`⚠️ ${providerConfig.name} validation warnings:`, errors.join(', '));
-      console.log(`📖 Setup instructions:`, providerConfig.setupInstructions.join(' → '));
+    // AWS SES validation
+    if (userValidation.provider === 'aws_ses') {
+      if (!secretUser.startsWith('AKIA') || secretUser.length !== 20) {
+        console.warn('⚠️ AWS SES SMTP username should be 20 characters starting with "AKIA"');
+      }
+    }
+
+    // Log user type detection and provider-specific settings
+    console.log(`🔍 Production SMTP Configuration:`, maskSMTPConfig({
+      source: 'function_secrets',
+      host: secretHost,
+      port: port,
+      username: secretUser,
+      userType: userValidation.userType,
+      provider: userValidation.provider,
+      senderEmail: secretUser,
+      senderName: 'System',
+      encryption: 'TLS'
+    }));
+    
+    // Log provider-specific recommendations
+    if (userValidation.provider) {
+      const providerSettings = getProviderSpecificSettings(userValidation.provider, userValidation.userType);
+      console.log(`📧 ${userValidation.provider.toUpperCase()} Settings:`, {
+        recommendedPort: providerSettings.defaultPort,
+        encryption: providerSettings.encryption,
+        authMethod: providerSettings.authMethod,
+        currentPort: port
+      });
     }
     
     return {
@@ -408,17 +453,14 @@ Never use placeholder, test, or hashed values in production.
   const normalizedPassword = (config.smtp_pass || '').toString().replace(/\s+/g, '').trim();
   const normalizedUsername = config.smtp_user.trim();
 
-  // Provider-agnostic validation for database config
-  const { validateSMTPConfig } = await import('../_shared/email-provider-configs.ts');
-  const dbValidation = validateSMTPConfig(
-    config.smtp_host,
-    config.smtp_port || 587,
-    normalizedUsername,
-    normalizedPassword
-  );
+  // Provider-specific validation for database config
+  const dbUserValidation = validateSMTPUser(normalizedUsername, config.smtp_host);
   
-  if (!dbValidation.valid) {
-    console.warn('⚠️ Database SMTP configuration issues:', dbValidation.errors.join(', '));
+  // Gmail-specific App Password validation for database config
+  if (dbUserValidation.provider === 'gmail' && (config.smtp_port || 587) === 587) {
+    if (normalizedPassword.length !== 16 && normalizedPassword.length > 0) {
+      console.warn('⚠️ Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
+    }
   }
   
   // Log user type detection for debugging
@@ -1055,9 +1097,9 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
     
     // Enhanced guidance for Gmail 535 errors with specific troubleshooting
     if (message.includes('535')) {
-      suggestion = 'Authentication rejected. Check username/password in Function Secrets. Verify credentials match your email provider requirements.';
+      suggestion = 'Authentication rejected (535). For Gmail: 1) Enable 2-Step Verification, 2) Generate 16-char App Password at https://myaccount.google.com/apppasswords, 3) Use full Gmail address as SMTP_USERNAME, 4) Remove spaces from App Password, 5) Verify account security alerts, 6) Try allowing less secure app access temporarily';
     } else if (message.includes('username and password not accepted')) {
-      suggestion = 'Username/password rejected. Check credentials in Function Secrets and verify they match your email provider requirements.';
+      suggestion = 'Username/password rejected. Check credentials in Function Secrets. For Gmail, use App Password (not regular password)';
     }
     
     return {
@@ -1071,7 +1113,7 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
     return {
       category: 'network',
       isTransient: true,
-      suggestion: 'Check network connectivity and SMTP server availability. Verify your provider hostname is correct.'
+      suggestion: 'Check network connectivity and SMTP server availability. For Gmail, verify host is smtp.gmail.com'
     };
   }
   
@@ -1079,7 +1121,7 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
     return {
       category: 'tls',
       isTransient: false,
-      suggestion: 'TLS/STARTTLS issue. Try port 465 (SSL) if port 587 (TLS) fails, or check your provider TLS requirements.'
+      suggestion: 'TLS/STARTTLS issue. Try port 465 (implicit TLS) if 587 (STARTTLS) fails, or set SMTP_ENCRYPTION to match your provider'
     };
   }
   
@@ -1236,7 +1278,7 @@ serve(async (req: Request) => {
           success: false,
           error: 'SMTP authentication failed',
           message: error.message.includes('535') ? 
-            'SMTP Authentication Error: Check username/password in Function Secrets. Verify credentials match your email provider requirements.' : 
+            'SMTP Authentication Error: Check username/password in Function Secrets. For Gmail, use App Passwords.' : 
             error.message,
           timestamp: new Date().toISOString()
         }), {

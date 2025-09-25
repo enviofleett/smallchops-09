@@ -1,236 +1,307 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// Real-time Email Processing Engine - PRODUCTION READY
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getCorsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-serve(async (req) => {
+Deno.serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+  
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseAdmin = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
-    );
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    const { priority = 'all', event_types, limit = 10 } = await req.json() || {};
-    
-    console.log('📧 Processing communication events', { priority, event_types, limit });
+    console.log('=== Instant Email Processor Started (Production Ready) ===')
 
-    // Build query for communication events to process
-    let query = supabaseAdmin
+    // Get high priority queued emails for immediate processing
+    const { data: highPriorityEmails, error: fetchError } = await supabase
       .from('communication_events')
       .select('*')
       .eq('status', 'queued')
+      .eq('priority', 'high')
+      .lt('retry_count', 3)
       .order('created_at', { ascending: true })
-      .limit(limit);
+      .limit(20)
 
-    // Add priority filter
-    if (priority === 'high') {
-      query = query.eq('priority', 'high');
-    }
-
-    // Add event type filter
-    if (event_types && Array.isArray(event_types)) {
-      query = query.in('event_type', event_types);
-    }
-
-    const { data: events, error: fetchError } = await query;
-    
     if (fetchError) {
-      throw new Error(`Failed to fetch events: ${fetchError.message}`);
+      console.error('Error fetching high priority emails:', fetchError)
+      throw fetchError
     }
 
-    console.log(`📋 Found ${events?.length || 0} events to process`);
+    let emailsToProcess = highPriorityEmails || []
+    
+    if (emailsToProcess.length === 0) {
+      console.log('✅ No high priority emails to process')
+      
+      // Also process normal priority emails if queue is empty
+      const { data: normalEmails, error: normalError } = await supabase
+        .from('communication_events')
+        .select('*')
+        .eq('status', 'queued')
+        .in('priority', ['normal', 'low'])
+        .lt('retry_count', 3)
+        .order('created_at', { ascending: true })
+        .limit(10)
 
-    let processed = 0;
-    let failed = 0;
+      if (normalError) {
+        console.error('Error fetching normal priority emails:', normalError)
+        throw normalError
+      }
 
-    for (const event of events || []) {
-      try {
-        // Mark as processing
-        const { error: updateError } = await supabaseAdmin
-          .from('communication_events')
-          .update({ 
-            status: 'processing',
-            processing_started_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', event.id);
-
-        if (updateError) {
-          console.error(`❌ Failed to mark event ${event.id} as processing:`, updateError);
-          continue;
-        }
-
-        if (event.channel === 'email' && event.recipient_email) {
-          // Process email
-          await processEmailEvent(supabaseAdmin, event);
-          processed++;
-        } else if (event.channel === 'sms' && event.sms_phone) {
-          // Process SMS
-          await processSMSEvent(supabaseAdmin, event);
-          processed++;
-        } else {
-          // Invalid event
-          await supabaseAdmin
-            .from('communication_events')
-            .update({ 
-              status: 'failed',
-              error_message: 'Invalid channel or missing recipient',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', event.id);
-          failed++;
-        }
-
-      } catch (eventError) {
-        console.error(`❌ Failed to process event ${event.id}:`, eventError);
-        
-        // Update retry count and status
-        const newRetryCount = (event.retry_count || 0) + 1;
-        const newStatus = newRetryCount >= 3 ? 'failed' : 'queued';
-        
-        await supabaseAdmin
-          .from('communication_events')
-          .update({ 
-            status: newStatus,
-            retry_count: newRetryCount,
-            last_error: eventError.message,
-            error_message: eventError.message,
-            last_retry_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', event.id);
-
-        failed++;
+      emailsToProcess = normalEmails || []
+      
+      if (emailsToProcess.length === 0) {
+        console.log('✅ No emails to process')
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'No emails to process',
+            processed: 0,
+            failed: 0
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
     }
 
-    console.log(`✅ Processing complete: ${processed} processed, ${failed} failed`);
-
-    return new Response(JSON.stringify({
-      success: true,
-      processed,
-      failed,
-      message: `Processed ${processed} events, ${failed} failed`
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    console.log(`📧 Processing ${emailsToProcess.length} emails`)
+    
+    const result = await processEmails(supabase, emailsToProcess, 'instant')
+    
+    return new Response(
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
-    console.error('💥 Email processor error:', error);
+    console.error('❌ Instant email processor error:', error)
     
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message,
-      message: 'Failed to process communication events'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        processed: 0,
+        failed: 0
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
   }
-});
+})
 
-async function processEmailEvent(supabaseAdmin, event) {
-  console.log(`📧 Processing email for: ${event.recipient_email}`);
-  
-  // Get email template
-  const { data: template, error: templateError } = await supabaseAdmin
-    .from('enhanced_email_templates')
-    .select('*')
-    .eq('template_key', event.template_key)
-    .eq('is_active', true)
-    .single();
+async function processEmails(supabase: any, emails: any[], priority: string) {
+  let processed = 0
+  let failed = 0
 
-  if (templateError || !template) {
-    throw new Error(`Template not found: ${event.template_key}`);
+  for (const email of emails) {
+    try {
+      console.log(`🔄 Processing email ${email.id} to ${email.recipient_email}`)
+
+      // Mark as processing
+      await supabase
+        .from('communication_events')
+        .update({ 
+          status: 'processing',
+          processing_started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', email.id)
+
+      // Check email suppression with error handling
+      let suppressionCheck = false;
+      try {
+        const { data } = await supabase
+          .rpc('is_email_suppressed', { email_address: email.recipient_email });
+        suppressionCheck = data === true;
+      } catch (suppressionError) {
+        console.warn(`⚠️ Suppression check failed for ${email.recipient_email}, allowing email:`, suppressionError.message);
+      }
+
+      if (suppressionCheck === true) {
+        console.log(`🚫 Email ${email.recipient_email} is suppressed, skipping`)
+        
+        await supabase
+          .from('communication_events')
+          .update({ 
+            status: 'failed',
+            error_message: 'Email address is suppressed',
+            processed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', email.id)
+        
+        failed++
+        continue
+      }
+
+      // Attempt to send via unified-smtp-sender
+      let emailResult
+      
+      try {
+        // Normalize template key for backwards compatibility
+        let normalizedTemplateKey = email.template_key;
+        const legacyMappings: Record<string, string> = {
+          'order_confirmed': 'order_confirmation',
+          'order_preparing': 'order_processing', 
+          'order_cancelled': 'order_cancellation',
+          'pickup_ready': 'order_ready'
+        };
+        
+        if (legacyMappings[email.template_key]) {
+          normalizedTemplateKey = legacyMappings[email.template_key];
+          console.log(`🔄 Normalized template key: ${email.template_key} → ${normalizedTemplateKey}`);
+        }
+
+        // Merge template_variables and variables for complete data
+        const mergedVariables = {
+          ...(email.template_variables || {}),
+          ...(email.variables || {})
+        };
+
+        console.log(`📧 Sending with template: ${normalizedTemplateKey} (original: ${email.template_key})`);
+        
+        emailResult = await supabase.functions.invoke('unified-smtp-sender', {
+          body: {
+            to: email.recipient_email,
+            subject: mergedVariables.subject || 'Notification from Starters Small Chops',
+            htmlContent: mergedVariables.html_content,
+            textContent: mergedVariables.text_content,
+            templateKey: normalizedTemplateKey,
+            variables: mergedVariables
+          }
+        })
+      } catch (sendError) {
+        console.error('Error calling unified-smtp-sender:', sendError)
+        emailResult = { error: sendError }
+      }
+
+      if (emailResult.error || !emailResult.data?.success) {
+        const errorMessage = emailResult.error?.message || emailResult.data?.error || 'Unknown sending error'
+        console.log(`❌ Failed to send email ${email.id}: ${errorMessage}`)
+
+        // Handle bounces and complaints by adding to suppression list
+        if (errorMessage.toLowerCase().includes('bounce') || 
+            errorMessage.toLowerCase().includes('rejected') || 
+            errorMessage.toLowerCase().includes('invalid')) {
+          
+          // FIXED: Use correct schema for email_suppression_list
+          await supabase
+            .from('email_suppression_list')
+            .upsert({
+              email_address: email.recipient_email.toLowerCase(),
+              reason: 'smtp_rejection',
+              event_data: JSON.stringify({
+                error: errorMessage,
+                email_id: email.id,
+                timestamp: new Date().toISOString()
+              })
+            })
+          
+          console.log(`📝 Added ${email.recipient_email} to suppression list`)
+        }
+
+        // Retry logic with exponential backoff
+        const newRetryCount = (email.retry_count || 0) + 1
+        const maxRetries = 3
+        
+        if (newRetryCount < maxRetries) {
+          const backoffMinutes = Math.pow(2, newRetryCount) * 5 // 5, 10, 20 minutes
+          const scheduledAt = new Date(Date.now() + backoffMinutes * 60000).toISOString()
+          
+          await supabase
+            .from('communication_events')
+            .update({
+              status: 'queued',
+              retry_count: newRetryCount,
+              scheduled_at: scheduledAt,
+              error_message: errorMessage,
+              processed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', email.id)
+            
+          console.log(`🔄 Scheduled retry ${newRetryCount}/${maxRetries} for email ${email.id}`)
+        } else {
+          await supabase
+            .from('communication_events')
+            .update({
+              status: 'failed',
+              retry_count: newRetryCount,
+              error_message: errorMessage,
+              processed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', email.id)
+            
+          console.log(`⏹️ Max retries reached for email ${email.id}, marking as failed`)
+        }
+        
+        failed++
+      } else {
+        console.log(`✅ Successfully sent email ${email.id}`)
+
+        // FIXED: Use external_id instead of provider_message_id
+        await supabase
+          .from('communication_events')
+          .update({
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            processed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            external_id: emailResult.data?.messageId
+          })
+          .eq('id', email.id)
+        
+        processed++
+      }
+
+    } catch (error) {
+      console.error(`❌ Error processing email ${email.id}:`, error)
+      
+      await supabase
+        .from('communication_events')
+        .update({
+          status: 'failed',
+          error_message: error.message,
+          retry_count: (email.retry_count || 0) + 1,
+          processed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', email.id)
+      
+      failed++
+    }
   }
 
-  // Prepare email data
-  const emailData = {
-    to: event.recipient_email,
-    templateKey: event.template_key,
-    variables: event.template_variables || {},
-    subject: replaceVariables(template.subject_template, event.template_variables || {}),
-    htmlContent: replaceVariables(template.html_template, event.template_variables || {}),
-    emailType: 'transactional',
-    priority: event.priority || 'normal'
-  };
-
-  // Send email via unified SMTP sender
-  const { data: emailResult, error: emailError } = await supabaseAdmin.functions.invoke('unified-smtp-sender', {
-    body: emailData
-  });
-
-  if (emailError) {
-    throw new Error(`SMTP sender failed: ${emailError.message}`);
-  }
-
-  // Mark as sent
-  await supabaseAdmin
-    .from('communication_events')
-    .update({ 
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      processed_at: new Date().toISOString(),
-      processing_time_ms: Date.now() - new Date(event.processing_started_at || event.created_at).getTime(),
-      provider_response: emailResult,
-      updated_at: new Date().toISOString()
+  // Log processing results
+  await supabase
+    .from('audit_logs')
+    .insert({
+      action: 'instant_email_processing_completed',
+      category: 'Email Processing',
+      message: `Instant email processing completed: ${processed} sent, ${failed} failed`,
+      new_values: {
+        processed,
+        failed,
+        priority,
+        batch_size: emails.length,
+        timestamp: new Date().toISOString()
+      }
     })
-    .eq('id', event.id);
 
-  console.log(`✅ Email sent successfully for event ${event.id}`);
-}
+  console.log(`📊 Processing complete: ${processed} sent, ${failed} failed`)
 
-async function processSMSEvent(supabaseAdmin, event) {
-  console.log(`📱 Processing SMS for: ${event.sms_phone}`);
-  
-  // Prepare SMS data
-  const smsData = {
-    phone: event.sms_phone,
-    message: event.template_variables?.message || `Update: Your order status has been updated.`,
-    templateKey: event.template_key
-  };
-
-  // Send SMS via SMS service
-  const { data: smsResult, error: smsError } = await supabaseAdmin.functions.invoke('sms-service', {
-    body: smsData
-  });
-
-  if (smsError) {
-    throw new Error(`SMS service failed: ${smsError.message}`);
+  return {
+    success: true,
+    processed,
+    failed,
+    message: `Processing completed: ${processed} sent, ${failed} failed`
   }
-
-  // Mark as sent
-  await supabaseAdmin
-    .from('communication_events')
-    .update({ 
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      processed_at: new Date().toISOString(),
-      processing_time_ms: Date.now() - new Date(event.processing_started_at || event.created_at).getTime(),
-      provider_response: smsResult,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', event.id);
-
-  console.log(`✅ SMS sent successfully for event ${event.id}`);
-}
-
-function replaceVariables(template, variables) {
-  if (!template || !variables) return template || '';
-  
-  let result = template;
-  for (const [key, value] of Object.entries(variables)) {
-    const placeholder = `{{${key}}}`;
-    result = result.replace(new RegExp(placeholder, 'g'), String(value || ''));
-  }
-  return result;
 }

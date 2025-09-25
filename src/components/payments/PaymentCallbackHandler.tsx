@@ -51,7 +51,14 @@ export const PaymentCallbackHandler: React.FC = () => {
             duration: 5000
           });
           
-          // Note: Removed automatic redirect - user will use manual buttons
+          // Redirect to success page after delay
+          setTimeout(() => {
+            if (verificationResult.data?.order_id) {
+              navigate(`/order-success?ref=${reference}&order_id=${verificationResult.data.order_id}`);
+            } else {
+              navigate(`/order-success?ref=${reference}`);
+            }
+          }, 3000);
           
         } else {
           // Check if this is a "transaction not found" error that we should retry
@@ -117,7 +124,13 @@ export const PaymentCallbackHandler: React.FC = () => {
                 description: `Your payment of ₦${result.data?.amount?.toLocaleString()} has been successfully processed.`
               });
               
-              // Note: Removed automatic redirect - user will use manual buttons
+              setTimeout(() => {
+                if (result.data?.order_id) {
+                  navigate(`/order-success?ref=${reference}&order_id=${result.data.order_id}`);
+                } else {
+                  navigate(`/order-success?ref=${reference}`);
+                }
+              }, 2000);
             } else {
               setStatus('failed');
               setMessage(result.message || 'Payment verification failed');
@@ -183,14 +196,9 @@ export const PaymentCallbackHandler: React.FC = () => {
                 <p className="text-sm text-green-700 mt-2">✅ Payment confirmed and order is being processed</p>
               </div>
             )}
-            <div className="flex gap-2 justify-center mt-4">
-              <Button onClick={() => navigate('/customer-profile')} className="w-full">
-                Track Your Order
-              </Button>
-              <Button onClick={() => navigate('/')} variant="outline" className="w-full">
-                Continue Shopping
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground text-center mt-3">
+              Redirecting to order confirmation page...
+            </p>
           </>
         );
       

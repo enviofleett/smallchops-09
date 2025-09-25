@@ -17,16 +17,7 @@ const AuthLayout = ({
       {/* Image Section - Hidden on mobile, Left side on desktop */}
       <div className="hidden lg:block lg:w-1/2 lg:h-screen relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40 z-10" />
-        <img 
-          src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/hero-carousel/auth-bg.jpg" 
-          alt="Welcome to our platform" 
-          className="w-full h-full object-cover" 
-          onError={(e) => {
-            // Fallback to gradient background
-            e.currentTarget.style.display = 'none';
-            e.currentTarget.parentElement.style.background = 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-foreground)) 100%)';
-          }}
-        />
+        <img src="/lovable-uploads/c25fd79f-d9c7-466d-9189-55f68cc44b83.png" alt="Delicious family meal" className="w-full h-full object-cover" />
         <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-white p-12">
           
         </div>

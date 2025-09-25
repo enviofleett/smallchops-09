@@ -3,15 +3,12 @@
   @page {
     size: 80mm auto;
     margin: 0;
-    padding: 0;
   }
   
   body {
     margin: 0;
     padding: 0;
     background: white !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
   
   body * {
@@ -27,19 +24,17 @@
     position: absolute;
     left: 0;
     top: 0;
-    width: 76mm;
-    max-width: 76mm;
+    width: 80mm;
+    max-width: 80mm;
     background: white !important;
     color: black !important;
     font-family: 'Courier New', monospace !important;
-    font-size: 8px !important;
-    line-height: 1.2 !important;
+    font-size: 9px !important;
+    line-height: 1.1 !important;
     margin: 0 !important;
     padding: 2mm !important;
-    page-break-after: avoid;
-    page-break-inside: avoid;
-    overflow: visible;
-    min-height: auto;
+    page-break-after: auto;
+    overflow: hidden;
   }
   
   .receipt-content {
@@ -50,12 +45,11 @@
   }
   
   .business-name {
-    font-weight: 900 !important;
-    font-size: 11px !important;
+    font-weight: bold !important;
+    font-size: 10px !important;
     text-align: center !important;
     text-transform: uppercase !important;
     margin-bottom: 2px !important;
-    letter-spacing: 0.5px !important;
   }
   
   .contact {
@@ -72,10 +66,9 @@
   }
   
   .section-header {
-    font-weight: 900 !important;
-    font-size: 9px !important;
+    font-weight: bold !important;
+    font-size: 8px !important;
     margin-bottom: 1px !important;
-    text-transform: uppercase !important;
   }
   
   .order-info,
@@ -102,7 +95,7 @@
   }
   
   .item-total {
-    font-weight: 900 !important;
+    font-weight: bold !important;
   }
   
   .item-meta {
@@ -138,30 +131,21 @@
   .total-line {
     display: flex !important;
     justify-content: space-between !important;
-    font-weight: 900 !important;
-    font-size: 10px !important;
-    border-top: 2px solid black !important;
-    padding-top: 2px !important;
-    margin-top: 2px !important;
+    font-weight: bold !important;
+    border-top: 1px solid black !important;
+    padding-top: 1px !important;
+    margin-top: 1px !important;
   }
   
   .total-label,
   .total-amount {
-    font-weight: 900 !important;
-    font-size: 10px !important;
+    font-weight: bold !important;
+    font-size: 9px !important;
   }
   
   .footer {
     text-align: center !important;
     font-size: 7px !important;
-  }
-  
-  .admin-print-info {
-    font-size: 8px !important;
-    margin-top: 4px !important;
-    text-align: center !important;
-    font-weight: 900 !important;
-    text-transform: uppercase !important;
   }
   
   .text-center {

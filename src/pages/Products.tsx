@@ -91,9 +91,9 @@ const Products = () => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(product => 
-        (product.name || '').toLowerCase().includes(query) ||
-        (product.sku || '').toLowerCase().includes(query) ||
-        (product.description || '').toLowerCase().includes(query)
+        product.name.toLowerCase().includes(query) ||
+        product.sku?.toLowerCase().includes(query) ||
+        product.description?.toLowerCase().includes(query)
       );
     }
     

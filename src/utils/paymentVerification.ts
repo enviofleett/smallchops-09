@@ -192,13 +192,11 @@ export const handlePaymentCallback = async (reference: string): Promise<PaymentV
     if (verificationResult.success) {
       console.log('✅ Payment callback verified successfully');
       
-      // Store success details for order confirmation page - prioritize order_number for guest tracking
+      // Store success details for order confirmation page
       const orderDetails = {
         reference,
-        order_number: verificationResult.data?.order_number, // Prioritize formatted order number
-        orderNumber: verificationResult.data?.order_number,   // Fallback key
-        order_id: verificationResult.data?.order_id,          // UUID as last resort
-        orderId: verificationResult.data?.order_id,           // Fallback key
+        orderId: verificationResult.data?.order_id,
+        orderNumber: verificationResult.data?.order_number,
         amount: verificationResult.data?.amount,
         paidAt: verificationResult.data?.paid_at,
         channel: verificationResult.data?.channel

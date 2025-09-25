@@ -90,9 +90,10 @@ const PublicHome = () => {
     toast
   } = useToast();
 
-  // Removed hardcoded image preloading - using dynamic business assets instead
+  // Preload critical images (reduced for performance)
+  useImagePreloader(['/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png']);
 
-  // Fetch products with discounts - PRODUCTION OPTIMIZED (Performance First)
+  // Fetch products with discounts - PRODUCTION OPTIMIZED (Fresh Data)
   const {
     data: products = [],
     isLoading: isLoadingProducts,
@@ -101,27 +102,38 @@ const PublicHome = () => {
   } = useQuery({
     queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
-    staleTime: 5 * 60 * 1000, // 5 minutes - reduce server load
-    gcTime: 10 * 60 * 1000, // 10 minutes cache - better performance
-    retry: 1, // Reduce retries for faster failure handling
-    retryDelay: 1000, // Fixed 1 second delay
-    refetchOnMount: false, // Prevent unnecessary refetches
-    refetchOnWindowFocus: false, // Prevent excessive refetches
-    refetchOnReconnect: true // Only refetch on network reconnect
+    staleTime: 30 * 1000, // 30 seconds only - fresh data priority
+    gcTime: 2 * 60 * 1000, // 2 minutes cache - reduced for freshness
+    retry: 2,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 3000),
+    refetchOnMount: true, // Always refetch on mount
+    refetchOnWindowFocus: true, // Refetch when user returns
+    refetchOnReconnect: true // Refetch on network reconnect
   });
 
-  // Debug logging removed for production performance
+  // Debug logging for production troubleshooting
+  console.log('🏠 PublicHome Debug:', {
+    productsCount: products?.length || 0,
+    isLoading: isLoadingProducts,
+    hasError: !!productsError,
+    activeCategory,
+    searchTerm,
+    productsPreview: products?.slice(0, 2)?.map(p => ({
+      id: p.id,
+      name: p.name
+    }))
+  });
 
-  // Fetch categories (PRODUCTION OPTIMIZED)
+  // Fetch categories (PRODUCTION FRESH DATA)
   const {
     data: categories = []
   } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
-    staleTime: 15 * 60 * 1000, // 15 minutes - categories change rarely
-    gcTime: 30 * 60 * 1000, // 30 minutes cache
-    refetchOnMount: false,
-    refetchOnWindowFocus: false
+    staleTime: 60 * 1000, // 1 minute - fresh categories
+    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
   });
 
   // Calculate price range from products for filters
@@ -185,22 +197,23 @@ const PublicHome = () => {
   // Filter and sort products by price (lowest to highest by default) - Production Ready
   const filteredAndSortedProducts = useMemo(() => {
     if (!Array.isArray(products)) {
+      console.warn('🚨 Products is not an array:', products);
       return [];
     }
     if (products.length === 0) {
+      console.log('📦 No products available');
       return [];
     }
 
     // Apply all filters
     const filtered = products.filter(product => {
       if (!product?.name) {
+        console.warn('🚨 Product missing name:', product);
         return false;
       }
 
-      // Search filter with null safety
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = (product.name || '').toLowerCase().includes(searchLower) || 
-        (product.description || '').toLowerCase().includes(searchLower);
+      // Search filter
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || product.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Price filter
       const productPrice = product.discounted_price || product.price;
@@ -221,7 +234,13 @@ const PublicHome = () => {
       return priceA - priceB;
     });
 
-    // Debug logging removed for production performance
+    console.log('🔍 Filtered and sorted products:', {
+      total: products.length,
+      filtered: filtered.length,
+      searchTerm,
+      filtersActive: filters.onlyPromotions || filters.priceRange[0] > priceRange[0] || filters.priceRange[1] < priceRange[1] || filters.minRating > 0,
+      sortedByPrice: 'lowest to highest'
+    });
     return sorted;
   }, [products, searchTerm, filters, priceRange]);
 
@@ -276,7 +295,7 @@ const PublicHome = () => {
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
                   LIVE . LOVE . SHARE
                 </h1>
-                <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 sm:px-0">Small Chops is <strong>ALWAYS</strong> a good idea..</p>
+                <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 sm:px-0">Small Chops is always a good idea..</p>
                 <div className="pt-2">
                   <Button onClick={() => navigate('/products')} className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg">
                     Order Now & Enjoy!

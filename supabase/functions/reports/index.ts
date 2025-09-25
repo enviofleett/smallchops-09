@@ -95,7 +95,7 @@ serve(async (req) => {
       const [productsResult, ordersResult, customersResult] = await Promise.allSettled([
         supabase.from('products').select('id', { count: 'exact', head: true }).not('name', 'ilike', '%test%'),
         supabase.from('orders').select('id, total_amount', { count: 'exact' }).eq('payment_status', 'paid'),
-        supabase.from('customer_accounts').select('id', { count: 'exact', head: true })
+        supabase.from('customer_accounts').select('id', { count: 'exact', head: true }).not('email', 'in', '(pam@gmail.com,lizzi4200@gmail.com,akpanphilip1122@gmail.com)')
       ]);
 
       // Handle products count
@@ -126,7 +126,7 @@ serve(async (req) => {
           .eq('payment_status', 'paid')
           .is('customer_id', null)
           .not('customer_email', 'is', null)
-          .order('created_at', { ascending: false });
+          .not('customer_email', 'in', '(pam@gmail.com,lizzi4200@gmail.com,akpanphilip1122@gmail.com)');
         
         const guestCustomersCount = new Set(guestOrdersData?.map(o => o.customer_email) || []).size;
         totalCustomers = authenticatedCustomers + guestCustomersCount;

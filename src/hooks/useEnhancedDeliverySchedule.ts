@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { deliveryBookingAPI, DeliverySlot } from '@/api/deliveryBookingApi';
 import { deliverySchedulingService } from '@/utils/deliveryScheduling';
-import { format, parseISO, isBefore, isAfter, isWeekend, setHours, setMinutes, startOfDay } from 'date-fns';
+import { format, parseISO, isBefore, isAfter, isWeekend } from 'date-fns';
 
 export interface ScheduleValidationResult {
   isValid: boolean;
@@ -56,56 +56,19 @@ export const useEnhancedDeliverySchedule = (schedule: DeliverySchedule | null) =
         };
 
         const scheduleDate = parseISO(schedule.delivery_date);
-        const now = new Date();
-        
-        // Create actual delivery datetime by combining date and start time
-        let deliveryDateTime = scheduleDate;
-        if (schedule.delivery_time_start) {
-          try {
-            const [hours, minutes] = schedule.delivery_time_start.split(':').map(Number);
-            deliveryDateTime = setMinutes(setHours(scheduleDate, hours), minutes);
-          } catch (error) {
-            console.warn('Could not parse delivery time:', schedule.delivery_time_start);
-            // Fallback to end of day if time parsing fails
-            deliveryDateTime = setHours(scheduleDate, 23);
-          }
-        }
+        const today = new Date();
 
         // Initialize delivery scheduling service
         await deliverySchedulingService.initialize();
 
-        // Check if delivery datetime is in the past (with 30-minute buffer)
-        const bufferTime = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
-        if (isBefore(deliveryDateTime, bufferTime)) {
-          // Only show as past if the entire delivery window has passed
-          let deliveryEndDateTime = deliveryDateTime;
-          if (schedule.delivery_time_end) {
-            try {
-              const [endHours, endMinutes] = schedule.delivery_time_end.split(':').map(Number);
-              deliveryEndDateTime = setMinutes(setHours(scheduleDate, endHours), endMinutes);
-            } catch (error) {
-              // If end time parsing fails, assume 1-hour window
-              deliveryEndDateTime = new Date(deliveryDateTime.getTime() + 60 * 60 * 1000);
-            }
-          }
-
-          // Only show warning if the entire delivery window has passed
-          if (isBefore(deliveryEndDateTime, now)) {
-            warnings.push({
-              type: 'past_date',
-              severity: 'error',
-              message: 'This delivery window has already passed',
-              recommendation: 'Contact customer to reschedule'
-            });
-          } else {
-            // Delivery window is active or starting soon
-            warnings.push({
-              type: 'lead_time',
-              severity: 'info',
-              message: 'Delivery window is approaching soon',
-              recommendation: 'Ensure order is prepared for delivery'
-            });
-          }
+        // Check if date is in the past
+        if (isBefore(scheduleDate, today)) {
+          warnings.push({
+            type: 'past_date',
+            severity: 'error',
+            message: 'This delivery date has already passed',
+            recommendation: 'Contact customer to reschedule'
+          });
         }
 
         // Check for holidays and business days

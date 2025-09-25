@@ -94,10 +94,9 @@ const PublicProducts = () => {
   const filteredProducts = useMemo(() => {
     return products
       .filter(product => {
-        // Search filter with null safety
-        const searchLower = searchTerm.toLowerCase();
-        const matchesSearch = (product.name || '').toLowerCase().includes(searchLower) ||
-          (product.description || '').toLowerCase().includes(searchLower);
+        // Search filter
+        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          product.description?.toLowerCase().includes(searchTerm.toLowerCase());
         
         // Price filter
         const productPrice = product.discounted_price || product.price;

@@ -1,10 +1,11 @@
 import React from 'react';
-import { User, Phone, MapPin, Package, Calendar, Clock, Shield, Truck } from 'lucide-react';
+import { User, Phone, MapPin, Package, Calendar, Clock, Shield, Truck, ShoppingCart, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SectionHeading } from './SectionHeading';
 import { formatAddressMultiline } from '@/utils/formatAddress';
 import { format } from 'date-fns';
+import { getFirstImage } from '@/lib/imageUtils';
 
 interface CustomerInfoCardProps {
   customerName: string;
@@ -29,6 +30,12 @@ interface CustomerInfoCardProps {
     delivery_time_end?: string;
     special_instructions?: string;
   };
+  items?: any[];
+  subtotal?: number;
+  totalVat?: number;
+  totalDiscount?: number;
+  deliveryFee?: number;
+  grandTotal?: number;
 }
 
 export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
@@ -39,7 +46,13 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
   deliveryAddress,
   pickupPoint,
   order,
-  deliverySchedule
+  deliverySchedule,
+  items = [],
+  subtotal = 0,
+  totalVat = 0,
+  totalDiscount = 0,
+  deliveryFee = 0,
+  grandTotal = 0
 }) => {
   const formatCurrency = (amount: number) => {
     return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
@@ -228,9 +241,83 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
             </div>
           )}
 
+          {/* Order Items */}
+          {items && items.length > 0 && (
+            <div className="pt-3 border-t border-border space-y-3">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Order Items ({items.length})
+                </span>
+              </div>
+              <div className="ml-6 space-y-3">
+                {items.slice(0, 3).map((item, index) => (
+                  <div key={item.id || index} className="flex items-start gap-3 p-3 bg-card/50 rounded-lg border border-border/50">
+                    {item.product?.image_url ? (
+                      <div className="w-10 h-10 rounded-md overflow-hidden flex-shrink-0 ring-1 ring-primary/20">
+                        <img 
+                          src={getFirstImage(item.product)} 
+                          alt={item.product_name} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            (target.nextElementSibling as HTMLElement)?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="hidden w-full h-full bg-primary/10 rounded-md flex items-center justify-center">
+                          <Package className="h-4 w-4 text-primary" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                        <Package className="h-4 w-4 text-primary" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h5 className="text-sm font-medium text-foreground truncate">{item.product_name}</h5>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <span className="font-medium">Qty:</span>
+                          <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs font-medium">
+                            {Number(item.quantity ?? 0)}
+                          </span>
+                        </span>
+                        <span className="text-foreground font-medium">
+                          {formatCurrency(Number(item.total_price ?? 0))}
+                        </span>
+                      </div>
+                      {item.special_instructions && (
+                        <div className="mt-2 p-2 bg-orange-50/50 border border-orange-200/50 rounded text-xs">
+                          <span className="text-orange-600 font-medium">Note:</span>
+                          <span className="text-orange-700 ml-1 italic">{item.special_instructions}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {items.length > 3 && (
+                  <div className="text-center py-2">
+                    <span className="text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+                      +{items.length - 3} more items
+                    </span>
+                  </div>
+                )}
+                {grandTotal > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-muted-foreground">Order Total:</span>
+                      <span className="text-base font-bold text-primary">{formatCurrency(grandTotal)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Special Instructions */}
           {deliverySchedule?.special_instructions && (
-            <div className="pt-3 border-t border-border space-y-2">
+            <div className="pt-3 border-t border-border space-y-3">
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -238,9 +325,19 @@ export const CustomerInfoCard: React.FC<CustomerInfoCardProps> = ({
                 </span>
               </div>
               <div className="ml-6">
-                <p className="text-sm text-foreground bg-muted/50 p-3 rounded-md">
-                  {deliverySchedule.special_instructions}
-                </p>
+                <div className="bg-orange-50/80 dark:bg-orange-950/30 p-4 rounded-lg border border-orange-200/50 dark:border-orange-800/50">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-orange-100 dark:bg-orange-900/50 rounded-full flex items-center justify-center">
+                      <span className="text-orange-600 dark:text-orange-400 text-sm">📝</span>
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="text-sm font-semibold text-orange-800 dark:text-orange-200 mb-2">Customer Instructions:</h5>
+                      <p className="text-sm text-orange-700 dark:text-orange-300 leading-relaxed whitespace-pre-wrap break-words">
+                        {deliverySchedule.special_instructions}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

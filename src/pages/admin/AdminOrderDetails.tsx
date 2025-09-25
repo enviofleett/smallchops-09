@@ -160,6 +160,12 @@ const AdminOrderDetails: React.FC = () => {
                 order_number: order.order_number
               }}
               deliverySchedule={delivery_schedule}
+              items={items}
+              subtotal={order.subtotal || 0}
+              totalVat={order.total_vat || 0}
+              totalDiscount={order.discount_amount || 0}
+              deliveryFee={order.delivery_fee || 0}
+              grandTotal={order.total_amount}
             />
             
             <OrderInfoCard

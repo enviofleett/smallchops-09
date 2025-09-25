@@ -101,11 +101,12 @@ export function EnhancedOrderCard({
   const statusConfig = getStatusConfig(order.status);
   const StatusIcon = statusConfig.icon;
 
-  // Check if payment can be continued
+  // Check if payment can be continued - exclude confirmed orders as they're considered successful
   const canContinuePayment = 
     order.payment_status !== 'paid' && 
+    order.status !== 'confirmed' &&
     order.total_amount > 0 && 
-    ['pending', 'confirmed', 'preparing'].includes(order.status);
+    ['pending', 'preparing'].includes(order.status);
 
   const handleContinuePayment = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -178,8 +179,8 @@ export function EnhancedOrderCard({
               
               <div className="flex items-center gap-2">
                 <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'} className="text-xs">
-                  {order.payment_status === 'paid' ? 'Paid' : 'Pending'}
+                <Badge variant={order.payment_status === 'paid' || order.status === 'confirmed' ? 'default' : 'secondary'} className="text-xs">
+                  {order.payment_status === 'paid' || order.status === 'confirmed' ? 'Successful' : 'Pending'}
                 </Badge>
               </div>
             </div>
@@ -282,7 +283,7 @@ export function EnhancedOrderCard({
               {/* Payment Details */}
               <div className="space-y-4">
                 <PaymentDetailsCard
-                  paymentStatus={order.payment_status}
+                  paymentStatus={order.status === 'confirmed' ? 'paid' : order.payment_status}
                   paymentMethod={order.payment_method}
                   paymentReference={order.payment_reference}
                   paidAt={order.paid_at}

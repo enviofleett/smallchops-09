@@ -16,10 +16,26 @@ interface SummaryTabProps {
     payment_reference?: string;
     items?: any[];
     order_type: string;
+    pickup_time?: string;
   };
   deliverySchedule?: {
     window?: string;
     date?: string;
+    delivery_date?: string;
+    delivery_time_start?: string;
+    delivery_time_end?: string;
+  };
+  detailedOrderData?: {
+    fulfillment_info?: {
+      pickup_time?: string;
+      delivery_date?: string;
+      delivery_hours?: {
+        start?: string;
+        end?: string;
+      };
+      address?: string;
+      business_hours?: any;
+    };
   };
 }
 
@@ -55,7 +71,56 @@ interface SummaryTabProps {
  * <SummaryTab order={order} deliverySchedule={deliverySchedule} />
  * ```
  */
-export const SummaryTab: React.FC<SummaryTabProps> = ({ order, deliverySchedule }) => {
+export const SummaryTab: React.FC<SummaryTabProps> = ({ order, deliverySchedule, detailedOrderData }) => {
+  // Extract fulfillment data for display
+  const fulfillmentInfo = detailedOrderData?.fulfillment_info;
+  
+  // Format pickup time for display
+  const formatPickupTime = () => {
+    if (order.order_type === 'pickup') {
+      if (fulfillmentInfo?.pickup_time) {
+        const pickupDate = new Date(fulfillmentInfo.pickup_time);
+        return {
+          date: pickupDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+          time: pickupDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        };
+      }
+      if (order.pickup_time) {
+        const pickupDate = new Date(order.pickup_time);
+        return {
+          date: pickupDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+          time: pickupDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        };
+      }
+    }
+    return null;
+  };
+
+  // Format delivery time for display
+  const formatDeliveryTime = () => {
+    if (order.order_type === 'delivery') {
+      if (fulfillmentInfo?.delivery_date && fulfillmentInfo?.delivery_hours) {
+        const deliveryDate = new Date(fulfillmentInfo.delivery_date);
+        const startTime = fulfillmentInfo.delivery_hours.start;
+        const endTime = fulfillmentInfo.delivery_hours.end;
+        return {
+          date: deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+          time: startTime && endTime ? `${startTime} - ${endTime}` : 'Time TBD'
+        };
+      }
+      if (deliverySchedule?.delivery_date && (deliverySchedule?.delivery_time_start || deliverySchedule?.window)) {
+        const deliveryDate = new Date(deliverySchedule.delivery_date);
+        return {
+          date: deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+          time: deliverySchedule.window || `${deliverySchedule.delivery_time_start} - ${deliverySchedule.delivery_time_end}`
+        };
+      }
+    }
+    return null;
+  };
+
+  const pickupInfo = formatPickupTime();
+  const deliveryInfo = formatDeliveryTime();
   return (
     <Card className="rounded-xl border shadow-sm mb-6">
       <div className="p-6">
@@ -79,18 +144,40 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({ order, deliverySchedule 
           <OrderItemsTable items={order.items || []} />
         </div>
         <div className="mt-6">
-          <div className="mb-2 font-medium">Delivery</div>
-          <div>
-            {order.order_type === 'pickup' ? (
-              <><Building2 className="inline w-4 h-4" /> Pickup</>
-            ) : (
-              <><Truck className="inline w-4 h-4" /> Delivery</>
+          <div className="mb-2 font-medium">Fulfillment Schedule</div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {order.order_type === 'pickup' ? (
+                <><Building2 className="inline w-4 h-4" /> Pickup</>
+              ) : (
+                <><Truck className="inline w-4 h-4" /> Delivery</>
+              )}
+            </div>
+            
+            {order.order_type === 'pickup' && pickupInfo && (
+              <div className="text-sm">
+                <div className="font-medium">{pickupInfo.date}</div>
+                <div className="text-muted-foreground">{pickupInfo.time}</div>
+              </div>
             )}
-            {deliverySchedule ? (
-              <span className="ml-2 text-muted-foreground">
-                {deliverySchedule.window} on {deliverySchedule.date}
-              </span>
-            ) : null}
+            
+            {order.order_type === 'delivery' && deliveryInfo && (
+              <div className="text-sm">
+                <div className="font-medium">{deliveryInfo.date}</div>
+                <div className="text-muted-foreground">{deliveryInfo.time}</div>
+              </div>
+            )}
+            
+            {!pickupInfo && !deliveryInfo && (
+              <div className="text-sm text-muted-foreground">Schedule not yet confirmed</div>
+            )}
+            
+            {fulfillmentInfo?.address && (
+              <div className="text-sm">
+                <div className="font-medium">Location:</div>
+                <div className="text-muted-foreground">{fulfillmentInfo.address}</div>
+              </div>
+            )}
           </div>
         </div>
       </div>

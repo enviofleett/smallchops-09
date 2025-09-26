@@ -9595,7 +9595,7 @@ export type Database = {
       }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
-        Returns: undefined
+        Returns: Json
       }
       calculate_delivery_metrics: {
         Args: { p_date: string }
@@ -9696,7 +9696,7 @@ export type Database = {
               p_recipient_email: string
               p_window_minutes?: number
             }
-        Returns: boolean
+        Returns: Json
       }
       check_enhanced_rate_limit: {
         Args: {
@@ -9748,7 +9748,7 @@ export type Database = {
               p_target_user_id: string
               p_window_minutes?: number
             }
-        Returns: boolean
+        Returns: Json
       }
       check_production_payment_safety: {
         Args: Record<PropertyKey, never>
@@ -11348,7 +11348,7 @@ export type Database = {
               p_template_key: string
               p_template_variables: Json
             }
-        Returns: string
+        Returns: Json
       }
       upsert_communication_event_enhanced: {
         Args: {

@@ -79,7 +79,11 @@ export const OrderDetailsTabs: React.FC<OrderDetailsTabsProps> = ({
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-6">
         {selectedTab === 'summary' && (
-          <SummaryTab order={order} deliverySchedule={deliverySchedule} />
+          <SummaryTab 
+            order={order} 
+            deliverySchedule={deliverySchedule}
+            detailedOrderData={detailedOrderData}
+          />
         )}
         {selectedTab === 'fulfillment' && (
           <FulfillmentTab detailedOrderData={detailedOrderData} isLoading={isLoading} error={error} />

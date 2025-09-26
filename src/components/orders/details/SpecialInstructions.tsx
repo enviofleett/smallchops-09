@@ -12,7 +12,14 @@ export const SpecialInstructions: React.FC<SpecialInstructionsProps> = ({
   instructions,
   deliveryInstructions
 }) => {
-  const hasAnyInstructions = instructions || deliveryInstructions;
+  // Clean up instructions - remove empty strings and 'No special instructions'
+  const cleanInstructions = instructions && instructions.trim() && 
+    !instructions.includes('No special instructions') ? instructions : null;
+  
+  const cleanDeliveryInstructions = deliveryInstructions && deliveryInstructions.trim() && 
+    !deliveryInstructions.includes('No special instructions') ? deliveryInstructions : null;
+  
+  const hasAnyInstructions = cleanInstructions || cleanDeliveryInstructions;
 
   return (
     <Card>
@@ -24,7 +31,7 @@ export const SpecialInstructions: React.FC<SpecialInstructionsProps> = ({
         
         {hasAnyInstructions ? (
           <div className="space-y-4">
-            {instructions && (
+            {cleanInstructions && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -32,15 +39,15 @@ export const SpecialInstructions: React.FC<SpecialInstructionsProps> = ({
                     Order Instructions
                   </span>
                 </div>
-                <div className="ml-6">
+                <div className="ml-6 bg-muted/30 p-3 rounded-lg">
                   <p className="text-sm text-foreground leading-relaxed">
-                    {instructions}
+                    {cleanInstructions}
                   </p>
                 </div>
               </div>
             )}
 
-            {deliveryInstructions && (
+            {cleanDeliveryInstructions && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Truck className="h-4 w-4 text-muted-foreground" />
@@ -48,9 +55,9 @@ export const SpecialInstructions: React.FC<SpecialInstructionsProps> = ({
                     Delivery Instructions
                   </span>
                 </div>
-                <div className="ml-6">
+                <div className="ml-6 bg-muted/30 p-3 rounded-lg">
                   <p className="text-sm text-foreground leading-relaxed">
-                    {deliveryInstructions}
+                    {cleanDeliveryInstructions}
                   </p>
                 </div>
               </div>

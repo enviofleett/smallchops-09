@@ -363,13 +363,13 @@ export const ComprehensiveOrderFulfillment: React.FC<ComprehensiveOrderFulfillme
                 </div>
               </div>
               
-              {(fulfillment_info?.pickup_point_phone || pickup_point?.phone) && (
+              {(fulfillment_info?.pickup_point_phone || pickup_point?.contact_phone) && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Contact</p>
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-green-600" />
                     <p className="font-medium">
-                      {fulfillment_info?.pickup_point_phone || pickup_point?.phone}
+                      {fulfillment_info?.pickup_point_phone || pickup_point?.contact_phone}
                     </p>
                   </div>
                 </div>

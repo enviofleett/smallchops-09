@@ -67,6 +67,18 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({
   
   const timeline = detailedOrderData?.timeline || [];
 
+  const getEventIcon = (status: string) => {
+    if (status === 'completed') return '✓';
+    if (status === 'pending') return '○';
+    return '○';
+  };
+
+  const getEventColor = (status: string) => {
+    if (status === 'completed') return 'text-green-600';
+    if (status === 'pending') return 'text-muted-foreground';
+    return 'text-muted-foreground';
+  };
+
   return (
     <Card className="rounded-xl border shadow-sm mb-6">
       <div className="p-6">
@@ -106,23 +118,47 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({
             </p>
           </div>
         </div>
-        <ul className="space-y-3">
+        
+        <div className="space-y-4">
           {timeline.length ? (
-            timeline.map((event, i) => (
-              <li key={i} className="flex items-center gap-3 text-sm">
-                <Calendar className="w-4 h-4 text-primary" />
-                <span className="font-medium capitalize">
-                  {event.event.replace('_', ' ')}
-                </span>
-                <span className="text-muted-foreground">
-                  {event.timestamp ? new Date(event.timestamp).toLocaleString() : ''}
-                </span>
-              </li>
+            timeline.map((event: any, i: number) => (
+              <div key={i} className="flex items-start gap-4">
+                <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold ${
+                  event.status === 'completed' 
+                    ? 'border-green-500 bg-green-50 text-green-600' 
+                    : 'border-gray-300 bg-gray-50 text-gray-400'
+                }`}>
+                  {getEventIcon(event.status)}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <span className={`font-medium ${getEventColor(event.status)}`}>
+                      {event.event}
+                    </span>
+                    {event.timestamp && (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(event.timestamp).toLocaleString('en-NG', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  {event.status === 'pending' && (
+                    <p className="text-xs text-muted-foreground mt-1">Waiting to be processed</p>
+                  )}
+                </div>
+              </div>
             ))
           ) : (
-            <div className="text-muted-foreground">No timeline events</div>
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">No timeline events available</p>
+            </div>
           )}
-        </ul>
+        </div>
       </div>
     </Card>
   );

@@ -23,6 +23,7 @@ interface CreateOrderParams {
   deliveryAddress?: any;
   pickupPointId?: string;
   deliveryZoneId?: string;
+  deliveryFee?: number;
   guestSessionId?: string;
   deliverySchedule?: {
     delivery_date: string;
@@ -58,7 +59,8 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
         type: params.fulfillmentType || 'delivery',
         address: params.deliveryAddress,
         pickup_point_id: params.pickupPointId,
-        delivery_zone_id: params.deliveryZoneId
+        delivery_zone_id: params.deliveryZoneId,
+        delivery_fee: params.deliveryFee || 0
       },
       payment: {
         method: 'paystack'

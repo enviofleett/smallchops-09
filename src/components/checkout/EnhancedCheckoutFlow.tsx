@@ -545,7 +545,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           type: formData.fulfillment_type,
           address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : undefined,
           pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : undefined,
-          delivery_zone_id: deliveryZone?.id || undefined
+          delivery_zone_id: deliveryZone?.id || undefined,
+          delivery_fee: deliveryFee
         },
         delivery_schedule: formData.delivery_date ? {
           delivery_date: formData.delivery_date,

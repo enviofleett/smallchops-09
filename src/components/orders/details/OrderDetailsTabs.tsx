@@ -82,7 +82,6 @@ export const OrderDetailsTabs: React.FC<OrderDetailsTabsProps> = ({
           <SummaryTab 
             order={order} 
             deliverySchedule={deliverySchedule}
-            detailedOrderData={detailedOrderData}
           />
         )}
         {selectedTab === 'fulfillment' && (

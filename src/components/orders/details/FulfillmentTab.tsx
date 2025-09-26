@@ -1,15 +1,10 @@
 import React from 'react';
-import { Card } from '@/components/ui/card';
-import { OrderProgressBar } from './OrderProgressBar';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ComprehensiveOrderFulfillment } from '@/components/orders/details/ComprehensiveOrderFulfillment';
+import { AlertCircle } from 'lucide-react';
 
 interface FulfillmentTabProps {
-  detailedOrderData?: {
-    steps?: any[];
-    assigned_agent?: {
-      name?: string;
-    };
-    instructions?: string;
-  };
+  detailedOrderData?: any;
   isLoading: boolean;
   error?: any;
 }
@@ -35,37 +30,30 @@ interface FulfillmentTabProps {
  * <FulfillmentTab detailedOrderData={detailedOrderData} isLoading={false} />
  * ```
  */
-export const FulfillmentTab: React.FC<FulfillmentTabProps> = ({ 
-  detailedOrderData, 
-  isLoading, 
-  error 
+export const FulfillmentTab: React.FC<FulfillmentTabProps> = ({
+  detailedOrderData,
+  isLoading,
+  error
 }) => {
-  if (isLoading) {
-    return <div className="text-center py-10">Loading fulfillment data...</div>;
-  }
-  
   if (error) {
-    return <div className="text-destructive">Error loading details.</div>;
-  }
-  
-  if (!detailedOrderData) {
-    return <div className="text-muted-foreground">No fulfillment data.</div>;
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Failed to load fulfillment details. Please try again.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   return (
-    <Card className="border shadow-sm rounded-xl mb-6">
-      <div className="p-6">
-        <h2 className="text-xl font-bold mb-4">Order Fulfillment Progress</h2>
-        <OrderProgressBar steps={detailedOrderData.steps || []} />
-        <div className="mt-6">
-          <div className="mb-2 font-medium">Assigned Agent</div>
-          <div>{detailedOrderData.assigned_agent?.name || 'Unassigned'}</div>
-        </div>
-        <div className="mt-6">
-          <div className="mb-2 font-medium">Instructions</div>
-          <div>{detailedOrderData.instructions || 'None'}</div>
-        </div>
+    <div className="bg-card rounded-xl border shadow-sm">
+      <div className="p-1">
+        <ComprehensiveOrderFulfillment 
+          data={detailedOrderData}
+          isLoading={isLoading}
+        />
       </div>
-    </Card>
+    </div>
   );
 };

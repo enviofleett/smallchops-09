@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Package, Printer, CreditCard, Truck } from 'lucide-react';
+import { Package, Printer, CreditCard, Truck, Building2 } from 'lucide-react';
 
 interface OrderDetailsHeaderProps {
   order: {
@@ -66,7 +66,11 @@ export const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({
               ₦{order.total_amount?.toLocaleString()}
             </span>
             <span className="flex items-center gap-1">
-              <Truck className="w-4 h-4" />
+              {order.order_type === 'pickup' ? (
+                <Building2 className="w-4 h-4" />
+              ) : (
+                <Truck className="w-4 h-4" />
+              )}
               {order.order_type}
             </span>
           </div>

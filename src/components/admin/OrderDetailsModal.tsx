@@ -14,6 +14,7 @@ import {
   Printer,
   Package
 } from 'lucide-react';
+import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -32,7 +33,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const printRef = useRef<HTMLDivElement>(null);
   
   // Fetch live data with real-time updates
-  const { data: detailedOrderData, isLoading: isLoadingDetailed, error, lastUpdated } = useRealTimeOrderData(order?.id);
+  const { data: detailedOrderData, isLoading: isLoadingDetailed, error, lastUpdated, connectionStatus, reconnect } = useRealTimeOrderData(order?.id);
   const { drivers, loading: driversLoading } = useDriverManagement();
   const { updateStatus, isUpdating } = useProductionStatusUpdate();
   
@@ -105,6 +106,17 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       className="max-w-7xl h-[95vh]"
     >
       <div className="flex flex-col h-full bg-gradient-to-br from-background via-background to-muted/10" ref={printRef}>
+        {/* Real-time connection status */}
+        <div className="px-6 pt-4">
+          <RealTimeConnectionStatus
+            connectionStatus={connectionStatus}
+            lastUpdated={lastUpdated}
+            onReconnect={reconnect}
+            compact={true}
+            className="mb-2"
+          />
+        </div>
+        
         <OrderDetailsHeader
           order={order}
           onPrint={handlePrint}

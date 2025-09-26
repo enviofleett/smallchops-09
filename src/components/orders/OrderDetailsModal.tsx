@@ -6,6 +6,7 @@ import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
 import { OrderDetailsHeader } from './details/OrderDetailsHeader';
 import { OrderDetailsTabs } from './details/OrderDetailsTabs';
 import { OrderDetailsFooter } from './details/OrderDetailsFooter';
+import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -51,7 +52,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const { data: detailedOrderData, isLoading, error, lastUpdated } = useRealTimeOrderData(order?.id);
+  const { data: detailedOrderData, isLoading, error, lastUpdated, connectionStatus, reconnect } = useRealTimeOrderData(order?.id);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -84,6 +85,17 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       className="max-w-7xl h-[95vh]"
     >
       <div className="flex flex-col h-full bg-gradient-to-br from-background via-background to-muted/10" ref={printRef}>
+        {/* Real-time connection status */}
+        <div className="px-6 pt-4">
+          <RealTimeConnectionStatus
+            connectionStatus={connectionStatus}
+            lastUpdated={lastUpdated}
+            onReconnect={reconnect}
+            compact={true}
+            className="mb-2"
+          />
+        </div>
+        
         <OrderDetailsHeader
           order={order}
           onPrint={handlePrint}

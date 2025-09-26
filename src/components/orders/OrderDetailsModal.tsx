@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
-import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
+import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
 import { OrderDetailsHeader } from './details/OrderDetailsHeader';
 import { OrderDetailsTabs } from './details/OrderDetailsTabs';
 import { OrderDetailsFooter } from './details/OrderDetailsFooter';
@@ -51,7 +51,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const { data: detailedOrderData, isLoading, error } = useDetailedOrderData(order?.id);
+  const { data: detailedOrderData, isLoading, error, lastUpdated } = useRealTimeOrderData(order?.id);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,

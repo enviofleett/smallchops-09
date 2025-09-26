@@ -3,7 +3,7 @@ import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
 import { Button } from '@/components/ui/button';
-import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
+import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
 import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
 import { OrderDetailsHeader } from '@/components/orders/details/OrderDetailsHeader';
@@ -31,8 +31,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [isAssigningRider, setIsAssigningRider] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   
-  // Fetch live data
-  const { data: detailedOrderData, isLoading: isLoadingDetailed, error } = useDetailedOrderData(order?.id);
+  // Fetch live data with real-time updates
+  const { data: detailedOrderData, isLoading: isLoadingDetailed, error, lastUpdated } = useRealTimeOrderData(order?.id);
   const { drivers, loading: driversLoading } = useDriverManagement();
   const { updateStatus, isUpdating } = useProductionStatusUpdate();
   

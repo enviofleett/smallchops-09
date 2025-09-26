@@ -34,191 +34,59 @@ export const useDetailedOrderData = (orderId: string) => {
   return useQuery({
     queryKey: ['detailed-order', orderId],
     queryFn: async () => {
-      if (!orderId) {
-        throw new Error('Order ID is required');
-      }
-
-      // Check if orderId is a UUID or an order number
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderId);
+      if (!orderId) throw new Error('Order ID is required');
       
-      try {
-        // If it's a UUID, try the comprehensive fulfillment function first
-        if (isUuid) {
-          const { data: comprehensiveData, error: comprehensiveError } = await supabase.rpc('get_comprehensive_order_fulfillment', {
-            p_order_id: orderId
-          });
-
-          if (!comprehensiveError && comprehensiveData && !(comprehensiveData as any).error) {
-            console.log('✅ Comprehensive fulfillment data loaded:', {
-              hasOrder: !!(comprehensiveData as any).order,
-              hasItems: !!(comprehensiveData as any).items,
-              hasDeliverySchedule: !!(comprehensiveData as any).delivery_schedule,
-              hasPickupPoint: !!(comprehensiveData as any).pickup_point,
-              hasFulfillmentInfo: !!(comprehensiveData as any).fulfillment_info
-            });
-            
-            const data = comprehensiveData as any;
-            return {
-              order: data.order,
-              items: data.items || [],
-              delivery_schedule: data.delivery_schedule,
-              pickup_point: data.pickup_point,
-              business_settings: data.business_settings,
-              fulfillment_info: data.fulfillment_info
-            } as DetailedOrderData;
-          }
-
-          // Fallback to original RPC function
-          const { data, error } = await supabase.rpc('get_detailed_order_with_products', {
-            p_order_id: orderId
-          });
-
-          if (error) {
-            // Only log in development
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('RPC error, using fallback query:', error);
-            }
-            throw error; // This will trigger the fallback
-          }
-          
-          if (data && typeof data === 'object' && 'error' in data) {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('RPC returned error, using fallback query:', data.error);
-            }
-            throw new Error(data.error as string);
-          }
-
-          if (data) {
-            // Handle new RPC response format: { order: {}, items: [], delivery_schedule: {} }
-            if (data && typeof data === 'object' && 'order' in data) {
-              console.log('✅ RPC order data structure:', {
-                hasOrder: !!data.order,
-                hasItems: !!data.items,
-                hasDeliverySchedule: !!data.delivery_schedule,
-                itemsCount: Array.isArray(data.items) ? data.items.length : 0,
-                scheduleData: data.delivery_schedule // Add actual schedule data for debugging
-              });
-              
-              return {
-                order: data.order,
-                items: data.items || [],
-                delivery_schedule: data.delivery_schedule
-              } as DetailedOrderData;
-            }
-            
-            // Fallback for legacy format (if needed)
-            const orderData = Array.isArray(data) ? data[0] : data;
-            if (orderData) {
-              return {
-                order: orderData,
-                items: (orderData as any).order_items || [],
-                delivery_schedule: (orderData as any).order_delivery_schedule
-              } as DetailedOrderData;
-            }
-          }
-        } else {
-          // If it's an order number, skip RPC and go directly to fallback
-          throw new Error('Order number provided, using fallback query');
-        }
-      } catch (rpcError) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('RPC failed, trying fallback query:', rpcError);
-        }
+      // Optimized primary query - use comprehensive RPC first
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+      
+      if (isUUID) {
+        // Use comprehensive RPC for UUIDs (most efficient)
+        const { data: comprehensiveData, error: comprehensiveError } = await supabase
+          .rpc('get_comprehensive_order_fulfillment', { p_order_id: orderId });
         
-        // Fallback: Separate queries with better error handling
-        try {
-          // Choose the correct query based on whether we have UUID or order number
-          const query = supabase
-            .from('orders')
-            .select(`
-              *,
-              order_items (
-                *,
-                products (
-                  id,
-                  name,
-                  description,
-                  price,
-                  image_url,
-                  category_id,
-                  features,
-                  ingredients
-                )
-              ),
-              order_delivery_schedule (*)
-            `);
-            
-          const { data: orderData, error: orderError } = isUuid 
-            ? await query.eq('id', orderId).maybeSingle()
-            : await query.eq('order_number', orderId).maybeSingle();
-
-          if (orderError) {
-            if (process.env.NODE_ENV === 'development') {
-              console.error('Fallback query error:', orderError);
-            }
-            throw new Error(`Failed to fetch order details: ${orderError.message}`);
-          }
-
-          if (!orderData) {
-            throw new Error('Order not found');
-          }
-
-          // Separate query for delivery schedule (non-critical)
-          let deliverySchedule = null;
-          try {
-            const { data: scheduleData } = isUuid
-              ? await supabase
-                  .from('order_delivery_schedule')
-                  .select('*')
-                  .eq('order_id', orderId)
-                  .maybeSingle()
-              : await supabase
-                  .from('order_delivery_schedule')
-                  .select('*')
-                  .eq('order_id', orderData.id)
-                  .maybeSingle();
-            
-            deliverySchedule = scheduleData;
-          } catch (scheduleError) {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('Could not fetch delivery schedule:', scheduleError);
-            }
-            // Continue without schedule - not critical
-          }
-
-          // Transform to expected format with normalized product data
-          const normalizedItems = (orderData.order_items || []).map((item: any) => ({
-            ...item,
-            product: item.products ? {
-              ...item.products,
-              images: item.products.image_url ? [item.products.image_url] : []
-            } : null
-          }));
-
-          // Priority order: separate query > joined data > fallback
-          const finalSchedule = deliverySchedule || (orderData as any).order_delivery_schedule;
-          
-          console.log('✅ Fallback query schedule resolution:', {
-            separateQuerySchedule: !!deliverySchedule,
-            joinedSchedule: !!(orderData as any).order_delivery_schedule,
-            finalSchedule: !!finalSchedule,
-            scheduleData: finalSchedule
-          });
-
-          return {
-            order: orderData,
-            items: normalizedItems,
-            delivery_schedule: finalSchedule
-          } as DetailedOrderData;
-        } catch (fallbackError) {
-          if (process.env.NODE_ENV === 'development') {
-            console.error('Both RPC and fallback queries failed:', fallbackError);
-          }
-          throw fallbackError;
+        if (!comprehensiveError && comprehensiveData && !(comprehensiveData as any)?.error) {
+          return (comprehensiveData as unknown) as DetailedOrderData;
         }
+        console.warn('Comprehensive RPC failed, using fallback:', comprehensiveError);
       }
-
-      throw new Error('No data returned from server');
+      
+      // Fallback for order numbers or when RPC fails
+      const orderQuery = isUUID 
+        ? supabase.from('orders').select('*').eq('id', orderId)
+        : supabase.from('orders').select('*').eq('order_number', orderId);
+      
+      const [orderResult, scheduleResult] = await Promise.all([
+        orderQuery.maybeSingle(),
+        supabase.from('order_delivery_schedule').select('*').eq(
+          isUUID ? 'order_id' : 'order_id', orderId
+        ).maybeSingle()
+      ]);
+      
+      if (orderResult.error) throw orderResult.error;
+      if (!orderResult.data) throw new Error('Order not found');
+      
+      const order = orderResult.data;
+      const schedule = scheduleResult.data;
+      
+      return {
+        order,
+        delivery_schedule: schedule,
+        items: [],
+        fulfillment_info: {
+          type: order.order_type,
+          address: (order.delivery_address as any)?.address_line_1 || 
+                  (order.delivery_address as any)?.address || 
+                  'Address not available',
+          delivery_date: schedule?.delivery_date,
+          delivery_hours: schedule ? {
+            start: schedule.delivery_time_start,
+            end: schedule.delivery_time_end,
+            is_flexible: schedule.is_flexible || false
+          } : null,
+          special_instructions: schedule?.special_instructions || order.special_instructions || 'No special instructions',
+          requested_at: schedule?.requested_at
+        }
+      } as DetailedOrderData;
     },
     enabled: !!orderId,
     staleTime: 1000 * 60 * 5, // 5 minutes

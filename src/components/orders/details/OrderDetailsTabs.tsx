@@ -14,6 +14,11 @@ interface OrderDetailsTabsProps {
   setSelectedTab: (tab: string) => void;
   isUpdatingStatus: boolean;
   handleStatusUpdate: (status: string) => Promise<void>;
+  drivers?: any[];
+  driversLoading?: boolean;
+  assignedRiderId?: string | null;
+  onRiderAssignment?: (riderId: string | null) => Promise<void>;
+  isAssigningRider?: boolean;
 }
 
 /**
@@ -53,6 +58,11 @@ export const OrderDetailsTabs: React.FC<OrderDetailsTabsProps> = ({
   setSelectedTab,
   isUpdatingStatus,
   handleStatusUpdate,
+  drivers,
+  driversLoading,
+  assignedRiderId,
+  onRiderAssignment,
+  isAssigningRider,
 }) => {
   const tabs = [
     { key: 'summary', label: 'Summary' },
@@ -92,6 +102,11 @@ export const OrderDetailsTabs: React.FC<OrderDetailsTabsProps> = ({
             order={order}
             isUpdatingStatus={isUpdatingStatus}
             handleStatusUpdate={handleStatusUpdate}
+            drivers={drivers}
+            driversLoading={driversLoading}
+            assignedRiderId={assignedRiderId}
+            onRiderAssignment={onRiderAssignment}
+            isAssigningRider={isAssigningRider}
           />
         )}
         {selectedTab === 'timeline' && (

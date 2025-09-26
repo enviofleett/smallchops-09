@@ -4,15 +4,16 @@ import { toast } from 'sonner';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
 import { Button } from '@/components/ui/button';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
+import { useDriverManagement } from '@/hooks/useDriverManagement';
+import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
 import { OrderDetailsHeader } from '@/components/orders/details/OrderDetailsHeader';
 import { OrderDetailsTabs } from '@/components/orders/details/OrderDetailsTabs';
 import { OrderDetailsFooter } from '@/components/orders/details/OrderDetailsFooter';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Printer,
   Package
 } from 'lucide-react';
-
-// Force refresh timestamp: 1727279220
 
 interface OrderDetailsModalProps {
   order: any;
@@ -20,18 +21,20 @@ interface OrderDetailsModalProps {
   onClose: () => void;
 }
 
-// Force refresh timestamp: 1727279220
-
 export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ 
   order, 
   isOpen, 
   onClose 
 }) => {
   const [selectedTab, setSelectedTab] = useState('summary');
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [assignedRiderId, setAssignedRiderId] = useState<string | null>(order?.assigned_rider_id || null);
+  const [isAssigningRider, setIsAssigningRider] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   
+  // Fetch live data
   const { data: detailedOrderData, isLoading: isLoadingDetailed, error } = useDetailedOrderData(order?.id);
+  const { drivers, loading: driversLoading } = useDriverManagement();
+  const { updateStatus, isUpdating } = useProductionStatusUpdate();
   
   if (!order) {
     return null;
@@ -45,15 +48,46 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   });
 
   const handleStatusUpdate = async (newStatus: string) => {
-    setIsUpdatingStatus(true);
     try {
-      // TODO: Implement status update logic here
-      // await updateOrderStatus(order.id, newStatus);
-      toast.success(`Order status updated to ${newStatus}`);
+      await updateStatus({ orderId: order.id, status: newStatus });
     } catch (error) {
-      toast.error('Failed to update order status');
+      console.error('Status update failed:', error);
+    }
+  };
+
+  const handleRiderAssignment = async (riderId: string | null) => {
+    if (isAssigningRider) return;
+    
+    setIsAssigningRider(true);
+    try {
+      if (riderId) {
+        const { data, error } = await supabase.rpc('assign_rider_to_order', {
+          p_order_id: order.id,
+          p_rider_id: riderId
+        });
+        
+        if (error) throw error;
+        
+        setAssignedRiderId(riderId);
+        const rider = drivers.find(d => d.id === riderId);
+        toast.success(`Rider ${rider?.name} assigned successfully`);
+      } else {
+        // Unassign rider
+        const { error } = await supabase
+          .from('orders')
+          .update({ assigned_rider_id: null })
+          .eq('id', order.id);
+        
+        if (error) throw error;
+        
+        setAssignedRiderId(null);
+        toast.success('Rider unassigned successfully');
+      }
+    } catch (error) {
+      console.error('Rider assignment failed:', error);
+      toast.error('Failed to assign rider');
     } finally {
-      setIsUpdatingStatus(false);
+      setIsAssigningRider(false);
     }
   };
 
@@ -83,8 +117,13 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           error={error}
           selectedTab={selectedTab}
           setSelectedTab={setSelectedTab}
-          isUpdatingStatus={isUpdatingStatus}
+          isUpdatingStatus={isUpdating}
           handleStatusUpdate={handleStatusUpdate}
+          drivers={drivers}
+          driversLoading={driversLoading}
+          assignedRiderId={assignedRiderId}
+          onRiderAssignment={handleRiderAssignment}
+          isAssigningRider={isAssigningRider}
         />
         <OrderDetailsFooter onClose={onClose} />
       </div>

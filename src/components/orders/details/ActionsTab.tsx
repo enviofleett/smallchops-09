@@ -1,20 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ActionsPanel } from './ActionsPanel';
 import { 
   Clock, CheckCircle2, XCircle, ArrowRight, Settings, 
-  MessageSquare, Hash, AlertCircle 
+  MessageSquare, Hash, AlertCircle, RefreshCw 
 } from 'lucide-react';
+import { OrderStatus } from '@/types/orders';
 
 interface ActionsTabProps {
-  order: {
-    status: string;
-  };
+  order: any;
   isUpdatingStatus: boolean;
   handleStatusUpdate: (status: string) => Promise<void>;
+  drivers?: any[];
+  driversLoading?: boolean;
+  assignedRiderId?: string | null;
+  onRiderAssignment?: (riderId: string | null) => Promise<void>;
+  isAssigningRider?: boolean;
 }
 
-// Status options for actions
+// Status options for quick actions
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'Pending', icon: Clock, color: 'text-yellow-600' },
   { value: 'confirmed', label: 'Confirmed', icon: CheckCircle2, color: 'text-blue-600' },
@@ -25,40 +30,72 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'text-red-600' }
 ];
 
-/**
- * ActionsTab component provides order status management and additional actions
- * 
- * @param order - Order object with current status
- * @param isUpdatingStatus - Loading state for status updates
- * @param handleStatusUpdate - Function to handle status updates
- * 
- * @example
- * ```tsx
- * const order = { status: "preparing" };
- * 
- * const handleStatusUpdate = async (status: string) => {
- *   // Update order status logic
- *   console.log('Updating to:', status);
- * };
- * 
- * <ActionsTab 
- *   order={order} 
- *   isUpdatingStatus={false}
- *   handleStatusUpdate={handleStatusUpdate}
- * />
- * ```
- */
 export const ActionsTab: React.FC<ActionsTabProps> = ({ 
   order, 
   isUpdatingStatus, 
-  handleStatusUpdate 
+  handleStatusUpdate,
+  drivers = [],
+  driversLoading = false,
+  assignedRiderId,
+  onRiderAssignment,
+  isAssigningRider = false
 }) => {
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(order.status);
+  const [manualStatus, setManualStatus] = useState<OrderStatus | ''>('');
+  const [isSendingManual, setIsSendingManual] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyState, setVerifyState] = useState<'idle' | 'success' | 'failed' | 'pending'>('idle');
+  const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
+
+  const handleStatusChange = (status: OrderStatus) => {
+    setSelectedStatus(status);
+  };
+
+  const handleRiderChange = async (riderId: string | null) => {
+    if (onRiderAssignment) {
+      await onRiderAssignment(riderId);
+    }
+  };
+
+  const handleUpdate = async () => {
+    await handleStatusUpdate(selectedStatus);
+  };
+
+  const handleManualSend = async () => {
+    if (!manualStatus) return;
+    setIsSendingManual(true);
+    try {
+      // Implement manual email send logic here
+      console.log('Sending manual email for status:', manualStatus);
+    } catch (error) {
+      console.error('Failed to send manual email:', error);
+    } finally {
+      setIsSendingManual(false);
+    }
+  };
+
+  const handleVerifyPayment = async () => {
+    setIsVerifying(true);
+    setVerifyState('pending');
+    try {
+      // Implement payment verification logic here
+      console.log('Verifying payment for order:', order.id);
+      setVerifyState('success');
+      setVerifyMessage('Payment verified successfully');
+    } catch (error) {
+      setVerifyState('failed');
+      setVerifyMessage('Payment verification failed');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   return (
-    <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 shadow-lg mb-6">
-      <div className="p-6">
-        <h2 className="text-xl font-bold mb-4">Order Actions & Status Management</h2>
-        <div className="mb-6">
-          <div className="font-medium mb-2">Quick Status Updates</div>
+    <div className="space-y-6">
+      {/* Quick Status Actions */}
+      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 shadow-lg">
+        <div className="p-6">
+          <h2 className="text-xl font-bold mb-4">Quick Status Updates</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             {STATUS_OPTIONS.map((status) => {
               const Icon = status.icon;
@@ -78,15 +115,47 @@ export const ActionsTab: React.FC<ActionsTabProps> = ({
                     ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
                   `}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-primary-foreground' : status.color}`} />
+                  {isDisabled ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-primary-foreground' : status.color}`} />
+                  )}
                   <span className="leading-tight text-center font-medium">{status.label}</span>
                 </Button>
               );
             })}
           </div>
         </div>
-        <div className="pt-6 border-t border-muted/30">
-          <div className="font-medium mb-2">Additional Actions</div>
+      </Card>
+
+      {/* Advanced Actions Panel */}
+      <ActionsPanel
+        selectedStatus={selectedStatus}
+        onStatusChange={handleStatusChange}
+        assignedRider={assignedRiderId}
+        onRiderChange={handleRiderChange}
+        riders={drivers}
+        isLoadingRiders={driversLoading}
+        manualStatus={manualStatus}
+        onManualStatusChange={setManualStatus}
+        onManualSend={handleManualSend}
+        onUpdate={handleUpdate}
+        onVerifyPayment={handleVerifyPayment}
+        paymentReference={order.payment_reference}
+        isUpdating={isUpdatingStatus || isAssigningRider}
+        isSendingManual={isSendingManual}
+        isVerifying={isVerifying}
+        verifyState={verifyState}
+        verifyMessage={verifyMessage}
+        orderId={order.id}
+        customerEmail={order.customer_email}
+        orderNumber={order.order_number}
+      />
+
+      {/* Additional Actions */}
+      <Card>
+        <div className="p-6">
+          <h3 className="font-medium mb-4">Additional Actions</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Button variant="outline" size="sm" className="h-12 flex flex-col items-center gap-1">
               <MessageSquare className="w-4 h-4" />
@@ -106,7 +175,7 @@ export const ActionsTab: React.FC<ActionsTabProps> = ({
             </Button>
           </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 };

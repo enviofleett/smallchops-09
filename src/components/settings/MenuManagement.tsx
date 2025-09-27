@@ -226,14 +226,14 @@ export const MenuManagement = () => {
             <div>
               <Label htmlFor="parent">Parent Menu</Label>
               <Select
-                value={newMenuData.parent_key}
-                onValueChange={(value) => setNewMenuData({ ...newMenuData, parent_key: value })}
+                value={newMenuData.parent_key || 'none'}
+                onValueChange={(value) => setNewMenuData({ ...newMenuData, parent_key: value === 'none' ? '' : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select parent (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (Main Menu)</SelectItem>
+                  <SelectItem value="none">None (Main Menu)</SelectItem>
                   {menuStructure?.map((menu) => (
                     <SelectItem key={menu.key} value={menu.key}>
                       {menu.label}

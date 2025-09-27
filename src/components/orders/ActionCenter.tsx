@@ -127,16 +127,16 @@ export const ActionCenter: React.FC<ActionCenterProps> = ({ order, onClose }) =>
         {/* Rider Assignment */}
         <div>
           <p className="text-sm font-medium mb-3">Assign Rider</p>
-          <Select
-            value={order.assigned_rider_id || ''}
-            onValueChange={(value) => handleRiderAssignment(value || null)}
-            disabled={isAssigningRider || driversLoading}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a rider..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">No rider assigned</SelectItem>
+        <Select
+          value={order.assigned_rider_id || 'unassigned'}
+          onValueChange={(value) => handleRiderAssignment(value === 'unassigned' ? null : value)}
+          disabled={isAssigningRider || driversLoading}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select a rider..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unassigned">No rider assigned</SelectItem>
               {drivers?.map((driver) => (
                 <SelectItem key={driver.id} value={driver.id}>
                   <div className="flex items-center gap-2">

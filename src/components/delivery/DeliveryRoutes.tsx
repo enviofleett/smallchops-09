@@ -144,14 +144,14 @@ export function DeliveryRoutes({ className }: DeliveryRoutesProps) {
                 <div className="space-y-2">
                   <Label htmlFor="driver">Driver</Label>
                   <Select 
-                    value={formData.driver_id || ''} 
-                    onValueChange={(value) => setFormData({...formData, driver_id: value})}
+                    value={formData.driver_id || 'unassigned'} 
+                    onValueChange={(value) => setFormData({...formData, driver_id: value === 'unassigned' ? '' : value})}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a driver" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {drivers.filter(d => d.is_active).map((driver) => (
                         <SelectItem key={driver.id} value={driver.id}>
                           {driver.name} ({driver.vehicle_type})

@@ -88,16 +88,16 @@ export const RealTimeOrdersExample: React.FC = () => {
       {/* Filters */}
       <div className="flex gap-4">
         <Select
-          value={statusFilter.join(',')}
+          value={statusFilter.length > 0 ? statusFilter.join(',') : 'all'}
           onValueChange={(value) => {
-            setStatusFilter(value ? value.split(',') as OrderStatus[] : []);
+            setStatusFilter(value === 'all' ? [] : value.split(',') as OrderStatus[]);
           }}
         >
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All statuses</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="confirmed">Confirmed</SelectItem>
             <SelectItem value="preparing">Preparing</SelectItem>
@@ -108,16 +108,16 @@ export const RealTimeOrdersExample: React.FC = () => {
         </Select>
 
         <Select
-          value={orderTypeFilter.join(',')}
+          value={orderTypeFilter.length > 0 ? orderTypeFilter.join(',') : 'all'}
           onValueChange={(value) => {
-            setOrderTypeFilter(value ? value.split(',') as ('delivery' | 'pickup' | 'dine_in')[] : []);
+            setOrderTypeFilter(value === 'all' ? [] : value.split(',') as ('delivery' | 'pickup' | 'dine_in')[]);
           }}
         >
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Filter by type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All types</SelectItem>
+            <SelectItem value="all">All types</SelectItem>
             <SelectItem value="delivery">Delivery</SelectItem>
             <SelectItem value="pickup">Pickup</SelectItem>
             <SelectItem value="dine_in">Dine In</SelectItem>

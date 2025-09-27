@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery } from '@tanstack/react-query';
 import { getOrders, OrderWithItems } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
-import { OrderDetailsModal } from '@/components/admin/OrderDetailsModal';
+import { OrderDetailsModalRedesign } from '@/components/orders/OrderDetailsModalRedesign';
 import { EnhancedOrderCard } from '@/components/admin/EnhancedOrderCard';
 import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
@@ -828,7 +828,7 @@ function AdminOrdersContent() {
 
         {/* Order Details Modal */}
         {selectedOrder && (
-          <OrderDetailsModal 
+          <OrderDetailsModalRedesign 
             order={selectedOrder} 
             isOpen={isDialogOpen} 
             onClose={() => {

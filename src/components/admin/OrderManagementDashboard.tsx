@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { OrderFilters } from './OrderFilters';
-import { OrderDetailsModal } from './OrderDetailsModal';
+import { OrderDetailsModalRedesign } from '@/components/orders/OrderDetailsModalRedesign';
 import { useOrdersQuery } from '@/hooks/useOrdersQuery';
 import { useOrderFilters } from '@/hooks/useOrderFilters';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -373,7 +373,7 @@ export const OrderManagementDashboard = () => {
 
       {/* Order Details Modal */}
       {selectedOrder && (
-        <OrderDetailsModal
+        <OrderDetailsModalRedesign
           order={selectedOrder}
           isOpen={isDetailsModalOpen}
           onClose={() => {

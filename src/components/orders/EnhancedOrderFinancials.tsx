@@ -205,7 +205,7 @@ export const EnhancedOrderFinancials: React.FC<OrderFinancialsProps> = ({
         </Card>
       )}
 
-      {/* Order Metadata */}
+        {/* Order Metadata */}
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -224,26 +224,58 @@ export const EnhancedOrderFinancials: React.FC<OrderFinancialsProps> = ({
               <p className="text-muted-foreground">Last Updated</p>
               <p className="font-medium">{formatDateTime(order.updated_at)}</p>
             </div>
-            
-            {order.guest_session_id && (
+
+            {order.paid_at && (
               <div>
-                <p className="text-muted-foreground">Guest Session</p>
-                <p className="font-mono text-xs">{order.guest_session_id}</p>
-              </div>
-            )}
-            
-            {order.idempotency_key && (
-              <div>
-                <p className="text-muted-foreground">Idempotency Key</p>
-                <p className="font-mono text-xs">{order.idempotency_key}</p>
+                <p className="text-muted-foreground">Paid At</p>
+                <p className="font-medium text-green-600">{formatDateTime(order.paid_at)}</p>
               </div>
             )}
 
-            {order.reference_updated_at && (
+            {order.payment_verified_at && (
               <div>
-                <p className="text-muted-foreground">Reference Updated</p>
-                <p className="font-medium">{formatDateTime(order.reference_updated_at)}</p>
+                <p className="text-muted-foreground">Payment Verified</p>
+                <p className="font-medium text-green-600">{formatDateTime(order.payment_verified_at)}</p>
               </div>
+            )}
+
+            {order.processing_started_at && (
+              <div>
+                <p className="text-muted-foreground">Processing Started</p>
+                <p className="font-medium">{formatDateTime(order.processing_started_at)}</p>
+              </div>
+            )}
+            
+            {showInternalMetrics && (
+              <>
+                {order.guest_session_id && (
+                  <div>
+                    <p className="text-muted-foreground">Guest Session</p>
+                    <p className="font-mono text-xs">{order.guest_session_id.slice(-8)}</p>
+                  </div>
+                )}
+                
+                {order.idempotency_key && (
+                  <div>
+                    <p className="text-muted-foreground">Idempotency Key</p>
+                    <p className="font-mono text-xs">{order.idempotency_key.slice(-8)}</p>
+                  </div>
+                )}
+
+                {order.paystack_reference && (
+                  <div>
+                    <p className="text-muted-foreground">Paystack Ref</p>
+                    <p className="font-mono text-xs">{order.paystack_reference}</p>
+                  </div>
+                )}
+
+                {order.reference_updated_at && (
+                  <div>
+                    <p className="text-muted-foreground">Reference Updated</p>
+                    <p className="font-medium">{formatDateTime(order.reference_updated_at)}</p>
+                  </div>
+                )}
+              </>
             )}
             
             {order.estimated_delivery_date && (

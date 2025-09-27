@@ -41,6 +41,7 @@ import { CommunicationLog } from './CommunicationLog';
 import { EnhancedItemsDisplay } from './EnhancedItemsDisplay';
 import { EnhancedCommunicationLog } from './EnhancedCommunicationLog';
 import { EnhancedOrderFinancials } from './EnhancedOrderFinancials';
+import { EnhancedTimelineTab } from './details/EnhancedTimelineTab';
 
 interface ProductionOrderDetailsPageProps {
   orderId: string;
@@ -348,47 +349,18 @@ export const ProductionOrderDetailsPage: React.FC<ProductionOrderDetailsPageProp
         {/* Enhanced Order Items Display */}
         <EnhancedItemsDisplay items={items || []} showFinancialDetails={true} />
 
-        {/* Fulfillment Timeline */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Order Progress
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative">
-              <div className="flex items-center justify-between">
-                {getTimelineSteps().map((step, index) => (
-                  <div key={step.key} className="flex flex-col items-center flex-1">
-                    <div className={`
-                      w-8 h-8 rounded-full flex items-center justify-center mb-2
-                      ${step.status === 'completed' 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-muted text-muted-foreground'
-                      }
-                    `}>
-                      {step.status === 'completed' ? (
-                        <CheckCircle2 className="h-4 w-4" />
-                      ) : (
-                        <Circle className="h-4 w-4" />
-                      )}
-                    </div>
-                    <p className="text-xs text-center font-medium">{step.label}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="absolute top-4 left-4 right-4 h-0.5 bg-muted -z-10">
-                <div 
-                  className="h-full bg-green-500 transition-all duration-500"
-                  style={{ 
-                    width: `${(getTimelineSteps().filter(s => s.status === 'completed').length - 1) * 25}%` 
-                  }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Enhanced Timeline View */}
+        <EnhancedTimelineTab 
+          detailedOrderData={{
+            timeline,
+            audit_logs,
+            communication_events,
+            order
+          }}
+          isLoading={isLoading}
+          error={error}
+          order={order}
+        />
 
         {/* Location & Scheduling Details */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

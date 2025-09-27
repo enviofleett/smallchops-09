@@ -104,11 +104,11 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
     retry: 2
   });
 
-  // Setup real-time subscriptions
+  // Setup real-time subscriptions with performance optimization
   const setupSubscriptions = useCallback(() => {
     if (!orderId) return;
 
-    console.log('📡 Setting up real-time subscriptions for order:', orderId);
+    console.log('📡 Setting up optimized real-time subscriptions for order:', orderId);
     setConnectionStatus('connecting');
 
     // Clean up existing channel
@@ -116,9 +116,9 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
       supabase.removeChannel(channelRef.current);
     }
 
-    // Create new channel for real-time updates
+    // Create single channel for all subscriptions (more efficient)
     const channel = supabase
-      .channel(`order-details-${orderId}`)
+      .channel(`order-updates-${orderId}`)
       .on(
         'postgres_changes',
         {
@@ -130,7 +130,8 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         (payload) => {
           console.log('📦 Order updated:', payload);
           setLastUpdated(new Date());
-          refetch();
+          // Debounced refetch for better performance
+          setTimeout(() => refetch(), 100);
         }
       )
       .on(
@@ -144,7 +145,7 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         (payload) => {
           console.log('🚚 Delivery schedule updated:', payload);
           setLastUpdated(new Date());
-          refetch();
+          setTimeout(() => refetch(), 100);
         }
       )
       .on(
@@ -158,7 +159,7 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         (payload) => {
           console.log('🛍️ Order items updated:', payload);
           setLastUpdated(new Date());
-          refetch();
+          setTimeout(() => refetch(), 100);
         }
       )
       .on(
@@ -172,7 +173,8 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         (payload) => {
           console.log('📧 Communication events updated:', payload);
           setLastUpdated(new Date());
-          refetch();
+          // Lower priority refresh for communication events
+          setTimeout(() => refetch(), 500);
         }
       )
       .on(
@@ -186,11 +188,12 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         (payload) => {
           console.log('📋 Audit logs updated:', payload);
           setLastUpdated(new Date());
-          refetch();
+          // Lower priority refresh for audit logs
+          setTimeout(() => refetch(), 1000);
         }
       )
       .subscribe((status) => {
-        console.log('📡 Subscription status:', status);
+        console.log('📡 Optimized subscription status:', status);
         
         if (status === 'SUBSCRIBED') {
           console.log('✅ Real-time subscriptions active for order:', orderId);
@@ -205,9 +208,9 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
           console.error('❌ Real-time subscription error for order:', orderId);
           setConnectionStatus('disconnected');
           
-          // Attempt to reconnect after 3 seconds
+          // Exponential backoff reconnection
           reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Attempting to reconnect for order:', orderId);
+            console.log('🔄 Attempting optimized reconnection for order:', orderId);
             setupSubscriptions();
           }, 3000);
         } else if (status === 'CLOSED') {

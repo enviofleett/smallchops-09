@@ -34,27 +34,54 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
       const { data: comprehensiveData, error: rpcError } = await supabase
         .rpc('get_comprehensive_order_fulfillment', { p_order_id: orderId });
       
-      if (rpcError) {
-        console.warn('⚠️ Comprehensive RPC failed, using fallback:', rpcError);
+      if (rpcError || (comprehensiveData && typeof comprehensiveData === 'object' && comprehensiveData && 'error' in comprehensiveData)) {
+        console.warn('⚠️ Comprehensive RPC failed, using fallback:', rpcError || comprehensiveData);
         
-        // Fallback to individual queries
-        const [orderResult, scheduleResult] = await Promise.all([
-          supabase.from('orders').select('*').eq('id', orderId).maybeSingle(),
-          supabase.from('order_delivery_schedule').select('*').eq('order_id', orderId).maybeSingle()
+        // Fallback to individual queries with better error handling
+        const [orderResult, scheduleResult, itemsResult] = await Promise.all([
+          supabase.from('orders').select(`
+            *,
+            order_items(*)
+          `).eq('id', orderId).maybeSingle(),
+          supabase.from('order_delivery_schedule').select('*').eq('order_id', orderId).maybeSingle(),
+          supabase.from('order_items').select('*').eq('order_id', orderId)
         ]);
         
-        if (orderResult.error) throw orderResult.error;
+        if (orderResult.error) {
+          console.error('Error fetching order:', orderResult.error);
+          throw new Error(`Order not found or access denied: ${orderResult.error.message}`);
+        }
+
+        if (!orderResult.data) {
+          throw new Error('Order not found');
+        }
+        
+        // Build comprehensive response structure
+        const order = orderResult.data;
+        const deliverySchedule = scheduleResult.data;
+        const items = itemsResult.data || [];
         
         return {
-          order: orderResult.data,
-          delivery_schedule: scheduleResult.data,
-          items: [],
+          order: order,
+          items: items,
+          delivery_schedule: deliverySchedule,
           fulfillment_info: {
-            type: orderResult.data?.order_type || 'delivery',
-            address: (orderResult.data?.delivery_address as any)?.address_line_1 || 
-                    (orderResult.data?.delivery_address as any)?.address || 
-                    'Address not available'
-          }
+            type: order.order_type || 'delivery',
+            address: (order.delivery_address as any)?.address_line_1 || 
+                    (order.delivery_address as any)?.address || 
+                    'Address not available',
+            pickup_time: order.pickup_time,
+            delivery_date: deliverySchedule?.delivery_date,
+            delivery_hours: deliverySchedule ? {
+              start: deliverySchedule.delivery_time_start,
+              end: deliverySchedule.delivery_time_end,
+              is_flexible: deliverySchedule.is_flexible
+            } : null,
+            order_instructions: order.special_instructions
+          },
+          pickup_point: null, // Will be fetched separately if needed
+          business_settings: null, // Will be fetched separately if needed
+          timeline: null // Will be built from order status
         };
       }
       

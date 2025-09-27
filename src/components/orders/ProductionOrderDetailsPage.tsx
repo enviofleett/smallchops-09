@@ -137,6 +137,8 @@ export const ProductionOrderDetailsPage: React.FC<ProductionOrderDetailsPageProp
       if (!orderId) return "No order ID provided";
       if (error?.message?.includes('Order ID is required')) return "Invalid order ID format";
       if (error?.message?.includes('RPC call failed')) return "Database connection issue";
+      if (error?.message?.includes('record "v_assigned_driver" is not assigned')) return "Order data loading issue - driver assignment system error";
+      if (error?.message?.includes('Database error occurred')) return "Temporary database issue - please try again";
       if (!orderData?.order) return "Order not found - it may have been deleted or you may not have permission to view it";
       return `Error loading order: ${error?.message || 'Unknown error'}`;
     };

@@ -38,6 +38,9 @@ import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ActionCenter } from './ActionCenter';
 import { CommunicationLog } from './CommunicationLog';
+import { EnhancedItemsDisplay } from './EnhancedItemsDisplay';
+import { EnhancedCommunicationLog } from './EnhancedCommunicationLog';
+import { EnhancedOrderFinancials } from './EnhancedOrderFinancials';
 
 interface ProductionOrderDetailsPageProps {
   orderId: string;
@@ -204,7 +207,17 @@ export const ProductionOrderDetailsPage: React.FC<ProductionOrderDetailsPageProp
     );
   }
 
-  const { order, items, fulfillment_info, pickup_point, business_settings, timeline } = orderData;
+  const { 
+    order, 
+    items, 
+    fulfillment_info, 
+    pickup_point, 
+    business_settings, 
+    timeline,
+    communication_events,
+    audit_logs,
+    assigned_agent
+  } = orderData;
 
   return (
     <div className="min-h-screen bg-background" ref={printRef}>
@@ -277,7 +290,7 @@ export const ProductionOrderDetailsPage: React.FC<ProductionOrderDetailsPageProp
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-8">
-        {/* Customer & Order Summary */}
+        {/* Customer Information & Enhanced Financials */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
@@ -287,20 +300,28 @@ export const ProductionOrderDetailsPage: React.FC<ProductionOrderDetailsPageProp
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Name</p>
-                <p className="font-medium">{order.customer_name || 'Not provided'}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Name</p>
+                  <p className="font-medium">{order.customer_name || 'Not provided'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Email</p>
+                  <p className="font-medium">{order.customer_email || 'Not provided'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Phone</p>
+                  <p className="font-medium">{order.customer_phone || 'Not provided'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Customer ID</p>
+                  <p className="font-mono text-sm">{order.customer_id || 'Guest Customer'}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Email</p>
-                <p className="font-medium">{order.customer_email || 'Not provided'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Phone</p>
-                <p className="font-medium">{order.customer_phone || 'Not provided'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Payment Status</p>
+              
+              {/* Payment Status */}
+              <div className="pt-4 border-t">
+                <p className="text-sm text-muted-foreground mb-2">Payment Status</p>
                 <Badge 
                   variant={order.payment_status === 'completed' ? 'default' : 'secondary'}
                   className={order.payment_status === 'completed' ? 'bg-green-500' : ''}
@@ -311,83 +332,21 @@ export const ProductionOrderDetailsPage: React.FC<ProductionOrderDetailsPageProp
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Order Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Subtotal</span>
-                <span className="font-medium">{formatCurrency(order.subtotal || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Delivery Fee</span>
-                <span className="font-medium">{formatCurrency(order.delivery_fee || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">VAT</span>
-                <span className="font-medium">{formatCurrency(order.vat_amount || 0)}</span>
-              </div>
-              <div className="border-t pt-2">
-                <div className="flex justify-between">
-                  <span className="font-semibold">Total</span>
-                  <span className="font-bold text-lg">{formatCurrency(order.total_amount)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Action Center */}
-          <ActionCenter order={order} />
+          {/* Enhanced Financial Details */}
+          <div className="lg:col-span-2">
+            <EnhancedOrderFinancials order={order} showInternalMetrics={true} />
+          </div>
         </div>
 
-        {/* Order Items */}
+        {/* Action Center */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Order Items ({items?.length || 0})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {items?.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2">Item</th>
-                      <th className="text-center py-2">Qty</th>
-                      <th className="text-right py-2">Unit Price</th>
-                      <th className="text-right py-2">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item: any, index: number) => (
-                      <tr key={index} className="border-b">
-                        <td className="py-3">
-                          <div>
-                            <p className="font-medium">{item.product?.name || 'Unknown Item'}</p>
-                            {item.special_instructions && (
-                              <p className="text-sm text-muted-foreground">{item.special_instructions}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="text-center py-3">{item.quantity}</td>
-                        <td className="text-right py-3">{formatCurrency(item.unit_price)}</td>
-                        <td className="text-right py-3 font-medium">{formatCurrency(item.total_price)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">No items found</p>
-            )}
+          <CardContent className="p-6">
+            <ActionCenter order={order} />
           </CardContent>
         </Card>
+
+        {/* Enhanced Order Items Display */}
+        <EnhancedItemsDisplay items={items || []} showFinancialDetails={true} />
 
         {/* Fulfillment Timeline */}
         <Card>
@@ -448,96 +407,178 @@ export const ProductionOrderDetailsPage: React.FC<ProductionOrderDetailsPageProp
                 </div>
               </div>
               
-              {order.order_type === 'pickup' && pickup_point && (
+              {order.order_type === 'pickup' && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">Pickup Point Details</p>
-                  <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-                    <p className="font-medium">{pickup_point.name}</p>
-                    {pickup_point.contact_phone && (
-                      <p className="text-sm text-muted-foreground">{pickup_point.contact_phone}</p>
-                    )}
+                  <p className="text-sm text-muted-foreground mb-2">Pickup Time</p>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                    <p className="font-medium">
+                      {order.pickup_time ? format(new Date(order.pickup_time), 'PPpp') : 'Not scheduled'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {fulfillment_info?.delivery_hours && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Delivery Window</p>
+                  <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                    <p className="font-medium">
+                      {fulfillment_info.delivery_hours.start} - {fulfillment_info.delivery_hours.end}
+                      {fulfillment_info.delivery_hours.is_flexible && ' (Flexible)'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {fulfillment_info?.special_instructions && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Special Instructions</p>
+                  <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg">
+                    <p>{fulfillment_info.special_instructions}</p>
                   </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
+          {/* Assigned Agent */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Scheduling Information
+                <Truck className="h-5 w-5" />
+                Assigned Agent
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">
-                  {order.order_type === 'pickup' ? 'Pickup' : 'Delivery'} Time
-                </p>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  {order.order_type === 'pickup' && fulfillment_info?.pickup_time ? (
-                    <p className="font-medium">{formatDateTime(fulfillment_info.pickup_time)}</p>
-                  ) : fulfillment_info?.delivery_date ? (
-                    <p className="font-medium">
-                      {format(new Date(fulfillment_info.delivery_date), 'PPP')}
-                      {fulfillment_info.delivery_hours && (
-                        <span className="text-sm text-muted-foreground block">
-                          {fulfillment_info.delivery_hours.start} - {fulfillment_info.delivery_hours.end}
-                          {fulfillment_info.delivery_hours.is_flexible && ' (Flexible)'}
-                        </span>
+            <CardContent>
+              {assigned_agent ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{assigned_agent.name}</p>
+                      <p className="text-sm text-muted-foreground">Delivery Agent</p>
+                    </div>
+                  </div>
+                  
+                  {assigned_agent.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{assigned_agent.phone}</span>
+                    </div>
+                  )}
+                  
+                  {assigned_agent.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{assigned_agent.email}</span>
+                    </div>
+                  )}
+
+                  {(assigned_agent.vehicle_type || assigned_agent.license_plate) && (
+                    <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm font-medium mb-2">Vehicle Information</p>
+                      {assigned_agent.vehicle_type && (
+                        <p className="text-sm">Type: {assigned_agent.vehicle_type}</p>
                       )}
-                    </p>
-                  ) : (
-                    <p className="text-muted-foreground">Not scheduled</p>
+                      {assigned_agent.vehicle_brand && assigned_agent.vehicle_model && (
+                        <p className="text-sm">
+                          Vehicle: {assigned_agent.vehicle_brand} {assigned_agent.vehicle_model}
+                        </p>
+                      )}
+                      {assigned_agent.license_plate && (
+                        <p className="text-sm">Plate: {assigned_agent.license_plate}</p>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-              
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Order Created</p>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="font-medium">{formatDateTime(order.created_at)}</p>
+              ) : (
+                <div className="text-center py-8">
+                  <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No agent assigned yet</p>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Special Instructions & Communication Log */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Enhanced Communication Log */}
+        <EnhancedCommunicationLog 
+          events={communication_events || []} 
+          isLoading={isLoading}
+        />
+
+        {/* Admin Notes & Activity Log */}
+        {audit_logs && audit_logs.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Hash className="h-5 w-5" />
+                Activity Log ({audit_logs.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {audit_logs.map((log: any) => (
+                  <div key={log.id} className="flex items-start gap-3 p-3 border border-border rounded-lg">
+                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary mt-2"></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{log.message}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {log.category} • {format(new Date(log.created_at), 'MMM dd, HH:mm')}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {log.action}
+                        </Badge>
+                      </div>
+                      
+                      {(log.old_values || log.new_values) && (
+                        <details className="mt-2">
+                          <summary className="text-xs text-muted-foreground cursor-pointer">
+                            View Details
+                          </summary>
+                          <div className="mt-1 p-2 bg-muted/30 rounded text-xs">
+                            {log.old_values && (
+                              <div className="mb-1">
+                                <strong>Before:</strong> {JSON.stringify(log.old_values, null, 2)}
+                              </div>
+                            )}
+                            {log.new_values && (
+                              <div>
+                                <strong>After:</strong> {JSON.stringify(log.new_values, null, 2)}
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Admin Notes */}
+        {order.admin_notes && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
-                Special Instructions
+                Admin Notes
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {[
-                  fulfillment_info?.order_instructions,
-                  fulfillment_info?.special_instructions,
-                  fulfillment_info?.schedule_instructions
-                ].filter(Boolean).length > 0 ? (
-                  [
-                    fulfillment_info?.order_instructions,
-                    fulfillment_info?.special_instructions,
-                    fulfillment_info?.schedule_instructions
-                  ].filter(Boolean).map((instruction, index) => (
-                    <div key={index} className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-sm">{instruction}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-muted-foreground">No special instructions</p>
-                )}
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <pre className="whitespace-pre-wrap text-sm">{order.admin_notes}</pre>
               </div>
             </CardContent>
           </Card>
-
-          {/* Communication Log */}
-          <CommunicationLog orderId={order.id} />
-        </div>
+        )}
 
         {/* Business Information Footer */}
         {business_settings && (

@@ -37,14 +37,19 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
       if (rpcError || (comprehensiveData && typeof comprehensiveData === 'object' && comprehensiveData && 'error' in comprehensiveData)) {
         console.warn('⚠️ Comprehensive RPC failed, using fallback:', rpcError || comprehensiveData);
         
-        // Fallback to individual queries with better error handling
-        const [orderResult, scheduleResult, itemsResult] = await Promise.all([
-          supabase.from('orders').select(`
-            *,
-            order_items(*)
-          `).eq('id', orderId).maybeSingle(),
+        // Enhanced fallback with comprehensive data
+        const [orderResult, scheduleResult, itemsResult, communicationResult, auditResult] = await Promise.all([
+          supabase.from('orders').select('*').eq('id', orderId).maybeSingle(),
           supabase.from('order_delivery_schedule').select('*').eq('order_id', orderId).maybeSingle(),
-          supabase.from('order_items').select('*').eq('order_id', orderId)
+          supabase.from('order_items').select(`
+            *,
+            products (
+              id, name, description, price, cost_price, image_url, 
+              category_id, features, ingredients
+            )
+          `).eq('order_id', orderId),
+          supabase.from('communication_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
+          supabase.from('audit_logs').select('*').eq('entity_id', orderId).order('created_at', { ascending: false }).limit(20)
         ]);
         
         if (orderResult.error) {
@@ -56,14 +61,18 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
           throw new Error('Order not found');
         }
         
-        // Build comprehensive response structure
+        // Build comprehensive response structure with all data
         const order = orderResult.data;
         const deliverySchedule = scheduleResult.data;
         const items = itemsResult.data || [];
+        const communications = communicationResult.data || [];
+        const auditLogs = auditResult.data || [];
         
         return {
           order: order,
           items: items,
+          communication_events: communications,
+          audit_logs: auditLogs,
           delivery_schedule: deliverySchedule,
           fulfillment_info: {
             type: order.order_type || 'delivery',
@@ -77,11 +86,12 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
               end: deliverySchedule.delivery_time_end,
               is_flexible: deliverySchedule.is_flexible
             } : null,
-            order_instructions: order.special_instructions
+            order_instructions: order.special_instructions,
+            special_instructions: deliverySchedule?.special_instructions || order.special_instructions
           },
           pickup_point: null, // Will be fetched separately if needed
           business_settings: null, // Will be fetched separately if needed
-          timeline: null // Will be built from order status
+          timeline: [] // Will be built from audit logs
         };
       }
       
@@ -147,6 +157,34 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         },
         (payload) => {
           console.log('🛍️ Order items updated:', payload);
+          setLastUpdated(new Date());
+          refetch();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'communication_events',
+          filter: `order_id=eq.${orderId}`
+        },
+        (payload) => {
+          console.log('📧 Communication events updated:', payload);
+          setLastUpdated(new Date());
+          refetch();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'audit_logs',
+          filter: `entity_id=eq.${orderId}`
+        },
+        (payload) => {
+          console.log('📋 Audit logs updated:', payload);
           setLastUpdated(new Date());
           refetch();
         }

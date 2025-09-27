@@ -133,14 +133,71 @@ export const ProductionOrderDetailsPage: React.FC<ProductionOrderDetailsPageProp
   }
 
   if (error || !orderData?.order) {
+    const getErrorMessage = () => {
+      if (!orderId) return "No order ID provided";
+      if (error?.message?.includes('Order ID is required')) return "Invalid order ID format";
+      if (error?.message?.includes('RPC call failed')) return "Database connection issue";
+      if (!orderData?.order) return "Order not found - it may have been deleted or you may not have permission to view it";
+      return `Error loading order: ${error?.message || 'Unknown error'}`;
+    };
+
+    const canRetry = error && !error?.message?.includes('not found') && orderId;
+
     return (
-      <div className="max-w-4xl mx-auto p-4">
+      <div className="max-w-4xl mx-auto p-4 space-y-4">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Failed to load order details. Please refresh the page or contact support.
+          <AlertDescription className="space-y-3">
+            <div>
+              <p className="font-medium">Unable to load order details</p>
+              <p className="text-sm opacity-90">{getErrorMessage()}</p>
+              {orderId && (
+                <p className="text-xs opacity-75 mt-2">Order ID: {orderId}</p>
+              )}
+            </div>
+            
+            {canRetry && (
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.reload()}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Retry
+                </Button>
+                {onClose && (
+                  <Button variant="ghost" size="sm" onClick={onClose}>
+                    Close
+                  </Button>
+                )}
+              </div>
+            )}
+            
+            {!canRetry && (
+              <div className="pt-2">
+                <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+                  Go Back
+                </Button>
+              </div>
+            )}
           </AlertDescription>
         </Alert>
+
+        {/* Development error details */}
+        {process.env.NODE_ENV === 'development' && error && (
+          <Alert>
+            <AlertDescription>
+              <details className="space-y-2">
+                <summary className="cursor-pointer font-medium">Debug Information</summary>
+                <pre className="text-xs bg-muted p-3 rounded overflow-auto">
+                  {JSON.stringify({ error, orderId, orderData }, null, 2)}
+                </pre>
+              </details>
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
     );
   }

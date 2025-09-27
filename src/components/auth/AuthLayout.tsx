@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import startersLogo from '@/assets/starters-logo.png';
+import loginHero from '@/assets/login-hero.jpg';
 interface AuthLayoutProps {
   children: React.ReactNode;
   title: string;
@@ -18,8 +19,8 @@ const AuthLayout = ({
       <div className="hidden lg:block lg:w-1/2 lg:h-screen relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40 z-10" />
         <img 
-          src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/hero-carousel/auth-bg.jpg" 
-          alt="Welcome to our platform" 
+          src={loginHero} 
+          alt="People enjoying Starters food and community" 
           className="w-full h-full object-cover" 
           onError={(e) => {
             // Fallback to gradient background

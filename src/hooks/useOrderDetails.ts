@@ -251,6 +251,6 @@ const generateTimelineFromStatus = (status: string, createdAt: string, updatedAt
     label: step.label,
     completed: index <= currentIndex,
     datetime: index === 0 ? createdAt : (index === currentIndex ? updatedAt : undefined),
-    status: index < currentIndex ? 'completed' : (index === currentIndex ? 'current' : 'pending'),
+    status: (index < currentIndex ? 'completed' : (index === currentIndex ? 'current' : 'pending')) as 'completed' | 'current' | 'pending',
   }));
 };

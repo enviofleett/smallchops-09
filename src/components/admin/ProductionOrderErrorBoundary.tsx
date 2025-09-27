@@ -61,21 +61,23 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      await supabase.functions.invoke('admin-orders-manager', {
-        body: {
-          action: 'log_admin_error',
-          orderId: this.props.orderId,
-          errorType: 'order_management_component_error',
-          error: {
-            message: error.message,
-            stack: error.stack,
-            componentStack: errorInfo.componentStack,
-            orderNumber: this.props.orderNumber,
-            timestamp: new Date().toISOString()
-          }
+      // Log to audit_logs table directly instead of edge function
+      await supabase.from('audit_logs').insert({
+        action: 'order_management_component_error',
+        category: 'Error Boundary',
+        message: `Production Order Error: ${error.message}`,
+        entity_id: this.props.orderId,
+        new_values: {
+          error_message: error.message,
+          error_stack: error.stack,
+          component_stack: errorInfo.componentStack,
+          order_number: this.props.orderNumber,
+          timestamp: new Date().toISOString(),
+          user_agent: navigator.userAgent
         }
       });
     } catch (auditError) {
+      // Fail silently in production to prevent error boundary loops
       console.warn('Failed to log error to audit trail:', auditError);
     }
   }
@@ -137,11 +139,11 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
               )}
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
+              <p className="text-sm text-accent-foreground font-medium">
                 <strong>Suggested Actions:</strong>
               </p>
-              <ul className="text-sm text-blue-700 mt-2 space-y-1">
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1">
                 <li>• Check your internet connection</li>
                 <li>• Verify the order still exists in the system</li>
                 <li>• Try refreshing the page</li>

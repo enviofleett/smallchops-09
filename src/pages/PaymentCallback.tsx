@@ -21,6 +21,7 @@ import {
 } from "@/utils/paymentMonitoring";
 import { paymentCompletionCoordinator } from "@/utils/paymentCompletion";
 import { verifyPayment } from "@/utils/paymentVerification";
+import { storeGuestOrderTracking, logGuestTrackingEvent } from "@/utils/guestCheckoutTracker";
 
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
@@ -295,6 +296,27 @@ export default function PaymentCallback() {
     // Log success
     logPaymentVerification(reference, true);
     logVerificationCompleted(reference, true, { orderId: payload?.order_id });
+
+    // PRODUCTION FIX: Store guest order tracking data for auto-population
+    if (payload?.order_number) {
+      try {
+        storeGuestOrderTracking({
+          order_number: payload.order_number,
+          orderId: payload.order_id,
+          paidAt: new Date().toISOString()
+        });
+        
+        logGuestTrackingEvent('auto_populated', {
+          orderNumber: payload.order_number,
+          orderId: payload.order_id,
+          source: 'payment_success'
+        });
+        
+        console.log('✅ Guest order tracking stored for:', payload.order_number);
+      } catch (trackingError) {
+        console.warn('⚠️ Failed to store guest tracking (non-blocking):', trackingError);
+      }
+    }
 
     try {
       // Coordinate completion flow

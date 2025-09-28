@@ -75,20 +75,16 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     lastUpdated={lastUpdated}
                   />
                   
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <div className="space-y-6">
-                      <CustomerSection order={order} />
-                      <OrderInfoSection 
-                        order={order}
-                        isUpdatingStatus={isUpdatingStatus}
-                        onStatusUpdate={() => refetch()}
-                      />
-                    </div>
-                    
-                    <div className="space-y-6">
-                      <OrderItemsSection order={order} />
-                      <DeliveryPickupSection order={order} />
-                    </div>
+                  {/* Changed from grid to one-column flex */}
+                  <div className="flex flex-col gap-6">
+                    <CustomerSection order={order} />
+                    <OrderInfoSection 
+                      order={order}
+                      isUpdatingStatus={isUpdatingStatus}
+                      onStatusUpdate={() => refetch()}
+                    />
+                    <OrderItemsSection order={order} />
+                    <DeliveryPickupSection order={order} />
                   </div>
                   
                   <TimelineSection order={order} />

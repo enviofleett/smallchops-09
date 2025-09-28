@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { formatAddress, emergencySafeFormatAddress } from '@/utils/formatAddress';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface RealTimeOrderDataHook {
@@ -76,9 +77,7 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
           delivery_schedule: deliverySchedule,
           fulfillment_info: {
             type: order.order_type || 'delivery',
-            address: (order.delivery_address as any)?.address_line_1 || 
-                    (order.delivery_address as any)?.address || 
-                    'Address not available',
+            address: emergencySafeFormatAddress(order.delivery_address),
             pickup_time: order.pickup_time,
             delivery_date: deliverySchedule?.delivery_date,
             delivery_hours: deliverySchedule ? {
@@ -96,6 +95,15 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
       }
       
       console.log('✅ Order data loaded successfully');
+      
+      // Apply production safety sanitization before returning
+      if (comprehensiveData && typeof comprehensiveData === 'object') {
+        const data = comprehensiveData as any;
+        if (data.order?.delivery_address) {
+          data.order.delivery_address = emergencySafeFormatAddress(data.order.delivery_address);
+        }
+      }
+      
       return comprehensiveData;
     },
     enabled: !!orderId,

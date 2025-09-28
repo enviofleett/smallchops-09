@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { toast } from 'sonner';
+import { safeStringify } from '@/utils/productionSafeData';
 
 interface Props {
   children: ReactNode;
@@ -111,24 +112,39 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
   private getProductionSafeErrorMessage = (error: Error | null): string => {
     if (!error) return 'An unexpected error occurred';
     
-    // Handle common React object rendering error
-    if (error.message.includes('Objects are not valid as a React child')) {
-      return 'Data formatting error: Address or object data cannot be displayed properly. This usually indicates corrupted order data.';
+    const errorMessage = safeStringify(error.message);
+    
+    // Enhanced React object rendering error detection
+    if (errorMessage.includes('Objects are not valid as a React child')) {
+      return 'Address or order data contains formatting errors that cannot be displayed. This typically occurs when order details are corrupted or in an unexpected format.';
     }
     
-    // Handle other common production errors
-    if (error.message.includes('Cannot read properties')) {
-      return 'Data access error: Missing or corrupted order information.';
+    // Enhanced common error patterns
+    if (errorMessage.includes('Cannot read properties') || errorMessage.includes('Cannot read property')) {
+      return 'Order data is missing required information. Some details may not display correctly.';
     }
     
-    if (error.message.includes('Network')) {
-      return 'Network connectivity issue: Unable to load order data.';
+    if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+      return 'Network connectivity issue: Unable to load current order data. Please check your connection.';
+    }
+    
+    if (errorMessage.includes('ChunkLoadError') || errorMessage.includes('Loading chunk')) {
+      return 'Application loading error: Please refresh the page to load the latest version.';
+    }
+    
+    // Minified React errors (common in production)
+    if (errorMessage.includes('Minified React error #31')) {
+      return 'React rendering error: Invalid data format detected in order details. This is usually caused by corrupted address or order information.';
+    }
+    
+    if (errorMessage.includes('Minified React error')) {
+      return 'React application error: Please refresh the page to restore functionality.';
     }
     
     // Return sanitized error message for production
-    return error.message.length > 200 
-      ? error.message.substring(0, 200) + '...' 
-      : error.message;
+    return errorMessage.length > 200 
+      ? errorMessage.substring(0, 200) + '...' 
+      : errorMessage;
   };
 
   render() {

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { formatAddress } from '@/utils/formatAddress';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -473,18 +474,12 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <h4 className="font-medium text-sm">Delivery Address</h4>
-                            <div className="text-sm text-muted-foreground">
-                              {order.delivery_address ? (
-                                typeof order.delivery_address === 'string' 
-                                  ? order.delivery_address 
-                                  : JSON.stringify(order.delivery_address)
-                              ) : (
-                                'No address provided'
-                              )}
+                            <div className="space-y-2">
+                              <h4 className="font-medium text-sm">Delivery Address</h4>
+                              <div className="text-sm text-muted-foreground">
+                                {formatAddress(order.delivery_address) || 'No address provided'}
+                              </div>
                             </div>
-                          </div>
                         </div>
 
                         {/* Order Items */}

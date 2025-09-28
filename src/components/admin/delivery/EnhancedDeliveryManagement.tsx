@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { formatAddress } from '@/utils/formatAddress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -426,7 +427,7 @@ export function EnhancedDeliveryManagement() {
                       label="Address" 
                       value={
                         <span className="text-xs">
-                          {order.delivery_address.address_line_1}, {order.delivery_address.city}
+                          {formatAddress(order.delivery_address)}
                         </span>
                       } 
                     />
@@ -588,7 +589,7 @@ export function EnhancedDeliveryManagement() {
                       Delivery Address
                     </h4>
                     <p className="text-sm">
-                      {order.delivery_address.address_line_1}, {order.delivery_address.city}
+                      {formatAddress(order.delivery_address)}
                     </p>
                     {schedule?.special_instructions && (
                       <p className="text-sm text-muted-foreground mt-1">

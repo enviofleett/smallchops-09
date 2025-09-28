@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { formatAddress } from '@/utils/formatAddress';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -231,7 +232,7 @@ export function UnifiedDeliveryManagement({
               <p><strong>Status:</strong> ${order.status}</p>
               <p><strong>Total:</strong> ₦${order.total_amount.toLocaleString()}</p>
               <p><strong>Date:</strong> ${format(new Date(order.created_at), 'PPpp')}</p>
-              ${order.delivery_address ? `<p><strong>Address:</strong> ${typeof order.delivery_address === 'object' ? JSON.stringify(order.delivery_address) : order.delivery_address}</p>` : ''}
+              ${order.delivery_address ? `<p><strong>Address:</strong> ${formatAddress(order.delivery_address)}</p>` : ''}
             </div>
           `).join('')}
         </body>

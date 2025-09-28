@@ -1,5 +1,6 @@
 import React from 'react';
 import { Order } from '@/types/orderDetailsModal';
+import { formatAddress } from '@/utils/formatAddress';
 
 interface PrintableOrderViewProps {
   order: Order | null;
@@ -149,11 +150,7 @@ export const PrintableOrderView: React.FC<PrintableOrderViewProps> = ({ order })
           </h3>
           <div className="space-y-2">
             {order.order_type === 'delivery' && order.delivery_address && (
-              <p><strong>Address:</strong> {
-                typeof order.delivery_address === 'string' 
-                  ? order.delivery_address 
-                  : JSON.stringify(order.delivery_address)
-              }</p>
+              <p><strong>Address:</strong> {formatAddress(order.delivery_address)}</p>
             )}
             {order.pickup_time && (
               <p><strong>Pickup Time:</strong> {formatDateTime(order.pickup_time)}</p>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Order, OrderModalState } from '@/types/orderDetailsModal';
+import { Order, OrderModalState, TimelineStep } from '@/types/orderDetailsModal';
 import { toast } from 'sonner';
 
 interface UseOrderDetailsReturn extends OrderModalState {
@@ -246,11 +246,11 @@ const generateTimelineFromStatus = (status: string, createdAt: string, updatedAt
   const statusOrder = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
   const currentIndex = statusOrder.indexOf(status);
 
-  return steps.map((step, index) => ({
+  return steps.map((step, index): TimelineStep => ({
     step: step.key,
     label: step.label,
     completed: index <= currentIndex,
     datetime: index === 0 ? createdAt : (index === currentIndex ? updatedAt : undefined),
-    status: (index < currentIndex ? 'completed' : (index === currentIndex ? 'current' : 'pending')) as 'completed' | 'current' | 'pending',
+    status: index < currentIndex ? 'completed' : (index === currentIndex ? 'current' : 'pending'),
   }));
 };

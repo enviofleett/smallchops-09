@@ -22,7 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
 import { useEmailService } from '@/hooks/useEmailService';
 import { toast } from 'sonner';
-import { OrderDetailsModal } from './OrderDetailsModal';
+import { OrderDetailsModalRedesign } from '@/components/orders/OrderDetailsModalRedesign';
 import { DeliveryAssignmentDialog } from './DeliveryAssignmentDialog';
 import { DeliveryStatusDialog } from './DeliveryStatusDialog';
 import { buildOutForDeliveryEmailContent } from '@/utils/orderEmailTemplates';
@@ -697,7 +697,7 @@ export function EnhancedDeliveryManagement() {
 
       {/* Modals and Dialogs */}
       {selectedOrder && (
-        <OrderDetailsModal
+        <OrderDetailsModalRedesign
           order={selectedOrder}
           isOpen={isDetailsModalOpen}
           onClose={() => {

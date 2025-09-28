@@ -132,7 +132,7 @@ const OrderDetailsSingleColumn = memo(({ orderId, adminEmail }: OrderDetailsSing
     error, 
     refetch,
     isRefetching 
-  } = useDetailedOrderData(orderId, RETRY_CONFIG);
+  } = useDetailedOrderData(orderId);
 
   const { updateStatus, isUpdating } = useUpdateOrderStatus(orderId);
   

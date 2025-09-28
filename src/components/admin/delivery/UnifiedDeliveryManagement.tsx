@@ -12,7 +12,7 @@ import { getOrders, updateOrder } from '@/api/orders';
 import { AdminOrderStatusBadge } from '@/components/admin/AdminOrderStatusBadge';
 import { OrderReceiptModal } from '@/components/customer/OrderReceiptModal';
 import { DeliveryAssignmentDialog } from './DeliveryAssignmentDialog';
-import { OrderDetailsModalRedesign } from '@/components/orders/OrderDetailsModalRedesign';
+import { NewOrderDetailsModal } from '@/components/orders/NewOrderDetailsModal';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
 import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
 import { isValidOrderStatus } from '@/utils/orderValidation';
@@ -545,9 +545,9 @@ export function UnifiedDeliveryManagement({
         </div>
       )}
       {/* Modals */}
-      <OrderDetailsModalRedesign
+      <NewOrderDetailsModal
         order={selectedOrder}
-        isOpen={isDetailsModalOpen}
+        open={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
       />
       <OrderReceiptModal

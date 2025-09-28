@@ -4,7 +4,7 @@ import { useCustomerOrderSchedules } from '@/hooks/useCustomerOrderSchedules';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
-import { OrderDetailsModalRedesign } from '@/components/orders/OrderDetailsModalRedesign';
+import { NewOrderDetailsModal } from '@/components/orders/NewOrderDetailsModal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -447,9 +447,9 @@ export function EnhancedOrdersSection() {
         )}
       </div>
 
-      <OrderDetailsModalRedesign
+      <NewOrderDetailsModal
         order={selectedOrder}
-        isOpen={isModalOpen}
+        open={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
           setSelectedOrder(null);

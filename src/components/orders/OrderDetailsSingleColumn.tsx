@@ -9,7 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { useDetailedOrderData } from "@/hooks/useDetailedOrderData";
 import { useUpdateOrderStatus } from "@/hooks/useUpdateOrderStatus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getDispatchRiders, updateOrder } from "@/api/orders";
+import { updateOrder } from "@/api/orders";
+import { getDispatchRiders } from "@/api/users";
 import { sendOrderStatusEmail } from "@/utils/sendOrderStatusEmail";
 import { toast } from "sonner";
 import { 
@@ -77,41 +78,74 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
     }
   });
 
-  // Status update with email notification
+  // Enhanced status update with email notification
   const handleStatusChange = async (newStatus: OrderStatus) => {
-    const success = await updateStatus(newStatus);
-    if (success && orderData?.order?.customer_email) {
-      try {
-        await sendOrderStatusEmail({
-          to: orderData.order.customer_email,
-          orderData: orderData.order,
-          status: newStatus,
-          adminEmail: adminEmail || 'admin@example.com'
-        });
-        toast.success("Status updated and email sent!");
-      } catch (emailError) {
-        toast.warning("Status updated but email failed to send");
+    try {
+      const success = await updateStatus(newStatus);
+      if (success && orderData?.order?.customer_email) {
+        try {
+          await sendOrderStatusEmail({
+            to: orderData.order.customer_email,
+            orderData: orderData.order,
+            status: newStatus,
+            adminEmail: adminEmail || 'admin@example.com'
+          });
+          toast.success("Status updated and email sent!");
+        } catch (emailError) {
+          console.warn('Email sending failed:', emailError);
+          toast.warning("Status updated but email failed to send");
+        }
       }
+      // Refresh data after successful update
+      refetch();
+    } catch (error) {
+      console.error('Status update failed:', error);
+      toast.error("Failed to update status");
     }
   };
 
-  // Rider assignment
+  // Enhanced rider assignment
   const handleRiderAssignment = (riderId: string) => {
-    updateOrderMutation.mutate({
-      orderId,
-      updates: { assigned_rider_id: riderId }
-    });
+    if (riderId === "no-riders") return;
+    
+    updateOrderMutation.mutate(
+      {
+        orderId,
+        updates: { assigned_rider_id: riderId }
+      },
+      {
+        onSuccess: () => {
+          const rider = dispatchRiders?.find(r => r.id === riderId);
+          toast.success(`Rider ${rider?.name} assigned successfully`);
+        },
+        onError: (error: any) => {
+          toast.error(`Failed to assign rider: ${error.message}`);
+        }
+      }
+    );
   };
 
-  // Phone update
+  // Enhanced phone update
   const handlePhoneUpdate = () => {
     if (newPhone.trim()) {
-      updateOrderMutation.mutate({
-        orderId,
-        updates: { customer_phone: newPhone }
-      });
-      setEditingPhone(false);
-      setNewPhone("");
+      updateOrderMutation.mutate(
+        {
+          orderId,
+          updates: { customer_phone: newPhone }
+        },
+        {
+          onSuccess: () => {
+            setEditingPhone(false);
+            setNewPhone("");
+            toast.success("Phone number updated successfully");
+          },
+          onError: (error: any) => {
+            toast.error(`Failed to update phone: ${error.message}`);
+          }
+        }
+      );
+    } else {
+      toast.error("Please enter a valid phone number");
     }
   };
 
@@ -119,9 +153,49 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
     window.print();
   };
 
-  if (isLoading) return <div className="p-6 text-center">Loading order details...</div>;
-  if (error) return <div className="p-6 text-center text-red-500">Error loading order</div>;
-  if (!orderData?.order) return <div className="p-6 text-center">Order not found</div>;
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground">Loading order details...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="text-center py-12">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-red-700 mb-2">Error Loading Order</h3>
+          <p className="text-red-600 mb-4">
+            {error instanceof Error ? error.message : 'Failed to load order details'}
+          </p>
+          <Button onClick={() => refetch()} variant="outline">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!orderData?.order) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="text-center py-12">
+          <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-semibold text-muted-foreground mb-2">Order Not Found</h3>
+          <p className="text-muted-foreground">
+            The order you're looking for doesn't exist or may have been removed.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const { order, items, fulfillment_info } = orderData;
   const deliveryFee = order.delivery_fee || 0;
@@ -258,7 +332,12 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
                   <p className="font-medium">₦{item.total_price?.toLocaleString()}</p>
                 </div>
               </div>
-            ))}
+            )) || (
+              <div className="text-center py-4 text-muted-foreground">
+                <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No items found</p>
+              </div>
+            )}
             
             <Separator />
             
@@ -268,14 +347,6 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
                 <span>₦{subtotal.toLocaleString()}</span>
               </div>
               
-              {order.order_type === 'delivery' && deliveryFee > 0 && (
-                <div className="flex justify-between">
-                  <span>Delivery Fee:</span>
-                  <span>₦{deliveryFee.toLocaleString()}</span>
-                </div>
-              )}
-              
-              <Separator />
               <div className="flex justify-between font-bold text-lg">
                 <span>Total:</span>
                 <span>₦{order.total_amount?.toLocaleString()}</span>
@@ -284,6 +355,24 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
           </div>
         </CardContent>
       </Card>
+
+      {/* Delivery Fee (for delivery orders only) */}
+      {order.order_type === 'delivery' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Truck className="w-5 h-5" />
+              Delivery Fee
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Delivery Fee:</span>
+              <span className="text-lg font-bold">₦{deliveryFee.toLocaleString()}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delivery Information (for delivery orders) */}
       {order.order_type === 'delivery' && fulfillment_info && (
@@ -357,40 +446,63 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
       {/* Admin Status Change */}
       <Card>
         <CardHeader>
-          <CardTitle>Admin Actions</CardTitle>
+          <CardTitle>Admin Actions (Admin Only)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
+            <Label className="text-sm font-medium">Current Status</Label>
+            <div className="mt-1 mb-3">
+              <Badge className={`${statusColors[order.status]} text-white`}>
+                {order.status.toUpperCase()}
+              </Badge>
+            </div>
             <Label className="text-sm font-medium">Update Status</Label>
             <Select onValueChange={handleStatusChange} disabled={isUpdating}>
               <SelectTrigger>
                 <SelectValue placeholder="Select new status" />
               </SelectTrigger>
               <SelectContent>
-                {statusOptions.map((status) => (
+                {statusOptions.filter(status => status !== order.status).map((status) => (
                   <SelectItem key={status} value={status}>
-                    {status.toUpperCase()}
+                    {status.replace('_', ' ').toUpperCase()}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {isUpdating && (
+              <p className="text-sm text-muted-foreground mt-2">Updating status...</p>
+            )}
           </div>
 
-          {order.order_type === 'delivery' && dispatchRiders && (
+          {order.order_type === 'delivery' && (
             <div>
-              <Label className="text-sm font-medium">Assign Rider</Label>
-              <Select onValueChange={handleRiderAssignment}>
+              <Label className="text-sm font-medium">
+                Assign Rider
+                {order.assigned_rider_id && (
+                  <span className="ml-2 text-xs text-green-600">
+                    (Currently assigned)
+                  </span>
+                )}
+              </Label>
+              <Select onValueChange={handleRiderAssignment} disabled={updateOrderMutation.isPending}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select dispatch rider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {dispatchRiders.map((rider) => (
+                  {dispatchRiders?.map((rider) => (
                     <SelectItem key={rider.id} value={rider.id}>
                       {rider.name} - {rider.phone}
                     </SelectItem>
-                  ))}
+                  )) || (
+                    <SelectItem value="no-riders" disabled>
+                      No riders available
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
+              {updateOrderMutation.isPending && (
+                <p className="text-sm text-muted-foreground mt-2">Assigning rider...</p>
+              )}
             </div>
           )}
         </CardContent>
@@ -399,9 +511,17 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
       {/* Last Update */}
       <Card>
         <CardContent className="pt-6">
-          <div className="text-sm text-muted-foreground">
-            <p>Last Updated: {new Date(order.updated_at).toLocaleString()}</p>
-            {order.updated_by && <p>Updated by: Admin Officer</p>}
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              <span>Last Updated: {order.updated_at ? new Date(order.updated_at).toLocaleString() : 'Not available'}</span>
+            </div>
+            {order.updated_by && (
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                <span>Updated by: {adminEmail || 'Admin Officer'}</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

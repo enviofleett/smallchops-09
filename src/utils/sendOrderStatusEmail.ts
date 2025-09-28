@@ -34,13 +34,14 @@ export async function sendOrderStatusEmail(params: SendOrderEmailParams): Promis
       trackingUrl: params.trackingUrl
     });
 
-    // Send email via edge function
-    const { data, error } = await supabase.functions.invoke('send-order-email', {
+    // Send email via unified SMTP sender
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         to: params.to,
         subject,
         html: htmlContent,
         text: textContent,
+        emailType: 'transactional',
         orderData: {
           orderId: params.orderData.id,
           orderNumber: params.orderData.order_number,

@@ -10303,6 +10303,10 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: Json
       }
+      get_comprehensive_order_fulfillment_simple: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       get_current_logo: {
         Args: Record<PropertyKey, never>
         Returns: string

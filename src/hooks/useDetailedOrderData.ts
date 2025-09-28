@@ -40,14 +40,26 @@ export const useDetailedOrderData = (orderId: string) => {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
       
       if (isUUID) {
-        // Use comprehensive RPC for UUIDs (most efficient)
+        // Try simple RPC first, then comprehensive RPC as backup
+        try {
+          const { data: simpleData, error: simpleError } = await supabase
+            .rpc('get_comprehensive_order_fulfillment_simple', { p_order_id: orderId });
+          
+          if (!simpleError && simpleData && !(simpleData as any)?.error) {
+            return (simpleData as unknown) as DetailedOrderData;
+          }
+        } catch (error) {
+          console.warn('Simple RPC failed, trying comprehensive:', error);
+        }
+        
+        // Try comprehensive RPC for UUIDs (fallback)
         const { data: comprehensiveData, error: comprehensiveError } = await supabase
           .rpc('get_comprehensive_order_fulfillment', { p_order_id: orderId });
         
         if (!comprehensiveError && comprehensiveData && !(comprehensiveData as any)?.error) {
           return (comprehensiveData as unknown) as DetailedOrderData;
         }
-        console.warn('Comprehensive RPC failed, using fallback:', comprehensiveError);
+        console.warn('Both RPCs failed, using fallback:', comprehensiveError);
       }
       
       // Fallback for order numbers or when RPC fails

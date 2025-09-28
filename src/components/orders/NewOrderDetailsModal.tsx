@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import { useReactToPrint } from 'react-to-print';
+import { toast } from 'sonner';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Package,
   User,
@@ -13,77 +16,29 @@ import {
   Mail,
   Truck,
   CheckCircle,
-  Printer
+  Printer,
+  AlertCircle,
+  Settings,
+  Loader2
 } from 'lucide-react';
+import { useUserContext } from '@/hooks/useUserContext';
+import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
+import { useDriverManagement } from '@/hooks/useDriverManagement';
+import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
+import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
+import { triggerOrderUpdate } from '@/components/notifications/NotificationIntegration';
+import { supabase } from '@/integrations/supabase/client';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
   onClose: () => void;
-  order?: any; // For compatibility, but we'll use mock data
+  order?: any; // Real order data - required for live data
 }
 
-// Mock order data - this will be consistent across all usages
-const mockOrderData = {
-  id: 'order_123456',
-  order_number: 'SC-2024-001',
-  status: 'preparing',
-  order_type: 'delivery',
-  customer_name: 'John Doe',
-  customer_email: 'john.doe@example.com',
-  customer_phone: '+234 812 345 6789',
-  payment_status: 'paid',
-  payment_reference: 'PAY_REF_123456789',
-  total_amount: 15500,
-  delivery_fee: 2000,
-  subtotal: 13500,
-  created_at: '2024-01-15T10:30:00Z',
-  updated_at: '2024-01-15T11:15:00Z',
-  items: [
-    {
-      id: 'item_1',
-      product: {
-        name: 'Beef Samosa (6 pieces)',
-        image_url: '/placeholder.svg'
-      },
-      quantity: 2,
-      unit_price: 3500,
-      total_price: 7000
-    },
-    {
-      id: 'item_2',
-      product: {
-        name: 'Chicken Spring Rolls (4 pieces)',
-        image_url: '/placeholder.svg'
-      },
-      quantity: 1,
-      unit_price: 2500,
-      total_price: 2500
-    },
-    {
-      id: 'item_3',
-      product: {
-        name: 'Mixed Fruit Platter',
-        image_url: '/placeholder.svg'
-      },
-      quantity: 1,
-      unit_price: 4000,
-      total_price: 4000
-    }
-  ],
-  fulfillment_info: {
-    address: '123 Victoria Island, Lagos, Nigeria',
-    delivery_date: '2024-01-15',
-    delivery_hours: {
-      start: '12:00',
-      end: '14:00'
-    },
-    special_instructions: 'Please call when you arrive at the gate'
-  }
-};
-
+// Status color mapping
 const STATUS_COLORS = {
   pending: "bg-yellow-500",
-  confirmed: "bg-blue-500", 
+  confirmed: "bg-blue-500",
   preparing: "bg-orange-500",
   ready: "bg-purple-500",
   out_for_delivery: "bg-indigo-500",
@@ -93,6 +48,222 @@ const STATUS_COLORS = {
   completed: "bg-green-600",
   returned: "bg-red-400"
 } as const;
+
+// Driver assignment dialog component (for admin use)
+const DriverAssignmentSection: React.FC<{
+  orderId: string;
+  currentDriverId?: string | null;
+  onDriverAssigned: () => void;
+}> = ({ orderId, currentDriverId, onDriverAssigned }) => {
+  const { drivers, loading: driversLoading } = useDriverManagement();
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  const activeDrivers = drivers.filter(driver => driver.is_active);
+
+  const handleAssignDriver = async () => {
+    if (!selectedDriverId || isAssigning) return;
+
+    setIsAssigning(true);
+    try {
+      const { error } = await supabase.rpc('assign_rider_to_order', {
+        p_order_id: orderId,
+        p_rider_id: selectedDriverId
+      });
+
+      if (error) throw error;
+
+      const driver = drivers.find(d => d.id === selectedDriverId);
+      toast.success(`Driver ${driver?.name} assigned successfully`);
+      
+      // Trigger notification for driver assignment
+      triggerOrderUpdate(orderId, 'driver_assigned', `Driver ${driver?.name} has been assigned to this order`);
+      
+      onDriverAssigned();
+    } catch (error) {
+      console.error('Driver assignment failed:', error);
+      toast.error('Failed to assign driver');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleUnassignDriver = async () => {
+    if (isAssigning) return;
+
+    setIsAssigning(true);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ assigned_rider_id: null })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast.success('Driver unassigned successfully');
+      triggerOrderUpdate(orderId, 'driver_unassigned', 'Driver has been unassigned from this order');
+      onDriverAssigned();
+    } catch (error) {
+      console.error('Driver unassignment failed:', error);
+      toast.error('Failed to unassign driver');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  if (driversLoading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Loading drivers...
+      </div>
+    );
+  }
+
+  const currentDriver = drivers.find(d => d.id === currentDriverId);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium">Driver Assignment</h4>
+        {currentDriver && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUnassignDriver}
+            disabled={isAssigning}
+          >
+            {isAssigning ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              'Unassign'
+            )}
+          </Button>
+        )}
+      </div>
+
+      {currentDriver ? (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Truck className="w-4 h-4 text-green-600" />
+            <span className="font-medium text-green-800">{currentDriver.name}</span>
+          </div>
+          <p className="text-sm text-green-600 mt-1">{currentDriver.phone}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <select
+            className="w-full p-2 border rounded-md"
+            value={selectedDriverId}
+            onChange={(e) => setSelectedDriverId(e.target.value)}
+            disabled={isAssigning || activeDrivers.length === 0}
+          >
+            <option value="">Select a driver...</option>
+            {activeDrivers.map(driver => (
+              <option key={driver.id} value={driver.id}>
+                {driver.name} - {driver.phone}
+              </option>
+            ))}
+          </select>
+          
+          {activeDrivers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No active drivers available</p>
+          ) : (
+            <Button
+              onClick={handleAssignDriver}
+              disabled={!selectedDriverId || isAssigning}
+              size="sm"
+              className="w-full"
+            >
+              {isAssigning ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                'Assign Driver'
+              )}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Status update section (for admin use)
+const AdminStatusUpdateSection: React.FC<{
+  orderId: string;
+  currentStatus: string;
+  orderNumber: string;
+  onStatusUpdated: () => void;
+}> = ({ orderId, currentStatus, orderNumber, onStatusUpdated }) => {
+  const { updateStatus, isUpdating } = useProductionStatusUpdate();
+  const [selectedStatus, setSelectedStatus] = useState(currentStatus);
+
+  const statusOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'preparing', label: 'Preparing' },
+    { value: 'ready', label: 'Ready' },
+    { value: 'out_for_delivery', label: 'Out for Delivery' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' }
+  ];
+
+  const handleStatusUpdate = async () => {
+    if (selectedStatus === currentStatus || isUpdating) return;
+
+    try {
+      await updateStatus({ orderId, status: selectedStatus });
+      
+      // Trigger notification with Gmail integration
+      triggerOrderUpdate(orderNumber, selectedStatus, `Order status updated to ${selectedStatus.replace('_', ' ')}`);
+      
+      onStatusUpdated();
+    } catch (error) {
+      console.error('Status update failed:', error);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <h4 className="font-medium">Update Order Status</h4>
+      
+      <div className="space-y-2">
+        <select
+          className="w-full p-2 border rounded-md"
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value)}
+          disabled={isUpdating}
+        >
+          {statusOptions.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        
+        <Button
+          onClick={handleStatusUpdate}
+          disabled={selectedStatus === currentStatus || isUpdating}
+          size="sm"
+          className="w-full"
+        >
+          {isUpdating ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Updating...
+            </>
+          ) : (
+            'Update Status'
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-NG', {
@@ -105,23 +276,112 @@ const formatCurrency = (amount: number): string => {
 export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   open,
   onClose,
-  order // This prop exists for compatibility but we use mock data
+  order // Real order data is now required
 }) => {
-  const orderData = mockOrderData; // Always use mock data
+  const userContext = useUserContext();
+  const printRef = useRef<HTMLDivElement>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const handlePrint = () => {
-    window.print();
+  // Fetch real-time order data
+  const { 
+    data: detailedOrderData, 
+    isLoading: isLoadingDetailed, 
+    error, 
+    lastUpdated, 
+    connectionStatus, 
+    reconnect 
+  } = useRealTimeOrderData(order?.id);
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Order-${order?.order_number || 'Details'}`,
+    onAfterPrint: () => toast.success('Order details printed successfully'),
+    onPrintError: () => toast.error('Failed to print order details')
+  });
+
+  const handleRefresh = () => {
+    reconnect();
+    setRefreshTrigger(prev => prev + 1);
   };
+
+  // Show error state if no order provided
+  if (!order) {
+    return (
+      <AdaptiveDialog
+        open={open}
+        onOpenChange={onClose}
+        size="sm"
+        title="Order Not Found"
+        description="Order details are not available"
+      >
+        <div className="text-center py-8">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No order data provided.</p>
+          <Button onClick={onClose} className="mt-4">Close</Button>
+        </div>
+      </AdaptiveDialog>
+    );
+  }
+
+  // Use detailed order data if available, otherwise fall back to basic order data
+  const orderData = detailedOrderData?.order || order;
+  const orderItems = detailedOrderData?.items || order.order_items || order.items || [];
+  const fulfillmentInfo = detailedOrderData?.fulfillment_info || order.fulfillment_info || {};
+
+  // Show loading state
+  if (isLoadingDetailed && !orderData) {
+    return (
+      <AdaptiveDialog
+        open={open}
+        onOpenChange={onClose}
+        size="lg"
+        title="Loading Order Details..."
+      >
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin" />
+          <span className="ml-2">Loading order details...</span>
+        </div>
+      </AdaptiveDialog>
+    );
+  }
+
+  const isAdmin = userContext === 'admin';
+  const isCustomer = userContext === 'customer';
 
   return (
     <AdaptiveDialog
       open={open}
       onOpenChange={onClose}
-      size="lg"
+      size="xl"
       title={`Order #${orderData.order_number}`}
-      description="Order details (Mock Data)"
+      description={isAdmin ? "Admin View - Full Order Management" : "Order Details"}
+      className="max-w-6xl"
     >
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6" ref={printRef}>
+        {/* Real-time connection status (admin only) */}
+        {isAdmin && (
+          <RealTimeConnectionStatus
+            connectionStatus={connectionStatus}
+            lastUpdated={lastUpdated}
+            onReconnect={reconnect}
+            compact={true}
+            className="mb-4"
+          />
+        )}
+
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Failed to load complete order details. Some information may be outdated.
+              <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-2">
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Header */}
         <Card>
           <CardHeader className="pb-4">
@@ -129,17 +389,24 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-2xl">#{orderData.order_number}</CardTitle>
+                  {!isLoadingDetailed && detailedOrderData && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800">
+                      LIVE DATA
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge className={`${STATUS_COLORS[orderData.status as keyof typeof STATUS_COLORS]} text-white`}>
-                    {orderData.status.replace('_', ' ').toUpperCase()}
+                    {orderData.status?.replace('_', ' ').toUpperCase()}
                   </Badge>
                   <Badge variant="outline">
-                    {orderData.order_type.toUpperCase()}
+                    {orderData.order_type?.toUpperCase() || 'DELIVERY'}
                   </Badge>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                    MOCK DATA
-                  </Badge>
+                  {isAdmin && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                      ADMIN VIEW
+                    </Badge>
+                  )}
                 </div>
               </div>
               <Button variant="outline" size="sm" onClick={handlePrint}>
@@ -162,98 +429,155 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Name</p>
-                <p className="text-sm">{orderData.customer_name}</p>
+                <p className="text-sm">{orderData.customer_name || 'Not provided'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Type</p>
-                <p className="text-sm">Guest Customer</p>
+                <p className="text-sm">{orderData.customer_type || 'Guest Customer'}</p>
               </div>
             </div>
             
-            <div>
-              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                Email
-              </p>
-              <p className="text-sm break-all">{orderData.customer_email}</p>
-            </div>
+            {orderData.customer_email && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  Email
+                </p>
+                <p className="text-sm break-all">{orderData.customer_email}</p>
+              </div>
+            )}
 
-            <div>
-              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Phone className="w-4 h-4" />
-                Phone
-              </p>
-              <p className="text-sm">{orderData.customer_phone}</p>
-            </div>
+            {orderData.customer_phone && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Phone className="w-4 h-4" />
+                  Phone
+                </p>
+                <p className="text-sm">{orderData.customer_phone}</p>
+              </div>
+            )}
 
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Payment Status</p>
                 <Badge 
                   variant="secondary" 
-                  className="ml-2 bg-green-100 text-green-800"
+                  className={`ml-2 ${
+                    orderData.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 
+                    orderData.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}
                 >
-                  {orderData.payment_status.toUpperCase()}
+                  {orderData.payment_status?.toUpperCase() || 'UNKNOWN'}
                 </Badge>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-muted-foreground">Payment Reference</p>
-                <p className="text-sm font-mono break-all">{orderData.payment_reference}</p>
-              </div>
+              {orderData.payment_reference && (
+                <div className="text-right">
+                  <p className="text-sm font-medium text-muted-foreground">Payment Reference</p>
+                  <p className="text-sm font-mono break-all">{orderData.payment_reference}</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {/* Admin Actions (Admin Only) */}
+        {isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Admin Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <AdminStatusUpdateSection
+                orderId={orderData.id}
+                currentStatus={orderData.status}
+                orderNumber={orderData.order_number}
+                onStatusUpdated={handleRefresh}
+              />
+              
+              <Separator />
+              
+              <DriverAssignmentSection
+                orderId={orderData.id}
+                currentDriverId={orderData.assigned_rider_id}
+                onDriverAssigned={handleRefresh}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Order Items */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="w-5 h-5" />
-              Order Items ({orderData.items.length})
+              Order Items ({orderItems.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {orderData.items.map((item, index) => (
-                <div key={item.id || index} className="flex items-center gap-4 p-4 border rounded-lg">
-                  {item.product?.image_url && (
-                    <img 
-                      src={item.product.image_url} 
-                      alt={item.product.name || 'Product'}
-                      className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                      loading="lazy"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium truncate">{item.product?.name || 'Product'}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Qty: {item.quantity} × {formatCurrency(item.unit_price)}
-                    </p>
+              {orderItems.length > 0 ? (
+                orderItems.map((item: any, index: number) => (
+                  <div key={item.id || index} className="flex items-center gap-4 p-4 border rounded-lg">
+                    {item.product?.image_url && (
+                      <img 
+                        src={item.product.image_url} 
+                        alt={item.product.name || 'Product'}
+                        className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                        loading="lazy"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium truncate">{item.product?.name || item.name || 'Product'}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Qty: {item.quantity} × {formatCurrency(item.unit_price || 0)}
+                      </p>
+                      {item.special_instructions && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Note: {item.special_instructions}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-medium">{formatCurrency(item.total_price || (item.quantity * (item.unit_price || 0)))}</p>
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-medium">{formatCurrency(item.total_price)}</p>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No items found in this order</p>
                 </div>
-              ))}
+              )}
               
               <Separator />
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>{formatCurrency(orderData.subtotal)}</span>
+                  <span>{formatCurrency(orderData.subtotal || 0)}</span>
                 </div>
                 
-                {orderData.order_type === 'delivery' && orderData.delivery_fee > 0 && (
+                {orderData.order_type === 'delivery' && (orderData.delivery_fee || 0) > 0 && (
                   <div className="flex justify-between">
                     <span>Delivery Fee:</span>
                     <span>{formatCurrency(orderData.delivery_fee)}</span>
                   </div>
                 )}
                 
+                {(orderData.tax_amount || 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span>Tax:</span>
+                    <span>{formatCurrency(orderData.tax_amount)}</span>
+                  </div>
+                )}
+                
                 <Separator />
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total:</span>
-                  <span>{formatCurrency(orderData.total_amount)}</span>
+                  <span>{formatCurrency(orderData.total_amount || 0)}</span>
                 </div>
               </div>
             </div>
@@ -261,7 +585,7 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
         </Card>
 
         {/* Delivery Information */}
-        {orderData.order_type === 'delivery' && orderData.fulfillment_info && (
+        {orderData.order_type === 'delivery' && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -276,8 +600,10 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
                   Delivery Window
                 </p>
                 <p className="text-sm">
-                  {orderData.fulfillment_info.delivery_date && orderData.fulfillment_info.delivery_hours 
-                    ? `${orderData.fulfillment_info.delivery_date} ${orderData.fulfillment_info.delivery_hours.start} - ${orderData.fulfillment_info.delivery_hours.end}`
+                  {fulfillmentInfo.delivery_date && fulfillmentInfo.delivery_hours 
+                    ? `${fulfillmentInfo.delivery_date} ${fulfillmentInfo.delivery_hours.start} - ${fulfillmentInfo.delivery_hours.end}`
+                    : detailedOrderData?.delivery_schedule?.delivery_date
+                    ? `${detailedOrderData.delivery_schedule.delivery_date} ${detailedOrderData.delivery_schedule.delivery_time_start} - ${detailedOrderData.delivery_schedule.delivery_time_end}`
                     : 'To be scheduled'
                   }
                 </p>
@@ -288,13 +614,26 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
                   <MapPin className="w-4 h-4" />
                   Address
                 </p>
-                <p className="text-sm break-words">{orderData.fulfillment_info.address}</p>
+                <p className="text-sm break-words">
+                  {fulfillmentInfo.address || orderData.delivery_address || 'No address provided'}
+                </p>
               </div>
               
-              {orderData.fulfillment_info.special_instructions && (
+              {(fulfillmentInfo.special_instructions || orderData.special_instructions || detailedOrderData?.delivery_schedule?.special_instructions) && (
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Special Instructions</p>
-                  <p className="text-sm break-words">{orderData.fulfillment_info.special_instructions}</p>
+                  <p className="text-sm break-words">
+                    {fulfillmentInfo.special_instructions || orderData.special_instructions || detailedOrderData?.delivery_schedule?.special_instructions}
+                  </p>
+                </div>
+              )}
+
+              {isAdmin && orderData.assigned_rider_id && detailedOrderData?.items && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 mb-1">Driver Assignment</p>
+                  <p className="text-sm text-blue-600">
+                    A driver has been assigned to this delivery order.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -306,50 +645,148 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5" />
-              Order Status
+              Order Timeline
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Order Confirmed</p>
-                  <p className="text-xs text-muted-foreground">January 15, 2024 at 10:30 AM</p>
+            {detailedOrderData?.timeline && detailedOrderData.timeline.length > 0 ? (
+              <div className="space-y-3">
+                {detailedOrderData.timeline.map((step: any, index: number) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      step.status === 'completed' ? 'bg-green-500' :
+                      step.status === 'current' ? 'bg-blue-500' :
+                      'bg-gray-300'
+                    }`}></div>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${
+                        step.status === 'pending' ? 'text-muted-foreground' : ''
+                      }`}>
+                        {step.label || step.step}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {step.datetime ? new Date(step.datetime).toLocaleString() : 'Pending'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              // Fallback timeline based on current status
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Order Placed</p>
+                    <p className="text-xs text-muted-foreground">
+                      {orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Date not available'}
+                    </p>
+                  </div>
+                </div>
+                
+                {['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'completed'].includes(orderData.status) && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Order Confirmed</p>
+                      <p className="text-xs text-muted-foreground">
+                        {orderData.updated_at ? new Date(orderData.updated_at).toLocaleString() : 'Recently'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${
+                    orderData.status === 'preparing' ? 'bg-orange-500' :
+                    ['ready', 'out_for_delivery', 'delivered', 'completed'].includes(orderData.status) ? 'bg-green-500' :
+                    'bg-gray-300'
+                  }`}></div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      !['preparing', 'ready', 'out_for_delivery', 'delivered', 'completed'].includes(orderData.status) ? 'text-muted-foreground' : ''
+                    }`}>
+                      {orderData.status === 'preparing' ? 'Currently Preparing' : 'Preparing'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {orderData.status === 'preparing' ? 'In progress' : 'Pending'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${
+                    ['delivered', 'completed'].includes(orderData.status) ? 'bg-green-500' :
+                    'bg-gray-300'
+                  }`}></div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      !['delivered', 'completed'].includes(orderData.status) ? 'text-muted-foreground' : ''
+                    }`}>
+                      {orderData.order_type === 'delivery' ? 'Delivered' : 'Ready for Pickup'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {['delivered', 'completed'].includes(orderData.status) ? 'Completed' : 'Pending'}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Currently Preparing</p>
-                  <p className="text-xs text-muted-foreground">January 15, 2024 at 11:00 AM</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-gray-300"></div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Ready for Delivery</p>
-                  <p className="text-xs text-muted-foreground">Pending</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-gray-300"></div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground">Delivered</p>
-                  <p className="text-xs text-muted-foreground">Pending</p>
-                </div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Communication Events (Admin Only) */}
+        {isAdmin && detailedOrderData?.communication_events && detailedOrderData.communication_events.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                Communication History
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-60 overflow-y-auto">
+                {detailedOrderData.communication_events.map((event: any, index: number) => (
+                  <div key={event.id || index} className="p-3 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="outline" className="text-xs">
+                        {event.event_type || 'Email'}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {event.created_at ? new Date(event.created_at).toLocaleString() : 'Recently'}
+                      </span>
+                    </div>
+                    <p className="text-sm">{event.message || event.subject || 'Communication sent'}</p>
+                    {event.status && (
+                      <Badge 
+                        variant="secondary" 
+                        className={`mt-2 text-xs ${
+                          event.status === 'sent' ? 'bg-green-100 text-green-800' :
+                          event.status === 'delivered' ? 'bg-blue-100 text-blue-800' :
+                          event.status === 'failed' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {event.status.toUpperCase()}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Metadata */}
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground space-y-1">
-              <p>Created: {new Date(orderData.created_at).toLocaleString()}</p>
-              <p>Last Updated: {new Date(orderData.updated_at).toLocaleString()}</p>
+              <p>Created: {orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Not available'}</p>
+              <p>Last Updated: {orderData.updated_at ? new Date(orderData.updated_at).toLocaleString() : orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Not available'}</p>
               <p>Order ID: {orderData.id}</p>
+              {isAdmin && connectionStatus === 'connected' && (
+                <p className="text-green-600">🟢 Real-time updates active</p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useDetailedOrderData } from "@/hooks/useDetailedOrderData";
 import { useUpdateOrderStatus } from "@/hooks/useUpdateOrderStatus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,7 +24,9 @@ import {
   Package, 
   Truck,
   CheckCircle,
-  AlertCircle 
+  AlertCircle,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import { OrderStatus, OrderType } from "@/types/orderDetailsModal";
 
@@ -31,7 +35,8 @@ interface OrderDetailsSingleColumnProps {
   adminEmail?: string;
 }
 
-const statusColors = {
+// Constants
+const STATUS_COLORS = {
   pending: "bg-yellow-500",
   confirmed: "bg-blue-500", 
   preparing: "bg-orange-500",
@@ -42,90 +47,229 @@ const statusColors = {
   refunded: "bg-gray-500",
   completed: "bg-green-600",
   returned: "bg-red-400"
-};
+} as const;
 
-const statusOptions: OrderStatus[] = [
+const STATUS_OPTIONS: OrderStatus[] = [
   'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 
   'delivered', 'cancelled', 'refunded', 'completed', 'returned'
 ];
 
-export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderDetailsSingleColumnProps) {
+const RETRY_CONFIG = {
+  retry: 3,
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+};
+
+// Utility functions
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+    minimumFractionDigits: 0
+  }).format(amount);
+};
+
+const validatePhoneNumber = (phone: string): boolean => {
+  const phoneRegex = /^(\+234|0)[789]\d{9}$/;
+  return phoneRegex.test(phone.replace(/\s+/g, ''));
+};
+
+const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[<>]/g, '');
+};
+
+// Loading skeleton component
+const OrderDetailsSkeleton = memo(() => (
+  <div className="max-w-2xl mx-auto p-6 space-y-6">
+    {[1, 2, 3, 4].map((i) => (
+      <Card key={i}>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+));
+
+OrderDetailsSkeleton.displayName = 'OrderDetailsSkeleton';
+
+// Error fallback component
+const ErrorFallback = memo(({ error, onRetry }: { error: Error; onRetry: () => void }) => (
+  <div className="max-w-2xl mx-auto p-6">
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription className="flex items-center justify-between">
+        <span>Failed to load order details: {error.message}</span>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Retry
+        </Button>
+      </AlertDescription>
+    </Alert>
+  </div>
+));
+
+ErrorFallback.displayName = 'ErrorFallback';
+
+// Main component
+const OrderDetailsSingleColumn = memo(({ orderId, adminEmail }: OrderDetailsSingleColumnProps) => {
+  // State
   const [editingPhone, setEditingPhone] = useState(false);
   const [newPhone, setNewPhone] = useState("");
-  
+  const [phoneError, setPhoneError] = useState("");
+
+  // Query client
   const queryClient = useQueryClient();
-  const { data: orderData, isLoading, error, refetch } = useDetailedOrderData(orderId);
+
+  // Data fetching
+  const { 
+    data: orderData, 
+    isLoading, 
+    error, 
+    refetch,
+    isRefetching 
+  } = useDetailedOrderData(orderId, RETRY_CONFIG);
+
   const { updateStatus, isUpdating } = useUpdateOrderStatus(orderId);
   
-  // Fetch dispatch riders for delivery orders
-  const { data: dispatchRiders } = useQuery({
+  // Fetch dispatch riders conditionally
+  const { data: dispatchRiders, isLoading: ridersLoading } = useQuery({
     queryKey: ['dispatch-riders'],
     queryFn: getDispatchRiders,
-    enabled: orderData?.order?.order_type === 'delivery'
+    enabled: orderData?.order?.order_type === 'delivery',
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...RETRY_CONFIG
   });
 
-  // Update order mutation
+  // Mutations
   const updateOrderMutation = useMutation({
     mutationFn: updateOrder,
     onSuccess: (data) => {
       toast.success("Order updated successfully");
-      refetch();
       queryClient.invalidateQueries({ queryKey: ['detailed-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] }); // Invalidate orders list
     },
     onError: (error: any) => {
-      toast.error(`Failed to update order: ${error.message}`);
+      console.error('Order update failed:', error);
+      toast.error(`Failed to update order: ${error?.message || 'Unknown error'}`);
     }
   });
 
-  // Status update with email notification
-  const handleStatusChange = async (newStatus: OrderStatus) => {
-    const success = await updateStatus(newStatus);
-    if (success && orderData?.order?.customer_email) {
-      try {
-        await sendOrderStatusEmail({
-          to: orderData.order.customer_email,
-          orderData: orderData.order,
-          status: newStatus,
-          adminEmail: adminEmail || 'admin@example.com'
-        });
-        toast.success("Status updated and email sent!");
-      } catch (emailError) {
-        toast.warning("Status updated but email failed to send");
-      }
-    }
-  };
+  // Memoized calculations
+  const orderSummary = useMemo(() => {
+    if (!orderData?.order || !orderData?.items) return null;
+    
+    const { order, items } = orderData;
+    const deliveryFee = order.delivery_fee || 0;
+    const subtotal = items.reduce((sum, item) => sum + (item.total_price || 0), 0);
+    
+    return { subtotal, deliveryFee, total: order.total_amount || 0 };
+  }, [orderData]);
 
-  // Rider assignment
-  const handleRiderAssignment = (riderId: string) => {
+  // Event handlers
+  const handleStatusChange = useCallback(async (newStatus: OrderStatus) => {
+    if (!orderData?.order) return;
+    
+    try {
+      const success = await updateStatus(newStatus);
+      if (success && orderData.order.customer_email) {
+        try {
+          await sendOrderStatusEmail({
+            to: orderData.order.customer_email,
+            orderData: orderData.order,
+            status: newStatus,
+            adminEmail: adminEmail || 'admin@example.com'
+          });
+          toast.success("Status updated and customer notified!");
+        } catch (emailError) {
+          console.warn('Email notification failed:', emailError);
+          toast.warning("Status updated but email notification failed");
+        }
+      }
+    } catch (error) {
+      console.error('Status update failed:', error);
+      toast.error("Failed to update order status");
+    }
+  }, [orderData, updateStatus, adminEmail]);
+
+  const handleRiderAssignment = useCallback((riderId: string) => {
+    if (!riderId.trim()) return;
+    
     updateOrderMutation.mutate({
       orderId,
       updates: { assigned_rider_id: riderId }
     });
-  };
+  }, [orderId, updateOrderMutation]);
 
-  // Phone update
-  const handlePhoneUpdate = () => {
-    if (newPhone.trim()) {
-      updateOrderMutation.mutate({
-        orderId,
-        updates: { customer_phone: newPhone }
-      });
-      setEditingPhone(false);
-      setNewPhone("");
+  const handlePhoneUpdate = useCallback(() => {
+    const sanitizedPhone = sanitizeInput(newPhone);
+    
+    if (!sanitizedPhone) {
+      setPhoneError("Phone number is required");
+      return;
     }
-  };
+    
+    if (!validatePhoneNumber(sanitizedPhone)) {
+      setPhoneError("Please enter a valid Nigerian phone number");
+      return;
+    }
+    
+    updateOrderMutation.mutate({
+      orderId,
+      updates: { customer_phone: sanitizedPhone }
+    });
+    
+    setEditingPhone(false);
+    setNewPhone("");
+    setPhoneError("");
+  }, [newPhone, orderId, updateOrderMutation]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePhoneEditStart = useCallback(() => {
+    setNewPhone(orderData?.order?.customer_phone || "");
+    setEditingPhone(true);
+    setPhoneError("");
+  }, [orderData?.order?.customer_phone]);
 
-  if (isLoading) return <div className="p-6 text-center">Loading order details...</div>;
-  if (error) return <div className="p-6 text-center text-red-500">Error loading order</div>;
-  if (!orderData?.order) return <div className="p-6 text-center">Order not found</div>;
+  const handlePhoneEditCancel = useCallback(() => {
+    setEditingPhone(false);
+    setNewPhone("");
+    setPhoneError("");
+  }, []);
+
+  const handlePrint = useCallback(() => {
+    try {
+      window.print();
+    } catch (error) {
+      console.error('Print failed:', error);
+      toast.error("Print functionality unavailable");
+    }
+  }, []);
+
+  // Loading state
+  if (isLoading) return <OrderDetailsSkeleton />;
+  
+  // Error state
+  if (error) return <ErrorFallback error={error as Error} onRetry={refetch} />;
+  
+  // No data state
+  if (!orderData?.order) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Order not found. The order may have been deleted or you may not have permission to view it.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   const { order, items, fulfillment_info } = orderData;
-  const deliveryFee = order.delivery_fee || 0;
-  const subtotal = items?.reduce((sum, item) => sum + (item.total_price || 0), 0) || 0;
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -134,22 +278,28 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
-              <CardTitle className="text-2xl">#{order.order_number}</CardTitle>
               <div className="flex items-center gap-2">
-                <Badge className={`${statusColors[order.status]} text-white`}>
-                  {order.status.toUpperCase()}
+                <CardTitle className="text-2xl">#{order.order_number}</CardTitle>
+                {isRefetching && (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={`${STATUS_COLORS[order.status]} text-white`}>
+                  {order.status.replace('_', ' ').toUpperCase()}
                 </Badge>
                 <Badge variant="outline">
                   {order.order_type.toUpperCase()}
                 </Badge>
                 <Badge variant="secondary" className="bg-green-100 text-green-800">
                   <CheckCircle className="w-3 h-3 mr-1" />
-                  CONNECTED
+                  LIVE
                 </Badge>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Button variant="outline" size="sm" onClick={handlePrint} disabled={isRefetching}>
               <Printer className="w-4 h-4" />
+              <span className="sr-only">Print order</span>
             </Button>
           </div>
         </CardHeader>
@@ -164,10 +314,10 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium">Name</Label>
-              <p className="text-sm">{order.customer_name}</p>
+              <p className="text-sm">{order.customer_name || 'N/A'}</p>
             </div>
             <div>
               <Label className="text-sm font-medium">Type</Label>
@@ -180,7 +330,7 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
               <Mail className="w-4 h-4" />
               Email
             </Label>
-            <p className="text-sm">{order.customer_email}</p>
+            <p className="text-sm break-all">{order.customer_email || 'N/A'}</p>
           </div>
 
           <div>
@@ -189,42 +339,79 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
               Phone
             </Label>
             {editingPhone ? (
-              <div className="flex gap-2 mt-1">
-                <Input
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="Enter phone number"
-                  className="flex-1"
-                />
-                <Button size="sm" onClick={handlePhoneUpdate}>Save</Button>
-                <Button size="sm" variant="outline" onClick={() => setEditingPhone(false)}>
-                  Cancel
-                </Button>
+              <div className="space-y-2 mt-1">
+                <div className="flex gap-2">
+                  <Input
+                    value={newPhone}
+                    onChange={(e) => {
+                      setNewPhone(e.target.value);
+                      if (phoneError) setPhoneError("");
+                    }}
+                    placeholder="e.g., +2348012345678"
+                    className={`flex-1 ${phoneError ? 'border-red-500' : ''}`}
+                    disabled={updateOrderMutation.isPending}
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={handlePhoneUpdate}
+                    disabled={updateOrderMutation.isPending}
+                  >
+                    {updateOrderMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Save'
+                    )}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={handlePhoneEditCancel}
+                    disabled={updateOrderMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                {phoneError && (
+                  <p className="text-sm text-red-500">{phoneError}</p>
+                )}
               </div>
             ) : (
               <p 
-                className="text-sm cursor-pointer hover:text-blue-600"
-                onClick={() => {
-                  setNewPhone(order.customer_phone || "");
-                  setEditingPhone(true);
+                className="text-sm cursor-pointer hover:text-blue-600 transition-colors"
+                onClick={handlePhoneEditStart}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handlePhoneEditStart();
+                  }
                 }}
               >
-                {order.customer_phone || "Click to add phone"}
+                {order.customer_phone || "Click to add phone number"}
               </p>
             )}
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <Label className="text-sm font-medium">Payment Status</Label>
-              <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
-                {order.payment_status.toUpperCase()}
+              <Badge 
+                variant="secondary" 
+                className={`ml-2 ${
+                  order.payment_status === 'paid' 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}
+              >
+                {order.payment_status?.toUpperCase() || 'PENDING'}
               </Badge>
             </div>
-            <div className="text-right">
-              <Label className="text-sm font-medium">Payment Reference</Label>
-              <p className="text-sm font-mono">{order.payment_reference}</p>
-            </div>
+            {order.payment_reference && (
+              <div className="text-right">
+                <Label className="text-sm font-medium">Payment Reference</Label>
+                <p className="text-sm font-mono break-all">{order.payment_reference}</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -234,7 +421,7 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
-            Order Items
+            Order Items ({items?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -244,48 +431,56 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
                 {item.product?.image_url && (
                   <img 
                     src={item.product.image_url} 
-                    alt={item.product.name}
-                    className="w-16 h-16 rounded-lg object-cover"
+                    alt={item.product.name || 'Product'}
+                    className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
                   />
                 )}
-                <div className="flex-1">
-                  <h4 className="font-medium">{item.product?.name || 'Product'}</h4>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium truncate">{item.product?.name || 'Product'}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Qty: {item.quantity} × ₦{item.unit_price?.toLocaleString()}
+                    Qty: {item.quantity || 0} × {formatCurrency(item.unit_price || 0)}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="font-medium">₦{item.total_price?.toLocaleString()}</p>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-medium">{formatCurrency(item.total_price || 0)}</p>
                 </div>
               </div>
             ))}
             
-            <Separator />
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>₦{subtotal.toLocaleString()}</span>
-              </div>
-              
-              {order.order_type === 'delivery' && deliveryFee > 0 && (
-                <div className="flex justify-between">
-                  <span>Delivery Fee:</span>
-                  <span>₦{deliveryFee.toLocaleString()}</span>
+            {orderSummary && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>{formatCurrency(orderSummary.subtotal)}</span>
+                  </div>
+                  
+                  {order.order_type === 'delivery' && orderSummary.deliveryFee > 0 && (
+                    <div className="flex justify-between">
+                      <span>Delivery Fee:</span>
+                      <span>{formatCurrency(orderSummary.deliveryFee)}</span>
+                    </div>
+                  )}
+                  
+                  <Separator />
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total:</span>
+                    <span>{formatCurrency(orderSummary.total)}</span>
+                  </div>
                 </div>
-              )}
-              
-              <Separator />
-              <div className="flex justify-between font-bold text-lg">
-                <span>Total:</span>
-                <span>₦{order.total_amount?.toLocaleString()}</span>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Delivery Information (for delivery orders) */}
+      {/* Delivery Information */}
       {order.order_type === 'delivery' && fulfillment_info && (
         <Card>
           <CardHeader>
@@ -313,20 +508,20 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
                 <MapPin className="w-4 h-4" />
                 Address
               </Label>
-              <p className="text-sm">{fulfillment_info.address}</p>
+              <p className="text-sm break-words">{fulfillment_info.address || 'Address not provided'}</p>
             </div>
             
             {fulfillment_info.special_instructions && (
               <div>
                 <Label className="text-sm font-medium">Special Instructions</Label>
-                <p className="text-sm">{fulfillment_info.special_instructions}</p>
+                <p className="text-sm break-words">{fulfillment_info.special_instructions}</p>
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Pickup Information (for pickup orders) */}
+      {/* Pickup Information */}
       {order.order_type === 'pickup' && fulfillment_info && (
         <Card>
           <CardHeader>
@@ -354,7 +549,7 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
         </Card>
       )}
 
-      {/* Admin Status Change */}
+      {/* Admin Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Admin Actions</CardTitle>
@@ -364,47 +559,57 @@ export default function OrderDetailsSingleColumn({ orderId, adminEmail }: OrderD
             <Label className="text-sm font-medium">Update Status</Label>
             <Select onValueChange={handleStatusChange} disabled={isUpdating}>
               <SelectTrigger>
-                <SelectValue placeholder="Select new status" />
+                <SelectValue placeholder={isUpdating ? "Updating..." : "Select new status"} />
               </SelectTrigger>
               <SelectContent>
-                {statusOptions.map((status) => (
+                {STATUS_OPTIONS.map((status) => (
                   <SelectItem key={status} value={status}>
-                    {status.toUpperCase()}
+                    {status.replace('_', ' ').toUpperCase()}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {order.order_type === 'delivery' && dispatchRiders && (
+          {order.order_type === 'delivery' && (
             <div>
               <Label className="text-sm font-medium">Assign Rider</Label>
-              <Select onValueChange={handleRiderAssignment}>
+              <Select onValueChange={handleRiderAssignment} disabled={ridersLoading}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select dispatch rider" />
+                  <SelectValue placeholder={
+                    ridersLoading ? "Loading riders..." : "Select dispatch rider"
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  {dispatchRiders.map((rider) => (
+                  {dispatchRiders?.map((rider) => (
                     <SelectItem key={rider.id} value={rider.id}>
                       {rider.name} - {rider.phone}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {!dispatchRiders?.length && !ridersLoading && (
+                <p className="text-sm text-muted-foreground mt-1">No riders available</p>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Last Update */}
+      {/* Metadata */}
       <Card>
         <CardContent className="pt-6">
-          <div className="text-sm text-muted-foreground">
-            <p>Last Updated: {new Date(order.updated_at).toLocaleString()}</p>
-            {order.updated_by && <p>Updated by: Admin Officer</p>}
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>Last Updated: {order.updated_at ? new Date(order.updated_at).toLocaleString() : 'Unknown'}</p>
+            {order.updated_by && <p>Updated by: {order.updated_by}</p>}
+            <p>Order ID: {order.id}</p>
           </div>
         </CardContent>
       </Card>
     </div>
   );
-}
+});
+
+OrderDetailsSingleColumn.displayName = 'OrderDetailsSingleColumn';
+
+export default OrderDetailsSingleColumn;

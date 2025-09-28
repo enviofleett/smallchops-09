@@ -32,8 +32,8 @@ export const useDeliveryTracking = (orderIdOrNumber?: string) => {
     setError(null);
 
     try {
-      // Get order details with rider assignment
-      const { data: order, error: orderError } = await supabase
+      // First try to find by order_number (most common for guests)
+      let { data: order, error: orderError } = await supabase
         .from('orders')
         .select(`
           *,
@@ -42,10 +42,32 @@ export const useDeliveryTracking = (orderIdOrNumber?: string) => {
             vehicles(type, brand, model, license_plate)
           )
         `)
-        .or(`id.eq.${orderIdentifier},order_number.eq.${orderIdentifier}`)
-        .single();
+        .eq('order_number', orderIdentifier)
+        .maybeSingle();
+
+      // If not found by order_number, try by ID
+      if (!order) {
+        const { data: orderById, error: orderByIdError } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            profiles:assigned_rider_id(name, phone),
+            vehicle_assignments(
+              vehicles(type, brand, model, license_plate)
+            )
+          `)
+          .eq('id', orderIdentifier)
+          .maybeSingle();
+        
+        order = orderById;
+        orderError = orderByIdError;
+      }
 
       if (orderError) throw orderError;
+      
+      if (!order) {
+        throw new Error('Order not found. Please check your order number and try again.');
+      }
 
       const trackingData: DeliveryTracking = {
         orderId: order.id,
@@ -61,7 +83,7 @@ export const useDeliveryTracking = (orderIdOrNumber?: string) => {
 
       setTracking(trackingData);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to track order';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to track order. Please check your order number and try again.';
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

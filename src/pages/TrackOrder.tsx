@@ -15,6 +15,7 @@ import { Search, Package, Truck, CheckCircle, Clock, MapPin, Phone, User, Naviga
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { getRecentGuestOrder, cleanupGuestOrderTracking, logGuestTrackingEvent } from '@/utils/guestCheckoutTracker';
+import { GuestOrderTracker } from '@/components/delivery/GuestOrderTracker';
 export default function TrackOrder() {
   const [searchParams] = useSearchParams();
   const {
@@ -174,34 +175,8 @@ export default function TrackOrder() {
             </p>
           </div>
 
-          {/* Search Form */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="w-5 h-5" />
-                Find Your Order
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSearch} className="flex gap-4">
-                <Input type="text" placeholder="Enter order number (e.g., ORD-12345) or order ID" value={searchValue} onChange={e => setSearchValue(e.target.value)} className="flex-1" />
-                <Button type="submit" disabled={loading || !searchValue.trim()}>
-                  {loading ? 'Searching...' : 'Track Order'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Error State */}
-          {error && <Card className="mb-8 border-red-200 bg-red-50">
-              <CardContent className="pt-6">
-                <div className="text-center text-red-700">
-                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="font-medium">{error}</p>
-                  <p className="text-sm mt-1">Please check your order number and try again</p>
-                </div>
-              </CardContent>
-            </Card>}
+          {/* Production-Ready Guest Order Tracker */}
+          <GuestOrderTracker autoPopulate={true} />
 
           {/* Order Tracking Results */}
           {tracking && <div className="space-y-6">

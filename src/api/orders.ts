@@ -1,15 +1,50 @@
 import { supabase } from '@/integrations/supabase/client';
+import { OrderStatus, PaymentStatus } from '@/types/orders';
+import { OrderType } from '@/types/orderDetailsModal';
 
 export interface OrderWithItems {
   id: string;
   order_number: string;
-  status: string;
+  status: OrderStatus;
+  order_type: OrderType;
   customer_name: string;
   customer_email: string;
+  customer_phone?: string;
+  payment_status: PaymentStatus | 'completed' | 'partially_refunded';
   total_amount: number;
   created_at: string;
   updated_at: string;
   items?: any[];
+  order_items?: any[];
+  delivery_address?: any;
+  delivery_fee?: number;
+  pickup_time?: string;
+  pickup_point_id?: string;
+  special_instructions?: string;
+  assigned_rider_id?: string;
+  subtotal?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  vat_rate?: number;
+  vat_amount?: number;
+  paid_at?: string;
+  processing_started_at?: string;
+  admin_notes?: string;
+  payment_method?: string;
+  payment_reference?: string;
+  total_vat?: number;
+  order_time?: string;
+  delivery_schedule?: any;
+  amount_kobo?: number;
+  created_by?: string;
+  customer_id?: string;
+  user_id?: string;
+  delivery_status?: string;
+  delivery_time?: string;
+  delivery_time_slot_id?: string;
+  delivery_zone_id?: string;
+  // Add all other possible database fields to prevent type errors
+  [key: string]: any;
 }
 
 export interface OrderUpdatePayload {
@@ -22,10 +57,48 @@ export interface OrderUpdatePayload {
   };
 }
 
-export async function getOrders() {
-  const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+interface GetOrdersParams {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  searchQuery?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export async function getOrders(params?: GetOrdersParams) {
+  let query = supabase.from('orders').select('*', { count: 'exact' });
+
+  // Apply filters if params are provided
+  if (params?.status && params.status !== 'all') {
+    query = query.eq('status', params.status as OrderStatus);
+  }
+
+  if (params?.searchQuery) {
+    query = query.or(`customer_name.ilike.%${params.searchQuery}%,customer_email.ilike.%${params.searchQuery}%,order_number.ilike.%${params.searchQuery}%`);
+  }
+
+  if (params?.startDate) {
+    query = query.gte('created_at', params.startDate);
+  }
+
+  if (params?.endDate) {
+    query = query.lte('created_at', params.endDate);
+  }
+
+  // Apply pagination
+  if (params?.page && params?.pageSize) {
+    const from = (params.page - 1) * params.pageSize;
+    const to = from + params.pageSize - 1;
+    query = query.range(from, to);
+  }
+
+  query = query.order('created_at', { ascending: false });
+
+  const { data, error, count } = await query;
   if (error) throw error;
-  return data || [];
+  
+  return { orders: data || [], count: count || 0 };
 }
 
 export async function updateOrder({ orderId, updates }: OrderUpdatePayload) {
@@ -50,7 +123,7 @@ export async function bulkDeleteOrders(orderIds: string[]) {
 export async function bulkUpdateOrders(orderIds: string[], updates: Record<string, any>) {
   const { data, error } = await supabase.from('orders').update(updates).in('id', orderIds);
   if (error) throw error;
-  return { updated_count: data?.length || 0 };
+  return { updated_count: (data as any[])?.length || 0 };
 }
 
 export async function assignRiderToOrder(orderId: string, riderId: string) {

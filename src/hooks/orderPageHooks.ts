@@ -196,7 +196,8 @@ export function useBulkOrderOperations() {
   const queryClient = useQueryClient();
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: bulkUpdateOrders,
+    mutationFn: ({ orderIds, updates }: { orderIds: string[], updates: Record<string, any> }) => 
+      bulkUpdateOrders(orderIds, updates),
     onSuccess: (data) => {
       toast.success(`${data.updated_count || 0} orders updated successfully`);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -212,7 +213,7 @@ export function useBulkOrderOperations() {
       return;
     }
 
-    bulkUpdateMutation.mutate(orderIds, { status });
+    bulkUpdateMutation.mutate({ orderIds, updates: { status } });
   }, [bulkUpdateMutation]);
 
   const handleBulkRiderAssignment = useCallback((orderIds: string[], riderId: string) => {
@@ -226,7 +227,7 @@ export function useBulkOrderOperations() {
       return;
     }
 
-    bulkUpdateMutation.mutate(orderIds, { assigned_rider_id: riderId });
+    bulkUpdateMutation.mutate({ orderIds, updates: { assigned_rider_id: riderId } });
   }, [bulkUpdateMutation]);
 
   return {

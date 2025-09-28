@@ -12,7 +12,7 @@ export type OrderStatus =
 
 export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';
 
-export type OrderType = 'delivery' | 'pickup';
+export type OrderType = 'delivery' | 'pickup' | 'dine_in';
 
 export interface Customer {
   id?: string;

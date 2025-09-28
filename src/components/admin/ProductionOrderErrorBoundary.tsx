@@ -108,6 +108,29 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  private getProductionSafeErrorMessage = (error: Error | null): string => {
+    if (!error) return 'An unexpected error occurred';
+    
+    // Handle common React object rendering error
+    if (error.message.includes('Objects are not valid as a React child')) {
+      return 'Data formatting error: Address or object data cannot be displayed properly. This usually indicates corrupted order data.';
+    }
+    
+    // Handle other common production errors
+    if (error.message.includes('Cannot read properties')) {
+      return 'Data access error: Missing or corrupted order information.';
+    }
+    
+    if (error.message.includes('Network')) {
+      return 'Network connectivity issue: Unable to load order data.';
+    }
+    
+    // Return sanitized error message for production
+    return error.message.length > 200 
+      ? error.message.substring(0, 200) + '...' 
+      : error.message;
+  };
+
   render() {
     if (this.state.hasError) {
       const { error } = this.state;
@@ -127,10 +150,10 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-muted/50 rounded-lg p-4">
-              <p className="text-sm font-medium text-destructive mb-2">Error Details:</p>
-              <p className="text-sm text-muted-foreground font-mono">
-                {error?.message || 'An unexpected error occurred'}
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+              <p className="text-sm font-medium text-destructive mb-2">Production Error Details:</p>
+              <p className="text-sm text-muted-foreground font-mono break-words">
+                {this.getProductionSafeErrorMessage(error)}
               </p>
               {this.state.retryCount > 0 && (
                 <p className="text-xs text-muted-foreground mt-2">
@@ -141,13 +164,13 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
 
             <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
               <p className="text-sm text-accent-foreground font-medium">
-                <strong>Suggested Actions:</strong>
+                <strong>Immediate Actions:</strong>
               </p>
               <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-                <li>• Check your internet connection</li>
-                <li>• Verify the order still exists in the system</li>
-                <li>• Try refreshing the page</li>
-                <li>• Contact support if the issue persists</li>
+                <li>• Refresh the page immediately</li>
+                <li>• Check if order data is corrupted</li>
+                <li>• Verify address formatting is correct</li>
+                <li>• Report to system administrator if persistent</li>
               </ul>
             </div>
 

@@ -319,8 +319,8 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
             </div>
           ) : (
             <div className="divide-y">
-              {deliveryOrders.map((order) => {
-                const schedule = order.delivery_schedule || schedules[order.id];
+              {deliveryOrders.map((order: OrderWithItems) => {
+                const schedule = (order as any).delivery_schedule || schedules[order.id];
                 const isExpanded = expandedOrder === order.id;
                 
                 return (
@@ -382,27 +382,27 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
                     {/* Order Summary */}
                     <div className="mb-4 space-y-3">
                       {/* Items Summary */}
-                      <div className="bg-muted/50 p-3 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-sm">Order Items ({order.order_items?.length || 0})</h4>
-                          <div className="text-sm text-muted-foreground">
-                            Total: ₦{order.total_amount?.toLocaleString()}
+                        <div className="bg-muted/50 p-3 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-sm">Order Items ({(order as any).order_items?.length || 0})</h4>
+                            <div className="text-sm text-muted-foreground">
+                              Total: ₦{order.total_amount?.toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            {(order as any).order_items?.slice(0, 3).map((item: any, index: number) => (
+                              <div key={index} className="flex justify-between items-center text-sm">
+                                <span className="truncate">{item.product_name} × {item.quantity}</span>
+                                <span className="font-medium whitespace-nowrap ml-2">₦{item.total_price?.toLocaleString()}</span>
+                              </div>
+                            ))}
+                            {((order as any).order_items?.length || 0) > 3 && (
+                              <div className="text-xs text-muted-foreground">
+                                +{((order as any).order_items?.length || 0) - 3} more items
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="space-y-1">
-                          {order.order_items?.slice(0, 3).map((item, index) => (
-                            <div key={index} className="flex justify-between items-center text-sm">
-                              <span className="truncate">{item.product_name} × {item.quantity}</span>
-                              <span className="font-medium whitespace-nowrap ml-2">₦{item.total_price?.toLocaleString()}</span>
-                            </div>
-                          ))}
-                          {(order.order_items?.length || 0) > 3 && (
-                            <div className="text-xs text-muted-foreground">
-                              +{(order.order_items?.length || 0) - 3} more items
-                            </div>
-                          )}
-                        </div>
-                      </div>
 
                       {/* Payment & Delivery Info */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -491,7 +491,7 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
                         <div className="space-y-2">
                           <h4 className="font-medium text-sm">Order Items</h4>
                           <div className="space-y-2">
-                            {order.order_items?.map((item, index) => (
+                            {(order as any).order_items?.map((item: any, index: number) => (
                               <div key={index} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
                                 <div className="flex-1">
                                   <div className="font-medium text-sm">{item.product_name}</div>

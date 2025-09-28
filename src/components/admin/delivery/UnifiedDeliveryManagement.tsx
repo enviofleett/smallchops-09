@@ -153,7 +153,7 @@ export function UnifiedDeliveryManagement({
       console.log(`🔄 Updating order ${orderId} status from "${order.status}" to "${newStatus}"`);
 
       // ENHANCED: Centralized error handling with loading state
-      await updateOrder(orderId, { status: newStatus as any });
+      await updateOrder({ orderId, updates: { status: newStatus as any } });
       toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
       refetch();
     } catch (error: any) {
@@ -184,7 +184,7 @@ export function UnifiedDeliveryManagement({
   const handleAssignDriver = async (orderIds: string[], driverId: string) => {
     try {
       const promises = orderIds.map(orderId =>
-        updateOrder(orderId, { assigned_rider_id: driverId })
+        updateOrder({ orderId, updates: { assigned_rider_id: driverId } })
       );
       await Promise.all(promises);
       toast.success(`${orderIds.length} order(s) assigned successfully`);

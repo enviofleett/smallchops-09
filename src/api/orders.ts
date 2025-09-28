@@ -9,11 +9,31 @@ export interface OrderWithItems {
   order_type: OrderType;
   customer_name: string;
   customer_email: string;
-  customer_phone?: string;
+  customer_phone: string;
   payment_status: PaymentStatus | 'completed' | 'partially_refunded';
   total_amount: number;
   created_at: string;
   updated_at: string;
+  admin_notes: string;
+  amount_kobo: number;
+  assigned_rider_id: string;
+  created_by: string;
+  delivery_status: string;
+  delivery_time: string;
+  delivery_time_slot_id: string;
+  delivery_zone_id: string;
+  email: string;
+  estimated_delivery_date: string;
+  guest_session_id: string;
+  idempotency_key: string;
+  last_modified_by: string;
+  preferred_delivery_time: string;
+  processing_lock: boolean;
+  processing_officer_id: string;
+  processing_officer_name: string;
+  subtotal_cost: number;
+  updated_by: string;
+  user_id: string;
   items?: any[];
   order_items?: any[];
   delivery_address?: any;
@@ -21,7 +41,6 @@ export interface OrderWithItems {
   pickup_time?: string;
   pickup_point_id?: string;
   special_instructions?: string;
-  assigned_rider_id?: string;
   subtotal?: number;
   tax_amount?: number;
   discount_amount?: number;
@@ -29,20 +48,16 @@ export interface OrderWithItems {
   vat_amount?: number;
   paid_at?: string;
   processing_started_at?: string;
-  admin_notes?: string;
   payment_method?: string;
   payment_reference?: string;
   total_vat?: number;
   order_time?: string;
   delivery_schedule?: any;
-  amount_kobo?: number;
-  created_by?: string;
-  customer_id?: string;
-  user_id?: string;
-  delivery_status?: string;
-  delivery_time?: string;
-  delivery_time_slot_id?: string;
-  delivery_zone_id?: string;
+  customer_id: string;
+  paystack_reference?: string;
+  reference_updated_at?: string;
+  payment_verified_at?: string;
+  pickup_ready?: boolean;
   // Add all other possible database fields to prevent type errors
   [key: string]: any;
 }
@@ -130,7 +145,11 @@ export async function assignRiderToOrder(orderId: string, riderId: string) {
   return updateOrder({ orderId, updates: { assigned_rider_id: riderId }});
 }
 
-export async function manuallyQueueCommunicationEvent(orderId: string, eventType: string) {
+// Function overloads for manuallyQueueCommunicationEvent
+export async function manuallyQueueCommunicationEvent(orderId: string, eventType: string): Promise<any>;
+export async function manuallyQueueCommunicationEvent(order: OrderWithItems, eventType: string): Promise<any>;
+export async function manuallyQueueCommunicationEvent(orderOrId: string | OrderWithItems, eventType: string) {
+  const orderId = typeof orderOrId === 'string' ? orderOrId : orderOrId.id;
   const { data, error } = await supabase.from('communication_events').insert({
     event_type: eventType,
     order_id: orderId,

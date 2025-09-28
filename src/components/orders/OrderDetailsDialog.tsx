@@ -148,7 +148,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     mutationFn: (updates: {
       status?: OrderStatus;
       assigned_rider_id?: string | null;
-    }) => updateOrder(order.id, updates),
+    }) => updateOrder({ orderId: order.id, updates }),
     onSuccess: () => {
       const statusChanged = selectedStatus !== order.status;
       toast({
@@ -172,7 +172,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   });
 
   const manualSendMutation = useMutation({
-    mutationFn: (status: OrderStatus) => manuallyQueueCommunicationEvent(order, status),
+    mutationFn: (status: OrderStatus) => manuallyQueueCommunicationEvent(order.id, status),
     onSuccess: () => {
       toast({
         title: 'Success',

@@ -229,7 +229,7 @@ function AdminOrdersContent() {
     // Apply comprehensive delivery/pickup date filter using utility functions
     if (deliveryFilter !== 'all') {
       try {
-        result = filterOrdersByDate(result, deliveryFilter, deliverySchedules);
+        result = filterOrdersByDate(result as any[], deliveryFilter, deliverySchedules) as any;
       } catch (error) {
         console.error('Error applying date filter:', error);
         // Fallback to showing all orders if filtering fails

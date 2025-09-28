@@ -79,6 +79,7 @@ const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerific
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"), undefined, true, 8000);
 const Cart = withLazyLoading(() => import("./pages/Cart"), undefined, true, 10000);
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"), undefined, false, 10000);
+const OrderDetailsPage = withLazyLoading(() => import("./pages/OrderDetailsPage"), undefined, false, 10000);
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"), undefined, true, 10000);
 const Blog = withLazyLoading(() => import("./pages/Blog"), undefined, true, 10000);
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })), undefined, false, 15000);
@@ -282,6 +283,7 @@ const App = () => {
                 <Route path="/dashboard" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/orders" element={<ErrorBoundaryWrapper context="Admin Orders"><AdminOrders /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/orders/:id" element={<ErrorBoundaryWrapper context="Admin Order Details"><AdminOrderDetails /></ErrorBoundaryWrapper>} />
+                <Route path="/admin/order-details/:orderId" element={<ErrorBoundaryWrapper context="Order Details UI"><OrderDetailsPage /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/delivery" element={<ErrorBoundaryWrapper context="Admin Delivery"><AdminDelivery /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/products" element={<ErrorBoundaryWrapper context="Products"><Products /></ErrorBoundaryWrapper>} />
                 <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />

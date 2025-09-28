@@ -39,6 +39,7 @@ import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBoundary';
 import ProductionOrderErrorBoundary from '@/components/admin/ProductionOrderErrorBoundary';
 import OrderErrorBoundary from '@/components/orders/OrderErrorBoundary';
+import { OrderDetailsTestButton } from '@/components/admin/OrderDetailsTestButton';
 
 function AdminOrdersContent() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -438,6 +439,7 @@ function AdminOrdersContent() {
               <BarChart3 className="w-4 h-4 mr-2" />
               Delivery Report
             </Button>
+            <OrderDetailsTestButton />
             <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Create Order

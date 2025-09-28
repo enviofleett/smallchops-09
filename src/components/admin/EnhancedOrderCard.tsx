@@ -242,6 +242,15 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
             >
               View Details
             </Button>
+            <Button 
+              variant="secondary" 
+              size="sm"
+              asChild
+            >
+              <a href={`/admin/order-details/${order.id}`} target="_blank" rel="noopener noreferrer">
+                Full Details
+              </a>
+            </Button>
             
             {order.payment_status !== 'paid' && order.status === 'pending' && (
               <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">

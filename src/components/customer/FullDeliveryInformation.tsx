@@ -14,7 +14,9 @@ import {
   CreditCard 
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { formatAddressMultiline } from '@/utils/formatAddress';
+import { formatAddressMultiline, emergencySafeFormatAddress } from '@/utils/formatAddress';
+import { safeStringify, validateComponentData } from '@/utils/productionSafeData';
+import { SafeOrderDataRenderer } from '@/components/common/SafeOrderDataRenderer';
 import type { PickupPoint } from '@/hooks/usePickupPoints';
 
 interface DeliverySchedule {
@@ -183,7 +185,18 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                   <div className="flex-1">
                     <p className="text-sm text-muted-foreground">Delivery Address</p>
                     <p className="font-medium whitespace-pre-line break-words">
-                      {formatAddressMultiline(order.delivery_address)}
+                      {(() => {
+                        try {
+                          // Validate address data before rendering
+                          if (!validateComponentData(order.delivery_address, 'FullDeliveryInformation.address')) {
+                            return emergencySafeFormatAddress(order.delivery_address);
+                          }
+                          return formatAddressMultiline(order.delivery_address);
+                        } catch (error) {
+                          console.warn('Address rendering error, using emergency fallback:', error);
+                          return emergencySafeFormatAddress(order.delivery_address);
+                        }
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -336,7 +349,7 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                               <div>
                                 <p className="text-sm text-muted-foreground">Special Instructions</p>
                                 <p className="font-medium break-words text-sm bg-muted/50 p-2 rounded">
-                                  {deliverySchedule.special_instructions}
+                                  {safeStringify(deliverySchedule.special_instructions)}
                                 </p>
                               </div>
                             </div>
@@ -376,7 +389,7 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                     <div>
                       <p className="text-sm text-muted-foreground">Special Instructions</p>
                       <p className="font-medium break-words text-sm bg-muted/50 p-2 rounded">
-                        {order.special_instructions}
+                        {safeStringify(order.special_instructions)}
                       </p>
                     </div>
                   </div>
@@ -401,7 +414,7 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                         <div>
                           <p className="text-sm text-muted-foreground">Item Instructions</p>
                           <p className="font-medium break-words text-sm bg-muted/50 p-2 rounded whitespace-pre-line">
-                            {itemInstructions}
+                            {safeStringify(itemInstructions)}
                           </p>
                         </div>
                       </div>
@@ -420,7 +433,7 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                     <Phone className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Contact Phone</p>
-                      <p className="font-medium">{order.customer_phone}</p>
+                      <p className="font-medium">{safeStringify(order.customer_phone)}</p>
                     </div>
                   </div>
                 </div>

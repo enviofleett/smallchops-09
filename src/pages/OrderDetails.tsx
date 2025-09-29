@@ -14,6 +14,10 @@ import { useNetworkResilience } from '@/hooks/useNetworkResilience';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { DeliveryScheduleCard } from '@/components/orders/DeliveryScheduleCard';
 import { FullDeliveryInformation } from '@/components/customer/FullDeliveryInformation';
+import { sanitizeOrderData, safeStringify } from '@/utils/productionSafeData';
+import { validateOrderData, createFallbackOrderData } from '@/utils/orderDataValidation';
+import { SafeOrderDataRenderer } from '@/components/common/SafeOrderDataRenderer';
+import ProductionOrderErrorBoundary from '@/components/admin/ProductionOrderErrorBoundary';
 import { getDeliveryScheduleByOrderId, DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { usePickupPoints } from '@/hooks/usePickupPoints';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
@@ -189,7 +193,20 @@ const loadData = React.useCallback(async () => {
     if (orderErr) throw orderErr;
     if (!orderData) throw new Error('Order not found');
 
-    setOrder(orderData as OrderDetailsData);
+    // Sanitize and validate order data before setting state
+    let safeOrderData = null;
+    try {
+      // First sanitize the data
+      const sanitized = sanitizeOrderData(orderData);
+      // Then validate it
+      const validated = validateOrderData(sanitized);
+      safeOrderData = validated || createFallbackOrderData(orderData);
+    } catch (sanitizationError) {
+      console.warn('Order data sanitization failed, using fallback:', sanitizationError);
+      safeOrderData = createFallbackOrderData(orderData);
+    }
+
+    setOrder(safeOrderData as OrderDetailsData);
 
     // Fetch order items with product details including features
     try {
@@ -398,14 +415,19 @@ const reconcileNow = async () => {
     : null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Helmet>
-        <title>Order {order.order_number} - Payment Status & Details</title>
-        <meta name="description" content={`View payment status and details for order ${order.order_number}.`} />
-        <link rel="canonical" href={`${window.location.origin}/orders/${order.id}`} />
-      </Helmet>
+    <ProductionOrderErrorBoundary 
+      orderId={order?.id}
+      orderNumber={order?.order_number}
+      onReset={() => loadData()}
+    >
+      <div className="min-h-screen bg-background">
+        <Helmet>
+          <title>Order {order.order_number} - Payment Status & Details</title>
+          <meta name="description" content={`View payment status and details for order ${order.order_number}.`} />
+          <link rel="canonical" href={`${window.location.origin}/orders/${order.id}`} />
+        </Helmet>
 
-      <PublicHeader />
+        <PublicHeader />
 
       <div className="container mx-auto px-4 py-6 max-w-4xl">
         {/* Header */}
@@ -456,7 +478,7 @@ const reconcileNow = async () => {
             {order.customer_name && (
               <div>
                 <p className="text-sm text-muted-foreground">Customer Name</p>
-                <p className="font-medium">{order.customer_name}</p>
+                <p className="font-medium">{safeStringify(order.customer_name)}</p>
               </div>
             )}
             {order.customer_email && (
@@ -464,7 +486,7 @@ const reconcileNow = async () => {
                 <p className="text-sm text-muted-foreground">Email</p>
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <p className="font-medium">{order.customer_email}</p>
+                  <p className="font-medium">{safeStringify(order.customer_email)}</p>
                 </div>
               </div>
             )}
@@ -473,7 +495,7 @@ const reconcileNow = async () => {
                 <p className="text-sm text-muted-foreground">Phone</p>
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <p className="font-medium">{order.customer_phone}</p>
+                  <p className="font-medium">{safeStringify(order.customer_phone)}</p>
                 </div>
               </div>
             )}
@@ -491,11 +513,11 @@ const reconcileNow = async () => {
               orderItems.map((item, index) => (
                 <div key={item.id || index} className="flex justify-between items-start border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
                   <div className="flex-1">
-                    <p className="font-medium">{item.product_name}</p>
+                    <p className="font-medium">{safeStringify(item.product_name)}</p>
                     <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
                     {item.special_instructions && (
                       <p className="text-sm text-blue-600 mt-1">
-                        Note: {item.special_instructions}
+                        Note: {safeStringify(item.special_instructions)}
                       </p>
                     )}
                     {/* Product Features */}
@@ -576,7 +598,7 @@ const reconcileNow = async () => {
             {order.payment_reference && (
               <div>
                 <p className="text-sm text-muted-foreground">Payment Reference</p>
-                <p className="font-mono text-sm break-all">{order.payment_reference}</p>
+                <p className="font-mono text-sm break-all">{safeStringify(order.payment_reference)}</p>
               </div>
             )}
             {tx?.channel && (
@@ -714,5 +736,6 @@ const reconcileNow = async () => {
         </Card>
       </div>
     </div>
+    </ProductionOrderErrorBoundary>
   );
 }

@@ -137,8 +137,23 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
       return 'React rendering error: Invalid data format detected in order details. This is usually caused by corrupted address or order information.';
     }
     
+    // More specific React error patterns
+    if (errorMessage.includes('Minified React error #130')) {
+      return 'React component error: Data validation failed during rendering. Please refresh to reload the order data.';
+    }
+    
     if (errorMessage.includes('Minified React error')) {
       return 'React application error: Please refresh the page to restore functionality.';
+    }
+    
+    // Address/object rendering specific errors
+    if (errorMessage.toLowerCase().includes('address') && (errorMessage.includes('render') || errorMessage.includes('child'))) {
+      return 'Order address information contains invalid data that cannot be displayed safely. The address may be corrupted in the database.';
+    }
+    
+    // JSON parsing errors related to address data
+    if (errorMessage.includes('JSON') && errorMessage.toLowerCase().includes('address')) {
+      return 'Order address data is malformed (invalid JSON format). This requires database correction.';
     }
     
     // Return sanitized error message for production
@@ -183,10 +198,11 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
                 <strong>Immediate Actions:</strong>
               </p>
               <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-                <li>• Refresh the page immediately</li>
-                <li>• Check if order data is corrupted</li>
-                <li>• Verify address formatting is correct</li>
-                <li>• Report to system administrator if persistent</li>
+                <li>• Refresh the page immediately to reload order data</li>
+                <li>• Check if order address information is corrupted</li>
+                <li>• Verify all order details display correctly after refresh</li>
+                <li>• Report persistent errors to system administrator</li>
+                <li>• If error persists, the order may need database cleanup</li>
               </ul>
             </div>
 

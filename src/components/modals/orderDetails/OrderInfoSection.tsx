@@ -7,6 +7,8 @@ import { Order, OrderStatus } from '@/types/orderDetailsModal';
 import { useUpdateOrderStatus } from '@/hooks/useUpdateOrderStatus';
 import { StatusBadge } from './StatusBadge';
 import { toast } from 'sonner';
+// Import defensive validation utilities
+import { safeOrder, statusOptions, getSafeStatus } from '@/utils/orderDefensiveValidation';
 
 interface OrderInfoSectionProps {
   order: Order;
@@ -14,25 +16,33 @@ interface OrderInfoSectionProps {
   onStatusUpdate: () => void;
 }
 
-const statusOptions: { value: OrderStatus; label: string }[] = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'preparing', label: 'Preparing' },
-  { value: 'ready', label: 'Ready' },
-  { value: 'out_for_delivery', label: 'Out for Delivery' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
 export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({ 
   order, 
   isUpdatingStatus,
   onStatusUpdate 
 }) => {
-  const { updateStatus, isUpdating } = useUpdateOrderStatus(order.id);
+  // Apply defensive validation to ensure safe rendering
+  const safeOrderData = safeOrder(order);
+  
+  // Handle invalid order data gracefully
+  if (!safeOrderData) {
+    return (
+      <Card className="keep-together">
+        <CardContent className="py-6">
+          <div className="text-center text-muted-foreground">
+            <Package className="h-8 w-8 mx-auto mb-2" />
+            <p>Order information unavailable</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { updateStatus, isUpdating } = useUpdateOrderStatus(safeOrderData.id);
 
   const handleStatusChange = async (newStatus: OrderStatus) => {
-    if (newStatus === order.status) return;
+    const safeCurrentStatus = getSafeStatus(safeOrderData.status);
+    if (newStatus === safeCurrentStatus) return;
     
     const success = await updateStatus(newStatus);
     if (success) {
@@ -41,24 +51,32 @@ export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({
   };
 
   const formatCurrency = (amount: number) => {
+    // Defensive number formatting
+    const safeAmount = Number(amount) || 0;
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
-    }).format(amount);
+    }).format(safeAmount);
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const formatDateTime = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return 'Invalid Date';
+    }
   };
 
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
+  const getPaymentStatusColor = (status: any) => {
+    const safeStatus = String(status || 'pending').toLowerCase();
+    switch (safeStatus) {
       case 'paid':
         return 'bg-success text-success-foreground';
       case 'pending':
@@ -85,7 +103,7 @@ export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({
             <Package className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="font-medium text-foreground capitalize">
-                {order.order_type}
+                {safeOrderData.order_type || 'delivery'}
               </p>
               <p className="text-xs text-muted-foreground">Order Type</p>
             </div>
@@ -95,7 +113,7 @@ export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="font-medium text-foreground">
-                {formatDateTime(order.created_at)}
+                {formatDateTime(safeOrderData.created_at)}
               </p>
               <p className="text-xs text-muted-foreground">Created At</p>
             </div>
@@ -106,8 +124,8 @@ export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({
           <div className="flex items-center gap-3">
             <CreditCard className="h-4 w-4 text-muted-foreground" />
             <div>
-              <Badge className={getPaymentStatusColor(order.payment_status)}>
-                {order.payment_status}
+              <Badge className={getPaymentStatusColor(safeOrderData.payment_status)}>
+                {String(safeOrderData.payment_status || 'pending').toUpperCase()}
               </Badge>
               <p className="text-xs text-muted-foreground mt-1">Payment Status</p>
             </div>
@@ -117,7 +135,7 @@ export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({
             <DollarSign className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="font-medium text-foreground">
-                {formatCurrency(order.total_amount)}
+                {formatCurrency(safeOrderData.total_amount)}
               </p>
               <p className="text-xs text-muted-foreground">Total Amount</p>
             </div>
@@ -131,20 +149,20 @@ export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({
             </label>
             <div className="flex items-center gap-2">
               <Select
-                value={order.status}
+                value={getSafeStatus(safeOrderData.status)}
                 onValueChange={handleStatusChange}
                 disabled={isUpdating || isUpdatingStatus}
               >
                 <SelectTrigger className="w-48">
                   <SelectValue>
-                    <StatusBadge status={order.status} />
+                    <StatusBadge status={getSafeStatus(safeOrderData.status)} />
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {statusOptions.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
                       <div className="flex items-center gap-2">
-                        <StatusBadge status={status.value} />
+                        <StatusBadge status={status.value as OrderStatus} />
                         <span>{status.label}</span>
                       </div>
                     </SelectItem>

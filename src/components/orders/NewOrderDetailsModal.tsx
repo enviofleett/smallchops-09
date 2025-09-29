@@ -392,20 +392,40 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   const fulfillmentInfo = detailedOrderData?.fulfillment_info || order.fulfillment_info || {};
 
   // Add defensive logging as requested in the problem statement
-  console.log("Order item debug", rawOrderItems, rawOrderData);
+  console.log("Order item debug - raw items:", rawOrderItems, "raw order data:", rawOrderData);
+  console.log("Order items source - order_items:", rawOrderData.order_items, "items:", rawOrderData.items);
 
-  // Normalize order items using the example logic from the problem statement
-  const normalizedOrderItems = (rawOrderData.order_items || rawOrderData.items || []).map((item: any) => ({
-    ...item,
-    product: item.product || (Array.isArray(item.products) ? item.products[0] : item.products)
-  }));
-
-  console.log("Normalized order items", normalizedOrderItems);
+  // Note: The safeOrder function already handles product/products normalization in safeOrderItems
+  // We just need to pass the raw items correctly to avoid double processing
+  const orderItemsForValidation = rawOrderData.order_items || rawOrderData.items || [];
+  
+  // Add defensive logging for debugging missing order items
+  if (orderItemsForValidation.length === 0) {
+    console.warn("No order items found in rawOrderData:", { 
+      order_items: rawOrderData.order_items, 
+      items: rawOrderData.items, 
+      keys: Object.keys(rawOrderData) 
+    });
+  } else {
+    console.log("Found order items for processing:", orderItemsForValidation.length, "items");
+    // Log structure of first item for debugging
+    if (orderItemsForValidation[0]) {
+      console.log("First item structure:", {
+        id: orderItemsForValidation[0].id,
+        product: orderItemsForValidation[0].product,
+        products: orderItemsForValidation[0].products,
+        total_price: orderItemsForValidation[0].total_price,
+        quantity: orderItemsForValidation[0].quantity,
+        unit_price: orderItemsForValidation[0].unit_price
+      });
+    }
+  }
 
   // Apply defensive validation to ensure safe rendering
+  // Pass raw items to safeOrder as it handles the product/products normalization internally
   const safeOrderData = safeOrder({
     ...rawOrderData,
-    order_items: normalizedOrderItems
+    order_items: orderItemsForValidation
   });
   if (!safeOrderData) {
     return (

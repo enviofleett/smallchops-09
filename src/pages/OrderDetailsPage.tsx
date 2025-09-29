@@ -33,7 +33,13 @@ export default function OrderDetailsPage() {
           .select(`
             *,
             order_items (
-              *,
+              id,
+              quantity,
+              unit_price,
+              total_price,
+              special_instructions,
+              customizations,
+              product_id,
               product:products (
                 id, name, description, price, image_url
               )

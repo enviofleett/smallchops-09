@@ -43,7 +43,16 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
           supabase.from('orders').select('*').eq('id', orderId).maybeSingle(),
           supabase.from('order_delivery_schedule').select('*').eq('order_id', orderId).maybeSingle(),
           supabase.from('order_items').select(`
-            *,
+            id,
+            quantity,
+            unit_price,
+            total_price,
+            special_instructions,
+            customizations,
+            product_id,
+            order_id,
+            created_at,
+            updated_at,
             product:products (
               id, name, description, price, cost_price, image_url, 
               category_id, features, ingredients

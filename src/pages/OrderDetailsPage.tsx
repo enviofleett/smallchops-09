@@ -34,7 +34,7 @@ export default function OrderDetailsPage() {
             *,
             order_items (
               *,
-              products (
+              product:products (
                 id, name, description, price, image_url
               )
             )

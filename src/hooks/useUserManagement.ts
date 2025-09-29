@@ -2,12 +2,11 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useRoleBasedPermissions } from './useRoleBasedPermissions';
 import { useAuth } from '@/contexts/AuthContext';
-
-export type CreateUserRole = 'super_admin' | 'admin' | 'manager' | 'support_officer';
+import { UserRoleType } from '@/types/auth';
 
 export interface CreateUserData {
   email: string;
-  role: CreateUserRole;
+  role: UserRoleType;
   name?: string;
 }
 

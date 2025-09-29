@@ -22,8 +22,9 @@ import { ProductionMonitoring } from '@/components/payments/ProductionMonitoring
 import { WebhookMonitoringDashboard } from '@/components/payments/WebhookMonitoringDashboard';
 import { ProductionReadinessChecker } from '@/components/admin/ProductionReadinessChecker';
 import { AlertCircle, CheckCircle, Copy, ExternalLink, Lock, UserX } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { useHasPermission } from '@/hooks/usePermissions';
+import AdminPageWrapper from '@/components/admin/AdminPageWrapper';
 
 interface PaymentIntegration {
   id?: string;
@@ -42,7 +43,7 @@ interface PaymentIntegration {
 }
 
 export const PaymentSettings: React.FC = () => {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useUnifiedAuth();
   const isAdmin = useHasPermission('payment_settings', 'edit');
   
   const [config, setConfig] = useState<PaymentIntegration>({
@@ -299,21 +300,24 @@ export const PaymentSettings: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Payment Settings</h1>
-          <p className="text-muted-foreground">Configure payment providers and manage transactions</p>
+    <AdminPageWrapper
+      title="Payment Settings"
+      description="Configure payment providers and manage transactions"
+      requiredRole="admin"
+      menuPermission="settingsPayments"
+      permissionLevel="edit"
+    >
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {user?.email} ({user?.role})
+            </Badge>
+            {getConnectionStatusBadge()}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs">
-            {user?.email} ({user?.role})
-          </Badge>
-          {getConnectionStatusBadge()}
-        </div>
-      </div>
 
-      <Tabs defaultValue="environment" className="space-y-6">
+        <Tabs defaultValue="environment" className="space-y-6">
         <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="environment">Environment</TabsTrigger>
           <TabsTrigger value="production">Production</TabsTrigger>
@@ -550,6 +554,7 @@ export const PaymentSettings: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AdminPageWrapper>
   );
 };

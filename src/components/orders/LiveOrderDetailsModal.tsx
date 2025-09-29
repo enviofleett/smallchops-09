@@ -75,7 +75,7 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
   if (isLoading) return <div>Loading...</div>;
   if (error || !order) return <div>Error loading order.</div>;
 
-  // Defensive checks
+  // Always use order.items, not order.order_items or other properties!
   const items = Array.isArray(order.items) ? order.items : [];
   const hasDrivers = Array.isArray(drivers) && drivers.length > 0;
 
@@ -161,8 +161,11 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
             ) : (
               <ul className="text-sm space-y-2">
                 {items.map(item => (
-                  <li key={item.id || item.productId}>
-                    <b>{item.name}</b> &times;{item.quantity} — ₦{item.total_price?.toLocaleString?.() ?? item.price?.toLocaleString?.() ?? "-"}
+                  <li key={item.id || item.product_id}>
+                    <b>{item.name}</b> &times;{item.quantity} — ₦{item.total_price?.toLocaleString?.() ?? item.unit_price?.toLocaleString?.() ?? "-"}
+                    {item.special_instructions && (
+                      <div className="text-xs text-gray-500">Note: {item.special_instructions}</div>
+                    )}
                   </li>
                 ))}
               </ul>

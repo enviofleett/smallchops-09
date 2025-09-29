@@ -489,21 +489,13 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 flex-wrap">
-                <Badge className={`${STATUS_COLORS[orderData.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'} text-white text-base px-4 py-2`}>
-                  {displayStatus(orderData.status)}
-                </Badge>
-                <Badge variant="outline" className="text-sm px-3 py-1">
-                  {orderData.order_type?.toUpperCase() || 'DELIVERY'}
-                </Badge>
+                <Badge className={`${STATUS_COLORS[orderData.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'} text-white text-base px-4 py-2`}>{displayStatus(orderData.status)}</Badge>
+                <Badge variant="outline" className="text-sm px-3 py-1">{orderData.order_type?.toUpperCase() || 'DELIVERY'}</Badge>
                 {!isLoadingDetailed && detailedOrderData && (
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                    LIVE DATA
-                  </Badge>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">LIVE DATA</Badge>
                 )}
                 {isAdmin && (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                    ADMIN VIEW
-                  </Badge>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">ADMIN VIEW</Badge>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -706,6 +698,24 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
                         </span>
                       </div>
                       
+                      {/* ========== ADDED: Product Description and Features ========== */}
+                      {item.product?.description && (
+                        <div className="text-xs text-muted-foreground">
+                          {item.product.description}
+                        </div>
+                      )}
+                      {item.product?.features && Array.isArray(item.product.features) && (
+                        <ul className="text-xs text-muted-foreground list-disc list-inside">
+                          {item.product.features.map((feature: string, i: number) => (
+                            <li key={i}>{feature}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {item.product?.features && !Array.isArray(item.product.features) && (
+                        <div className="text-xs text-muted-foreground">{item.product.features}</div>
+                      )}
+                      {/* ============================================================ */}
+
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span>Qty: {item.quantity || 1}</span>
                         <span>×</span>
@@ -726,280 +736,3 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
                     </div>
                   </div>
                 ))}
-                
-                {/* Order Summary */}
-                <div className="border-t pt-4 mt-6">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span className="font-medium">
-                        ₦{orderItems.reduce((sum: number, item: any) => sum + (item.total_price || 0), 0).toLocaleString()}
-                      </span>
-                    </div>
-                    
-                    {orderData.vat_amount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">VAT ({orderData.vat_rate || 7.5}%)</span>
-                        <span className="font-medium">₦{orderData.vat_amount.toLocaleString()}</span>
-                      </div>
-                    )}
-                    
-                    {orderData.delivery_fee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Delivery Fee</span>
-                        <span className="font-medium">₦{orderData.delivery_fee.toLocaleString()}</span>
-                      </div>
-                    )}
-                    
-                    {orderData.discount_amount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Discount</span>
-                        <span className="font-medium text-success">-₦{orderData.discount_amount.toLocaleString()}</span>
-                      </div>
-                    )}
-                    
-                    <div className="border-t pt-2">
-                      <div className="flex justify-between font-semibold text-lg">
-                        <span>Total</span>
-                        <span>₦{orderData.total_amount.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Delivery Information */}
-        {orderData.order_type === 'delivery' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="w-5 h-5" />
-                Delivery Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Delivery Window
-                </p>
-                <p className="text-sm">
-                  {fulfillmentInfo.delivery_date && fulfillmentInfo.delivery_hours 
-                    ? `${fulfillmentInfo.delivery_date} ${fulfillmentInfo.delivery_hours.start} - ${fulfillmentInfo.delivery_hours.end}`
-                    : detailedOrderData?.delivery_schedule?.delivery_date
-                    ? `${detailedOrderData.delivery_schedule.delivery_date} ${detailedOrderData.delivery_schedule.delivery_time_start} - ${detailedOrderData.delivery_schedule.delivery_time_end}`
-                    : 'To be scheduled'
-                  }
-                </p>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  Address
-                </p>
-                <p className="text-sm break-words">
-                  {displayAddress(fulfillmentInfo.address || orderData.delivery_address)}
-                </p>
-              </div>
-              
-              {(fulfillmentInfo.special_instructions || orderData.special_instructions || detailedOrderData?.delivery_schedule?.special_instructions) && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Special Instructions</p>
-                  <p className="text-sm break-words">
-                    {fulfillmentInfo.special_instructions || orderData.special_instructions || detailedOrderData?.delivery_schedule?.special_instructions}
-                  </p>
-                </div>
-              )}
-
-              {isAdmin && orderData.assigned_rider_id && detailedOrderData?.items && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800 mb-1">Driver Assignment</p>
-                  <p className="text-sm text-blue-600">
-                    A driver has been assigned to this delivery order.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Status Timeline */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" />
-              Order Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {detailedOrderData?.timeline && detailedOrderData.timeline.length > 0 ? (
-              <div className="space-y-3">
-                {detailedOrderData.timeline.map((step: any, index: number) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      step.status === 'completed' ? 'bg-green-500' :
-                      step.status === 'current' ? 'bg-blue-500' :
-                      'bg-gray-300'
-                    }`}></div>
-                    <div className="flex-1">
-                      <p className={`text-sm font-medium ${
-                        step.status === 'pending' ? 'text-muted-foreground' : ''
-                      }`}>
-                        {step.label || step.step}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {step.datetime ? new Date(step.datetime).toLocaleString() : 'Pending'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              // Fallback timeline based on current status
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Order Placed</p>
-                    <p className="text-xs text-muted-foreground">
-                      {orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Date not available'}
-                    </p>
-                  </div>
-                </div>
-                
-                {['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'completed'].includes(orderData.status) && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Order Confirmed</p>
-                      <p className="text-xs text-muted-foreground">
-                        {orderData.updated_at ? new Date(orderData.updated_at).toLocaleString() : 'Recently'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    orderData.status === 'preparing' ? 'bg-orange-500' :
-                    ['ready', 'out_for_delivery', 'delivered', 'completed'].includes(orderData.status) ? 'bg-green-500' :
-                    'bg-gray-300'
-                  }`}></div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${
-                      !['preparing', 'ready', 'out_for_delivery', 'delivered', 'completed'].includes(orderData.status) ? 'text-muted-foreground' : ''
-                    }`}>
-                      {orderData.status === 'preparing' ? 'Currently Preparing' : 'Preparing'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {orderData.status === 'preparing' ? 'In progress' : 'Pending'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    ['delivered', 'completed'].includes(orderData.status) ? 'bg-green-500' :
-                    'bg-gray-300'
-                  }`}></div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${
-                      !['delivered', 'completed'].includes(orderData.status) ? 'text-muted-foreground' : ''
-                    }`}>
-                      {orderData.order_type === 'delivery' ? 'Delivered' : 'Ready for Pickup'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {['delivered', 'completed'].includes(orderData.status) ? 'Completed' : 'Pending'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Communication Events (Admin Only) */}
-        {isAdmin && detailedOrderData?.communication_events && detailedOrderData.communication_events.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="w-5 h-5" />
-                Communication History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 max-h-60 overflow-y-auto">
-                {detailedOrderData.communication_events.map((event: any, index: number) => (
-                  <div key={event.id || index} className="p-3 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline" className="text-xs">
-                        {event.event_type || 'Email'}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {event.created_at ? new Date(event.created_at).toLocaleString() : 'Recently'}
-                      </span>
-                    </div>
-                    <p className="text-sm">{event.message || event.subject || 'Communication sent'}</p>
-                    {event.status && (
-                      <Badge 
-                        variant="secondary" 
-                        className={`mt-2 text-xs ${
-                          event.status === 'sent' ? 'bg-green-100 text-green-800' :
-                          event.status === 'delivered' ? 'bg-blue-100 text-blue-800' :
-                          event.status === 'failed' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {event.status.toUpperCase()}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Metadata */}
-        <Card>
-          <CardContent className="pt-6">
-             <div className="text-sm text-muted-foreground space-y-1">
-               <p>Created: {orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Not available'}</p>
-               <p>Last Updated: {orderData.updated_at ? new Date(orderData.updated_at).toLocaleString() : orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Not available'}</p>
-               <p>Order ID: {orderData.id}</p>
-               {isAdmin && connectionStatus === 'connected' && (
-                 <p className="text-green-600">🟢 Real-time updates active</p>
-               )}
-             </div>
-           </CardContent>
-         </Card>
-
-         {/* Hidden Thermal Receipt for Printing */}
-         <div ref={thermalPrintRef} style={{ position: 'absolute', left: '-9999px', top: '0', background: 'white', padding: '2mm' }}>
-           <ThermalPrintReceipt
-             order={{
-               ...orderData,
-               order_items: orderItems,
-               fulfillment_info: fulfillmentInfo
-             }}
-             deliverySchedule={fulfillmentInfo}
-             businessInfo={businessSettings ? {
-               name: businessSettings.name || 'Starter Small Chops',
-               whatsapp_support_number: businessSettings.whatsapp_support_number || '0807 301 1100',
-               admin_notification_email: 'store@startersmallchops.com',
-               logo_url: businessSettings.logo_url
-             } : {
-               name: 'Starter Small Chops',
-               whatsapp_support_number: '0807 301 1100',
-               admin_notification_email: 'store@startersmallchops.com'
-             }}
-           />
-         </div>
-       </div>
-     </AdaptiveDialog>
-   );
- };

@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { OrderStatus, PaymentStatus } from '@/types/orders';
 import { OrderType } from '@/types/orderDetailsModal';
 import { Json } from '@/integrations/supabase/types';
+import { safeJSONParseArray, safeJSONParse } from '@/utils/jsonValidation';
 
 export interface OrderWithItems {
   id: string;
@@ -82,21 +83,34 @@ interface GetOrdersParams {
   endDate?: string;
 }
 
-// Helper function to normalize items field from Json to array
+// Enhanced helper function with proper error handling and JSON validation
 function normalizeOrderItems(order: any): OrderWithItems {
-  return {
-    ...order,
-    items: Array.isArray(order.items) 
-      ? order.items 
-      : order.items 
-        ? (typeof order.items === 'string' ? JSON.parse(order.items) : [])
-        : [],
-    order_items: Array.isArray(order.order_items) 
-      ? order.order_items 
-      : order.order_items 
-        ? (typeof order.order_items === 'string' ? JSON.parse(order.order_items) : [])
-        : []
-  };
+  try {
+    return {
+      ...order,
+      items: safeJSONParseArray(order.items),
+      order_items: safeJSONParseArray(order.order_items),
+      delivery_address: order.delivery_address 
+        ? (typeof order.delivery_address === 'string' 
+            ? safeJSONParse(order.delivery_address, {})
+            : order.delivery_address)
+        : null
+    };
+  } catch (error) {
+    console.error('Error normalizing order items:', {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    
+    // Return order with safe fallbacks
+    return {
+      ...order,
+      items: [],
+      order_items: [],
+      delivery_address: null
+    };
+  }
 }
 
 export async function getOrders(params?: GetOrdersParams) {

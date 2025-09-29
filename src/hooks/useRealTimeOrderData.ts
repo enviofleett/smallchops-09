@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatAddress, emergencySafeFormatAddress } from '@/utils/formatAddress';
+import { safeJSONParse, safeJSONParseArray } from '@/utils/jsonValidation';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface RealTimeOrderDataHook {
@@ -96,11 +97,35 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
       
       console.log('✅ Order data loaded successfully');
       
-      // Apply production safety sanitization before returning
+      // Apply production safety sanitization AND JSON validation before returning
       if (comprehensiveData && typeof comprehensiveData === 'object') {
         const data = comprehensiveData as any;
+        
+        // Validate and fix delivery_address
         if (data.order?.delivery_address) {
-          data.order.delivery_address = emergencySafeFormatAddress(data.order.delivery_address);
+          data.order.delivery_address = safeJSONParse(
+            data.order.delivery_address,
+            {} // fallback to empty object
+          );
+          // Then apply formatting
+          data.order.delivery_address = emergencySafeFormatAddress(
+            data.order.delivery_address
+          );
+        }
+        
+        // Validate items array
+        if (data.items) {
+          data.items = Array.isArray(data.items) ? data.items : [];
+          
+          // Validate each item's product features and ingredients
+          data.items = data.items.map((item: any) => ({
+            ...item,
+            product: item.product ? {
+              ...item.product,
+              features: safeJSONParseArray(item.product.features),
+              ingredients: safeJSONParseArray(item.product.ingredients)
+            } : null
+          }));
         }
       }
       

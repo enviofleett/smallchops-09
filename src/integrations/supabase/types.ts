@@ -10691,6 +10691,10 @@ export type Database = {
         Args: { email_address: string }
         Returns: boolean
       }
+      is_jsonb_valid: {
+        Args: { input: string }
+        Returns: boolean
+      }
       is_lock_holder_for_order: {
         Args: { p_admin_user_id: string; p_order_id: string }
         Returns: boolean

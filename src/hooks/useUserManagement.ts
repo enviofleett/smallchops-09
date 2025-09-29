@@ -17,7 +17,7 @@ export const useUserManagement = () => {
   const { canAssignRoles } = useRoleBasedPermissions();
   const { user } = useAuth();
 
-  const createUser = async (userData: CreateUserData) => {
+  const createUserInvitation = async (userData: CreateUserData) => {
     if (!canAssignRoles()) {
       throw new Error('Insufficient permissions to assign roles');
     }
@@ -26,29 +26,26 @@ export const useUserManagement = () => {
     setError(null);
 
     try {
-      // For now, we'll create an invitation that can be used to register
-      // In a full implementation, you would call a Supabase Edge Function
-      // that handles user creation with proper admin privileges
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
 
-      const { data, error } = await supabase
-        .from('user_invitations') // Assuming this table exists
-        .insert({
-          email: userData.email,
-          role: userData.role,
-          invited_by: user?.id,
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-          name: userData.name
-        })
-        .select()
-        .single();
+      // Call the Edge Function to create user invitation
+      const { data, error } = await supabase.functions.invoke('role-management/create-user-invitation', {
+        body: userData,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       if (error) {
         throw error;
       }
 
-      return data;
+      return data.invitation;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create user';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create user invitation';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -65,16 +62,24 @@ export const useUserManagement = () => {
     setError(null);
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      // Call the Edge Function to update user role
+      const { data, error } = await supabase.functions.invoke('role-management/update-role', {
+        body: { userId, newRole },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       if (error) {
         throw error;
       }
 
-      return true;
+      return data.success;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update user role';
       setError(errorMessage);
@@ -137,11 +142,69 @@ export const useUserManagement = () => {
     }
   };
 
+  const listInvitations = async () => {
+    if (!canAssignRoles()) {
+      throw new Error('Insufficient permissions to view invitations');
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('user_invitations')
+        .select('id, email, role, name, status, expires_at, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch invitations';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const revokeInvitation = async (invitationId: string) => {
+    if (!canAssignRoles()) {
+      throw new Error('Insufficient permissions to revoke invitations');
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase
+        .from('user_invitations')
+        .update({ status: 'revoked' })
+        .eq('id', invitationId);
+
+      if (error) {
+        throw error;
+      }
+
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to revoke invitation';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
-    createUser,
+    createUserInvitation,
     updateUserRole,
     deactivateUser,
     listUsers,
+    listInvitations,
+    revokeInvitation,
     isLoading,
     error,
     canAssignRoles: canAssignRoles(),

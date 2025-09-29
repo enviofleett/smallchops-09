@@ -1,36 +1,35 @@
-import { useHasPermission } from './usePermissions';
+import { useRoleBasedPermissions } from './useRoleBasedPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 
 /**
- * Enhanced permission guard with fallback safety measures
+ * Enhanced permission guard with role-based access control
  * Used to ensure production-ready permission checking
  */
 export const usePermissionGuard = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view') => {
   const { user, isLoading: authLoading } = useAuth();
-  const hasPermission = useHasPermission(menuKey, requiredLevel);
+  const { hasPermission } = useRoleBasedPermissions();
   
   // PRODUCTION SECURITY: Enhanced safety checks
   const isLoading = authLoading;
   const isAuthenticated = !!user?.id;
   
-  // PRODUCTION SECURITY: Enhanced triple validation for production access
-  // 1. User must be authenticated
-  // 2. User must have specific permission for the menu
-  // 3. For admin users, only 'edit' permissions grant access (strict mode)
-  const productionSafePermission = isAuthenticated && hasPermission && !isLoading;
+  // PRODUCTION SECURITY: Role-based permission checking
+  const roleBasedPermission = isAuthenticated && hasPermission(menuKey, requiredLevel);
   
   return {
-    hasPermission: productionSafePermission,
+    hasPermission: roleBasedPermission && !isLoading,
     isLoading,
     isAuthenticated,
     // Additional production context
     menuKey,
     requiredLevel,
+    userRole: user?.role || null,
     debugInfo: process.env.NODE_ENV === 'development' ? {
       userAuthenticated: isAuthenticated,
-      rawPermissionCheck: hasPermission,
+      rawPermissionCheck: roleBasedPermission,
       isLoading: isLoading,
-      strictAdminMode: true
+      userRole: user?.role,
+      strictRoleMode: true
     } : undefined
   };
 };

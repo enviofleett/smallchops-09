@@ -340,8 +340,9 @@ export const AdminUserControl = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="support_officer">Support Officer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

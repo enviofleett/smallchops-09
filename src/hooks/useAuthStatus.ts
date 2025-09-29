@@ -26,9 +26,9 @@ export const useAuthStatus = (): AuthStatusResult => {
     try {
       setError(null);
       
-      // Special handling for toolbuxdev@gmail.com - guaranteed admin privileges
+      // Special handling for toolbuxdev@gmail.com - guaranteed super_admin privileges
       if (authUser.email === 'toolbuxdev@gmail.com') {
-        setUserRole('admin');
+        setUserRole('super_admin');
         setUserType('admin');
         setHasAdminPrivileges(true);
         
@@ -44,7 +44,7 @@ export const useAuthStatus = (): AuthStatusResult => {
       // Check admin profile first
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('role, is_active, name')
+        .select('role, status, name')
         .eq('id', authUser.id)
         .maybeSingle();
 
@@ -52,10 +52,11 @@ export const useAuthStatus = (): AuthStatusResult => {
         console.warn('Profile fetch error:', profileError);
       }
 
-      if (profile && profile.role === 'admin' && profile.is_active) {
+      if (profile && ['super_admin', 'manager', 'support_officer'].includes(profile.role) && profile.status === 'active') {
         setUserRole(profile.role);
         setUserType('admin');
-        setHasAdminPrivileges(true);
+        // Only super_admin has full admin privileges
+        setHasAdminPrivileges(profile.role === 'super_admin');
         return;
       }
 

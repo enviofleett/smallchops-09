@@ -45,13 +45,33 @@ export const OrderItemsSection: React.FC<OrderItemsSectionProps> = ({ order }) =
                 <div key={item.id || index} className="flex justify-between items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-foreground truncate">
-                      {item.name}
+                      {item.product?.name || item.name || item.product_name || 'Unknown Item'}
                     </h4>
+                    
+                    {/* Product Description */}
+                    {item.product?.description && (
+                      <p className="text-sm text-muted-foreground mt-1" 
+                         dangerouslySetInnerHTML={{ __html: item.product.description }} />
+                    )}
+                    
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span>Qty: {item.quantity}</span>
                       <span>×</span>
                       <span>{formatCurrency(item.unit_price)}</span>
                     </div>
+                    
+                    {/* Product Features */}
+                    {item.product?.features && Array.isArray(item.product.features) && item.product.features.length > 0 && (
+                      <div className="mt-2 p-2 bg-muted/30 rounded text-xs">
+                        <span className="font-medium text-primary">What's included:</span>
+                        <ul className="mt-1 space-y-0.5">
+                          {item.product.features.map((feature, featureIndex) => (
+                            <li key={featureIndex} className="text-muted-foreground">• {feature}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
                     {item.special_instructions && (
                       <p className="text-xs text-muted-foreground mt-1 italic">
                         Note: {item.special_instructions}

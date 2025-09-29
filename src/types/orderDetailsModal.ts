@@ -24,12 +24,14 @@ export interface Customer {
 export interface Product {
   id: string;
   name: string;
+  description?: string;
   features?: string[];
 }
 
 export interface OrderItem {
   id: string;
-  product_name: string;
+  product_name?: string;
+  name?: string; // For backward compatibility 
   quantity: number;
   unit_price: number;
   total_price: number;

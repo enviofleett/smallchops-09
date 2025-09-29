@@ -65,13 +65,20 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         // Build comprehensive response structure with all data
         const order = orderResult.data;
         const deliverySchedule = scheduleResult.data;
-        const items = itemsResult.data || [];
+        const rawItems = itemsResult.data || [];
         const communications = communicationResult.data || [];
         const auditLogs = auditResult.data || [];
         
+        // Normalize order items to ensure consistent .product field
+        const normalizedItems = rawItems.map((item: any) => ({
+          ...item,
+          // Ensure .product is always present and consistent
+          product: item.product || (Array.isArray(item.products) ? item.products[0] : item.products) || null
+        }));
+        
         return {
           order: order,
-          items: items,
+          items: normalizedItems,
           communication_events: communications,
           audit_logs: auditLogs,
           delivery_schedule: deliverySchedule,
@@ -101,6 +108,15 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         const data = comprehensiveData as any;
         if (data.order?.delivery_address) {
           data.order.delivery_address = emergencySafeFormatAddress(data.order.delivery_address);
+        }
+        
+        // Normalize order items to ensure consistent .product field
+        if (Array.isArray(data.items)) {
+          data.items = data.items.map((item: any) => ({
+            ...item,
+            // Ensure .product is always present and consistent
+            product: item.product || (Array.isArray(item.products) ? item.products[0] : item.products) || null
+          }));
         }
       }
       

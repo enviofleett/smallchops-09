@@ -394,10 +394,13 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   // Add defensive logging as requested in the problem statement
   console.log("Order item debug", rawOrderItems, rawOrderData);
 
-  // Normalize order items using the example logic from the problem statement
+  // Normalize order items using defensive logic for robust data handling
   const normalizedOrderItems = rawOrderItems.map((item: any) => ({
     ...item,
-    product: item.product || (Array.isArray(item.products) ? item.products[0] : item.products)
+    // Ensure .product is always present and consistent - handle all edge cases
+    product: item.product || 
+             (Array.isArray(item.products) ? item.products[0] : item.products) || 
+             null
   }));
 
   console.log("Normalized order items", normalizedOrderItems);
@@ -696,51 +699,69 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
               </div>
             ) : (
               <div className="space-y-4">
-                {orderItems.map((item: any, index: number) => (
-                  <div key={item.id || index} className="flex items-start gap-4 p-4 border rounded-lg bg-card">
-                    {item.product?.image_url && (
-                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                        <img 
-                          src={item.product.image_url} 
-                          alt={item.product.name || 'Product'}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-medium text-foreground leading-tight">
-                          {item.product?.name || item.name || 'Product'}
-                        </h4>
-                        <span className="font-semibold text-foreground whitespace-nowrap">
-                          ₦{(item.total_price || 0).toLocaleString()}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>Qty: {item.quantity || 1}</span>
-                        <span>×</span>
-                        <span>₦{(item.unit_price || 0).toLocaleString()}</span>
-                      </div>
+                {orderItems.map((item: any, index: number) => {
+                  // Additional defensive check for corrupted item data
+                  if (!item || typeof item !== 'object') {
+                    console.warn(`Skipping invalid order item at index ${index}:`, item);
+                    return null;
+                  }
 
-                      {item.special_instructions && (
-                        <div className="text-xs text-muted-foreground italic bg-muted/50 p-2 rounded">
-                          <span className="font-medium">Note:</span> {item.special_instructions}
+                  return (
+                    <div key={item.id || index} className="flex items-start gap-4 p-4 border rounded-lg bg-card">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
+                        {item.product?.image_url ? (
+                          <img 
+                            src={item.product.image_url} 
+                            alt={item.product.name || 'Product'}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <Package className="w-8 h-8 text-muted-foreground/50" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-medium text-foreground leading-tight">
+                            {item.product?.name || item.product_name || item.name || 'Unknown Product'}
+                          </h4>
+                          <span className="font-semibold text-foreground whitespace-nowrap">
+                            ₦{(item.total_price || 0).toLocaleString()}
+                          </span>
                         </div>
-                      )}
+                        
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span>Qty: {item.quantity || 1}</span>
+                          <span>×</span>
+                          <span>₦{(item.unit_price || 0).toLocaleString()}</span>
+                        </div>
 
-                      {item.customizations && (
-                        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                          <span className="font-medium">Customizations:</span> {item.customizations}
-                        </div>
-                      )}
+                        {item.special_instructions && (
+                          <div className="text-xs text-muted-foreground italic bg-muted/50 p-2 rounded">
+                            <span className="font-medium">Note:</span> {item.special_instructions}
+                          </div>
+                        )}
+
+                        {item.customizations && (
+                          <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                            <span className="font-medium">Customizations:</span> {item.customizations}
+                          </div>
+                        )}
+
+                        {/* Display product features if available */}
+                        {item.product?.features && Array.isArray(item.product.features) && item.product.features.length > 0 && (
+                          <div className="text-xs text-muted-foreground bg-blue-50 p-2 rounded">
+                            <span className="font-medium">Features:</span> {item.product.features.join(', ')}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                }).filter(Boolean)}
+                
                 
                 {/* Order Summary */}
                 <div className="border-t pt-4 mt-6">

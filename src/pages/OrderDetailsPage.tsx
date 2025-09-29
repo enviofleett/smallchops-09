@@ -3,7 +3,8 @@ import { useParams, Navigate } from 'react-router-dom';
 import { NewOrderDetailsModal } from '@/components/orders/NewOrderDetailsModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { safeOrder } from '@/utils/orderDefensiveValidation';
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -35,7 +36,8 @@ export default function OrderDetailsPage() {
             order_items (
               *,
               product:products (
-                id, name, description, price, image_url
+                id, name, description, price, cost_price, image_url, 
+                category_id, features, ingredients
               )
             )
           `)
@@ -51,7 +53,28 @@ export default function OrderDetailsPage() {
           return;
         }
 
-        setOrder(data);
+        // Normalize order items to ensure consistent .product field
+        if (data.order_items) {
+          data.order_items = data.order_items.map((item: any) => ({
+            ...item,
+            // Ensure .product is always present and consistent
+            product: item.product || (Array.isArray(item.products) ? item.products[0] : item.products) || null
+          }));
+        }
+
+        // Apply defensive validation to ensure robust data handling
+        const validatedOrder = safeOrder({
+          ...data,
+          items: data.order_items || [],
+          order_items: data.order_items || []
+        });
+
+        if (!validatedOrder) {
+          setError('Invalid order data received');
+          return;
+        }
+
+        setOrder(validatedOrder);
         setIsModalOpen(true);
       } catch (err) {
         console.error('Error fetching order:', err);
@@ -84,14 +107,24 @@ export default function OrderDetailsPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Unable to Load Order</h2>
           <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.history.back()}
-            className="text-blue-600 hover:underline"
-          >
-            Go back
-          </button>
+          <div className="space-y-2">
+            <button 
+              onClick={() => window.location.reload()}
+              className="block w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Retry Loading
+            </button>
+            <button 
+              onClick={() => window.history.back()}
+              className="block w-full px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     );

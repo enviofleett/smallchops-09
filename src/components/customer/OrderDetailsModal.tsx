@@ -20,6 +20,12 @@ interface OrderItem {
   discount_amount?: number;
   customizations?: any;
   special_instructions?: string;
+  product?: {
+    id: string;
+    name: string;
+    description?: string;
+    features?: string[];
+  };
 }
 
 interface DeliverySchedule {
@@ -229,7 +235,26 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     <div key={item.id} className="border rounded-lg p-4">
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex-1">
-                          <h4 className="font-medium">{item.product_name}</h4>
+                          <h4 className="font-medium">{item.product?.name || item.product_name}</h4>
+                          
+                          {/* Product Description */}
+                          {item.product?.description && (
+                            <p className="text-sm text-muted-foreground mt-1" 
+                               dangerouslySetInnerHTML={{ __html: item.product.description }} />
+                          )}
+                          
+                          {/* Product Features */}
+                          {item.product?.features && Array.isArray(item.product.features) && item.product.features.length > 0 && (
+                            <div className="mt-2 p-2 bg-muted/30 rounded text-xs">
+                              <span className="font-medium text-primary">What's included:</span>
+                              <ul className="mt-1 space-y-0.5">
+                                {item.product.features.map((feature, featureIndex) => (
+                                  <li key={featureIndex} className="text-muted-foreground">• {feature}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
                           {item.special_instructions && (
                             <p className="text-sm text-muted-foreground mt-1">
                               <strong>Special Instructions:</strong> {item.special_instructions}

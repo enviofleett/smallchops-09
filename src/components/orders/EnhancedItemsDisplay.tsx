@@ -154,6 +154,18 @@ export const EnhancedItemsDisplay: React.FC<EnhancedItemsDisplayProps> = ({
                     </div>
                   )}
 
+                  {/* Product Features */}
+                  {item.product?.features && Array.isArray(item.product.features) && item.product.features.length > 0 && (
+                    <div className="mt-2 p-2 bg-muted/30 rounded text-xs">
+                      <span className="font-medium text-primary">What's included:</span>
+                      <ul className="mt-1 space-y-0.5">
+                        {item.product.features.map((feature, featureIndex) => (
+                          <li key={featureIndex} className="text-muted-foreground">• {feature}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {/* Special Instructions */}
                   {item.special_instructions && (
                     <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-950/20 rounded border-l-4 border-blue-500">

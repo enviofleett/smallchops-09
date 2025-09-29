@@ -1,11 +1,29 @@
-// ...imports remain unchanged...
+import React, { useRef, useState } from 'react';
+import { useReactToPrint } from 'react-to-print';
+import { format } from 'date-fns';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
+import { ThermalPrintReceipt } from './ThermalPrintReceipt';
+import { DeliveryPickupSection } from '../modals/orderDetails/DeliveryPickupSection';
+import { OrderWithItems } from '@/api/orders';
+import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { useUserContext } from '@/hooks/useUserContext';
+import { safeOrder } from '@/utils/orderDefensiveValidation';
 
-// (imports and helper components omitted for brevity)
+interface NewOrderDetailsModalProps {
+  open: boolean;
+  onClose: () => void;
+  order: any;
+}
 
 export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   open,
   onClose,
-  order // Real order data is now required
+  order
 }) => {
   const userContext = useUserContext();
   const printRef = useRef<HTMLDivElement>(null);
@@ -26,7 +44,6 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   const handlePrint = useReactToPrint({
     contentRef: thermalPrintRef,
     documentTitle: `Order-${order?.order_number || 'Details'}`,
-    // ...styles and event handlers unchanged...
   });
 
   const handleRefresh = () => {
@@ -73,6 +90,7 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
     items: normalizedOrderItems,
     order_items: normalizedOrderItems
   });
+  
   if (!safeOrderData) {
     return (
       <AdaptiveDialog
@@ -130,4 +148,125 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   const isAdmin = userContext === 'admin';
   const isCustomer = userContext === 'customer';
 
-  // ...rest of the rendering logic unchanged (cards, items, timeline, etc.)...
+  return (
+    <>
+      {/* Hidden thermal print component */}
+      <div style={{ display: 'none' }}>
+        <div ref={thermalPrintRef}>
+          <ThermalPrintReceipt
+            order={orderData as unknown as OrderWithItems}
+            businessInfo={businessSettings}
+          />
+        </div>
+      </div>
+
+      <AdaptiveDialog
+        open={open}
+        onOpenChange={onClose}
+        size="xl"
+        title={`Order #${orderData.order_number}`}
+        description={`${orderData.order_type === 'delivery' ? 'Delivery' : 'Pickup'} order for ${orderData.customer_name}`}
+      >
+        <div className="space-y-6">
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrint}>
+              Print Receipt
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
+              Refresh
+            </Button>
+          </div>
+          {/* Connection status */}
+          {connectionStatus !== 'connected' && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Connection status: {connectionStatus}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Order Items */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {orderItems.map((item: any) => (
+                  <div key={item.id} className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="font-medium">{item.product?.name || 'Unknown Product'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Quantity: {item.quantity}
+                      </p>
+                    </div>
+                    <p className="font-medium">
+                      ₦{((item.unit_price || 0) * (item.quantity || 1)).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+                <div className="border-t pt-4 flex justify-between items-center font-bold">
+                  <span>Total</span>
+                  <span>₦{orderData.total_amount.toLocaleString()}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Delivery/Pickup Information */}
+          <DeliveryPickupSection order={orderData} />
+
+          {/* Customer Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Customer Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Name:</span>
+                  <span className="font-medium">{orderData.customer_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Email:</span>
+                  <span className="font-medium">{orderData.customer_email}</span>
+                </div>
+                {orderData.customer_phone && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Phone:</span>
+                    <span className="font-medium">{orderData.customer_phone}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Order Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Status:</span>
+                  <span className="font-medium capitalize">{orderData.status.replace(/_/g, ' ')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Payment:</span>
+                  <span className="font-medium capitalize">{orderData.payment_status}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Created:</span>
+                  <span className="font-medium">{format(new Date(orderData.created_at), 'PPp')}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </AdaptiveDialog>
+    </>
+  );
+};

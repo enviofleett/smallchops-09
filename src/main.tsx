@@ -11,6 +11,9 @@ import { initializeSecurityMonitoring } from "./utils/securityHeaders";
 // Import global error handler for ComponentLoadError
 import "./utils/componentErrorHandler";
 
+// Create helmet context for react-helmet-async
+const helmetContext = {};
+
 // Initialize performance monitoring
 initWebVitals();
 
@@ -71,7 +74,7 @@ if ('serviceWorker' in navigator) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <HelmetProvider>
+    <HelmetProvider context={helmetContext}>
       <App />
     </HelmetProvider>
   </StrictMode>,

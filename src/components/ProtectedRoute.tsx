@@ -3,23 +3,23 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuthStatus } from '@/hooks/useAuthStatus';
-import { useHasPermission } from '@/hooks/usePermissions';
+import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'manager' | 'staff' | 'dispatch_rider';
+  requiredRole?: 'super_admin' | 'manager' | 'support_officer';
   menuKey?: string;
   requiredPermission?: 'view' | 'edit';
   requireAdmin?: boolean;
 }
 
 /**
- * Enhanced ProtectedRoute with improved authentication and authorization
+ * Enhanced ProtectedRoute with role-based access control
  * 
  * Features:
- * - Works with both legacy AuthContext and enhanced useAuthStatus
+ * - Role-based permission system (super_admin, manager, support_officer)
  * - Guaranteed admin access for toolbuxdev@gmail.com
- * - Proper permission-based access control
+ * - Menu-based access control
  * - Better loading states and error handling
  */
 const ProtectedRoute = ({ 
@@ -32,8 +32,7 @@ const ProtectedRoute = ({
   // Use both auth systems for maximum compatibility
   const authContext = useAuth();
   const authStatus = useAuthStatus();
-  
-  const hasPermission = useHasPermission(menuKey || '', requiredPermission);
+  const { hasPermission, userRole, canCreateUsers } = useRoleBasedPermissions();
 
   // Determine loading state from both systems
   const isLoading = authContext.isLoading || authStatus.isLoading;
@@ -44,7 +43,7 @@ const ProtectedRoute = ({
   // Determine user info - prefer authStatus for enhanced features
   const user = authStatus.user || authContext.user;
   const userType = authStatus.userType || authContext.userType;
-  const hasAdminPrivileges = authStatus.hasAdminPrivileges || (authContext.user?.role === 'admin');
+  const hasAdminPrivileges = authStatus.hasAdminPrivileges;
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -71,29 +70,33 @@ const ProtectedRoute = ({
     return <>{children}</>;
   }
 
-  // If admin is required, check admin privileges
-  if (requireAdmin && !hasAdminPrivileges) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  // For admin routes, ensure user is admin type
-  if (userType !== 'admin' && (requireAdmin || requiredRole === 'admin')) {
-    return <Navigate to="/admin/auth" replace />;
-  }
-
-  // Check legacy role-based access
-  if (requiredRole && authContext.user?.role) {
-    const userRole = authContext.user.role;
-    if (userRole !== requiredRole && userRole !== 'admin') {
+  // Check role-based access
+  if (requiredRole && userRole !== requiredRole) {
+    // Super admin can access everything, manager can access manager and support officer routes
+    if (userRole === 'super_admin') {
+      // Super admin can access all routes
+    } else if (userRole === 'manager' && requiredRole === 'support_officer') {
+      // Manager can access support officer routes
+    } else {
       return <Navigate to="/dashboard" replace />;
     }
   }
 
-  // Check modern permission-based access
-  if (menuKey && !hasPermission) {
+  // If admin is required, check admin privileges (only super_admin has full admin privileges)
+  if (requireAdmin && !hasAdminPrivileges) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // For admin routes, ensure user has admin role
+  if (userType !== 'admin' && (requireAdmin || ['super_admin', 'manager', 'support_officer'].includes(requiredRole || ''))) {
+    return <Navigate to="/admin/auth" replace />;
+  }
+
+  // Check modern menu permission-based access
+  if (menuKey && !hasPermission(menuKey, requiredPermission)) {
     // For admin users, show a more specific error
-    if (hasAdminPrivileges) {
-      console.warn(`Admin user lacks permission for ${menuKey}. This might indicate a permission setup issue.`);
+    if (userRole) {
+      console.warn(`User with role '${userRole}' lacks permission for ${menuKey}. Redirecting to dashboard.`);
     }
     return <Navigate to="/dashboard" replace />;
   }

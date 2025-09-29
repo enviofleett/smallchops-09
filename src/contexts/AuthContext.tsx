@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../integrations/supabase/client';
 import { User, AuthState, LoginCredentials } from '../types/auth';
+import { UserRole } from '@/hooks/useRoleBasedPermissions';
 import logger from '../lib/logger';
 import { useToast } from '@/hooks/use-toast';
 import { handlePostLoginRedirect } from '@/utils/redirect';
@@ -196,13 +197,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Create admin profile for users who should be admins
         const { data: newProfile, error: profileError } = await supabase
           .from('profiles')
-          .insert({
+          .insert([{
             id: authUser.id,
             name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Admin',
-            email: authUser.email,
-            role: user.role as UserRole || 'admin',
-            is_active: true
-          })
+            role: 'admin',
+            status: 'active'
+          }])
           .select()
           .single();
 
@@ -210,7 +210,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser({
             id: newProfile.id,
             name: newProfile.name,
-            role: newProfile.role,
+            role: newProfile.role as UserRole,
             avatar_url: newProfile.avatar_url,
             email: authUser.email || '',
           });

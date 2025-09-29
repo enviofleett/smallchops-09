@@ -155,7 +155,7 @@ const ProductionAuthGuard: React.FC<ProductionAuthGuardProps> = ({
               You don't have {permissionLevel} permissions for this feature.
             </p>
             <Button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => window.location.href = '/dashboard'}
               className="w-full"
             >
               Return to Dashboard

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useRoleBasedPermissions } from './useRoleBasedPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 
-export type CreateUserRole = 'super_admin' | 'manager' | 'support_officer';
+export type CreateUserRole = 'super_admin' | 'admin' | 'manager' | 'support_officer';
 
 export interface CreateUserData {
   email: string;
@@ -152,9 +152,9 @@ export const useUserManagement = () => {
 
     try {
       const { data, error } = await supabase
-        .from('user_invitations')
-        .select('id, email, role, name, status, expires_at, created_at')
-        .order('created_at', { ascending: false });
+        .from('admin_invitations')
+        .select('id, email, role, invited_at as created_at, status, expires_at')
+        .order('invited_at', { ascending: false });
 
       if (error) {
         throw error;
@@ -180,7 +180,7 @@ export const useUserManagement = () => {
 
     try {
       const { error } = await supabase
-        .from('user_invitations')
+        .from('admin_invitations')
         .update({ status: 'revoked' })
         .eq('id', invitationId);
 

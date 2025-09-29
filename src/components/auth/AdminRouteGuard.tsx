@@ -5,7 +5,7 @@ import { storeRedirectUrl } from '@/utils/redirect';
 
 interface AdminRouteGuardProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'manager' | 'staff' | 'dispatch_rider';
+  requiredRole?: 'super_admin' | 'manager' | 'support_officer';
   fallbackPath?: string;
 }
 
@@ -45,7 +45,7 @@ const AdminRouteGuard = ({
   }
 
   // Check specific role requirements
-  if (requiredRole && user.role !== requiredRole && user.role !== 'admin') {
+  if (requiredRole && user.role !== requiredRole && user.role !== 'super_admin') {
     return <Navigate to="/dashboard" replace />;
   }
 

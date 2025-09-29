@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 
-export type UserRole = 'super_admin' | 'manager' | 'support_officer' | 'admin';
+export type UserRole = 'super_admin' | 'admin' | 'manager' | 'support_officer';
 
 export interface RolePermission {
   role: UserRole;

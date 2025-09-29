@@ -49,6 +49,7 @@ export const useOrderDetails = (orderId: string): UseOrderDetailsReturn => {
           total_amount: orderData.total_amount,
           created_at: orderData.created_at,
           updated_at: orderData.updated_at,
+          order_time: orderData.created_at, // Use created_at as order_time
           items: items.map((item: any) => ({
             id: item.id,
             name: item.product?.name || 'Unknown Item',
@@ -140,6 +141,7 @@ export const useOrderDetails = (orderId: string): UseOrderDetailsReturn => {
         })(),
         total_amount: orderData.total_amount,
         created_at: orderData.created_at,
+        order_time: orderData.created_at,
         updated_at: orderData.updated_at,
         items: (orderData.order_items || []).map((item: any) => ({
           id: item.id,
@@ -156,7 +158,7 @@ export const useOrderDetails = (orderId: string): UseOrderDetailsReturn => {
             features: item.products.features
           } : undefined,
         })),
-        delivery_address: orderData.delivery_address,
+        delivery_address: orderData.delivery_address as string | null,
         pickup_time: orderData.pickup_time,
         pickup_point_id: orderData.pickup_point_id,
         special_instructions: orderData.special_instructions,

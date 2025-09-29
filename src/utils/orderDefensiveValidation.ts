@@ -279,3 +279,26 @@ export function calculateSafeOrderTotal(order: any): number {
   
   return Math.max(0, itemsTotal + deliveryFee + vatAmount - discountAmount);
 }
+
+/**
+ * Enhanced production-safe logging for order data issues
+ * @param context - Context information for debugging
+ * @param orderData - Raw order data that caused issues
+ */
+export function logOrderDataIssue(context: string, orderData: any): void {
+  const logData = {
+    context,
+    timestamp: new Date().toISOString(),
+    orderId: orderData?.id || 'unknown',
+    orderNumber: orderData?.order_number || 'unknown',
+    dataKeys: orderData ? Object.keys(orderData) : [],
+    hasValidId: !!(orderData?.id),
+    hasValidNumber: !!(orderData?.order_number),
+    hasItems: Array.isArray(orderData?.items) || Array.isArray(orderData?.order_items),
+    itemCount: Array.isArray(orderData?.items) ? orderData.items.length : 
+               Array.isArray(orderData?.order_items) ? orderData.order_items.length : 0
+  };
+  
+  // Production-safe logging (avoid sensitive data exposure)
+  console.warn('Order data validation issue:', logData);
+}

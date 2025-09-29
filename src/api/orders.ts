@@ -86,10 +86,13 @@ interface GetOrdersParams {
 // Enhanced helper function with proper error handling and JSON validation
 function normalizeOrderItems(order: any): OrderWithItems {
   try {
+    // Extract items from nested query result (order_items array from JOIN)
+    const items = order.order_items || order.items || [];
+    
     return {
       ...order,
-      items: safeJSONParseArray(order.items),
-      order_items: safeJSONParseArray(order.order_items),
+      items: Array.isArray(items) ? items : safeJSONParseArray(items),
+      order_items: Array.isArray(items) ? items : safeJSONParseArray(items),
       delivery_address: order.delivery_address 
         ? (typeof order.delivery_address === 'string' 
             ? safeJSONParse(order.delivery_address, {})
@@ -114,7 +117,35 @@ function normalizeOrderItems(order: any): OrderWithItems {
 }
 
 export async function getOrders(params?: GetOrdersParams) {
-  let query = supabase.from('orders').select('*', { count: 'exact' });
+  let query = supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (
+        id,
+        quantity,
+        unit_price,
+        total_price,
+        product_id,
+        product_name,
+        special_instructions,
+        customizations,
+        vat_rate,
+        vat_amount,
+        discount_amount,
+        product:products (
+          id,
+          name,
+          description,
+          price,
+          cost_price,
+          image_url,
+          category_id,
+          features,
+          ingredients
+        )
+      )
+    `, { count: 'exact' });
 
   // Apply filters if params are provided
   if (params?.status && params.status !== 'all') {

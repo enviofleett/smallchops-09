@@ -5515,6 +5515,7 @@ export type Database = {
           guest_session_id: string | null
           id: string
           idempotency_key: string | null
+          items: Json
           last_modified_by: string | null
           order_number: string
           order_time: string
@@ -5567,6 +5568,7 @@ export type Database = {
           guest_session_id?: string | null
           id?: string
           idempotency_key?: string | null
+          items?: Json
           last_modified_by?: string | null
           order_number: string
           order_time?: string
@@ -5619,6 +5621,7 @@ export type Database = {
           guest_session_id?: string | null
           id?: string
           idempotency_key?: string | null
+          items?: Json
           last_modified_by?: string | null
           order_number?: string
           order_time?: string
@@ -10297,6 +10300,10 @@ export type Database = {
       }
       get_business_branding: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_comprehensive_order_details: {
+        Args: { p_order_id: string }
         Returns: Json
       }
       get_comprehensive_order_fulfillment: {

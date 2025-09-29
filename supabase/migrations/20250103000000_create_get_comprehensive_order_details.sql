@@ -1,8 +1,12 @@
 -- Create get_comprehensive_order_details function with safe JSON handling
 -- Fixes PostgreSQL error 22P02: invalid input syntax for type json
 
-CREATE OR REPLACE FUNCTION get_comprehensive_order_details(p_order_id UUID)
-RETURNS JSONB AS $$
+CREATE OR REPLACE FUNCTION public.get_comprehensive_order_details(p_order_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     v_result JSONB;
     v_order RECORD;
@@ -59,8 +63,7 @@ BEGIN
                     'customizations', CASE 
                         WHEN oi.customizations IS NOT NULL THEN 
                             CASE 
-                                WHEN jsonb_typeof(oi.customizations) = 'object' THEN oi.customizations
-                                WHEN jsonb_typeof(oi.customizations) = 'array' THEN oi.customizations
+                                WHEN jsonb_typeof(oi.customizations) IN ('object', 'array') THEN oi.customizations
                                 ELSE '{}'::jsonb
                             END
                         ELSE '{}'::jsonb
@@ -118,7 +121,7 @@ EXCEPTION WHEN OTHERS THEN
         'details', SQLERRM
     );
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 -- Add comment explaining the function
 COMMENT ON FUNCTION get_comprehensive_order_details(UUID) IS 

@@ -6,6 +6,7 @@ import { User, AuthState, LoginCredentials } from '../types/auth';
 import logger from '../lib/logger';
 import { useToast } from '@/hooks/use-toast';
 import { handlePostLoginRedirect } from '@/utils/redirect';
+import { AuthAuditLogger } from '@/utils/authAuditLogger';
 
 interface CustomerAccount {
   id: string;
@@ -184,7 +185,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                                authUser.user_metadata?.user_type === 'admin';
       
       // New user - determine type based on metadata or email
-      const isAdminEmail = authUser.email === 'store@startersmallchops.com' || 
+      // Special case: toolbuxdev@gmail.com always gets admin privileges
+      const isAdminEmail = authUser.email === 'toolbuxdev@gmail.com' ||
+                          authUser.email === 'store@startersmallchops.com' || 
+                          authUser.email === 'chudesyl@gmail.com' ||
                           authUser.email?.includes('admin') || 
                           isCreatedByAdmin;
       
@@ -275,6 +279,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         console.error('Login error:', error);
         
+        // Log failed login attempt
+        await AuthAuditLogger.logLogin('', email, false, error.message);
+        
         // Provide more helpful error messages for common issues
         let errorMessage = error.message;
         if (error.message.includes('Invalid login credentials')) {
@@ -292,6 +299,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (data.user) {
+        // Log successful login
+        await AuthAuditLogger.logLogin(data.user.id, email, true);
+        
+        // Special logging for toolbuxdev@gmail.com
+        if (email === 'toolbuxdev@gmail.com') {
+          await AuthAuditLogger.logToolbuxAccess('login', { ip: 'unknown', timestamp: new Date().toISOString() });
+        }
+        
         // Load user data to determine correct redirect with retry logic
         await loadUserData(data.user);
         
@@ -323,7 +338,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                                    data.user.user_metadata?.created_by_admin ||
                                    data.user.user_metadata?.user_type === 'admin';
         
-        const redirectPath = (profile || isAdminFromMetadata) ? '/dashboard' : '/';
+        // Special handling for guaranteed admin emails
+        const isGuaranteedAdmin = data.user.email === 'toolbuxdev@gmail.com' ||
+                                 data.user.email === 'chudesyl@gmail.com';
+        
+        const redirectPath = (profile || isAdminFromMetadata || isGuaranteedAdmin) ? '/dashboard' : '/';
         return { success: true, redirect: redirectPath };
       }
 
@@ -438,8 +457,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      // Log logout before actually logging out
+      if (user?.email) {
+        await AuthAuditLogger.logLogout(user.id, user.email);
+        
+        if (user.email === 'toolbuxdev@gmail.com') {
+          await AuthAuditLogger.logToolbuxAccess('logout');
+        }
+      }
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
   const resetPassword = async (email: string) => {

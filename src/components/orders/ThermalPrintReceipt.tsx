@@ -83,7 +83,7 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
   const deliveryInfo = getDeliveryInfo();
   
   return (
-    <div className="thermal-receipt" style={{ display: 'none' }}>
+    <div className="thermal-receipt">
       <div className="receipt-content">
         {/* Business Header */}
         <div className="text-center mb-2">

@@ -178,5 +178,8 @@
 @media print {
   .thermal-receipt {
     display: block !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
   }
 }

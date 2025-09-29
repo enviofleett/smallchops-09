@@ -300,60 +300,59 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   const handlePrint = useReactToPrint({
     contentRef: thermalPrintRef,
     documentTitle: `Order-${order?.order_number || 'Details'}`,
-    onBeforePrint: () => {
-      // Add print-specific styles for thermal printing
-      const printStyles = document.createElement('style');
-      printStyles.innerHTML = `
-        @media print {
-          @page {
-            size: 80mm auto;
-            margin: 0;
-            padding: 0;
-          }
-          body {
-            margin: 0;
-            padding: 0;
-            background: white !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-            font-family: 'Courier New', monospace !important;
-          }
-          body * {
-            visibility: hidden;
-          }
-          .thermal-receipt,
-          .thermal-receipt * {
-            visibility: visible;
-          }
-          .thermal-receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 76mm;
-            max-width: 76mm;
-            background: white !important;
-            color: black !important;
-            font-family: 'Courier New', monospace !important;
-            font-size: 8px !important;
-            line-height: 1.2 !important;
-            margin: 0 !important;
-            padding: 2mm !important;
-            page-break-after: avoid;
-            page-break-inside: avoid;
-            overflow: visible;
-            min-height: auto;
-            display: block !important;
-          }
+    pageStyle: `
+      @page {
+        size: 80mm auto;
+        margin: 2mm;
+        padding: 0;
+      }
+      @media print {
+        body {
+          margin: 0;
+          padding: 0;
+          background: white !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          font-family: 'Courier New', monospace !important;
         }
-      `;
-      document.head.appendChild(printStyles);
+        .thermal-receipt {
+          display: block !important;
+          position: relative !important;
+          left: auto !important;
+          top: auto !important;
+          width: 76mm !important;
+          max-width: 76mm !important;
+          background: white !important;
+          color: black !important;
+          font-family: 'Courier New', monospace !important;
+          font-size: 8px !important;
+          line-height: 1.2 !important;
+          margin: 0 !important;
+          padding: 2mm !important;
+          page-break-after: avoid;
+          page-break-inside: avoid;
+          overflow: visible;
+          min-height: auto;
+        }
+      }
+    `,
+    onBeforePrint: () => {
+      // Show the thermal receipt temporarily for printing
+      if (thermalPrintRef.current) {
+        thermalPrintRef.current.style.display = 'block';
+        thermalPrintRef.current.style.position = 'relative';
+        thermalPrintRef.current.style.left = 'auto';
+        thermalPrintRef.current.style.top = 'auto';
+      }
       return Promise.resolve();
     },
     onAfterPrint: () => {
-      // Clean up print styles
-      const printStyles = document.head.querySelector('style:last-child');
-      if (printStyles && printStyles.innerHTML.includes('@page')) {
-        document.head.removeChild(printStyles);
+      // Hide the thermal receipt again after printing
+      if (thermalPrintRef.current) {
+        thermalPrintRef.current.style.display = 'none';
+        thermalPrintRef.current.style.position = 'absolute';
+        thermalPrintRef.current.style.left = '-9999px';
+        thermalPrintRef.current.style.top = '0';
       }
       toast.success('Thermal receipt printed successfully');
     },
@@ -465,10 +464,69 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
                   </Badge>
                 )}
               </div>
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                <Printer className="w-4 h-4 mr-2" />
-                Print Receipt
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handlePrint}>
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print Receipt
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    // Show preview of thermal receipt for debugging
+                    if (thermalPrintRef.current) {
+                      const receiptContent = thermalPrintRef.current.innerHTML;
+                      const previewWindow = window.open('', '_blank', 'width=400,height=600');
+                      if (previewWindow) {
+                        previewWindow.document.write(`
+                          <!DOCTYPE html>
+                          <html>
+                            <head>
+                              <title>Receipt Preview</title>
+                              <style>
+                                body { 
+                                  font-family: 'Courier New', monospace; 
+                                  font-size: 8px; 
+                                  line-height: 1.2; 
+                                  max-width: 76mm; 
+                                  margin: 0 auto; 
+                                  padding: 2mm;
+                                  background: white;
+                                  color: black;
+                                }
+                                .business-name { font-weight: 900; font-size: 11px; text-align: center; text-transform: uppercase; margin-bottom: 2px; }
+                                .contact { font-size: 8px; text-align: center; margin-bottom: 1px; }
+                                .section-header { font-weight: 900; font-size: 9px; margin-bottom: 1px; text-transform: uppercase; }
+                                .divider { text-align: center; font-size: 8px; margin: 1px 0; }
+                                .item-header { display: flex; justify-content: space-between; font-size: 8px; }
+                                .item-total { font-weight: 900; }
+                                .item-meta { font-size: 7px; margin-bottom: 0; }
+                                .item-detail { font-size: 7px; margin-left: 2px; margin-bottom: 0; }
+                                .summary-line { display: flex; justify-content: space-between; font-size: 8px; margin-bottom: 0; }
+                                .total-line { display: flex; justify-content: space-between; font-weight: 900; font-size: 10px; border-top: 2px solid black; padding-top: 2px; margin-top: 2px; }
+                                .text-center { text-align: center; }
+                                .order-info, .customer-info, .delivery-schedule, .payment-info, .special-instructions { margin-bottom: 2px; font-size: 8px; }
+                                .items-section { margin-bottom: 2px; }
+                                .item-block { margin-bottom: 1px; }
+                                .order-summary { margin-bottom: 2px; }
+                                .footer { text-align: center; font-size: 7px; }
+                                .admin-print-info { font-size: 8px; margin-top: 4px; text-align: center; font-weight: 900; text-transform: uppercase; }
+                              </style>
+                            </head>
+                            <body>
+                              ${receiptContent}
+                            </body>
+                          </html>
+                        `);
+                        previewWindow.document.close();
+                      }
+                    }
+                  }}
+                  className="text-xs"
+                >
+                  Preview
+                </Button>
+              </div>
             </div>
           </CardHeader>
         </Card>
@@ -879,7 +937,7 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
          </Card>
 
          {/* Hidden Thermal Receipt for Printing */}
-         <div ref={thermalPrintRef} style={{ position: 'absolute', left: '-9999px', top: '0' }}>
+         <div ref={thermalPrintRef} style={{ position: 'absolute', left: '-9999px', top: '0', background: 'white', padding: '2mm' }}>
            <ThermalPrintReceipt
              order={{
                ...orderData,

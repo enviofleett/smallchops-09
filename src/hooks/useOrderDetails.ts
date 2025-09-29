@@ -58,6 +58,12 @@ export const useOrderDetails = (orderId: string): UseOrderDetailsReturn => {
             product_id: item.product_id,
             special_instructions: item.special_instructions,
             customizations: item.customizations,
+            product: item.product ? {
+              id: item.product.id,
+              name: item.product.name,
+              description: item.product.description,
+              features: item.product.features
+            } : undefined,
           })),
           delivery_address: orderData.delivery_address,
           pickup_time: orderData.pickup_time,
@@ -101,7 +107,8 @@ export const useOrderDetails = (orderId: string): UseOrderDetailsReturn => {
               id,
               name,
               price,
-              description
+              description,
+              features
             )
           )
         `)
@@ -142,6 +149,12 @@ export const useOrderDetails = (orderId: string): UseOrderDetailsReturn => {
           total_price: item.total_price,
           product_id: item.product_id,
           special_instructions: item.special_instructions,
+          product: item.products ? {
+            id: item.products.id,
+            name: item.products.name,
+            description: item.products.description,
+            features: item.products.features
+          } : undefined,
         })),
         delivery_address: orderData.delivery_address,
         pickup_time: orderData.pickup_time,

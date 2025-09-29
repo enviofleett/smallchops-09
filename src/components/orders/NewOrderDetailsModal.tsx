@@ -513,69 +513,100 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {orderItems.length > 0 ? (
-                orderItems.map((item: any, index: number) => (
-                  <div key={item.id || index} className="flex items-center gap-4 p-4 border rounded-lg">
+            {orderItems.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No items found for this order</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orderItems.map((item: any, index: number) => (
+                  <div key={item.id || index} className="flex items-start gap-4 p-4 border rounded-lg bg-card">
                     {item.product?.image_url && (
-                      <img 
-                        src={item.product.image_url} 
-                        alt={item.product.name || 'Product'}
-                        className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                        loading="lazy"
-                      />
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        <img 
+                          src={item.product.image_url} 
+                          alt={item.product.name || 'Product'}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium truncate">{item.product?.name || item.name || 'Product'}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Qty: {item.quantity} × {formatCurrency(item.unit_price || 0)}
-                      </p>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-medium text-foreground leading-tight">
+                          {item.product?.name || item.name || 'Product'}
+                        </h4>
+                        <span className="font-semibold text-foreground whitespace-nowrap">
+                          ₦{(item.total_price || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>Qty: {item.quantity || 1}</span>
+                        <span>×</span>
+                        <span>₦{(item.unit_price || 0).toLocaleString()}</span>
+                      </div>
+
                       {item.special_instructions && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Note: {item.special_instructions}
-                        </p>
+                        <div className="text-xs text-muted-foreground italic bg-muted/50 p-2 rounded">
+                          <span className="font-medium">Note:</span> {item.special_instructions}
+                        </div>
+                      )}
+
+                      {item.customizations && (
+                        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                          <span className="font-medium">Customizations:</span> {item.customizations}
+                        </div>
                       )}
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="font-medium">{formatCurrency(item.total_price || (item.quantity * (item.unit_price || 0)))}</p>
+                  </div>
+                ))}
+                
+                {/* Order Summary */}
+                <div className="border-t pt-4 mt-6">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="font-medium">
+                        ₦{orderItems.reduce((sum: number, item: any) => sum + (item.total_price || 0), 0).toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    {orderData.vat_amount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">VAT ({orderData.vat_rate || 7.5}%)</span>
+                        <span className="font-medium">₦{orderData.vat_amount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    
+                    {orderData.delivery_fee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Delivery Fee</span>
+                        <span className="font-medium">₦{orderData.delivery_fee.toLocaleString()}</span>
+                      </div>
+                    )}
+                    
+                    {orderData.discount_amount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Discount</span>
+                        <span className="font-medium text-success">-₦{orderData.discount_amount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    
+                    <div className="border-t pt-2">
+                      <div className="flex justify-between font-semibold text-lg">
+                        <span>Total</span>
+                        <span>₦{orderData.total_amount.toLocaleString()}</span>
+                      </div>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No items found in this order</p>
-                </div>
-              )}
-              
-              <Separator />
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(orderData.subtotal || 0)}</span>
-                </div>
-                
-                {orderData.order_type === 'delivery' && (orderData.delivery_fee || 0) > 0 && (
-                  <div className="flex justify-between">
-                    <span>Delivery Fee:</span>
-                    <span>{formatCurrency(orderData.delivery_fee)}</span>
-                  </div>
-                )}
-                
-                {(orderData.tax_amount || 0) > 0 && (
-                  <div className="flex justify-between">
-                    <span>Tax:</span>
-                    <span>{formatCurrency(orderData.tax_amount)}</span>
-                  </div>
-                )}
-                
-                <Separator />
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total:</span>
-                  <span>{formatCurrency(orderData.total_amount || 0)}</span>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 

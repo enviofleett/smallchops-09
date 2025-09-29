@@ -2,12 +2,38 @@ import React from 'react';
 import { Clock, CheckCircle, Circle, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Order, TimelineStep } from '@/types/orderDetailsModal';
+import { safeOrder } from '@/utils/orderDefensiveValidation';
 
 interface TimelineSectionProps {
   order: Order;
 }
 
 export const TimelineSection: React.FC<TimelineSectionProps> = ({ order }) => {
+  // Apply defensive validation to ensure safe rendering
+  const safeOrderData = safeOrder(order);
+  
+  // Handle invalid order data gracefully
+  if (!safeOrderData) {
+    return (
+      <Card className="keep-together">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            Order Timeline
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm">Timeline information not available</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Use the validated timeline data
+  const timeline = safeOrderData.timeline || [];
   const getStepIcon = (step: TimelineStep, index: number) => {
     if (step.completed) {
       return <CheckCircle className="h-5 w-5 text-success" />;
@@ -57,19 +83,19 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({ order }) => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {order.timeline.length === 0 ? (
+        {timeline.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <AlertCircle className="h-5 w-5 mr-2" />
             <span>No timeline data available</span>
           </div>
         ) : (
           <div className="relative">
-            {order.timeline.map((step, index) => {
-              const nextStep = order.timeline[index + 1];
-              const isLast = index === order.timeline.length - 1;
+            {timeline.map((step, index) => {
+              const nextStep = timeline[index + 1];
+              const isLast = index === timeline.length - 1;
 
               return (
-                <div key={step.step} className="relative flex items-start gap-4 pb-6">
+                <div key={step.step || index} className="relative flex items-start gap-4 pb-6">
                   {/* Timeline connector */}
                   {!isLast && (
                     <div 
@@ -86,7 +112,7 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({ order }) => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <h4 className={`font-medium ${getStepColor(step)}`}>
-                        {step.label}
+                        {step.label || 'Unknown Step'}
                       </h4>
                       {step.datetime && (
                         <span className="text-xs text-muted-foreground shrink-0">

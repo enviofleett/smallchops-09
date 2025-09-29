@@ -21,15 +21,24 @@ export interface Customer {
   phone: string;
 }
 
-export interface OrderItem {
+export interface Product {
   id: string;
   name: string;
+  features?: string[];
+}
+
+export interface OrderItem {
+  id: string;
+  product_name: string;
   quantity: number;
   unit_price: number;
   total_price: number;
-  product_id?: string;
+  vat_amount?: number;
+  discount_amount?: number;
+  customizations?: any;
   special_instructions?: string;
-  customizations?: string;
+  product_id?: string;
+  product?: Product;
 }
 
 export interface Address {
@@ -81,8 +90,9 @@ export interface Order {
   total_amount: number;
   created_at: string;
   updated_at?: string;
+  order_time: string;
   items: OrderItem[];
-  delivery_address?: any;
+  delivery_address?: Address | string | null;
   pickup_time?: string;
   pickup_point_id?: string;
   special_instructions?: string;

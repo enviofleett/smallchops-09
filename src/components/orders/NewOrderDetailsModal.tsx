@@ -31,6 +31,9 @@ import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
 import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
 import { triggerOrderUpdate } from '@/components/notifications/NotificationIntegration';
 import { supabase } from '@/integrations/supabase/client';
+// Add defensive validation imports
+import { safeOrder, displayStatus, displayAddress, statusOptions } from '@/utils/orderDefensiveValidation';
+import { SafeOrderDataRenderer } from '@/components/common/SafeOrderDataRenderer';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
@@ -384,9 +387,48 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   }
 
   // Use detailed order data if available, otherwise fall back to basic order data
-  const orderData = detailedOrderData?.order || order;
-  const orderItems = detailedOrderData?.items || order.order_items || order.items || [];
+  const rawOrderData = detailedOrderData?.order || order;
+  const rawOrderItems = detailedOrderData?.items || order.order_items || order.items || [];
   const fulfillmentInfo = detailedOrderData?.fulfillment_info || order.fulfillment_info || {};
+
+  // Apply defensive validation to ensure safe rendering
+  const safeOrderData = safeOrder(rawOrderData);
+  if (!safeOrderData) {
+    return (
+      <AdaptiveDialog
+        open={open}
+        onOpenChange={onClose}
+        size="lg"
+        title="Order Details"
+        description="Unable to load order"
+      >
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-medium">Invalid order data</p>
+                <p className="text-sm text-muted-foreground">
+                  The order data is corrupted or missing. Please try refreshing the page.
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.reload()}
+              >
+                Refresh
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </AdaptiveDialog>
+    );
+  }
+
+  // Use the validated safe order data for rendering
+  const orderData = safeOrderData;
+  const orderItems = safeOrderData.items;
 
   // Show loading state
   if (isLoadingDetailed && !orderData) {
@@ -447,8 +489,8 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 flex-wrap">
-                <Badge className={`${STATUS_COLORS[orderData.status as keyof typeof STATUS_COLORS]} text-white text-base px-4 py-2`}>
-                  {orderData.status?.replace('_', ' ').toUpperCase()}
+                <Badge className={`${STATUS_COLORS[orderData.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'} text-white text-base px-4 py-2`}>
+                  {displayStatus(orderData.status)}
                 </Badge>
                 <Badge variant="outline" className="text-sm px-3 py-1">
                   {orderData.order_type?.toUpperCase() || 'DELIVERY'}
@@ -760,7 +802,7 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
                   Address
                 </p>
                 <p className="text-sm break-words">
-                  {fulfillmentInfo.address || orderData.delivery_address || 'No address provided'}
+                  {displayAddress(fulfillmentInfo.address || orderData.delivery_address)}
                 </p>
               </div>
               

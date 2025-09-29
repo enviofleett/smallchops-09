@@ -1,4 +1,4 @@
-import { OrderStatus } from '@/types/orders';
+import { OrderStatus } from '@/types/orderDetailsModal';
 
 // Valid order status values that match the database enum
 export const VALID_ORDER_STATUSES: OrderStatus[] = [
@@ -37,9 +37,11 @@ export const validateOrderStatus = (
 };
 
 /**
- * Gets user-friendly status label
+ * Gets user-friendly status label - defensive version
  */
-export const getStatusLabel = (status: OrderStatus): string => {
+export const getStatusLabel = (status: any): string => {
+  const safeStatus = validateOrderStatus(status);
+  
   const labels: Record<OrderStatus, string> = {
     pending: 'Pending',
     confirmed: 'Confirmed',
@@ -53,5 +55,5 @@ export const getStatusLabel = (status: OrderStatus): string => {
     returned: 'Returned'
   };
   
-  return labels[status] || status;
+  return labels[safeStatus] || 'Unknown';
 };

@@ -395,16 +395,17 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   console.log("Order item debug", rawOrderItems, rawOrderData);
 
   // Normalize order items using the example logic from the problem statement
-  const normalizedOrderItems = (rawOrderData.order_items || rawOrderData.items || []).map((item: any) => ({
+  const normalizedOrderItems = rawOrderItems.map((item: any) => ({
     ...item,
     product: item.product || (Array.isArray(item.products) ? item.products[0] : item.products)
   }));
 
   console.log("Normalized order items", normalizedOrderItems);
 
-  // Apply defensive validation to ensure safe rendering
+  // Apply defensive validation to ensure safe rendering - include items in order data
   const safeOrderData = safeOrder({
     ...rawOrderData,
+    items: normalizedOrderItems, // Ensure items are included in the order data
     order_items: normalizedOrderItems
   });
   if (!safeOrderData) {

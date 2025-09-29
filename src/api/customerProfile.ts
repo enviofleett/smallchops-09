@@ -329,7 +329,7 @@ export const getCustomerAnalytics = async (): Promise<CustomerAnalytics> => {
   // Process favorite categories
   const categoryCount: Record<string, number> = {};
   favoriteCategories?.forEach(fav => {
-    const categoryName = fav.products?.categories?.name;
+    const categoryName = fav.product?.categories?.name;
     if (categoryName) {
       categoryCount[categoryName] = (categoryCount[categoryName] || 0) + 1;
     }

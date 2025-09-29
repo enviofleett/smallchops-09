@@ -228,10 +228,10 @@ export function OrderTrackingCard({
           <div className="space-y-3">
             {order.order_items?.slice(0, 3).map((item) => (
               <div key={item.id} className="flex items-center gap-3">
-                {item.product?.image_url && (
+                {item.products?.image_url && (
                   <img
-                    src={item.product.image_url}
-                    alt={item.product.name}
+                    src={item.products.image_url}
+                    alt={item.products.name}
                     className="w-12 h-12 rounded-lg object-cover"
                   />
                 )}

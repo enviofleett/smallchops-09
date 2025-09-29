@@ -102,10 +102,10 @@ export function OrderSummary({ detailed = false }: OrderSummaryProps) {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {order.order_items.slice(0, detailed ? undefined : 3).map((item, index) => (
                               <div key={index} className="flex items-center gap-2 text-sm">
-                                {item.products?.image_url && (
+                                {item.product?.image_url && (
                                   <img
-                                    src={item.products.image_url}
-                                    alt={item.products.name}
+                                    src={item.product.image_url}
+                                    alt={item.product.name}
                                     className="w-8 h-8 rounded object-cover"
                                   />
                                 )}

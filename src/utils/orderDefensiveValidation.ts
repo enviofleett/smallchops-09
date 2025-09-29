@@ -52,30 +52,48 @@ export function getSafeOrderType(type: any): OrderType {
 }
 
 /**
- * Safe OrderItem validation and transformation
+ * Safe OrderItem validation and transformation with products/product normalization
  */
 export function safeOrderItems(items: any[]): OrderItem[] {
   if (!Array.isArray(items)) return [];
   
   return items
     .filter(item => item && typeof item === 'object')
-    .map(item => ({
-      id: String(item.id ?? ''),
-      product_name: String(item.product_name ?? item.name ?? ''),
-      quantity: isNaN(Number(item.quantity)) ? 1 : Number(item.quantity),
-      unit_price: isNaN(Number(item.unit_price)) ? 0 : Number(item.unit_price),
-      total_price: isNaN(Number(item.total_price)) ? 0 : Number(item.total_price),
-      vat_amount: item.vat_amount !== undefined ? (isNaN(Number(item.vat_amount)) ? 0 : Number(item.vat_amount)) : undefined,
-      discount_amount: item.discount_amount !== undefined ? (isNaN(Number(item.discount_amount)) ? 0 : Number(item.discount_amount)) : undefined,
-      customizations: item.customizations ?? undefined,
-      special_instructions: item.special_instructions ? String(item.special_instructions) : undefined,
-      product_id: item.product_id ? String(item.product_id) : undefined,
-      product: item.product ? {
-        id: String(item.product.id ?? ''),
-        name: String(item.product.name ?? ''),
-        features: Array.isArray(item.product.features) ? item.product.features.map(String) : undefined
-      } : undefined
-    }));
+    .map(item => {
+      // Normalize products (plural/array) to product (singular/object)
+      let normalizedProduct = null;
+      if (item.product) {
+        normalizedProduct = item.product;
+      } else if (item.products) {
+        // Handle products as array (take first element) or object
+        if (Array.isArray(item.products)) {
+          normalizedProduct = item.products[0] || null;
+        } else {
+          normalizedProduct = item.products;
+        }
+      }
+
+      return {
+        id: String(item.id ?? ''),
+        product_name: String(item.product_name ?? normalizedProduct?.name ?? item.name ?? ''),
+        quantity: isNaN(Number(item.quantity)) ? 1 : Number(item.quantity),
+        unit_price: isNaN(Number(item.unit_price)) ? 0 : Number(item.unit_price),
+        total_price: isNaN(Number(item.total_price)) ? 0 : Number(item.total_price),
+        vat_amount: item.vat_amount !== undefined ? (isNaN(Number(item.vat_amount)) ? 0 : Number(item.vat_amount)) : undefined,
+        discount_amount: item.discount_amount !== undefined ? (isNaN(Number(item.discount_amount)) ? 0 : Number(item.discount_amount)) : undefined,
+        customizations: item.customizations ?? undefined,
+        special_instructions: item.special_instructions ? String(item.special_instructions) : undefined,
+        product_id: item.product_id ? String(item.product_id) : undefined,
+        product: normalizedProduct ? {
+          id: String(normalizedProduct.id ?? ''),
+          name: String(normalizedProduct.name ?? ''),
+          description: normalizedProduct.description ? String(normalizedProduct.description) : undefined,
+          price: normalizedProduct.price !== undefined ? (isNaN(Number(normalizedProduct.price)) ? 0 : Number(normalizedProduct.price)) : undefined,
+          image_url: normalizedProduct.image_url ? String(normalizedProduct.image_url) : undefined,
+          features: Array.isArray(normalizedProduct.features) ? normalizedProduct.features.map(String) : undefined
+        } : undefined
+      };
+    });
 }
 
 /**
@@ -199,7 +217,7 @@ export function safeOrder(order: any): Order | null {
       created_at: String(order.created_at ?? ''),
       updated_at: order.updated_at ? String(order.updated_at) : undefined,
       order_time: String(order.order_time ?? order.created_at ?? new Date().toISOString()),
-      items: safeOrderItems(order.items || []),
+      items: safeOrderItems(order.items || order.order_items || []),
       delivery_address: safeAddress(order.delivery_address),
       pickup_time: order.pickup_time ? String(order.pickup_time) : undefined,
       pickup_point_id: order.pickup_point_id ? String(order.pickup_point_id) : undefined,

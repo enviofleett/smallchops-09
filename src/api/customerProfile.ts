@@ -304,7 +304,7 @@ export const getCustomerAnalytics = async (): Promise<CustomerAnalytics> => {
       order_items (
         quantity,
         price,
-        products (
+        product:products (
           name,
           image_url
         )
@@ -318,7 +318,7 @@ export const getCustomerAnalytics = async (): Promise<CustomerAnalytics> => {
   const { data: favoriteCategories } = await supabase
     .from('customer_favorites')
     .select(`
-      products (
+      product:products (
         categories (
           name
         )

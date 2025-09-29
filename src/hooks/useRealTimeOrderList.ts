@@ -47,7 +47,7 @@ export const useRealTimeOrderList = (options: UseRealTimeOrderListOptions = {}) 
             quantity,
             unit_price,
             total_price,
-            products (
+            product:products (
               id,
               name,
               price,

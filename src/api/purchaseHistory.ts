@@ -64,7 +64,7 @@ export const getCustomerOrderHistory = async (
       *,
       order_items (
         *,
-        products (
+        product:products (
           name,
           image_url,
           description

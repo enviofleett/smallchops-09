@@ -24,6 +24,21 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
     return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
   };
 
+  const formatDate = (dateValue: any, formatStr: string) => {
+    if (!dateValue) return 'Not specified';
+    
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      return format(date, formatStr);
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return 'Invalid date';
+    }
+  };
+
   const getOrderTypeDisplay = () => {
     return order.order_type === 'delivery' ? 'Delivery' : 'Pickup';
   };
@@ -83,7 +98,7 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
         {/* Order Info */}
         <div className="order-info">
           <div>ORDER #: {order.order_number}</div>
-          <div>Date: {format(new Date(order.created_at), 'yyyy-MM-dd HH:mm')}</div>
+          <div>Date: {formatDate(order.created_at, 'yyyy-MM-dd HH:mm')}</div>
           <div>Type: {getOrderTypeDisplay()}</div>
           <div>Status: {order.status?.replace('_', ' ').toUpperCase()}</div>
         </div>
@@ -93,7 +108,7 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
         {/* Customer Info */}
         <div className="customer-info">
           <div className="section-header">CUSTOMER INFO:</div>
-          <div>Name: {order.customer_name}</div>
+          <div>Name: {order.customer_name || 'Not provided'}</div>
           {order.customer_phone && <div>Phone: {order.customer_phone}</div>}
           {order.customer_email && <div>Email: {order.customer_email}</div>}
         </div>
@@ -105,8 +120,8 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           <div className="section-header">{getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
           {deliverySchedule && (
             <>
-              <div>Date: {format(new Date(deliverySchedule.delivery_date), 'yyyy-MM-dd')}</div>
-              <div>Time: {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</div>
+              <div>Date: {formatDate(deliverySchedule.delivery_date, 'yyyy-MM-dd')}</div>
+              <div>Time: {deliverySchedule.delivery_time_start || 'Not specified'} - {deliverySchedule.delivery_time_end || 'Not specified'}</div>
               {deliverySchedule.is_flexible && <div>Flexible: Yes</div>}
               {deliveryInfo?.address && <div>Address: {deliveryInfo.address}</div>}
               {deliveryInfo?.instructions && <div>Instructions: {deliveryInfo.instructions}</div>}
@@ -125,34 +140,34 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
         
         <div className="divider">================================</div>
         
-        {/* Order Items with Details */}
-        <div className="items-section">
-          <div className="section-header">ORDER ITEMS & DETAILS:</div>
-          <div className="divider">--------------------------------</div>
-          
-          {order.order_items?.map((item, index) => {
-            const itemDetails = getItemDetails(item);
-            return (
-              <div key={index} className="item-block">
-                <div className="item-header">
-                  <span>{item.product_name}</span>
-                  <span className="item-total">{formatCurrency(item.total_price || 0)}</span>
-                </div>
-                <div className="item-meta">
-                  Qty: {item.quantity}
-                  {item.unit_price && (
-                    <span> @ {formatCurrency(item.unit_price)}</span>
-                  )}
-                </div>
-                
-                {itemDetails.map((detail, detailIndex) => (
-                  <div key={detailIndex} className="item-detail">
-                    {detail}
-                  </div>
-                ))}
-                
-                {index < order.order_items.length - 1 && <div className="item-spacer"></div>}
-              </div>
+         {/* Order Items with Details */}
+         <div className="items-section">
+           <div className="section-header">ORDER ITEMS & DETAILS:</div>
+           <div className="divider">--------------------------------</div>
+           
+           {(order.order_items || []).map((item, index) => {
+             const itemDetails = getItemDetails(item);
+             return (
+               <div key={index} className="item-block">
+                 <div className="item-header">
+                   <span>{item.product_name || 'Item'}</span>
+                   <span className="item-total">{formatCurrency(item.total_price || 0)}</span>
+                 </div>
+                 <div className="item-meta">
+                   Qty: {item.quantity || 1}
+                   {item.unit_price && (
+                     <span> @ {formatCurrency(item.unit_price)}</span>
+                   )}
+                 </div>
+                 
+                 {itemDetails.map((detail, detailIndex) => (
+                   <div key={detailIndex} className="item-detail">
+                     {detail}
+                   </div>
+                 ))}
+                 
+                 {index < (order.order_items || []).length - 1 && <div className="item-spacer"></div>}
+               </div>
             );
           })}
           
@@ -173,7 +188,7 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           )}
           {order.total_vat && order.total_vat > 0 && (
             <div className="summary-line">
-              <span>VAT ({((order.total_vat / (order.subtotal || 1)) * 100).toFixed(1)}%):</span>
+              <span>VAT ({((order.total_vat / Math.max(order.subtotal || 1, 1)) * 100).toFixed(1)}%):</span>
               <span>{formatCurrency(order.total_vat)}</span>
             </div>
           )}
@@ -183,7 +198,7 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           
           <div className="total-line">
             <span>TOTAL:</span>
-            <span>{formatCurrency(order.total_amount)}</span>
+            <span>{formatCurrency(order.total_amount || 0)}</span>
           </div>
         </div>
         

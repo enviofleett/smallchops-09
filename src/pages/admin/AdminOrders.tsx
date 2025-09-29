@@ -40,6 +40,7 @@ import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBound
 import ProductionOrderErrorBoundary from '@/components/admin/ProductionOrderErrorBoundary';
 import OrderErrorBoundary from '@/components/orders/OrderErrorBoundary';
 import { OrderDetailsTestButton } from '@/components/admin/OrderDetailsTestButton';
+import AdminPageWrapper from '@/components/admin/AdminPageWrapper';
 
 function AdminOrdersContent() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -416,20 +417,9 @@ function AdminOrdersContent() {
 
   return (
     <>
-      <Helmet>
-        <title>Order Management - Admin Dashboard</title>
-        <meta name="description" content="Manage all orders, track deliveries, and monitor order status in real-time." />
-      </Helmet>
-
       <div className="space-y-6">
         {/* Header - Mobile Responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Order Management</h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
-              Monitor and manage all customer orders and deliveries
-            </p>
-          </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button 
               variant="outline" 
@@ -1164,8 +1154,15 @@ function AdminOrderCard({
 
 export default function AdminOrders() {
   return (
-    <ProductionOrderErrorBoundary>
-      <AdminOrdersContent />
-    </ProductionOrderErrorBoundary>
+    <AdminPageWrapper
+      title="Order Management"
+      description="Monitor and manage all customer orders and deliveries"
+      menuPermission="orders"
+      permissionLevel="edit"
+    >
+      <ProductionOrderErrorBoundary>
+        <AdminOrdersContent />
+      </ProductionOrderErrorBoundary>
+    </AdminPageWrapper>
   );
 }

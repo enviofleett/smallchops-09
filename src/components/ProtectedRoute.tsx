@@ -3,10 +3,11 @@ import React, { useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { storeRedirectUrl } from '@/utils/redirect';
+import { UserRoleType } from '@/types/auth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'super_admin' | 'manager' | 'support_officer' | 'admin';
+  requiredRole?: UserRoleType;
   menuKey?: string;
   requiredPermission?: 'view' | 'edit';
   requireAdmin?: boolean;

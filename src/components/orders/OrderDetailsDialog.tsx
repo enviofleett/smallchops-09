@@ -18,7 +18,7 @@ import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
 import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
 import { useJobOrderPrint } from '@/hooks/useJobOrderPrint';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { ThermalReceiptPreview } from './ThermalReceiptPreview';
 import { JobOrderPreview } from './JobOrderPreview';
 import { cn } from '@/lib/utils';
@@ -68,7 +68,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   const { printThermalReceipt, showPreview, isPreviewOpen, closePreview, printFromPreview, previewOrder, previewDeliverySchedule, previewBusinessInfo } = useThermalPrint();
   
   // Get current admin user
-  const { user: adminUser } = useAuth();
+  const { user: adminUser } = useUnifiedAuth();
 
   // Use detailed order data to get product features and full information
   const {

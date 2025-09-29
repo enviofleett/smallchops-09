@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, User, LogOut, Home, Package, Users, Settings } from 'lucide-react';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -15,11 +16,10 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
+
 const TopNav = () => {
-  const {
-    user,
-    logout
-  } = useAuth();
+  const { user } = useUnifiedAuth();
+  const { logout } = useAuth(); // Keep logout from original auth context
   const {
     data: settings
   } = useBusinessSettings();

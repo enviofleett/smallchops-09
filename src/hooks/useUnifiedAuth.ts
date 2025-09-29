@@ -1,7 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useRoleBasedPermissions, UserRole } from './useRoleBasedPermissions';
+import { useRoleBasedPermissions } from './useRoleBasedPermissions';
 import { usePermissions } from './usePermissions';
 import { useMemo } from 'react';
+import { UserRoleType } from '@/types/auth';
 
 /**
  * Unified authentication hook that consolidates all auth-related checks
@@ -38,7 +39,7 @@ export const useUnifiedAuth = () => {
   };
 
   // Production-ready role check
-  const hasRole = (requiredRole: UserRole): boolean => {
+  const hasRole = (requiredRole: UserRoleType): boolean => {
     if (!isAdmin || !user) return false;
     
     // Special case for toolbuxdev@gmail.com

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { handlePostLoginRedirect } from '@/utils/redirect';
 
 const AuthRouter = () => {
-  const { isAuthenticated, isLoading, userType, user, customerAccount } = useAuth();
+  const { isAuthenticated, isLoading, userType, user } = useUnifiedAuth();
 
   if (isLoading) {
     return (
@@ -21,7 +21,7 @@ const AuthRouter = () => {
       return <Navigate to={redirectPath} replace />;
     }
     
-    if (userType === 'customer' && customerAccount) {
+    if (userType === 'customer') {
       const redirectPath = handlePostLoginRedirect('customer');
       return <Navigate to={redirectPath} replace />;
     }

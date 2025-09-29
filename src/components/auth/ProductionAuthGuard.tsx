@@ -6,10 +6,11 @@ import { Loader2, Shield, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { UserRoleType } from '@/types/auth';
 
 interface ProductionAuthGuardProps {
   children: React.ReactNode;
-  requiredRole?: 'super_admin' | 'manager' | 'support_officer' | 'admin';
+  requiredRole?: UserRoleType;
   menuPermission?: string;
   permissionLevel?: 'view' | 'edit';
   fallbackPath?: string;

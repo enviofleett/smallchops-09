@@ -1,14 +1,14 @@
 import React from 'react';
 import { ProductionErrorBoundary } from './ProductionErrorBoundary';
 import ProductionAuthGuard from '../auth/ProductionAuthGuard';
-import { UserRole } from '@/hooks/useRoleBasedPermissions';
+import { UserRoleType } from '@/types/auth';
 import { Helmet } from 'react-helmet-async';
 
 interface AdminPageWrapperProps {
   children: React.ReactNode;
   title: string;
   description?: string;
-  requiredRole?: UserRole;
+  requiredRole?: UserRoleType;
   menuPermission?: string;
   permissionLevel?: 'view' | 'edit';
   seoTitle?: string;

@@ -1,12 +1,13 @@
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import Dashboard from './Dashboard';
 import CustomerPortal from './CustomerPortal';
+import AdminPageWrapper from '@/components/admin/AdminPageWrapper';
 
 const Index = () => {
-  const { isAuthenticated, isLoading, userType, user, customerAccount } = useAuth();
+  const { isAuthenticated, isLoading, userType, user } = useUnifiedAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,7 +20,7 @@ const Index = () => {
     }
 
     // If customer is authenticated, redirect to customer portal (public home)
-    if (isAuthenticated && userType === 'customer' && customerAccount) {
+    if (isAuthenticated && userType === 'customer') {
       navigate('/', { replace: true });
       return;
     }
@@ -29,7 +30,7 @@ const Index = () => {
       navigate('/auth', { replace: true });
       return;
     }
-  }, [isAuthenticated, isLoading, userType, user, customerAccount, navigate]);
+  }, [isAuthenticated, isLoading, userType, user, navigate]);
 
   if (isLoading) {
     return (
@@ -44,11 +45,20 @@ const Index = () => {
 
   // Show admin dashboard if admin is authenticated
   if (isAuthenticated && userType === 'admin' && user) {
-    return <Dashboard />;
+    return (
+      <AdminPageWrapper
+        title="Dashboard"
+        description="Admin dashboard overview"
+        menuPermission="dashboard"
+        permissionLevel="view"
+      >
+        <Dashboard />
+      </AdminPageWrapper>
+    );
   }
 
   // Show customer portal if customer is authenticated
-  if (isAuthenticated && userType === 'customer' && customerAccount) {
+  if (isAuthenticated && userType === 'customer') {
     return <CustomerPortal />;
   }
 

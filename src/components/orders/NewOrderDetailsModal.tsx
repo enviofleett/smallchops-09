@@ -391,8 +391,22 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   const rawOrderItems = detailedOrderData?.items || order.order_items || order.items || [];
   const fulfillmentInfo = detailedOrderData?.fulfillment_info || order.fulfillment_info || {};
 
+  // Add defensive logging as requested in the problem statement
+  console.log("Order item debug", rawOrderItems, rawOrderData);
+
+  // Normalize order items using the example logic from the problem statement
+  const normalizedOrderItems = (rawOrderData.order_items || rawOrderData.items || []).map((item: any) => ({
+    ...item,
+    product: item.product || (Array.isArray(item.products) ? item.products[0] : item.products)
+  }));
+
+  console.log("Normalized order items", normalizedOrderItems);
+
   // Apply defensive validation to ensure safe rendering
-  const safeOrderData = safeOrder(rawOrderData);
+  const safeOrderData = safeOrder({
+    ...rawOrderData,
+    order_items: normalizedOrderItems
+  });
   if (!safeOrderData) {
     return (
       <AdaptiveDialog

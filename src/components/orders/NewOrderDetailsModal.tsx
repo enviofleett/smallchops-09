@@ -279,34 +279,76 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                   No items found
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {items.map((item: any) => {
                     const features = item.product?.features 
                       ? parseProductFeatures(item.product.features)
                       : [];
                     
+                    const productImage = item.product?.image_url || 
+                      (item.product?.images && item.product.images[0]) || 
+                      '/placeholder.svg';
+                    
                     return (
-                      <div key={item.id} className="flex justify-between items-start p-3 bg-muted/50 rounded-lg">
-                        <div className="flex-1">
-                          <div className="font-medium">
+                      <div key={item.id} className="flex gap-4 p-4 bg-muted/50 rounded-lg border border-border/50">
+                        {/* Product Image */}
+                        <div className="flex-shrink-0">
+                          <img 
+                            src={productImage} 
+                            alt={item.product?.name || item.product_name || 'Product'}
+                            className="w-20 h-20 rounded-md object-cover border border-border"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder.svg';
+                            }}
+                          />
+                        </div>
+
+                        {/* Product Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-base">
                             {item.product?.name || item.product_name || 'Unknown Product'}
                           </div>
+                          
+                          {item.product?.description && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {item.product.description}
+                            </p>
+                          )}
+
                           {features.length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {features.join(' • ')}
+                            <div className="text-xs text-muted-foreground mt-2 flex flex-wrap gap-1">
+                              {features.map((feature, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-background/80 rounded-md border">
+                                  {feature}
+                                </span>
+                              ))}
                             </div>
                           )}
+
                           {item.special_instructions && (
-                            <div className="text-xs text-muted-foreground mt-1 italic">
-                              Note: {item.special_instructions}
+                            <div className="text-xs text-amber-600 dark:text-amber-500 mt-2 italic bg-amber-50 dark:bg-amber-950/20 px-2 py-1 rounded">
+                              📝 {item.special_instructions}
                             </div>
                           )}
-                          <div className="text-sm text-muted-foreground mt-1">
-                            Qty: {item.quantity} × ₦{item.unit_price.toLocaleString()}
+
+                          <div className="flex items-center gap-4 mt-2 text-sm">
+                            <span className="text-muted-foreground">
+                              Quantity: <span className="font-medium text-foreground">{item.quantity}</span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Unit Price: <span className="font-medium text-foreground">₦{item.unit_price.toLocaleString()}</span>
+                            </span>
                           </div>
                         </div>
-                        <div className="font-semibold">
-                          ₦{item.total_price.toLocaleString()}
+
+                        {/* Price */}
+                        <div className="flex-shrink-0 text-right">
+                          <div className="font-bold text-lg">
+                            ₦{item.total_price.toLocaleString()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Total
+                          </div>
                         </div>
                       </div>
                     );

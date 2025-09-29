@@ -386,28 +386,23 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-2xl">#{orderData.order_number}</CardTitle>
-                  {!isLoadingDetailed && detailedOrderData && (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">
-                      LIVE DATA
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className={`${STATUS_COLORS[orderData.status as keyof typeof STATUS_COLORS]} text-white`}>
-                    {orderData.status?.replace('_', ' ').toUpperCase()}
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge className={`${STATUS_COLORS[orderData.status as keyof typeof STATUS_COLORS]} text-white text-base px-4 py-2`}>
+                  {orderData.status?.replace('_', ' ').toUpperCase()}
+                </Badge>
+                <Badge variant="outline" className="text-sm px-3 py-1">
+                  {orderData.order_type?.toUpperCase() || 'DELIVERY'}
+                </Badge>
+                {!isLoadingDetailed && detailedOrderData && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                    LIVE DATA
                   </Badge>
-                  <Badge variant="outline">
-                    {orderData.order_type?.toUpperCase() || 'DELIVERY'}
+                )}
+                {isAdmin && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                    ADMIN VIEW
                   </Badge>
-                  {isAdmin && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                      ADMIN VIEW
-                    </Badge>
-                  )}
-                </div>
+                )}
               </div>
               <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="w-4 h-4" />

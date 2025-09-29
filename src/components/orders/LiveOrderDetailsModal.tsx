@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { useOrderDetails } from "@/hooks/useOrderDetails";
 import { useDriverManagement } from "@/hooks/useDriverManagement";
 import { useProductionStatusUpdate } from "@/hooks/useProductionStatusUpdate";
-import { useGmailOrderEmail } from "@/hooks/useGmailOrderEmail";
 
 export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin }) {
   // Fetch real order data
@@ -19,29 +18,17 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
   // Admin-only hooks
   const { drivers } = useDriverManagement();
   const { updateStatus } = useProductionStatusUpdate();
-  const { sendOrderEmail } = useGmailOrderEmail();
 
   // Handler for assigning driver
   const handleAssignDriver = async (driverId) => {
-    // await assignDriver(order.id, driverId); // enable if you have this mutation
-    await sendOrderEmail({
-      to: order.customer_email,
-      type: "rider-assigned",
-      orderId: order.id,
-      driverId,
-    });
+    // Simple driver assignment without email
+    console.log('Assigning driver:', driverId);
     refetch();
   };
 
   // Handler for status change
   const handleChangeStatus = async (status) => {
     await updateStatus({ orderId: order.id, status });
-    await sendOrderEmail({
-      to: order.customer_email,
-      type: "status-update",
-      orderId: order.id,
-      status,
-    });
     refetch();
   };
 
@@ -79,8 +66,6 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
             <h3 className="font-semibold text-base">Payment Details</h3>
             <div className="text-sm space-y-1">
               <div>Status: {order.payment_status}</div>
-              <div>Method: {order.payment_method}</div>
-              <div>Reference: {order.payment_reference}</div>
             </div>
           </section>
           {/* Financial Breakdown */}
@@ -97,15 +82,11 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
             <h3 className="font-semibold text-base">Delivery Details</h3>
             <div className="text-sm space-y-1">
               <div>Address: {order.delivery_address?.display ?? "-"}</div>
-              <div>Window: {order.delivery_window ?? "-"}</div>
               <div>Instructions: {order.special_instructions ?? "-"}</div>
-              <div>
-                Assigned Driver: {order.assigned_rider_name ?? "Not assigned"}
-              </div>
               {isAdmin && (
                 <div>
                   <select
-                    defaultValue={order.assigned_rider_id ?? ""}
+                    defaultValue=""
                     onChange={e => handleAssignDriver(e.target.value)}
                   >
                     <option value="">Select Driver</option>

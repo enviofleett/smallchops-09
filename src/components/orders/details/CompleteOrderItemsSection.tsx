@@ -219,7 +219,9 @@ export const CompleteOrderItemsSection: React.FC<CompleteOrderItemsSectionProps>
                             {itemName}
                           </h4>
                           {hasValidationErrors && (
-                            <AlertCircle className="h-4 w-4 text-destructive" title="Data validation issues" />
+                            <div title="Data validation issues">
+                              <AlertCircle className="h-4 w-4 text-destructive" />
+                            </div>
                           )}
                         </div>
                         

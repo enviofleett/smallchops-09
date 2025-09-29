@@ -180,7 +180,7 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
             <div className="flex flex-col gap-2">
               {canRetry && (
                 <Button
-                  onClick={() => retry(() => reconnect())}
+                  onClick={() => retry(async () => { reconnect(); })}
                   disabled={isRetrying}
                   className="w-full"
                 >

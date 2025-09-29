@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"],
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "suppressExcessPropertyErrors": true,
+    "suppressImplicitAnyIndexErrors": true
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-env main.ts"
+  },
+  "exclude": ["supabase/functions/**/*.ts"]
+}

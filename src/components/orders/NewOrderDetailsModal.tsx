@@ -1,6 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
+import { ThermalPrintReceipt } from './ThermalPrintReceipt';
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import '@/styles/thermal-print.css';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -280,7 +283,9 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
 }) => {
   const userContext = useUserContext();
   const printRef = useRef<HTMLDivElement>(null);
+  const thermalPrintRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const { data: businessSettings } = useBusinessSettings();
 
   // Fetch real-time order data
   const { 
@@ -293,10 +298,66 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
   } = useRealTimeOrderData(order?.id);
 
   const handlePrint = useReactToPrint({
-    contentRef: printRef,
+    contentRef: thermalPrintRef,
     documentTitle: `Order-${order?.order_number || 'Details'}`,
-    onAfterPrint: () => toast.success('Order details printed successfully'),
-    onPrintError: () => toast.error('Failed to print order details')
+    onBeforePrint: () => {
+      // Add print-specific styles for thermal printing
+      const printStyles = document.createElement('style');
+      printStyles.innerHTML = `
+        @media print {
+          @page {
+            size: 80mm auto;
+            margin: 0;
+            padding: 0;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            font-family: 'Courier New', monospace !important;
+          }
+          body * {
+            visibility: hidden;
+          }
+          .thermal-receipt,
+          .thermal-receipt * {
+            visibility: visible;
+          }
+          .thermal-receipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 76mm;
+            max-width: 76mm;
+            background: white !important;
+            color: black !important;
+            font-family: 'Courier New', monospace !important;
+            font-size: 8px !important;
+            line-height: 1.2 !important;
+            margin: 0 !important;
+            padding: 2mm !important;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+            overflow: visible;
+            min-height: auto;
+            display: block !important;
+          }
+        }
+      `;
+      document.head.appendChild(printStyles);
+      return Promise.resolve();
+    },
+    onAfterPrint: () => {
+      // Clean up print styles
+      const printStyles = document.head.querySelector('style:last-child');
+      if (printStyles && printStyles.innerHTML.includes('@page')) {
+        document.head.removeChild(printStyles);
+      }
+      toast.success('Thermal receipt printed successfully');
+    },
+    onPrintError: () => toast.error('Failed to print thermal receipt')
   });
 
   const handleRefresh = () => {
@@ -405,8 +466,8 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
                 )}
               </div>
               <Button variant="outline" size="sm" onClick={handlePrint}>
-                <Printer className="w-4 h-4" />
-                <span className="sr-only">Print order</span>
+                <Printer className="w-4 h-4 mr-2" />
+                Print Receipt
               </Button>
             </div>
           </CardHeader>
@@ -806,17 +867,39 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
         {/* Metadata */}
         <Card>
           <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>Created: {orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Not available'}</p>
-              <p>Last Updated: {orderData.updated_at ? new Date(orderData.updated_at).toLocaleString() : orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Not available'}</p>
-              <p>Order ID: {orderData.id}</p>
-              {isAdmin && connectionStatus === 'connected' && (
-                <p className="text-green-600">🟢 Real-time updates active</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </AdaptiveDialog>
-  );
-};
+             <div className="text-sm text-muted-foreground space-y-1">
+               <p>Created: {orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Not available'}</p>
+               <p>Last Updated: {orderData.updated_at ? new Date(orderData.updated_at).toLocaleString() : orderData.created_at ? new Date(orderData.created_at).toLocaleString() : 'Not available'}</p>
+               <p>Order ID: {orderData.id}</p>
+               {isAdmin && connectionStatus === 'connected' && (
+                 <p className="text-green-600">🟢 Real-time updates active</p>
+               )}
+             </div>
+           </CardContent>
+         </Card>
+
+         {/* Hidden Thermal Receipt for Printing */}
+         <div ref={thermalPrintRef} style={{ position: 'absolute', left: '-9999px', top: '0' }}>
+           <ThermalPrintReceipt
+             order={{
+               ...orderData,
+               order_items: orderItems,
+               fulfillment_info: fulfillmentInfo
+             }}
+             deliverySchedule={fulfillmentInfo}
+             businessInfo={businessSettings ? {
+               name: businessSettings.name || 'Starter Small Chops',
+               whatsapp_support_number: businessSettings.whatsapp_support_number || '0807 301 1100',
+               admin_notification_email: 'store@startersmallchops.com',
+               logo_url: businessSettings.logo_url
+             } : {
+               name: 'Starter Small Chops',
+               whatsapp_support_number: '0807 301 1100',
+               admin_notification_email: 'store@startersmallchops.com'
+             }}
+           />
+         </div>
+       </div>
+     </AdaptiveDialog>
+   );
+ };

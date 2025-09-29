@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useOrderDetails } from "@/hooks/useOrderDetails";
 import { useDriverManagement } from "@/hooks/useDriverManagement";
 import { useProductionStatusUpdate } from "@/hooks/useProductionStatusUpdate";
-import { useGmailOrderEmail } from "@/hooks/useGmailOrderEmail";
+import { EmailOperations } from "@/utils/emailOperations";
 
 export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin }) {
   // Fetch real order data
@@ -19,7 +19,6 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
   // Admin-only hooks
   const { drivers = [] } = useDriverManagement();
   const { updateStatus } = useProductionStatusUpdate();
-  const { sendOrderEmail } = useGmailOrderEmail();
 
   const [assigningDriver, setAssigningDriver] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -35,13 +34,16 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
     if (!order || !driverId) return;
     setAssigningDriver(true);
     try {
-      // Uncomment and implement if you have assignDriver API:
-      // await assignDriver(order.id, driverId);
-      await sendOrderEmail({
-        to: order.customer_email,
-        type: "rider-assigned",
-        orderId: order.id,
-        driverId,
+      // Find driver name
+      const driver = drivers.find(d => d.id === driverId);
+      await EmailOperations.queueTransactionalEmail({
+        recipient_email: order.customer_email,
+        template_key: "rider_assigned",
+        variables: {
+          customer_name: order.customer_name,
+          order_number: order.order_number,
+          driver_name: driver?.name || "Driver"
+        }
       });
       refetch();
     } catch (e) {
@@ -58,11 +60,14 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
     setUpdatingStatus(true);
     try {
       await updateStatus({ orderId: order.id, status });
-      await sendOrderEmail({
-        to: order.customer_email,
-        type: "status-update",
-        orderId: order.id,
-        status,
+      await EmailOperations.queueTransactionalEmail({
+        recipient_email: order.customer_email,
+        template_key: `order_${status}`,
+        variables: {
+          customer_name: order.customer_name,
+          order_number: order.order_number,
+          status: status.replace(/_/g, " ")
+        }
       });
       refetch();
     } catch (e) {

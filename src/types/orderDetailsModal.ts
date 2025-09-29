@@ -96,6 +96,14 @@ export interface Order {
   vat_amount?: number;
   paid_at?: string;
   processing_started_at?: string;
+  // Payment fields
+  payment_method?: string;
+  payment_reference?: string;
+  // Driver assignment fields
+  assigned_rider_id?: string;
+  assigned_rider_name?: string;
+  // Delivery fields
+  delivery_window?: string;
 }
 
 export interface OrderDetailsModalProps {

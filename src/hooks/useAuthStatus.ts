@@ -56,7 +56,7 @@ export const useAuthStatus = (): AuthStatusResult => {
         setUserRole(profile.role);
         setUserType('admin');
         // Only super_admin has full admin privileges
-        setHasAdminPrivileges(profile.role === 'super_admin');
+        setHasAdminPrivileges(['super_admin', 'admin'].includes(profile.role));
         return;
       }
 

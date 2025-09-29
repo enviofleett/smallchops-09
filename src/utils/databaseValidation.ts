@@ -231,7 +231,7 @@ export const fixCorruptedOrderAddress = async (orderId: string): Promise<boolean
         }
       } else if (typeof order.delivery_address === 'object') {
         // Clean up object address
-        const addr = order.delivery_address.address || order.delivery_address;
+        const addr = (order.delivery_address as any).address || order.delivery_address;
         fixedAddress = {
           address_line_1: String(addr.address_line_1 || addr.address || '').trim(),
           address_line_2: String(addr.address_line_2 || '').trim(),

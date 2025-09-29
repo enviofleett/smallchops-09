@@ -125,7 +125,7 @@ export const useUserManagement = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, name, role, status, created_at, updated_at')
-        .in('role', ['super_admin', 'manager', 'support_officer'])
+        .in('role', ['admin', 'manager', 'staff'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -153,7 +153,7 @@ export const useUserManagement = () => {
     try {
       const { data, error } = await supabase
         .from('admin_invitations')
-        .select('id, email, role, invited_at as created_at, status, expires_at')
+        .select('id, email, role, invited_at, status, expires_at')
         .order('invited_at', { ascending: false });
 
       if (error) {

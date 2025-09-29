@@ -589,7 +589,7 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Type</p>
-                <p className="text-sm">{orderData.customer_type || 'Guest Customer'}</p>
+                <p className="text-sm">Guest Customer</p>
               </div>
             </div>
             
@@ -980,12 +980,26 @@ export const NewOrderDetailsModal: React.FC<NewOrderDetailsModalProps> = ({
 
          {/* Hidden Thermal Receipt for Printing */}
          <div ref={thermalPrintRef} style={{ position: 'absolute', left: '-9999px', top: '0', background: 'white', padding: '2mm' }}>
-           <ThermalPrintReceipt
-             order={{
-               ...orderData,
-               order_items: orderItems,
-               fulfillment_info: fulfillmentInfo
-             }}
+            <ThermalPrintReceipt
+              order={{
+                ...orderData,
+                order_items: orderItems,
+                fulfillment_info: fulfillmentInfo,
+                admin_notes: '',
+                amount_kobo: orderData.total_amount * 100,
+                created_by: '',
+                delivery_status: '',
+                delivery_time: '',
+                delivery_time_slot_id: '',
+                delivery_zone_id: '',
+                email: orderData.customer_email,
+                estimated_delivery_date: '',
+                guest_session_id: '',
+                idempotency_key: '',
+                last_modified_by: '',
+                preferred_delivery_time: '',
+                assigned_rider_id: ''
+              } as any}
              deliverySchedule={fulfillmentInfo}
              businessInfo={businessSettings ? {
                name: businessSettings.name || 'Starter Small Chops',

@@ -157,8 +157,9 @@ export class AuthTestUtility {
       }
 
       const hasOrderData = data && typeof data === 'object';
-      const hasItems = data?.items && Array.isArray(data.items);
-      const hasOrderInfo = data?.order && typeof data.order === 'object';
+      const parsedData = data as any;
+      const hasItems = parsedData?.items && Array.isArray(parsedData.items);
+      const hasOrderInfo = parsedData?.order && typeof parsedData.order === 'object';
 
       return {
         test: 'Order Fulfillment Data',
@@ -168,8 +169,8 @@ export class AuthTestUtility {
           order_id: orderId,
           has_order: hasOrderInfo,
           has_items: hasItems,
-          items_count: hasItems ? data.items.length : 0,
-          has_fulfillment_info: !!data?.fulfillment_info
+          items_count: hasItems ? (data as any).items.length : 0,
+          has_fulfillment_info: !!(data as any)?.fulfillment_info
         }
       };
     } catch (error) {

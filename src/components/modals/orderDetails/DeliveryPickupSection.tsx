@@ -35,8 +35,8 @@ export const DeliveryPickupSection: React.FC<DeliveryPickupSectionProps> = ({ or
   const formatTimeWindow = () => {
     if (isDelivery) {
       // For delivery orders, check various delivery time fields
-      if (order.delivery_address?.delivery_window) {
-        return order.delivery_address.delivery_window;
+      if (typeof order.delivery_address === 'object' && order.delivery_address && 'delivery_window' in order.delivery_address) {
+        return (order.delivery_address as any).delivery_window;
       }
       // Add other delivery time logic here
       return 'Time window not specified';

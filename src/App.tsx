@@ -277,23 +277,23 @@ const App = () => {
               <Route path="/orders" element={<Navigate to="/admin/orders" replace />} />
               <Route path="/delivery-pickup" element={<Navigate to="/admin/delivery" replace />} />
 
-              {/* Protected admin routes */}
+              {/* Protected admin routes with unified authentication */}
               <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
-                <Route path="/admin" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
-                <Route path="/dashboard" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
-                <Route path="/admin/orders" element={<ErrorBoundaryWrapper context="Admin Orders"><AdminOrders /></ErrorBoundaryWrapper>} />
-                <Route path="/admin/orders/:id" element={<ErrorBoundaryWrapper context="Admin Order Details"><AdminOrderDetails /></ErrorBoundaryWrapper>} />
-                <Route path="/admin/order-details/:orderId" element={<ErrorBoundaryWrapper context="Order Details UI"><OrderDetailsPage /></ErrorBoundaryWrapper>} />
-                <Route path="/admin/delivery" element={<ErrorBoundaryWrapper context="Admin Delivery"><AdminDelivery /></ErrorBoundaryWrapper>} />
-                <Route path="/admin/products" element={<ErrorBoundaryWrapper context="Products"><Products /></ErrorBoundaryWrapper>} />
-                <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />
-                <Route path="/customers" element={<ErrorBoundaryWrapper context="Customers"><Customers /></ErrorBoundaryWrapper>} />
-                <Route path="/reports" element={<ErrorBoundaryWrapper context="Reports"><Reports /></ErrorBoundaryWrapper>} />
-                <Route path="/promotions" element={<ErrorBoundaryWrapper context="Promotions"><Promotions /></ErrorBoundaryWrapper>} />
-                <Route path="/bookings" element={<ErrorBoundaryWrapper context="Catering Bookings"><BookingManagement /></ErrorBoundaryWrapper>} />
-                <Route path="/audit-logs" element={<ErrorBoundaryWrapper context="Audit Logs"><AuditLogs /></ErrorBoundaryWrapper>} />
-                <Route path="/settings" element={<ErrorBoundaryWrapper context="Settings"><Settings /></ErrorBoundaryWrapper>} />
-                <Route path="/payment-settings" element={<ErrorBoundaryWrapper context="Payment Settings"><PaymentSettings /></ErrorBoundaryWrapper>} />
+                <Route path="/admin" element={<Index />} />
+                <Route path="/dashboard" element={<Index />} />
+                <Route path="/admin/orders" element={<AdminOrders />} />
+                <Route path="/admin/orders/:id" element={<AdminOrderDetails />} />
+                <Route path="/admin/order-details/:orderId" element={<OrderDetailsPage />} />
+                <Route path="/admin/delivery" element={<AdminDelivery />} />
+                <Route path="/admin/products" element={<Products />} />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/promotions" element={<Promotions />} />
+                <Route path="/bookings" element={<BookingManagement />} />
+                <Route path="/audit-logs" element={<AuditLogs />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/payment-settings" element={<PaymentSettings />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 
-export type UserRole = 'super_admin' | 'manager' | 'support_officer';
+export type UserRole = 'super_admin' | 'manager' | 'support_officer' | 'admin';
 
 export interface RolePermission {
   role: UserRole;
@@ -15,6 +15,27 @@ const ROLE_PERMISSIONS: RolePermission[] = [
     role: 'super_admin',
     permissions: {
       // Super admin has access to all menus and features
+      'dashboard': 'edit',
+      'orders': 'edit',
+      'categories': 'edit',
+      'products': 'edit',
+      'customers': 'edit',
+      'bookings': 'edit',
+      'delivery': 'edit',
+      'promotions': 'edit',
+      'reports': 'edit',
+      'auditLogs': 'edit',
+      'settings': 'edit',
+      'settingsAdmin': 'edit',
+      'settingsPermissions': 'edit',
+      'settingsPayments': 'edit',
+      'settingsCommunications': 'edit',
+    }
+  },
+  {
+    role: 'admin',
+    permissions: {
+      // Admin role has full access to everything
       'dashboard': 'edit',
       'orders': 'edit',
       'categories': 'edit',
@@ -87,7 +108,7 @@ export const useRoleBasedPermissions = () => {
       return 'super_admin';
     }
     
-    return user.role as UserRole || null;
+    return user.role as UserRole || 'support_officer';
   };
 
   const hasPermission = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view'): boolean => {
@@ -113,12 +134,12 @@ export const useRoleBasedPermissions = () => {
 
   const canCreateUsers = (): boolean => {
     const userRole = getUserRole();
-    return userRole === 'super_admin' || user?.email === 'toolbuxdev@gmail.com';
+    return userRole === 'super_admin' || userRole === 'admin' || user?.email === 'toolbuxdev@gmail.com';
   };
 
   const canAssignRoles = (): boolean => {
     const userRole = getUserRole();
-    return userRole === 'super_admin' || user?.email === 'toolbuxdev@gmail.com';
+    return userRole === 'super_admin' || userRole === 'admin' || user?.email === 'toolbuxdev@gmail.com';
   };
 
   const getAccessibleMenus = (): string[] => {

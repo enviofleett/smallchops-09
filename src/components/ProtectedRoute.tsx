@@ -1,26 +1,25 @@
 
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useAuthStatus } from '@/hooks/useAuthStatus';
-import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
+import React, { useEffect } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
+import { storeRedirectUrl } from '@/utils/redirect';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'super_admin' | 'manager' | 'support_officer';
+  requiredRole?: 'super_admin' | 'manager' | 'support_officer' | 'admin';
   menuKey?: string;
   requiredPermission?: 'view' | 'edit';
   requireAdmin?: boolean;
 }
 
 /**
- * Enhanced ProtectedRoute with role-based access control
+ * Enhanced ProtectedRoute with unified authentication system
  * 
  * Features:
- * - Role-based permission system (super_admin, manager, support_officer)
- * - Guaranteed admin access for toolbuxdev@gmail.com
+ * - Unified authentication checking
+ * - Role-based permission system
  * - Menu-based access control
- * - Better loading states and error handling
+ * - Production-ready security
  */
 const ProtectedRoute = ({ 
   children, 
@@ -29,79 +28,58 @@ const ProtectedRoute = ({
   requiredPermission = 'view',
   requireAdmin = false
 }: ProtectedRouteProps) => {
-  // Use both auth systems for maximum compatibility
-  const authContext = useAuth();
-  const authStatus = useAuthStatus();
-  const { hasPermission, userRole, canCreateUsers } = useRoleBasedPermissions();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { 
+    user, 
+    isLoading, 
+    isAuthenticated, 
+    canAccessAdmin,
+    hasRole,
+    hasMenuPermission 
+  } = useUnifiedAuth();
 
-  // Determine loading state from both systems
-  const isLoading = authContext.isLoading || authStatus.isLoading;
-  
-  // Determine authentication state
-  const isAuthenticated = authContext.isAuthenticated || authStatus.isAuthenticated;
-  
-  // Determine user info - prefer authStatus for enhanced features
-  const user = authStatus.user || authContext.user;
-  const userType = authStatus.userType || authContext.userType;
-  const hasAdminPrivileges = authStatus.hasAdminPrivileges;
+  // PRODUCTION SECURITY: Store redirect URL for seamless post-login navigation
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && location.pathname !== '/admin/auth' && location.pathname !== '/auth') {
+      const fullPath = location.pathname + location.search + location.hash;
+      storeRedirectUrl(fullPath);
+    }
+  }, [isLoading, isAuthenticated, location]);
 
-  // Show loading spinner while checking authentication
+  // PRODUCTION SECURITY: Show loading state while checking authentication
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground text-sm">Verifying access...</p>
+        </div>
       </div>
     );
   }
 
-  // Handle authentication errors gracefully
-  if (authStatus.error && !isAuthenticated) {
-    console.error('Authentication error:', authStatus.error);
+  // PRODUCTION SECURITY: Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/auth" state={{ from: location }} replace />;
+  }
+
+  // PRODUCTION SECURITY: Check admin access using unified auth
+  if (!canAccessAdmin) {
     return <Navigate to="/admin/auth" replace />;
   }
 
-  // Check basic authentication
-  if (!isAuthenticated || !user) {
-    return <Navigate to="/admin/auth" replace />;
-  }
-
-  // Special case: toolbuxdev@gmail.com always gets admin access
-  if (user.email === 'toolbuxdev@gmail.com') {
-    return <>{children}</>;
-  }
-
-  // Check role-based access
-  if (requiredRole && userRole !== requiredRole) {
-    // Super admin can access everything, manager can access manager and support officer routes
-    if (userRole === 'super_admin') {
-      // Super admin can access all routes
-    } else if (userRole === 'manager' && requiredRole === 'support_officer') {
-      // Manager can access support officer routes
-    } else {
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
-
-  // If admin is required, check admin privileges (only super_admin has full admin privileges)
-  if (requireAdmin && !hasAdminPrivileges) {
+  // PRODUCTION SECURITY: Role-based access control
+  if (requiredRole && !hasRole(requiredRole)) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // For admin routes, ensure user has admin role
-  if (userType !== 'admin' && (requireAdmin || ['super_admin', 'manager', 'support_officer'].includes(requiredRole || ''))) {
-    return <Navigate to="/admin/auth" replace />;
-  }
-
-  // Check modern menu permission-based access
-  if (menuKey && !hasPermission(menuKey, requiredPermission)) {
-    // For admin users, show a more specific error
-    if (userRole) {
-      console.warn(`User with role '${userRole}' lacks permission for ${menuKey}. Redirecting to dashboard.`);
-    }
+  // PRODUCTION SECURITY: Menu-based permission checking for granular control
+  if (menuKey && !hasMenuPermission(menuKey, requiredPermission)) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // All checks passed - render children
+  // All checks passed - render protected content
   return <>{children}</>;
 };
 

@@ -200,7 +200,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             id: authUser.id,
             name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Admin',
             email: authUser.email,
-            role: authUser.user_metadata?.role || 'admin',
+            role: user.role as UserRole || 'admin',
             is_active: true
           })
           .select()

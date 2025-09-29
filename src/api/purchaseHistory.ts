@@ -2,6 +2,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { OrderWithItems } from './orders';
 import { OrderStatus } from '@/types/orders';
 
+// Helper function to normalize items field from Json to array
+function normalizeOrderItems(order: any): OrderWithItems {
+  return {
+    ...order,
+    items: Array.isArray(order.items) 
+      ? order.items 
+      : order.items 
+        ? (typeof order.items === 'string' ? JSON.parse(order.items) : [])
+        : [],
+    order_items: Array.isArray(order.order_items) 
+      ? order.order_items 
+      : order.order_items 
+        ? (typeof order.order_items === 'string' ? JSON.parse(order.order_items) : [])
+        : []
+  };
+}
+
 export interface PurchaseHistoryFilters {
   page?: number;
   pageSize?: number;
@@ -101,7 +118,10 @@ export const getCustomerOrderHistory = async (
     throw new Error(error.message);
   }
 
-  return { orders: data || [], count: count || 0 };
+  // Normalize items to ensure they're always arrays
+  const normalizedOrders = (data || []).map(normalizeOrderItems);
+
+  return { orders: normalizedOrders, count: count || 0 };
 };
 
 export const getCustomerTransactionHistory = async (

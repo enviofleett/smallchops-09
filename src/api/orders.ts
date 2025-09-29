@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { OrderStatus, PaymentStatus } from '@/types/orders';
 import { OrderType } from '@/types/orderDetailsModal';
+import { Json } from '@/integrations/supabase/types';
 
 export interface OrderWithItems {
   id: string;
@@ -81,6 +82,23 @@ interface GetOrdersParams {
   endDate?: string;
 }
 
+// Helper function to normalize items field from Json to array
+function normalizeOrderItems(order: any): OrderWithItems {
+  return {
+    ...order,
+    items: Array.isArray(order.items) 
+      ? order.items 
+      : order.items 
+        ? (typeof order.items === 'string' ? JSON.parse(order.items) : [])
+        : [],
+    order_items: Array.isArray(order.order_items) 
+      ? order.order_items 
+      : order.order_items 
+        ? (typeof order.order_items === 'string' ? JSON.parse(order.order_items) : [])
+        : []
+  };
+}
+
 export async function getOrders(params?: GetOrdersParams) {
   let query = supabase.from('orders').select('*', { count: 'exact' });
 
@@ -113,7 +131,10 @@ export async function getOrders(params?: GetOrdersParams) {
   const { data, error, count } = await query;
   if (error) throw error;
   
-  return { orders: data || [], count: count || 0 };
+  // Normalize items to ensure they're always arrays
+  const normalizedOrders = (data || []).map(normalizeOrderItems);
+  
+  return { orders: normalizedOrders, count: count || 0 };
 }
 
 export async function updateOrder({ orderId, updates }: OrderUpdatePayload) {

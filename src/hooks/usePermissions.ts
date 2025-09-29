@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { AuthAuditLogger } from '@/utils/authAuditLogger';
 
 export interface UserPermission {
   menu_key: string;
@@ -16,6 +17,33 @@ export const usePermissions = () => {
     queryKey: ['user-permissions', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
+
+      // Special case: toolbuxdev@gmail.com gets all permissions automatically
+      if (user.email === 'toolbuxdev@gmail.com') {
+        // Return comprehensive admin permissions
+        const adminPermissions: UserPermission[] = [
+          { menu_key: 'settings_admin_users', permission_level: 'edit' },
+          { menu_key: 'settings_business', permission_level: 'edit' },
+          { menu_key: 'settings_payments', permission_level: 'edit' },
+          { menu_key: 'settings_delivery', permission_level: 'edit' },
+          { menu_key: 'settings_communications', permission_level: 'edit' },
+          { menu_key: 'orders_management', permission_level: 'edit' },
+          { menu_key: 'products_management', permission_level: 'edit' },
+          { menu_key: 'customers_management', permission_level: 'edit' },
+          { menu_key: 'analytics_dashboard', permission_level: 'edit' },
+          { menu_key: 'content_management', permission_level: 'edit' },
+          { menu_key: 'drivers_management', permission_level: 'edit' },
+          { menu_key: 'delivery_zones', permission_level: 'edit' },
+          { menu_key: 'orders', permission_level: 'edit' },
+          { menu_key: 'categories', permission_level: 'edit' },
+          { menu_key: 'products', permission_level: 'edit' },
+          { menu_key: 'customers', permission_level: 'edit' },
+          { menu_key: 'promotions', permission_level: 'edit' },
+          { menu_key: 'reports', permission_level: 'edit' },
+          { menu_key: 'delivery', permission_level: 'edit' }
+        ];
+        return adminPermissions;
+      }
 
       const { data, error } = await supabase
         .from('user_permissions')
@@ -35,6 +63,15 @@ export const useHasPermission = (menuKey: string, requiredLevel: 'view' | 'edit'
 
   // PRODUCTION SECURITY: Return false while loading permissions to prevent unauthorized access
   if (isLoading || !user?.id) return false;
+
+  // Special case: toolbuxdev@gmail.com always has admin access
+  if (user.email === 'toolbuxdev@gmail.com') {
+    // Log toolbux admin access for sensitive operations
+    if (menuKey.includes('admin') || menuKey.includes('settings')) {
+      AuthAuditLogger.logToolbuxAccess(`access_${menuKey}`, { required_level: requiredLevel });
+    }
+    return true;
+  }
 
   // PRODUCTION SECURITY: Find exact permission for the menu key
   let permission = permissions?.find(p => p.menu_key === menuKey);

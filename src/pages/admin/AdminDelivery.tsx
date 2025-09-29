@@ -23,6 +23,7 @@ import { usePaidOrders } from '@/hooks/usePaidOrders';
 import { useOrderFilters } from '@/hooks/useOrderFilters';
 import { DeliveryRouteManager } from '@/components/delivery/DeliveryRouteManager';
 import { useIsMobile } from '@/hooks/use-mobile';
+import AdminPageWrapper from '@/components/admin/AdminPageWrapper';
 import { 
   Truck, 
   Clock,
@@ -192,25 +193,18 @@ export default function AdminDelivery() {
   const gridClasses = isMobile ? 'grid-cols-2' : 'md:grid-cols-4';
 
   return (
-    <>
-      {/* SEO */}
-      <Helmet>
-        <title>Delivery Management - Admin Dashboard</title>
-        <meta name="description" content="Manage delivery operations, track routes, and monitor delivery performance." />
-      </Helmet>
-
-      <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 md:p-6">
+    <AdminPageWrapper
+      title="Delivery Management"
+      description="Manage delivery operations, track routes, and monitor delivery performance"
+      menuPermission="delivery"
+      permissionLevel="edit"
+    >
+      <div className="space-y-4 sm:space-y-6">
         {/* System Status Check */}
         <SystemStatusChecker />
         
-        {/* Header */}
+        {/* Date Selection and Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Delivery Management</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Monitor delivery operations, routes, and performance metrics
-            </p>
-          </div>
           <div className="flex gap-2 w-full sm:w-auto">
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
@@ -410,7 +404,7 @@ export default function AdminDelivery() {
           }}
         />
       </div>
-    </>
+    </AdminPageWrapper>
   );
 }
 

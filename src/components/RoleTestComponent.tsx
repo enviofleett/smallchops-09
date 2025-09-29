@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, XCircle, User, Settings, BarChart3, Package } from 'lucide-react';
@@ -10,7 +10,7 @@ import { CheckCircle, XCircle, User, Settings, BarChart3, Package } from 'lucide
  * This shows what menus/features each role can access
  */
 export const RoleTestComponent = () => {
-  const { user } = useAuth();
+  const { user } = useUnifiedAuth();
   const { userRole, hasPermission, canAssignRoles, getAccessibleMenus } = useRoleBasedPermissions();
 
   const testMenus = [

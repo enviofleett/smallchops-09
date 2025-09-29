@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StarRating } from '@/components/ui/star-rating';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 
 interface ReviewFormProps {
   onSubmit: (rating: number, reviewText?: string) => void;
@@ -13,7 +13,7 @@ interface ReviewFormProps {
 export const ReviewForm: React.FC<ReviewFormProps> = ({ onSubmit, isSubmitting }) => {
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated } = useUnifiedAuth();
 
   if (!isAuthenticated) {
     return (

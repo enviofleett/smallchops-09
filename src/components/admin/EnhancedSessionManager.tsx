@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { 
   Monitor, 
   MapPin, 
@@ -43,7 +43,7 @@ export const EnhancedSessionManager = () => {
   const [sessions, setSessions] = useState<SessionWithProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useUnifiedAuth();
 
   const loadSessions = async () => {
     setIsLoading(true);

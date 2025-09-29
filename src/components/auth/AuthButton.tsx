@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AuthModal } from './AuthModal';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -19,7 +20,8 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
   showText = true 
 }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const { user, session, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, session, isAuthenticated, isLoading } = useUnifiedAuth();
+  const { logout } = useAuth(); // Keep logout from original context
   const { toast } = useToast();
 
   const handleSignOut = async () => {

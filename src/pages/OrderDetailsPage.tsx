@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { NewOrderDetailsModal } from '@/components/orders/NewOrderDetailsModal';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import AdminPageWrapper from '@/components/admin/AdminPageWrapper';
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { user } = useAuth();
+  const { user } = useUnifiedAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -98,18 +99,19 @@ export default function OrderDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Order Details</h1>
-          <p className="text-muted-foreground mb-4">Order ID: {orderId}</p>
-        </div>
+    <AdminPageWrapper
+      title="Order Details"
+      description={`Order ID: ${orderId}`}
+      menuPermission="orders"
+      permissionLevel="view"
+    >
+      <div className="text-center">
         <NewOrderDetailsModal 
           open={isModalOpen}
           onClose={handleClose}
           order={order}
         />
       </div>
-    </div>
+    </AdminPageWrapper>
   );
 }

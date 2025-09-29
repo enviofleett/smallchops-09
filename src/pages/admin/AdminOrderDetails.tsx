@@ -17,6 +17,7 @@ import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import AdminPageWrapper from '@/components/admin/AdminPageWrapper';
 
 const AdminOrderDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -94,13 +95,18 @@ const AdminOrderDetails: React.FC = () => {
   const { order, items, delivery_schedule } = data;
 
   return (
-    <div className="min-h-screen bg-background print:bg-white">
-      {/* Header - Hidden on print */}
-      <div className="border-b bg-card print:hidden">
-        <div className="container mx-auto px-4 py-3 sm:py-4">
+    <AdminPageWrapper
+      title={`Order #${order?.order_number || id}`}
+      description={`Order details and management`}
+      menuPermission="orders"
+      permissionLevel="view"
+    >
+      <div className="print:bg-white">
+        {/* Header - Hidden on print */}
+        <div className="print:hidden">
           {/* Mobile Header Layout */}
           <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-            {/* Title and Back Button */}
+            {/* Back Button and Actions */}
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => navigate('/admin/orders')}
@@ -111,7 +117,6 @@ const AdminOrderDetails: React.FC = () => {
                 <ArrowLeft className="h-4 w-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
-              <div className="min-w-0 flex-1">
                 <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">
                   Order #{order.order_number}
                 </h1>
@@ -293,7 +298,7 @@ const AdminOrderDetails: React.FC = () => {
           <p>Generated on {format(new Date(), 'PPP')} • Order #{order.order_number}</p>
         </div>
       </div>
-    </div>
+    </AdminPageWrapper>
   );
 };
 

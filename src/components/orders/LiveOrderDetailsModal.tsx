@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRealTimeOrderData } from "@/hooks/useRealTimeOrderData";
 import { useDriverManagement } from "@/hooks/useDriverManagement";
 import { useProductionStatusUpdate } from "@/hooks/useProductionStatusUpdate";
+import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { EmailOperations } from "@/utils/emailOperations";
+import { errorReporting } from "@/lib/errorReporting";
 import { EnhancedFinancialBreakdown } from "./details/EnhancedFinancialBreakdown";
 import { CompleteFulfillmentSection } from "./details/CompleteFulfillmentSection";
 import { EnhancedDriverSection } from "./details/EnhancedDriverSection";
 import { CompleteOrderItemsSection } from "./details/CompleteOrderItemsSection";
-import { RefreshCw } from "lucide-react";
+import { OrderDetailsSectionErrorBoundary } from "./details/ErrorBoundary";
+import { RefreshCw, AlertTriangle, Wifi, WifiOff, Clock } from "lucide-react";
 
 export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin }) {
   // Fetch comprehensive real-time order data
@@ -34,85 +38,195 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
   const { drivers = [] } = useDriverManagement();
   const { updateStatus } = useProductionStatusUpdate();
 
+  // Error recovery hook
+  const { retry, canRetry, isRetrying } = useErrorRecovery({
+    maxRetries: 3,
+    retryDelay: 2000,
+    onMaxRetriesExceeded: (error) => {
+      errorReporting.reportError(
+        errorReporting.createErrorReport(error, 'OrderDetailsModal')
+      );
+    }
+  });
+
   const [assigningDriver, setAssigningDriver] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  // Debug logs
+  // Debug logs (only in development)
   useEffect(() => {
-    console.log("ORDER DATA:", order);
-    console.log("DRIVERS:", drivers);
-  }, [order, drivers]);
+    if (process.env.NODE_ENV === 'development') {
+      console.log("ORDER DATA:", order);
+      console.log("DRIVERS:", drivers);
+      console.log("CONNECTION STATUS:", connectionStatus);
+    }
+  }, [order, drivers, connectionStatus]);
 
-  // Handler for assigning driver
+  // Enhanced handler for assigning driver with error recovery
   const handleAssignDriver = async (driverId) => {
     if (!order || !driverId) return;
+    
     setAssigningDriver(true);
+    
     try {
-      // Find driver name
-      const driver = drivers.find(d => d.id === driverId);
-      await EmailOperations.queueTransactionalEmail({
-        recipient_email: order.customer_email,
-        template_key: "rider_assigned",
-        variables: {
-          customer_name: order.customer_name,
-          order_number: order.order_number,
-          driver_name: driver?.name || "Driver"
+      await retry(async () => {
+        // Find driver name with validation
+        const driver = Array.isArray(drivers) ? 
+          drivers.find(d => d?.id === driverId) : null;
+        
+        if (!driver) {
+          throw new Error('Selected driver not found');
         }
+
+        // Queue email notification
+        await EmailOperations.queueTransactionalEmail({
+          recipient_email: order.customer_email || '',
+          template_key: "rider_assigned",
+          variables: {
+            customer_name: order.customer_name || 'Customer',
+            order_number: order.order_number || orderId,
+            driver_name: driver.name || "Driver"
+          }
+        });
+
+        // Refresh real-time data
+        reconnect();
       });
-      // Use reconnect to refresh real-time data
-      reconnect();
     } catch (e) {
-      alert("Failed to assign driver.");
-      console.error(e);
+      const errorReport = errorReporting.createErrorReport(
+        e instanceof Error ? e : new Error('Driver assignment failed'),
+        'AssignDriver'
+      );
+      errorReporting.reportError(errorReport);
+      
+      // Show user-friendly error message
+      alert(errorReporting.getUserFriendlyMessage('runtime', e as Error));
+    } finally {
+      setAssigningDriver(false);
     }
-    setAssigningDriver(false);
   };
 
-  // Handler for status change
+  // Enhanced handler for status change with error recovery
   const handleChangeStatus = async (e) => {
     const status = e.target.value;
     if (!order || !status) return;
+    
     setUpdatingStatus(true);
+    
     try {
-      await updateStatus({ orderId: order.id, status });
-      await EmailOperations.queueTransactionalEmail({
-        recipient_email: order.customer_email,
-        template_key: `order_${status}`,
-        variables: {
-          customer_name: order.customer_name,
-          order_number: order.order_number,
-          status: status.replace(/_/g, " ")
-        }
+      await retry(async () => {
+        await updateStatus({ orderId: order.id, status });
+        
+        // Queue status update email
+        await EmailOperations.queueTransactionalEmail({
+          recipient_email: order.customer_email || '',
+          template_key: `order_${status}`,
+          variables: {
+            customer_name: order.customer_name || 'Customer',
+            order_number: order.order_number || orderId,
+            status: status.replace(/_/g, " ")
+          }
+        });
+        
+        // Refresh real-time data
+        reconnect();
       });
-      // Use reconnect to refresh real-time data
-      reconnect();
     } catch (e) {
-      alert("Failed to update status.");
-      console.error(e);
+      const errorReport = errorReporting.createErrorReport(
+        e instanceof Error ? e : new Error('Status update failed'),
+        'UpdateStatus'
+      );
+      errorReporting.reportError(errorReport);
+      
+      // Show user-friendly error message
+      alert(errorReporting.getUserFriendlyMessage('runtime', e as Error));
+    } finally {
+      setUpdatingStatus(false);
     }
-    setUpdatingStatus(false);
   };
 
+  // Enhanced loading state
   if (isLoading) return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg w-full md:max-w-4xl">
-        <div className="flex items-center justify-center py-8">
-          <RefreshCw className="h-6 w-6 animate-spin text-primary mr-2" />
-          Loading order details...
+        <div className="flex flex-col items-center justify-center py-8 space-y-4">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          <div className="text-center">
+            <p className="font-medium">Loading order details...</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {orderId ? `Order #${orderId}` : 'Fetching data'}
+            </p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
 
-  if (error || !order) return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg w-full md:max-w-4xl">
-        <div className="text-center py-8 text-destructive">
-          {error?.message || 'Error loading order details'}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+  // Enhanced error state with recovery options
+  if (error || !order) {
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-lg w-full md:max-w-4xl">
+          <div className="text-center py-8 space-y-4">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+            <div>
+              <h3 className="font-semibold text-foreground mb-2">
+                Unable to load order details
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {error?.message || 'Order not found or failed to load'}
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              {canRetry && (
+                <Button
+                  onClick={() => retry(() => reconnect())}
+                  disabled={isRetrying}
+                  className="w-full"
+                >
+                  {isRetrying ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                      Retrying...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Try Again
+                    </>
+                  )}
+                </Button>
+              )}
+              
+              <Button variant="outline" onClick={onClose} className="w-full">
+                Close
+              </Button>
+            </div>
+
+            {/* Development error details */}
+            {process.env.NODE_ENV === 'development' && error && (
+              <Alert className="text-left">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <details className="space-y-2">
+                    <summary className="cursor-pointer font-medium">Debug Information</summary>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-auto whitespace-pre-wrap">
+                      {JSON.stringify({ 
+                        error: error.message, 
+                        orderId, 
+                        orderData,
+                        connectionStatus 
+                      }, null, 2)}
+                    </pre>
+                  </details>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const hasDrivers = Array.isArray(drivers) && drivers.length > 0;
 
@@ -216,7 +330,10 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
             </section>
 
             {/* Enhanced Financial Breakdown */}
-            <EnhancedFinancialBreakdown order={order} />
+            <EnhancedFinancialBreakdown 
+              order={order} 
+              isLoading={isLoading}
+            />
 
             {/* Complete Fulfillment Section */}
             <CompleteFulfillmentSection 
@@ -224,6 +341,7 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
               fulfillmentInfo={fulfillmentInfo}
               deliverySchedule={deliverySchedule}
               pickupPoint={pickupPoint}
+              isLoading={isLoading}
             />
           </div>
 
@@ -237,10 +355,14 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
               isAdmin={isAdmin}
               onAssignDriver={handleAssignDriver}
               assigningDriver={assigningDriver}
+              isLoading={isLoading}
             />
 
             {/* Complete Order Items Section */}
-            <CompleteOrderItemsSection items={items} />
+            <CompleteOrderItemsSection 
+              items={items}
+              isLoading={isLoading}
+            />
 
             {/* Admin Actions */}
             {isAdmin && (

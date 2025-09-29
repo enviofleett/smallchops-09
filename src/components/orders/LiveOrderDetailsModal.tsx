@@ -1,20 +1,34 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useOrderDetails } from "@/hooks/useOrderDetails";
+import { useRealTimeOrderData } from "@/hooks/useRealTimeOrderData";
 import { useDriverManagement } from "@/hooks/useDriverManagement";
 import { useProductionStatusUpdate } from "@/hooks/useProductionStatusUpdate";
 import { EmailOperations } from "@/utils/emailOperations";
+import { EnhancedFinancialBreakdown } from "./details/EnhancedFinancialBreakdown";
+import { CompleteFulfillmentSection } from "./details/CompleteFulfillmentSection";
+import { EnhancedDriverSection } from "./details/EnhancedDriverSection";
+import { CompleteOrderItemsSection } from "./details/CompleteOrderItemsSection";
+import { RefreshCw } from "lucide-react";
 
 export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin }) {
-  // Fetch real order data
+  // Fetch comprehensive real-time order data
   const {
-    order,
+    data: orderData,
     isLoading,
     error,
-    refetch,
+    lastUpdated,
     connectionStatus,
-  } = useOrderDetails(orderId);
+    reconnect
+  } = useRealTimeOrderData(orderId);
+
+  // Extract data from comprehensive response
+  const order = orderData?.order;
+  const items = orderData?.items || [];
+  const fulfillmentInfo = orderData?.fulfillment_info;
+  const deliverySchedule = orderData?.delivery_schedule;
+  const pickupPoint = orderData?.pickup_point;
+  const assignedAgent = orderData?.assigned_agent;
 
   // Admin-only hooks
   const { drivers = [] } = useDriverManagement();
@@ -45,7 +59,8 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
           driver_name: driver?.name || "Driver"
         }
       });
-      refetch();
+      // Use reconnect to refresh real-time data
+      reconnect();
     } catch (e) {
       alert("Failed to assign driver.");
       console.error(e);
@@ -69,7 +84,8 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
           status: status.replace(/_/g, " ")
         }
       });
-      refetch();
+      // Use reconnect to refresh real-time data
+      reconnect();
     } catch (e) {
       alert("Failed to update status.");
       console.error(e);
@@ -77,146 +93,194 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
     setUpdatingStatus(false);
   };
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error || !order) return <div>Error loading order.</div>;
+  if (isLoading) return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg w-full md:max-w-4xl">
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw className="h-6 w-6 animate-spin text-primary mr-2" />
+          Loading order details...
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
-  // Always use order.items, not order.order_items or other properties!
-  const items = Array.isArray(order.items) ? order.items : [];
+  if (error || !order) return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg w-full md:max-w-4xl">
+        <div className="text-center py-8 text-destructive">
+          {error?.message || 'Error loading order details'}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   const hasDrivers = Array.isArray(drivers) && drivers.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg w-full md:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>
-            Order #{order.order_number}
-            <span className="ml-2 px-2 py-1 rounded bg-gray-200 text-xs font-semibold">
-              {order.status}
-            </span>
-            <span className="ml-2 text-xs text-gray-400">{order.order_type}</span>
-          </DialogTitle>
-        </DialogHeader>
-        <div className="pt-2 space-y-4">
-          {/* Live order connection status */}
-          <div className="text-xs flex items-center gap-2">
-            Connection status: <span className={connectionStatus === "connected" ? "text-green-600" : "text-gray-500"}>{connectionStatus}</span>
-          </div>
-          {/* Customer info */}
-          <section>
-            <h3 className="font-semibold text-base">Customer Information</h3>
-            <div className="text-sm space-y-1">
-              <div>Name: {order.customer_name || "-"}</div>
-              <div>Email: {order.customer_email || "-"}</div>
-              <div>Phone: {order.customer_phone || "-"}</div>
-            </div>
-          </section>
-          {/* Payment details */}
-          <section>
-            <h3 className="font-semibold text-base">Payment Details</h3>
-            <div className="text-sm space-y-1">
-              <div>Status: {order.payment_status || "-"}</div>
-              <div>Method: {order.payment_method || "-"}</div>
-              <div>Reference: {order.payment_reference || "-"}</div>
-            </div>
-          </section>
-          {/* Financial Breakdown */}
-          <section>
-            <h3 className="font-semibold text-base">Financial Breakdown</h3>
-            <div className="text-sm space-y-1">
-              <div>Subtotal: ₦{order.subtotal?.toLocaleString() ?? "-"}</div>
-              <div>Delivery Fee: ₦{order.delivery_fee?.toLocaleString() ?? "-"}</div>
-              <div>Total: ₦{order.total_amount?.toLocaleString() ?? "-"}</div>
-            </div>
-          </section>
-          {/* Fulfillment */}
-          <section>
-            <h3 className="font-semibold text-base">Delivery Details</h3>
-            <div className="text-sm space-y-1">
-              <div>Address: {order.delivery_address?.display ?? "-"}</div>
-              <div>Window: {order.delivery_window ?? "-"}</div>
-              <div>Instructions: {order.special_instructions ?? "-"}</div>
+      <DialogContent className="max-w-lg w-full md:max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="sticky top-0 bg-background z-10 pb-4 border-b">
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <div>
-                Assigned Driver: {order.assigned_rider_name ?? "Not assigned"}
+                <div className="flex items-center gap-2">
+                  Order #{order.order_number}
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                    order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                    order.status === 'out_for_delivery' ? 'bg-blue-100 text-blue-800' :
+                    order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                    'bg-amber-100 text-amber-800'
+                  }`}>
+                    {order.status?.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <div className="text-sm text-muted-foreground font-normal">
+                  {order.order_type?.replace(/_/g, ' ')} • Created {new Date(order.created_at).toLocaleDateString()}
+                </div>
               </div>
-              {isAdmin && (
-                <div>
-                  <select
-                    value={order.assigned_rider_id ?? ""}
-                    disabled={!hasDrivers || assigningDriver}
-                    onChange={e => handleAssignDriver(e.target.value)}
-                  >
-                    <option value="">
-                      {hasDrivers ? "Select a driver..." : "No active drivers available"}
-                    </option>
-                    {drivers.map(driver => (
-                      <option key={driver.id} value={driver.id}>{driver.name}</option>
-                    ))}
-                  </select>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Connection Status */}
+              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                connectionStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  connectionStatus === 'connected' ? 'bg-green-500' :
+                  connectionStatus === 'connecting' ? 'bg-yellow-500' :
+                  'bg-red-500'
+                }`} />
+                {connectionStatus}
+              </div>
+              
+              {/* Last Updated */}
+              {lastUpdated && (
+                <div className="text-xs text-muted-foreground">
+                  Updated {lastUpdated.toLocaleTimeString()}
                 </div>
               )}
             </div>
-          </section>
-          {/* Items */}
-          <section>
-            <h3 className="font-semibold text-base">Order Items ({items.length})</h3>
-            {items.length === 0 ? (
-              <div className="text-gray-500 flex items-center gap-2">
-                <span role="img" aria-label="empty">📦</span> No items found in this order
-              </div>
-            ) : (
-              <ul className="text-sm space-y-2">
-                {items.map(item => (
-                  <li key={item.id || item.product_id}>
-                    <b>{item.name}</b> &times;{item.quantity} — ₦{item.total_price?.toLocaleString?.() ?? item.unit_price?.toLocaleString?.() ?? "-"}
-                    {item.special_instructions && (
-                      <div className="text-xs text-gray-500">Note: {item.special_instructions}</div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          {/* Timeline */}
-          <section>
-            <h3 className="font-semibold text-base">Order Timeline</h3>
-            <ol className="text-xs list-decimal ml-5">
-              {(order.timeline || []).length === 0 ? (
-                <li className="text-gray-500">No timeline events.</li>
-              ) : (
-                order.timeline.map(ev => (
-                  <li key={ev.step} className={ev.completed ? "text-green-600" : "text-gray-500"}>
-                    {ev.label} <span className="ml-2 text-gray-400">{ev.datetime}</span>
-                  </li>
-                ))
-              )}
-            </ol>
-          </section>
-          {/* Action Center */}
-          {isAdmin && (
-            <section>
-              <h3 className="font-semibold text-base">Admin Actions</h3>
-              <div className="flex flex-col gap-2">
-                <label>
-                  Update Order Status
-                  <select value={order.status} onChange={handleChangeStatus} disabled={updatingStatus}>
-                    {"pending,confirmed,preparing,ready,out_for_delivery,delivered,cancelled,refunded,completed,returned"
-                      .split(",")
-                      .map(status => (
-                        <option key={status} value={status}>{status.replace(/_/g, " ")}</option>
-                      ))}
-                  </select>
-                </label>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={refetch}
-                  disabled={assigningDriver || updatingStatus}
-                >
-                  Refresh
-                </Button>
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+          {/* Left Column */}
+          <div className="space-y-6">
+            {/* Customer Information */}
+            <section className="space-y-3">
+              <h3 className="font-semibold text-base text-foreground">Customer Information</h3>
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Name:</span>
+                  <span className="font-medium text-foreground">{order.customer_name || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Email:</span>
+                  <span className="font-medium text-foreground">{order.customer_email || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Phone:</span>
+                  <span className="font-medium text-foreground">{order.customer_phone || '-'}</span>
+                </div>
               </div>
             </section>
-          )}
+
+            {/* Payment Details */}
+            <section className="space-y-3">
+              <h3 className="font-semibold text-base text-foreground">Payment Details</h3>
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Status:</span>
+                  <span className={`font-medium ${
+                    order.payment_status === 'paid' ? 'text-green-600' :
+                    order.payment_status === 'failed' ? 'text-red-600' :
+                    'text-amber-600'
+                  }`}>
+                    {order.payment_status || '-'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Method:</span>
+                  <span className="font-medium text-foreground">{order.payment_method || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Reference:</span>
+                  <span className="font-medium text-foreground font-mono text-xs">
+                    {order.payment_reference || '-'}
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            {/* Enhanced Financial Breakdown */}
+            <EnhancedFinancialBreakdown order={order} />
+
+            {/* Complete Fulfillment Section */}
+            <CompleteFulfillmentSection 
+              order={order}
+              fulfillmentInfo={fulfillmentInfo}
+              deliverySchedule={deliverySchedule}
+              pickupPoint={pickupPoint}
+            />
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-6">
+            {/* Enhanced Driver Section */}
+            <EnhancedDriverSection
+              order={order}
+              assignedAgent={assignedAgent}
+              drivers={drivers}
+              isAdmin={isAdmin}
+              onAssignDriver={handleAssignDriver}
+              assigningDriver={assigningDriver}
+            />
+
+            {/* Complete Order Items Section */}
+            <CompleteOrderItemsSection items={items} />
+
+            {/* Admin Actions */}
+            {isAdmin && (
+              <section className="space-y-3">
+                <h3 className="font-semibold text-base text-foreground">Admin Actions</h3>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground block mb-2">
+                      Update Order Status
+                    </label>
+                    <select 
+                      value={order.status} 
+                      onChange={handleChangeStatus} 
+                      disabled={updatingStatus}
+                      className="w-full p-2 border rounded-md bg-background"
+                    >
+                      {"pending,confirmed,preparing,ready,out_for_delivery,delivered,cancelled,refunded,completed,returned"
+                        .split(",")
+                        .map(status => (
+                          <option key={status} value={status}>
+                            {status.replace(/_/g, " ")}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={reconnect}
+                    disabled={assigningDriver || updatingStatus}
+                    className="w-full"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh Data
+                  </Button>
+                </div>
+              </section>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

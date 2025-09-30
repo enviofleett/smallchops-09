@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
 import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
@@ -20,7 +21,8 @@ import {
   FileText,
   DollarSign,
   Calendar,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
@@ -240,7 +242,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
               </div>
 
               {/* Delivery Window */}
-              {safeOrder.order_type === 'delivery' && deliverySchedule && (
+              {safeOrder.order_type === 'delivery' && (
                 <>
                   <Separator />
                   <div className="space-y-2">
@@ -248,32 +250,44 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       Delivery Window
                     </div>
-                    <div className="pl-6 space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground">Date:</span>
-                        <span className="font-medium">
-                          {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground">Time:</span>
-                        <span className="font-medium">
-                          {format(new Date(`2000-01-01T${deliverySchedule.delivery_time_start}`), 'h:mm a')} - {format(new Date(`2000-01-01T${deliverySchedule.delivery_time_end}`), 'h:mm a')}
-                        </span>
-                        {deliverySchedule.is_flexible && (
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            Flexible
-                          </Badge>
+                    
+                    {deliverySchedule ? (
+                      <div className="pl-6 space-y-1">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-muted-foreground">Date:</span>
+                          <span className="font-medium">
+                            {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-muted-foreground">Time:</span>
+                          <span className="font-medium">
+                            {format(new Date(`2000-01-01T${deliverySchedule.delivery_time_start}`), 'h:mm a')} - {format(new Date(`2000-01-01T${deliverySchedule.delivery_time_end}`), 'h:mm a')}
+                          </span>
+                          {deliverySchedule.is_flexible && (
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              Flexible
+                            </Badge>
+                          )}
+                        </div>
+                        {deliverySchedule.special_instructions && (
+                          <div className="text-xs text-muted-foreground italic mt-2 bg-muted/30 px-2 py-1 rounded">
+                            📝 {deliverySchedule.special_instructions}
+                          </div>
                         )}
                       </div>
-                      {deliverySchedule.special_instructions && (
-                        <div className="text-xs text-muted-foreground italic mt-2 bg-muted/30 px-2 py-1 rounded">
-                          📝 {deliverySchedule.special_instructions}
-                        </div>
-                      )}
-                    </div>
+                    ) : (
+                      <div className="pl-6">
+                        <Alert variant="warning">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            No delivery window has been scheduled for this order yet.
+                          </AlertDescription>
+                        </Alert>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

@@ -19,6 +19,7 @@ import { AdminOrderPrintView } from './AdminOrderPrintView';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import '@/styles/admin-print.css';
+import '@/styles/admin-80mm-print.css';
 
 interface OrderDetailsModalProps {
   order: any;

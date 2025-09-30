@@ -42,6 +42,7 @@ import { getOrderTimeWindow, hasValidTimeField, formatDeliveryDate } from '@/uti
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { toast } from 'sonner';
 import '@/styles/admin-print.css';
+import '@/styles/admin-80mm-print.css';
 
 interface NewOrderDetailsModalProps {
   open: boolean;

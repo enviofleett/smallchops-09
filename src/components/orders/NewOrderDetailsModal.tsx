@@ -32,6 +32,7 @@ import { useOrderPageHooks } from '@/hooks/orderPageHooks';
 import { UnifiedOrder } from '@/types/unifiedOrder';
 import { OrderWithItems } from '@/api/orders';
 import { useAuth } from '@/contexts/AuthContext';
+import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
@@ -173,12 +174,12 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
         description={`${safeOrder.order_type} order for ${safeOrder.customer_name}`}
         size="xl"
       >
-        <div className="space-y-4 max-h-[80vh] overflow-y-auto p-6">
+        <div className="space-y-6 max-h-[80vh] overflow-y-auto p-4 sm:p-6">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b">
             <div>
-              <h2 className="text-2xl font-bold">Order #{safeOrder.order_number}</h2>
-              <p className="text-sm text-muted-foreground">
+              <h2 className="text-xl font-bold">Order #{safeOrder.order_number}</h2>
+              <p className="text-base text-muted-foreground">
                 {format(new Date(safeOrder.order_time), 'MMM dd, yyyy hh:mm a')}
               </p>
             </div>
@@ -186,44 +187,59 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
               <Badge className={`${getStatusColor(safeOrder.status)} text-white`}>
                 {safeOrder.status.replace('_', ' ').toUpperCase()}
               </Badge>
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                <Printer className="h-4 w-4 mr-2" />
-                Print
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleRefresh}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              {isAdmin && (
+                <Button variant="outline" size="sm" onClick={handlePrint}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </Button>
+              )}
+              {isAdmin && (
+                <Button variant="outline" size="sm" onClick={handleRefresh}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 
-          <RealTimeConnectionStatus 
-            connectionStatus={connectionStatus}
-            lastUpdated={lastUpdated}
-            onReconnect={reconnect}
-            compact={true}
-          />
+          {isAdmin && (
+            <RealTimeConnectionStatus 
+              connectionStatus={connectionStatus}
+              lastUpdated={lastUpdated}
+              onReconnect={reconnect}
+              compact={true}
+            />
+          )}
+
+          {/* Customer Order Status Tracker - CUSTOMERS ONLY */}
+          {!isAdmin && (
+            <CustomerOrderStatusTracker
+              currentStatus={safeOrder.status}
+              orderTime={safeOrder.order_time}
+              estimatedDeliveryTime={deliverySchedule?.delivery_time_end}
+            />
+          )}
 
           {/* Customer Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <User className="h-5 w-5" />
                 Customer Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-3">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">{safeOrder.customer_name}</span>
+                <span className="font-medium text-base">{safeOrder.customer_name}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{safeOrder.customer_email}</span>
+                <span className="text-base">{safeOrder.customer_email}</span>
               </div>
               {safeOrder.customer_phone && (
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{safeOrder.customer_phone}</span>
+                  <span className="text-base">{safeOrder.customer_phone}</span>
                 </div>
               )}
             </CardContent>
@@ -232,13 +248,13 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
           {/* Order Summary */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <FileText className="h-5 w-5" />
                 Order Summary
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-2 text-sm">
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-base">
                 <div className="text-muted-foreground">Order Type:</div>
                 <div className="font-medium capitalize">{safeOrder.order_type}</div>
                 
@@ -333,7 +349,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
           {/* Order Items */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Package className="h-5 w-5" />
                 Order Items
               </CardTitle>
@@ -355,13 +371,13 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                       '/placeholder.svg';
                     
                     return (
-                      <div key={item.id} className="flex gap-4 p-4 bg-muted/50 rounded-lg border border-border/50">
+                      <div key={item.id} className="flex gap-4 p-4 bg-muted/50 rounded-lg border border-border/50 hover:shadow-sm transition-shadow">
                         {/* Product Image */}
                         <div className="flex-shrink-0">
                           <img 
                             src={productImage} 
                             alt={item.product?.name || item.product_name || 'Product'}
-                            className="w-20 h-20 rounded-md object-cover border border-border"
+                            className="w-20 h-20 rounded-lg object-cover border border-border"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = '/placeholder.svg';
                             }}
@@ -391,7 +407,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                           )}
 
                           {item.special_instructions && (
-                            <div className="text-xs text-amber-600 dark:text-amber-500 mt-2 italic bg-amber-50 dark:bg-amber-950/20 px-2 py-1 rounded">
+                            <div className="text-sm italic text-muted-foreground mt-2 p-2 bg-muted/50 rounded">
                               📝 {item.special_instructions}
                             </div>
                           )}
@@ -426,39 +442,39 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
           {/* Pricing Breakdown */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <DollarSign className="h-5 w-5" />
                 Pricing Breakdown
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {safeOrder.subtotal !== undefined && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Subtotal:</span>
                     <span>₦{safeOrder.subtotal.toLocaleString()}</span>
                   </div>
                 )}
                 {safeOrder.tax_amount !== undefined && safeOrder.tax_amount > 0 && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Tax/VAT:</span>
                     <span>₦{safeOrder.tax_amount.toLocaleString()}</span>
                   </div>
                 )}
                 {safeOrder.delivery_fee !== undefined && safeOrder.delivery_fee > 0 && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Delivery Fee:</span>
                     <span>₦{safeOrder.delivery_fee.toLocaleString()}</span>
                   </div>
                 )}
                 {safeOrder.discount_amount !== undefined && safeOrder.discount_amount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
+                  <div className="flex justify-between text-base text-green-600">
                     <span>Discount:</span>
                     <span>-₦{safeOrder.discount_amount.toLocaleString()}</span>
                   </div>
                 )}
                 <Separator />
-                <div className="flex justify-between font-bold text-lg">
+                <div className="flex justify-between font-bold text-xl">
                   <span>Total:</span>
                   <span>₦{safeOrder.total_amount.toLocaleString()}</span>
                 </div>
@@ -470,22 +486,22 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
           {(safeOrder.payment_method || safeOrder.payment_reference) && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
                   <CreditCard className="h-5 w-5" />
                   Payment Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 {safeOrder.payment_method && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Method:</span>
                     <span className="font-medium capitalize">{safeOrder.payment_method}</span>
                   </div>
                 )}
                 {safeOrder.payment_reference && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Reference:</span>
-                    <span className="font-mono text-xs">{safeOrder.payment_reference}</span>
+                    <span className="font-mono text-sm">{safeOrder.payment_reference}</span>
                   </div>
                 )}
               </CardContent>

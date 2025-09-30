@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCustomerOrders } from '@/hooks/useCustomerOrders';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useCustomerOrderSchedules } from '@/hooks/useCustomerOrderSchedules';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
@@ -10,7 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ShoppingBag, AlertTriangle, Filter, X, Calendar } from 'lucide-react';
+import { ShoppingBag, AlertTriangle, Filter, X, Calendar, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -30,18 +31,32 @@ const ContentSkeleton = () => (
 );
 
 export function EnhancedOrdersSection() {
-  const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useCustomerOrders();
+  const { isAuthenticated, customerAccount, user } = useCustomerAuth();
+  const { data: ordersData, isLoading: ordersLoading, error: ordersError, refetch } = useCustomerOrders();
   const { handleError } = useErrorHandler();
   const [selectedOrder, setSelectedOrder] = React.useState<any>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isInitialLoad, setIsInitialLoad] = React.useState(true);
   const [showAllOrders, setShowAllOrders] = React.useState(false);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   
   // Filter states
   const [showFilters, setShowFilters] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
   const [startDate, setStartDate] = React.useState<string>('');
   const [endDate, setEndDate] = React.useState<string>('');
+  
+  // Log auth state on mount
+  React.useEffect(() => {
+    console.log('🔍 EnhancedOrdersSection mounted with auth state:', {
+      isAuthenticated,
+      hasUser: !!user,
+      hasCustomerAccount: !!customerAccount,
+      userEmail: user?.email,
+      customerEmail: customerAccount?.email,
+      customerAccountId: customerAccount?.id
+    });
+  }, [isAuthenticated, user, customerAccount]);
   
   // Handle initial load state
   React.useEffect(() => {
@@ -92,6 +107,16 @@ export function EnhancedOrdersSection() {
   const orders = filteredOrders;
   const orderIds = React.useMemo(() => orders.map(order => order.id), [orders]);
   const { schedules } = useCustomerOrderSchedules(orderIds);
+  
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
   
   // Clear filters function
   const clearFilters = () => {
@@ -234,14 +259,45 @@ export function EnhancedOrdersSection() {
   // No orders at all
   if (orders.length === 0) {
     return (
-      <Card className="p-8 text-center">
-        <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
-        <p className="text-gray-500 mb-4">You haven't placed any orders yet</p>
-        <Button onClick={() => window.location.href = '/products'}>
-          Start Shopping
-        </Button>
-      </Card>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">My Orders</h2>
+            <p className="text-gray-500">Track and manage your orders</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+        
+        <Card className="p-8 text-center">
+          <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
+          <p className="text-gray-500 mb-4">You haven't placed any orders yet</p>
+          
+          {/* Debug info in development */}
+          {import.meta.env.DEV && (
+            <div className="mt-4 p-4 bg-gray-50 rounded text-left text-xs space-y-1">
+              <p className="font-semibold text-gray-700">Debug Info:</p>
+              <p>Auth: {isAuthenticated ? '✅' : '❌'}</p>
+              <p>User: {user?.email || 'None'}</p>
+              <p>Customer: {customerAccount?.email || 'None'}</p>
+              <p>Account ID: {customerAccount?.id || 'None'}</p>
+              <p className="text-blue-600">Check browser console for detailed logs</p>
+            </div>
+          )}
+          <Button onClick={() => window.location.href = '/products'}>
+            Start Shopping
+          </Button>
+        </Card>
+      </div>
     );
   }
 
@@ -253,13 +309,23 @@ export function EnhancedOrdersSection() {
           <p className="text-gray-500">Track and manage your orders</p>
         </div>
         
-        {/* Filter Toggle Button */}
+        {/* Filter Toggle Button and Refresh */}
         <div className="flex items-center gap-2">
           {hasActiveFilters && (
             <Badge variant="secondary" className="px-2 py-1 text-xs">
               {filteredOrders.length} of {ordersData?.orders?.length || 0} orders
             </Badge>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button
             variant="outline"
             size="sm"

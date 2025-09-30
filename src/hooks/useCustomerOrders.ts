@@ -11,10 +11,22 @@ export const useCustomerOrders = () => {
   const query = useQuery({
     queryKey: ['customer-orders', customerAccount?.id, user?.email],
     queryFn: async () => {
+      // Get user's auth session for debugging
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔍 Order Query - Auth State:', {
+        isAuthenticated,
+        hasUser: !!user,
+        hasCustomerAccount: !!customerAccount,
+        userEmail: user?.email,
+        customerEmail: customerAccount?.email,
+        sessionUser: session?.user?.email,
+        customerId: customerAccount?.id
+      });
+
       // First, get the user's email for order lookup
-      const userEmail = user?.email || customerAccount?.email;
+      const userEmail = user?.email || customerAccount?.email || session?.user?.email;
       if (!userEmail) {
-        console.log('🔍 No user email found for order lookup');
+        console.error('❌ No user email found for order lookup');
         return { orders: [], count: 0 };
       }
       
@@ -47,9 +59,19 @@ export const useCustomerOrders = () => {
           .order('order_time', { ascending: false });
 
         if (emailError) {
-          console.error('Error in email orders query:', emailError);
+          console.error('❌ Error in email orders query:', emailError);
+          console.error('❌ Query details:', { userEmail, isAuthenticated });
         } else {
-          console.log('🔍 Email-based orders found:', emailOrders?.length || 0);
+          console.log('✅ Email-based orders found:', emailOrders?.length || 0);
+          if (emailOrders && emailOrders.length > 0) {
+            console.log('✅ Sample order:', {
+              orderNumber: emailOrders[0].order_number,
+              status: emailOrders[0].status,
+              paymentStatus: emailOrders[0].payment_status,
+              totalAmount: emailOrders[0].total_amount,
+              itemsCount: emailOrders[0].order_items?.length || 0
+            });
+          }
           allOrders.push(...(emailOrders || []));
         }
 
@@ -87,14 +109,34 @@ export const useCustomerOrders = () => {
           }
         }
 
-        console.log(`✅ Total orders found: ${allOrders.length} for customer account ID: ${customerAccount?.id} or email: ${userEmail}`);
+        console.log(`✅ TOTAL ORDERS FOUND: ${allOrders.length} for customer:`, {
+          customerAccountId: customerAccount?.id,
+          email: userEmail,
+          orderIds: allOrders.map(o => o.order_number).slice(0, 5)
+        });
+        
+        if (allOrders.length === 0) {
+          console.warn('⚠️ No orders found! Debugging info:', {
+            isAuthenticated,
+            hasUser: !!user,
+            hasCustomerAccount: !!customerAccount,
+            userEmail,
+            customerAccountId: customerAccount?.id
+          });
+        }
         
         return {
           orders: allOrders,
           count: allOrders.length
         };
       } catch (error) {
-        console.error('Error fetching orders:', error);
+        console.error('❌ CRITICAL ERROR fetching orders:', error);
+        console.error('❌ Error details:', {
+          error,
+          isAuthenticated,
+          userEmail: user?.email,
+          customerEmail: customerAccount?.email
+        });
         return { orders: [], count: 0 };
       }
     },

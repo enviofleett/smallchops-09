@@ -37,6 +37,7 @@ export const useCustomerAuth = () => {
 
     const loadCustomerAccount = async (userId: string) => {
       try {
+        console.log('🔍 useCustomerAuth: Loading customer account for userId:', userId);
         const { data, error } = await supabase
           .from('customer_accounts')
           .select('*')
@@ -44,22 +45,38 @@ export const useCustomerAuth = () => {
           .maybeSingle();
         
         if (error) {
-          console.error('Error fetching customer account:', error);
+          console.error('❌ Error fetching customer account:', error);
           return null;
         }
         
-        // Removed debug logging for production performance
+        if (data) {
+          console.log('✅ Customer account loaded:', {
+            id: data.id,
+            name: data.name,
+            email: data.email
+          });
+        } else {
+          console.warn('⚠️ No customer account found for userId:', userId);
+        }
+        
         return data;
       } catch (error) {
-        console.error('Customer account fetch error:', error);
+        console.error('❌ Customer account fetch error:', error);
         return null;
       }
     };
 
     const initializeAuth = async () => {
       try {
+        console.log('🔍 useCustomerAuth: Initializing auth...');
+        
         // Set up auth state listener
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('🔍 useCustomerAuth: Auth state changed:', event, {
+            hasSession: !!session,
+            userEmail: session?.user?.email
+          });
+          
           if (!mounted) return;
           
           if (session?.user) {
@@ -103,11 +120,13 @@ export const useCustomerAuth = () => {
         subscription = data.subscription;
 
         // Check for existing session
+        console.log('🔍 useCustomerAuth: Checking for existing session...');
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (!mounted) return;
 
         if (initialSession?.user) {
+          console.log('✅ useCustomerAuth: Found existing session for:', initialSession.user.email);
           setAuthState(prev => ({ 
             ...prev, 
             user: initialSession.user, 
@@ -118,6 +137,11 @@ export const useCustomerAuth = () => {
           const customerAccount = await loadCustomerAccount(initialSession.user.id);
           
           if (mounted) {
+            console.log('✅ useCustomerAuth: Auth state fully initialized', {
+              hasUser: true,
+              hasCustomerAccount: !!customerAccount,
+              customerEmail: customerAccount?.email
+            });
             setAuthState(prev => ({
               ...prev,
               customerAccount,
@@ -127,6 +151,7 @@ export const useCustomerAuth = () => {
             }));
           }
         } else {
+          console.log('⚠️ useCustomerAuth: No existing session found');
           if (mounted) {
             setAuthState(prev => ({ ...prev, isLoading: false }));
           }

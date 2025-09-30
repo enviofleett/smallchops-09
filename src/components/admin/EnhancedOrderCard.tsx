@@ -69,7 +69,7 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
     >
       <Card className={`transition-all duration-200 hover:shadow-lg ${
         isOverdue ? 'border-l-4 border-l-destructive bg-red-50/20' : 
-        order.payment_status === 'paid' ? 'border-l-4 border-l-green-500 bg-green-50/20' : ''
+        order.payment_status === 'paid' ? 'border-2 border-green-500 shadow-sm' : ''
       }`}>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">

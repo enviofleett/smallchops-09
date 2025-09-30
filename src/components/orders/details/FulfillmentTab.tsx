@@ -47,8 +47,8 @@ export const FulfillmentTab: React.FC<FulfillmentTabProps> = ({
   }
 
   return (
-    <div className="bg-card rounded-xl border shadow-sm">
-      <div className="p-4">
+    <div className="bg-card rounded-lg border shadow-sm">
+      <div className="p-6">
         <ComprehensiveOrderFulfillment 
           data={detailedOrderData || {}}
           isLoading={isLoading}

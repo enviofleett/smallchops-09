@@ -22,12 +22,9 @@ interface OrderDetailsFooterProps {
  */
 export const OrderDetailsFooter: React.FC<OrderDetailsFooterProps> = ({ onClose }) => {
   return (
-    <div className="flex justify-end border-t px-6 py-4 gap-3">
+    <div className="flex justify-end border-t px-6 py-4">
       <Button variant="outline" onClick={onClose}>
         Close
-      </Button>
-      <Button variant="ghost">
-        Help
       </Button>
     </div>
   );

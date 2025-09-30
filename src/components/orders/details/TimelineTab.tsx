@@ -80,14 +80,15 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({
   };
 
   return (
-    <Card className="rounded-xl border shadow-sm mb-6">
-      <div className="p-6">
-        <h2 className="text-xl font-bold mb-4">Order Timeline</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mb-6">
+    <Card className="rounded-lg border shadow-sm">
+      <div className="p-6 space-y-6">
+        <h3 className="text-base font-semibold">Order Timeline</h3>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <p className="text-xs text-muted-foreground">Created</p>
-            <p className="font-medium">
-              {new Date(order.created_at).toLocaleDateString('en-NG', { 
+            <p className="text-xs font-medium text-muted-foreground mb-1">Created</p>
+            <p className="text-sm">
+              {new Date(order.created_at).toLocaleDateString('en-US', { 
                 month: 'short', 
                 day: 'numeric', 
                 hour: '2-digit', 
@@ -96,9 +97,9 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Last Updated</p>
-            <p className="font-medium">
-              {new Date(order.updated_at || order.created_at).toLocaleDateString('en-NG', { 
+            <p className="text-xs font-medium text-muted-foreground mb-1">Last Updated</p>
+            <p className="text-sm">
+              {new Date(order.updated_at || order.created_at).toLocaleDateString('en-US', { 
                 month: 'short', 
                 day: 'numeric', 
                 hour: '2-digit', 
@@ -107,12 +108,12 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Type</p>
-            <p className="font-medium capitalize flex items-center gap-1">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Type</p>
+            <p className="text-sm capitalize flex items-center gap-1.5">
               {order.order_type === 'pickup' ? (
-                <Building2 className="w-3 h-3" />
+                <Building2 className="w-4 h-4" />
               ) : (
-                <Truck className="w-3 h-3" />
+                <Truck className="w-4 h-4" />
               )}
               {order.order_type}
             </p>
@@ -123,7 +124,7 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({
           {timeline.length ? (
             timeline.map((event: any, i: number) => (
               <div key={i} className="flex items-start gap-4">
-                <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold ${
+                <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-semibold ${
                   event.status === 'completed' 
                     ? 'border-green-500 bg-green-50 text-green-600' 
                     : 'border-gray-300 bg-gray-50 text-gray-400'
@@ -132,12 +133,12 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
-                    <span className={`font-medium ${getEventColor(event.status)}`}>
+                    <span className={`text-sm font-medium ${getEventColor(event.status)}`}>
                       {event.event}
                     </span>
                     {event.timestamp && (
                       <span className="text-xs text-muted-foreground">
-                        {new Date(event.timestamp).toLocaleString('en-NG', {
+                        {new Date(event.timestamp).toLocaleString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
@@ -154,7 +155,7 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({
             ))
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <Calendar className="h-10 w-10 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No timeline events available</p>
             </div>
           )}

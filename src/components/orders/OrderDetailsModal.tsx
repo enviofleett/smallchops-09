@@ -126,23 +126,12 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       open={isOpen}
       onOpenChange={onClose}
       size="xl"
-      title={`Order #${order.order_number}`}
+      title="Order Details"
       className="max-w-7xl h-[95vh]"
     >
-      <div className="flex flex-col h-full bg-gradient-to-br from-background via-background to-muted/10" ref={printRef}>
-        {/* Real-time connection status */}
-        <div className="px-6 pt-4">
-          <RealTimeConnectionStatus
-            connectionStatus={connectionStatus}
-            lastUpdated={lastUpdated}
-            onReconnect={reconnect}
-            compact={true}
-            className="mb-2"
-          />
-        </div>
-
+      <div className="flex flex-col h-full" ref={printRef}>
         {/* Visual Order Status Tracker for Admin */}
-        <div className="px-6 pt-2">
+        <div className="px-6 pt-6">
           <CustomerOrderStatusTracker
             currentStatus={order.status}
             orderTime={order.created_at}

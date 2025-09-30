@@ -93,9 +93,9 @@ export const ActionsTab: React.FC<ActionsTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Quick Status Actions */}
-      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 shadow-lg">
-        <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Quick Status Updates</h2>
+      <Card className="rounded-lg border shadow-sm">
+        <div className="p-6 space-y-4">
+          <h3 className="text-base font-semibold">Quick Status Updates</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             {STATUS_OPTIONS.map((status) => {
               const Icon = status.icon;
@@ -105,22 +105,20 @@ export const ActionsTab: React.FC<ActionsTabProps> = ({
                 <Button
                   key={status.value}
                   variant={isActive ? "default" : "outline"}
-                  size="lg"
                   disabled={isDisabled}
                   onClick={() => handleStatusUpdate(status.value)}
                   className={`
-                    h-auto py-4 px-3 flex flex-col items-center gap-2 text-xs
-                    transition-all duration-200 hover:scale-105
-                    ${isActive ? 'ring-2 ring-primary ring-offset-2 shadow-lg' : 'hover:shadow-md'}
-                    ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
+                    h-auto py-3 px-2 flex flex-col items-center gap-2
+                    transition-colors
+                    ${isActive ? 'ring-2 ring-primary ring-offset-1' : ''}
                   `}
                 >
                   {isDisabled ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Icon className={`w-5 h-5 ${isActive ? 'text-primary-foreground' : status.color}`} />
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-primary-foreground' : status.color}`} />
                   )}
-                  <span className="leading-tight text-center font-medium">{status.label}</span>
+                  <span className="text-xs leading-tight text-center">{status.label}</span>
                 </Button>
               );
             })}
@@ -153,23 +151,23 @@ export const ActionsTab: React.FC<ActionsTabProps> = ({
       />
 
       {/* Additional Actions */}
-      <Card>
-        <div className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Additional Actions</h3>
+      <Card className="rounded-lg border shadow-sm">
+        <div className="p-6 space-y-4">
+          <h3 className="text-base font-semibold">Additional Actions</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Button variant="outline" size="sm" className="h-12 flex flex-col items-center gap-1">
+            <Button variant="outline" size="sm" className="h-auto py-3 flex flex-col items-center gap-1.5">
               <MessageSquare className="w-4 h-4" />
               <span className="text-xs">Notify Customer</span>
             </Button>
-            <Button variant="outline" size="sm" className="h-12 flex flex-col items-center gap-1">
+            <Button variant="outline" size="sm" className="h-auto py-3 flex flex-col items-center gap-1.5">
               <Hash className="w-4 h-4" />
               <span className="text-xs">Generate Invoice</span>
             </Button>
-            <Button variant="outline" size="sm" className="h-12 flex flex-col items-center gap-1">
+            <Button variant="outline" size="sm" className="h-auto py-3 flex flex-col items-center gap-1.5">
               <Clock className="w-4 h-4" />
               <span className="text-xs">View History</span>
             </Button>
-            <Button variant="outline" size="sm" className="h-12 flex flex-col items-center gap-1 text-destructive hover:text-destructive">
+            <Button variant="outline" size="sm" className="h-auto py-3 flex flex-col items-center gap-1.5 text-destructive hover:text-destructive">
               <AlertCircle className="w-4 h-4" />
               <span className="text-xs">Cancel Order</span>
             </Button>

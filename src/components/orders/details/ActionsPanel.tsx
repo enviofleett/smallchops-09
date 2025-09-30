@@ -65,16 +65,13 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
   orderNumber
 }) => {
   return (
-    <Card>
-      <CardContent className="p-4 sm:p-6 space-y-6">
-        <SectionHeading 
-          title="Order Actions" 
-          icon={Settings} 
-        />
+    <Card className="rounded-lg border shadow-sm">
+      <CardContent className="p-6 space-y-6">
+        <h3 className="text-base font-semibold">Advanced Actions</h3>
         
         {/* Status Update */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Update Status</label>
+          <label className="text-xs font-medium text-muted-foreground">Update Status</label>
           <Select value={selectedStatus} onValueChange={(value) => onStatusChange(value as OrderStatus)}>
             <SelectTrigger className="w-full bg-background">
               <SelectValue placeholder="Select status" />
@@ -101,7 +98,7 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
 
         {/* Rider Assignment */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
+          <label className="text-xs font-medium text-muted-foreground">
             {selectedStatus === 'out_for_delivery' ? 'Reassign Dispatch Rider' : 'Assign Dispatch Rider'}
           </label>
           
@@ -207,7 +204,7 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
 
         {/* Payment Verification */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Payment Verification</label>
+          <label className="text-xs font-medium text-muted-foreground">Payment Verification</label>
           <div className="space-y-2">
             <div className="text-xs text-muted-foreground font-mono break-all bg-muted rounded p-2">
               Ref: {paymentReference || '—'}

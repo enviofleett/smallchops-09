@@ -28,27 +28,29 @@ interface OrderItemsTableProps {
  */
 export const OrderItemsTable: React.FC<OrderItemsTableProps> = ({ items }) => {
   if (!items.length) {
-    return <div className="text-muted-foreground">No items</div>;
+    return <div className="text-sm text-muted-foreground">No items</div>;
   }
 
   return (
-    <table className="w-full text-sm border rounded">
-      <thead>
-        <tr className="font-bold">
-          <th className="text-left py-2">Item</th>
-          <th className="text-right py-2">Qty</th>
-          <th className="text-right py-2">Price</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item, i) => (
-          <tr key={i}>
-            <td className="py-2">{item.name}</td>
-            <td className="py-2 text-right">{item.quantity}</td>
-            <td className="py-2 text-right">₦{item.price?.toLocaleString()}</td>
+    <div className="rounded-lg border overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/50">
+          <tr>
+            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Item</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Qty</th>
+            <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Price</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item, i) => (
+            <tr key={i} className="hover:bg-muted/30 transition-colors">
+              <td className="px-4 py-3">{item.name}</td>
+              <td className="px-4 py-3 text-right">{item.quantity}</td>
+              <td className="px-4 py-3 text-right font-medium">₦{item.price?.toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };

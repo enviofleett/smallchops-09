@@ -40,50 +40,49 @@ export const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({
   onPrint 
 }) => {
   return (
-    <div className="flex-shrink-0 border-b-2 bg-gradient-to-r from-primary/5 via-background to-accent/5 px-6 py-5">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl lg:text-2xl font-bold text-foreground flex items-center gap-2">
-              <Package className="w-6 h-6 text-primary" />
-              Order #{order.order_number}
-            </h1>
+    <div className="border-b px-6 py-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-1">
+            <h2 className="text-xl font-semibold">#{order.order_number}</h2>
             <Badge
               variant={order.status === 'delivered' ? 'default' : 'secondary'}
-              className="text-sm px-3 py-1 font-medium capitalize"
+              className="capitalize"
             >
-              {order.status?.replace('_', ' ')}
+              {order.status.replace(/_/g, ' ')}
             </Badge>
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              {order.order_type === 'pickup' ? (
+                <><Building2 className="w-4 h-4" /> Pickup</>
+              ) : (
+                <><Truck className="w-4 h-4" /> Delivery</>
+              )}
+            </div>
           </div>
-          <p className="text-base text-muted-foreground">
-            Complete order fulfillment details • Last updated {new Date(order.updated_at || order.created_at).toLocaleDateString()}
+          <p className="text-xs text-muted-foreground">
+            Updated {new Date(order.updated_at || order.created_at).toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric', 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-4 text-base text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <CreditCard className="w-4 h-4" />
-              ₦{order.total_amount?.toLocaleString()}
-            </span>
-            <span className="flex items-center gap-1.5 capitalize">
-              {order.order_type === 'pickup' ? (
-                <Building2 className="w-4 h-4" />
-              ) : (
-                <Truck className="w-4 h-4" />
-              )}
-              {order.order_type}
-            </span>
+        
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-lg font-semibold">₦{order.total_amount?.toLocaleString()}</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
             onClick={onPrint}
-            className="print:hidden border-primary/20 hover:border-primary/40"
-            aria-label={`Print order ${order.order_number} details`}
+            className="flex items-center gap-2"
           >
-            <Printer className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Print Details</span>
-            <span className="sm:hidden">Print</span>
+            <Printer className="w-4 h-4" />
+            Print
           </Button>
         </div>
       </div>

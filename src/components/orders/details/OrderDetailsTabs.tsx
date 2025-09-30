@@ -74,11 +74,11 @@ export const OrderDetailsTabs: React.FC<OrderDetailsTabsProps> = ({
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
       {/* Tab Navigation */}
-      <div className="flex border-b bg-muted/10 px-6">
+      <div className="flex border-b px-6">
         {tabs.map(tab => (
           <button
             key={tab.key}
-            className={`px-4 py-3 font-semibold focus:outline-none transition-colors ${selectedTab === tab.key ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-primary'}`}
+            className={`px-4 py-3 text-sm font-medium focus:outline-none transition-colors ${selectedTab === tab.key ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             onClick={() => setSelectedTab(tab.key)}
             aria-selected={selectedTab === tab.key}
           >
@@ -87,7 +87,7 @@ export const OrderDetailsTabs: React.FC<OrderDetailsTabsProps> = ({
         ))}
       </div>
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {selectedTab === 'summary' && (
           <SummaryTab 
             order={order} 

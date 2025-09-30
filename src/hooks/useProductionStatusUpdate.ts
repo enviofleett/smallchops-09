@@ -7,6 +7,7 @@ import { validateOrderStatus, isValidOrderStatus } from '@/utils/orderValidation
 
 /**
  * Production-hardened status update hook with comprehensive error handling
+ * Implements optimistic updates, forced refetch, and error rollback
  */
 export const useProductionStatusUpdate = () => {
   const queryClient = useQueryClient();
@@ -50,6 +51,61 @@ export const useProductionStatusUpdate = () => {
         }
       );
     },
+    // Optimistic update: Update UI immediately before server responds
+    onMutate: async (variables) => {
+      const { orderId, status } = variables;
+
+      // Cancel any outgoing refetches to avoid overwriting our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['admin-orders'] });
+      await queryClient.cancelQueries({ queryKey: ['unified-orders'] });
+      await queryClient.cancelQueries({ queryKey: ['detailed-order', orderId] });
+
+      // Snapshot the previous values for rollback
+      const previousAdminOrders = queryClient.getQueryData(['admin-orders']);
+      const previousUnifiedOrders = queryClient.getQueryData(['unified-orders']);
+      const previousDetailedOrder = queryClient.getQueryData(['detailed-order', orderId]);
+
+      // Optimistically update admin orders list
+      queryClient.setQueryData(['admin-orders'], (old: any) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            data: page.data?.map((order: any) =>
+              order.id === orderId
+                ? { ...order, status, updated_at: new Date().toISOString() }
+                : order
+            )
+          }))
+        };
+      });
+
+      // Optimistically update unified orders list
+      queryClient.setQueryData(['unified-orders'], (old: any) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            data: page.data?.map((order: any) =>
+              order.id === orderId
+                ? { ...order, status, updated_at: new Date().toISOString() }
+                : order
+            )
+          }))
+        };
+      });
+
+      // Optimistically update detailed order
+      queryClient.setQueryData(['detailed-order', orderId], (old: any) => {
+        if (!old) return old;
+        return { ...old, status, updated_at: new Date().toISOString() };
+      });
+
+      // Return context with previous values for rollback
+      return { previousAdminOrders, previousUnifiedOrders, previousDetailedOrder };
+    },
     onSuccess: (data, variables) => {
       const statusLabel = variables.status.replace('_', ' ');
       toast.success(`✅ Order status updated to ${statusLabel}`);
@@ -63,12 +119,12 @@ export const useProductionStatusUpdate = () => {
         console.log('🔄 Email notification deduplicated (already queued)');
       }
       
-      // Invalidate all relevant queries
-      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['unified-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['detailed-order', variables.orderId] });
+      // Forced refetch to ensure data consistency with server
+      queryClient.refetchQueries({ queryKey: ['admin-orders'] });
+      queryClient.refetchQueries({ queryKey: ['unified-orders'] });
+      queryClient.refetchQueries({ queryKey: ['detailed-order', variables.orderId] });
     },
-    onError: (error: any, variables) => {
+    onError: (error: any, variables, context: any) => {
       console.error('❌ Production status update failed:', error);
       
       // BULLETPROOF: Enhanced error messaging with specific error detection
@@ -94,6 +150,17 @@ export const useProductionStatusUpdate = () => {
       }
       
       toast.error(errorMessage);
+      
+      // Rollback: Restore previous state on error
+      if (context?.previousAdminOrders !== undefined) {
+        queryClient.setQueryData(['admin-orders'], context.previousAdminOrders);
+      }
+      if (context?.previousUnifiedOrders !== undefined) {
+        queryClient.setQueryData(['unified-orders'], context.previousUnifiedOrders);
+      }
+      if (context?.previousDetailedOrder !== undefined) {
+        queryClient.setQueryData(['detailed-order', variables.orderId], context.previousDetailedOrder);
+      }
       
       // Log error for monitoring (non-blocking)
       supabase.functions.invoke('admin-orders-manager', {

@@ -59,10 +59,10 @@
     background: white !important;
     color: #000 !important;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace, sans-serif !important;
-    font-size: 8px !important;
-    line-height: 1.2 !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
     margin: 0 !important;
-    padding: 2mm !important;
+    padding: 3mm !important;
     page-break-after: avoid;
     page-break-inside: avoid;
     overflow: visible;
@@ -80,29 +80,29 @@
   /* Business header - bold and prominent */
   .business-name {
     font-weight: 900 !important;
-    font-size: 11px !important;
+    font-size: 14px !important;
     text-align: center !important;
     text-transform: uppercase !important;
-    margin: 0 0 1mm 0 !important;
+    margin: 0 0 2mm 0 !important;
     padding: 0 !important;
     letter-spacing: 0.5px !important;
-    line-height: 1.2 !important;
+    line-height: 1.4 !important;
   }
   
   /* Contact info */
   .contact {
-    font-size: 8px !important;
+    font-size: 11px !important;
     text-align: center !important;
-    margin: 0 0 0.5mm 0 !important;
+    margin: 0 0 1mm 0 !important;
     padding: 0 !important;
-    line-height: 1.2 !important;
+    line-height: 1.4 !important;
   }
   
   /* Visual dividers */
   .divider {
     text-align: center !important;
-    font-size: 8px !important;
-    margin: 1mm 0 !important;
+    font-size: 10px !important;
+    margin: 2mm 0 !important;
     padding: 0 !important;
     line-height: 1 !important;
     letter-spacing: -0.5px !important;
@@ -111,12 +111,13 @@
   /* Section headers - bold for clarity */
   .section-header {
     font-weight: 900 !important;
-    font-size: 9px !important;
-    margin: 0 0 1mm 0 !important;
+    font-size: 12px !important;
+    margin: 0 0 1.5mm 0 !important;
     padding: 0 !important;
     text-transform: uppercase !important;
-    line-height: 1.2 !important;
+    line-height: 1.4 !important;
     letter-spacing: 0.3px !important;
+    text-align: center !important;
   }
   
   .order-info,
@@ -126,10 +127,10 @@
   .payment-info,
   .special-instructions,
   .prep-notes {
-    margin: 0 0 0.5mm 0 !important;
+    margin: 0 0 1mm 0 !important;
     padding: 0 !important;
-    font-size: 7px !important;
-    line-height: 1.2 !important;
+    font-size: 10px !important;
+    line-height: 1.4 !important;
   }
   
   .order-info div,
@@ -137,17 +138,17 @@
   .schedule-info div,
   .payment-info div,
   .prep-notes div {
-    margin: 0 !important;
+    margin: 0.5mm 0 !important;
     padding: 0 !important;
   }
   
   .items-section {
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 1mm 0 !important;
   }
   
   .item-block {
-    margin: 0 0 0.5mm 0 !important;
+    margin: 0 0 1mm 0 !important;
     padding: 0 !important;
   }
   
@@ -155,11 +156,11 @@
   .item-header {
     display: flex !important;
     justify-content: space-between !important;
-    font-size: 9px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
     margin: 0 !important;
     padding: 0 !important;
-    line-height: 1.3 !important;
+    line-height: 1.4 !important;
   }
   
   /* Item total - bold for emphasis */
@@ -169,17 +170,17 @@
   }
   
   .item-meta {
-    font-size: 6px !important;
+    font-size: 9px !important;
     margin: 0 !important;
     padding: 0 !important;
-    line-height: 1.1 !important;
+    line-height: 1.4 !important;
   }
   
   .item-detail {
-    font-size: 6px !important;
+    font-size: 9px !important;
     margin: 0 !important;
     padding: 0 0 0 2px !important;
-    line-height: 1.1 !important;
+    line-height: 1.4 !important;
   }
   
   .item-spacer {
@@ -188,16 +189,16 @@
   
   .order-summary {
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 1mm 0 !important;
   }
   
   .summary-line {
     display: flex !important;
     justify-content: space-between !important;
-    font-size: 7px !important;
-    margin: 0 !important;
+    font-size: 10px !important;
+    margin: 0.5mm 0 !important;
     padding: 0 !important;
-    line-height: 1.2 !important;
+    line-height: 1.4 !important;
   }
   
   .summary-line.discount {
@@ -209,41 +210,42 @@
     display: flex !important;
     justify-content: space-between !important;
     font-weight: 900 !important;
-    font-size: 11px !important;
-    border-top: 2px solid #000 !important;
-    padding: 1mm 0 0 0 !important;
-    margin: 1mm 0 0 0 !important;
-    line-height: 1.3 !important;
+    font-size: 14px !important;
+    border-top: 2px dashed #000 !important;
+    padding: 2mm 0 0 0 !important;
+    margin: 2mm 0 0 0 !important;
+    line-height: 1.4 !important;
   }
   
   .total-label,
   .total-amount {
     font-weight: 900 !important;
-    font-size: 11px !important;
+    font-size: 14px !important;
   }
   
   .receipt-footer {
     text-align: center !important;
-    font-size: 6px !important;
+    font-size: 9px !important;
     margin: 0 !important;
-    padding: 0 !important;
-    line-height: 1.2 !important;
+    padding: 1mm 0 !important;
+    line-height: 1.4 !important;
   }
   
   .receipt-footer div {
-    margin: 0 !important;
+    margin: 0.5mm 0 !important;
     padding: 0 !important;
   }
   
   /* Admin print information - bold */
   .admin-print-info {
-    font-size: 7px !important;
-    margin: 1mm 0 0 0 !important;
-    padding: 0 !important;
+    font-size: 10px !important;
+    margin: 2mm 0 0 0 !important;
+    padding: 1mm 0 0 0 !important;
     text-align: center !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    line-height: 1.2 !important;
+    line-height: 1.4 !important;
+    border-top: 1px dashed #000 !important;
   }
   
   .admin-print-info div {

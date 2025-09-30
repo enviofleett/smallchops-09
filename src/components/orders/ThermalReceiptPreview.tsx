@@ -63,7 +63,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
           
           {/* Receipt Preview Container - Simulates 80mm paper width */}
           <div className="bg-white border-2 border-gray-300 rounded-md p-4 shadow-lg" style={{ width: '302px', maxWidth: '100%' }}>
-            <div className="thermal-receipt-preview" style={{ fontFamily: 'Courier New, monospace', fontSize: '11px', lineHeight: '1.3', color: 'black' }}>
+            <div className="thermal-receipt-preview" style={{ fontFamily: 'Consolas, Monaco, Courier New, monospace, sans-serif', fontSize: '11px', lineHeight: '1.3', color: 'black' }}>
               
               {/* Business Header */}
               <div className="text-center mb-2">
@@ -78,7 +78,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               </div>
               
               <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
-                ================================
+                - - - - - - - - - - - - - - - - - -
               </div>
               
               {/* Order Info */}
@@ -90,7 +90,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               </div>
               
               <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
-                ================================
+                - - - - - - - - - - - - - - - - - -
               </div>
               
               {/* Customer Info */}
@@ -104,7 +104,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               </div>
               
               <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
-                ================================
+                - - - - - - - - - - - - - - - - - -
               </div>
               
               {/* Schedule Info */}
@@ -158,7 +158,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
                   </div>
                   
                   <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
-                    ================================
+                    - - - - - - - - - - - - - - - - - -
                   </div>
                 </>
               )}
@@ -169,7 +169,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
                   🛒 ORDER ITEMS:
                 </div>
                 <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '1px 0' }}>
-                  --------------------------------
+                  - - - - - - - - - - - - - - - -
                 </div>
                 
                 {order.order_items?.map((item, index) => (
@@ -188,7 +188,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
                 ))}
                 
                 <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '1px 0' }}>
-                  --------------------------------
+                  - - - - - - - - - - - - - - - -
                 </div>
               </div>
               
@@ -237,7 +237,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               </div>
               
               <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
-                ================================
+                - - - - - - - - - - - - - - - - - -
               </div>
               
               {/* Payment Info */}
@@ -251,7 +251,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               </div>
               
               <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
-                ================================
+                - - - - - - - - - - - - - - - - - -
               </div>
               
               {/* Footer */}
@@ -263,7 +263,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
                 )}
                 
                 <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', margin: '2px 0' }}>
-                  ================================
+                  - - - - - - - - - - - - - - - - - -
                 </div>
                 
                 {businessInfo?.printed_by && (

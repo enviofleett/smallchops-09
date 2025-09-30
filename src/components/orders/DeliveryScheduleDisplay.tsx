@@ -7,56 +7,35 @@ import { format, isToday, isTomorrow, isPast, parseISO, setHours, setMinutes } f
 import { DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { OrderStatus } from '@/types/orders';
 import { useEnhancedDeliverySchedule, ScheduleWarning } from '@/hooks/useEnhancedDeliverySchedule';
-import { useDeliveryWindowValidation } from '@/hooks/useDeliveryWindowValidation';
-import { DeliveryWindowCriticalError } from './DeliveryWindowCriticalError';
 
 interface DeliveryScheduleDisplayProps {
-  schedule: DeliverySchedule | null;
-  orderType?: 'delivery' | 'pickup' | 'dine_in';
+  schedule: DeliverySchedule;
+  orderType?: 'delivery' | 'pickup';
   orderStatus?: OrderStatus;
-  orderId?: string;
   className?: string;
-  onRetry?: () => void;
 }
 
 export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = ({ 
   schedule, 
   orderType = 'delivery',
   orderStatus = 'pending',
-  orderId,
-  className = "",
-  onRetry
+  className = "" 
 }) => {
-  // CRITICAL: Validate delivery window for delivery orders (fail-fast)
-  const windowValidation = useDeliveryWindowValidation(schedule, orderType, orderId);
+  // Validate schedule data
+  const isValidSchedule = (schedule: any) => {
+    return schedule && 
+           schedule.delivery_date && 
+           schedule.delivery_time_start && 
+           schedule.delivery_time_end;
+  };
 
-  // FAIL FAST: Show critical error for delivery orders with missing windows
-  if (windowValidation.isCriticalError) {
+  if (!schedule || !isValidSchedule(schedule)) {
     return (
-      <DeliveryWindowCriticalError
-        orderId={orderId}
-        errorMessage={windowValidation.errorMessage}
-        onRetry={onRetry}
-        showContactSupport={true}
-      />
-    );
-  }
-
-  // For pickup orders without schedule, show friendly message
-  if (orderType === 'pickup' && !schedule) {
-    return (
-      <div className="text-muted-foreground p-4 border border-border rounded-lg bg-muted/50">
-        <p className="text-sm">No specific pickup schedule set. Please refer to pickup location hours.</p>
+      <div className="text-gray-500 p-4 border border-gray-200 rounded-lg">
+        No delivery schedule available
       </div>
     );
   }
-
-  // Should not reach here for delivery orders without valid schedule due to validation above
-  if (!schedule) {
-    return null;
-  }
-
-  // Enhanced validation for business context (holidays, slots, etc.)
   const { validation, loading } = useEnhancedDeliverySchedule(schedule);
   const formatTime = (timeString: string) => {
     if (!timeString) return '';

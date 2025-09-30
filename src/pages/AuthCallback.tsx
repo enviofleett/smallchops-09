@@ -19,17 +19,57 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Auth callback error:', error);
-          setError(error.message);
+        // Add timeout protection
+        const timeout = setTimeout(() => {
+          console.error('Auth callback timeout - redirecting to auth page');
+          setError('Authentication timeout. Please try again.');
           setStatus('error');
+        }, 15000); // 15 second timeout
+
+        // Retry logic for session retrieval
+        let sessionData = null;
+        let retryCount = 0;
+        const maxRetries = 5;
+
+        while (!sessionData && retryCount < maxRetries) {
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error(`Auth callback error (attempt ${retryCount + 1}):`, error);
+            if (retryCount === maxRetries - 1) {
+              clearTimeout(timeout);
+              setError(error.message || 'Failed to retrieve session');
+              setStatus('error');
+              return;
+            }
+          }
+
+          if (data.session?.user) {
+            sessionData = data;
+            console.log('Session retrieved successfully:', data.session.user.email);
+            break;
+          }
+
+          // Wait before retrying with exponential backoff
+          retryCount++;
+          if (retryCount < maxRetries) {
+            console.log(`No session yet, retry ${retryCount}/${maxRetries}...`);
+            await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+          }
+        }
+
+        clearTimeout(timeout);
+
+        if (!sessionData?.session?.user) {
+          console.error('No session found after retries, redirecting to auth');
+          setError('Authentication failed. Please try logging in again.');
+          setStatus('error');
+          setTimeout(() => navigate('/auth', { replace: true }), 2000);
           return;
         }
 
-        if (data.session?.user) {
-          const user = data.session.user;
+        if (sessionData.session?.user) {
+          const user = sessionData.session.user;
           console.log('Auth callback - user authenticated:', user.email);
           setUserId(user.id);
 
@@ -176,14 +216,11 @@ const AuthCallback: React.FC = () => {
               navigate(redirectTo, { replace: true });
             }, 1500);
           } else {
-            // No profile found - redirect to auth
-            console.warn('No user profile found, redirecting to auth');
-            navigate('/auth', { replace: true });
+            // No profile found - this shouldn't happen after retries
+            console.error('No user profile found after successful auth');
+            setError('Account setup incomplete. Please contact support.');
+            setStatus('error');
           }
-        } else {
-          // No active session, redirect to auth page
-          console.log('No session found, redirecting to auth');
-          navigate('/auth', { replace: true });
         }
       } catch (err) {
         console.error('Unexpected error in auth callback:', err);

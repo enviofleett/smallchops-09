@@ -36,6 +36,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { formatAddress } from '@/utils/formatAddress';
+import { useDeliveryWindowValidation } from '@/hooks/useDeliveryWindowValidation';
+import { DeliveryWindowCriticalError } from './DeliveryWindowCriticalError';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
@@ -64,6 +66,13 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
   // Fetch pickup point data if order is pickup type
   const { data: pickupPoint, isLoading: isLoadingPickupPoint } = usePickupPoint(
     order?.pickup_point_id
+  );
+
+  // CRITICAL: Validate delivery window for delivery orders
+  const deliveryWindowValidation = useDeliveryWindowValidation(
+    data?.delivery_schedule,
+    order?.order_type || 'delivery',
+    order?.id
   );
 
   const handlePrint = useReactToPrint({
@@ -297,7 +306,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                     </>
                   )}
 
-                  {/* Delivery Time Window */}
+                  {/* Delivery Time Window - WITH VALIDATION */}
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
@@ -305,7 +314,17 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                       Delivery Window
                     </div>
                     
-                    {deliverySchedule ? (
+                    {/* FAIL FAST: Show critical error if missing for delivery orders */}
+                    {deliveryWindowValidation.isCriticalError ? (
+                      <div className="pl-6">
+                        <DeliveryWindowCriticalError
+                          orderId={safeOrder.id}
+                          errorMessage={deliveryWindowValidation.errorMessage}
+                          onRetry={handleRefresh}
+                          showContactSupport={true}
+                        />
+                      </div>
+                    ) : deliverySchedule ? (
                       <div className="pl-6 space-y-1">
                         <div className="flex items-center gap-2 text-sm">
                           <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
@@ -327,16 +346,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                           )}
                         </div>
                       </div>
-                    ) : (
-                      <div className="pl-6">
-                        <Alert variant="default">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            No delivery window has been scheduled yet.
-                          </AlertDescription>
-                        </Alert>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
                 </>
               ) : safeOrder.order_type === 'pickup' ? (

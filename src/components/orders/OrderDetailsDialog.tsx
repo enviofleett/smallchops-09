@@ -28,7 +28,7 @@ import { StatCard } from './details/StatCard';
 import { CustomerInfoCard } from './details/CustomerInfoCard';
 import { OrderInfoCard } from './details/OrderInfoCard';
 import { ActionsPanel } from './details/ActionsPanel';
-import { ItemsList } from './details/ItemsList';
+import { UnifiedOrderSummary } from './details/UnifiedOrderSummary';
 import { SpecialInstructions } from './details/SpecialInstructions';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
@@ -563,14 +563,16 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               />
             </div>
 
-            {/* Items List */}
-            <ItemsList 
+            {/* Unified Order Summary */}
+            <UnifiedOrderSummary 
               items={detailedOrderData?.items || enrichedItems || order.order_items || []}
               subtotal={order.subtotal || 0}
-              totalVat={order.total_vat || 0}
-              totalDiscount={(order as any).total_discount || 0}
+              totalVat={order.vat_amount || order.total_vat || 0}
+              totalDiscount={(order as any).discount_amount || (order as any).total_discount || 0}
               deliveryFee={order.delivery_fee || 0}
               grandTotal={order.total_amount}
+              vatRate={order.vat_rate || 7.5}
+              paymentStatus={order.payment_status}
             />
 
             {/* Special Instructions */}

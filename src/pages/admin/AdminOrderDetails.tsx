@@ -6,7 +6,7 @@ import { CustomerInfoCard } from '@/components/orders/details/CustomerInfoCard';
 import { OrderInfoCard } from '@/components/orders/details/OrderInfoCard';
 import { PaymentDetailsCard } from '@/components/orders/PaymentDetailsCard';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
-import { ItemsList } from '@/components/orders/details/ItemsList';
+import { UnifiedOrderSummary } from '@/components/orders/details/UnifiedOrderSummary';
 import { SpecialInstructions } from '@/components/orders/details/SpecialInstructions';
 import { ActionsPanel } from '@/components/orders/details/ActionsPanel';
 import { FulfillmentSection } from '@/components/orders/details/FulfillmentSection';
@@ -235,13 +235,15 @@ const AdminOrderDetails: React.FC = () => {
               paymentReference={order.payment_reference}
             />
             
-            <ItemsList
+            <UnifiedOrderSummary
               items={items}
               subtotal={order.subtotal || 0}
-              totalVat={order.total_vat || 0}
+              totalVat={order.vat_amount || order.total_vat || 0}
               totalDiscount={order.discount_amount || 0}
               deliveryFee={order.delivery_fee || 0}
               grandTotal={order.total_amount}
+              vatRate={order.vat_rate || 7.5}
+              paymentStatus={order.payment_status}
             />
             
             <SpecialInstructions

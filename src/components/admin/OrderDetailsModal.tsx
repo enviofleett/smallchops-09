@@ -15,6 +15,10 @@ import {
   Package
 } from 'lucide-react';
 import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
+import { AdminOrderPrintView } from './AdminOrderPrintView';
+import { useAuth } from '@/contexts/AuthContext';
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import '@/styles/admin-print.css';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -36,6 +40,10 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const { data: detailedOrderData, isLoading: isLoadingDetailed, error, lastUpdated, connectionStatus, reconnect } = useRealTimeOrderData(order?.id);
   const { drivers, loading: driversLoading } = useDriverManagement();
   const { updateStatus, isUpdating } = useProductionStatusUpdate();
+  
+  // Get admin user info for print footer
+  const { user } = useAuth();
+  const { data: businessSettings } = useBusinessSettings();
   
   if (!order) {
     return null;
@@ -98,47 +106,59 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   }
 
   return (
-    <AdaptiveDialog
-      open={isOpen}
-      onOpenChange={onClose}
-      size="xl"
-      title={`Order #${order.order_number}`}
-      className="max-w-7xl h-[95vh]"
-    >
-      <div className="flex flex-col h-full bg-gradient-to-br from-background via-background to-muted/10" ref={printRef}>
-        {/* Real-time connection status */}
-        <div className="px-6 pt-4">
-          <RealTimeConnectionStatus
-            connectionStatus={connectionStatus}
-            lastUpdated={lastUpdated}
-            onReconnect={reconnect}
-            compact={true}
-            className="mb-2"
+    <>
+      <AdaptiveDialog
+        open={isOpen}
+        onOpenChange={onClose}
+        size="xl"
+        title={`Order #${order.order_number}`}
+        className="max-w-7xl h-[95vh]"
+      >
+        <div className="flex flex-col h-full bg-gradient-to-br from-background via-background to-muted/10">
+          {/* Real-time connection status */}
+          <div className="px-6 pt-4">
+            <RealTimeConnectionStatus
+              connectionStatus={connectionStatus}
+              lastUpdated={lastUpdated}
+              onReconnect={reconnect}
+              compact={true}
+              className="mb-2"
+            />
+          </div>
+          
+          <OrderDetailsHeader
+            order={order}
+            onPrint={handlePrint}
           />
+          <OrderDetailsTabs
+            order={order}
+            deliverySchedule={undefined}
+            detailedOrderData={detailedOrderData}
+            isLoading={isLoadingDetailed}
+            error={error}
+            selectedTab={selectedTab}
+            setSelectedTab={setSelectedTab}
+            isUpdatingStatus={isUpdating}
+            handleStatusUpdate={handleStatusUpdate}
+            drivers={drivers}
+            driversLoading={driversLoading}
+            assignedRiderId={assignedRiderId}
+            onRiderAssignment={handleRiderAssignment}
+            isAssigningRider={isAssigningRider}
+          />
+          <OrderDetailsFooter onClose={onClose} />
         </div>
-        
-        <OrderDetailsHeader
+      </AdaptiveDialog>
+
+      {/* Enhanced Print View (hidden on screen, visible when printing) */}
+      <div ref={printRef} className="hidden">
+        <AdminOrderPrintView
           order={order}
-          onPrint={handlePrint}
+          businessSettings={businessSettings}
+          adminName={user?.name}
+          adminEmail={user?.email}
         />
-        <OrderDetailsTabs
-          order={order}
-          deliverySchedule={undefined}
-          detailedOrderData={detailedOrderData}
-          isLoading={isLoadingDetailed}
-          error={error}
-          selectedTab={selectedTab}
-          setSelectedTab={setSelectedTab}
-          isUpdatingStatus={isUpdating}
-          handleStatusUpdate={handleStatusUpdate}
-          drivers={drivers}
-          driversLoading={driversLoading}
-          assignedRiderId={assignedRiderId}
-          onRiderAssignment={handleRiderAssignment}
-          isAssigningRider={isAssigningRider}
-        />
-        <OrderDetailsFooter onClose={onClose} />
       </div>
-    </AdaptiveDialog>
+    </>
   );
 };

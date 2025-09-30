@@ -1,0 +1,275 @@
+/**
+ * ADMIN ORDER PRINT STYLES
+ * Optimized for single-page A4/Letter portrait printing
+ * Designed to fit orders with ≤8 products on one page
+ */
+
+@media print {
+  /* Hide everything except print content */
+  body * {
+    visibility: hidden;
+  }
+
+  .admin-print-view,
+  .admin-print-view * {
+    visibility: visible;
+  }
+
+  .admin-print-view {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+    color: black;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 11px;
+    line-height: 1.3;
+    padding: 0.3in;
+    margin: 0;
+  }
+
+  /* Hide all other UI elements */
+  header, nav, footer, aside, .sidebar, .navigation, 
+  button, .button, [role="button"], .print-hide {
+    display: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4 portrait;
+    margin: 0.3in;
+  }
+
+  /* Business Header - Compact */
+  .print-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #000;
+  }
+
+  .print-logo {
+    height: 40px;
+    width: auto;
+    max-width: 120px;
+  }
+
+  .print-business-name {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 18px;
+    font-weight: 900;
+    margin: 0;
+    color: #000;
+  }
+
+  /* Order Title Section - Compact */
+  .print-title-section {
+    text-align: center;
+    margin: 8px 0;
+    padding: 4px 0;
+  }
+
+  .print-order-title {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 900;
+    margin: 0 0 3px 0;
+    letter-spacing: 1px;
+  }
+
+  .print-order-number {
+    font-size: 13px;
+    font-weight: bold;
+    color: #333;
+  }
+
+  /* Section Headings */
+  .print-section-heading {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 900;
+    margin: 0 0 4px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #333;
+    letter-spacing: 0.5px;
+  }
+
+  /* Content Grid - Compact */
+  .print-content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .print-section {
+    margin-bottom: 8px;
+  }
+
+  /* Info Rows - Compact */
+  .print-info-row {
+    display: flex;
+    margin-bottom: 2px;
+    line-height: 1.4;
+  }
+
+  .print-label {
+    font-weight: bold;
+    min-width: 100px;
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+
+  .print-status,
+  .print-payment-status {
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .print-time-window {
+    font-weight: 600;
+    color: #000;
+  }
+
+  .print-reference {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+  }
+
+  /* Items Table - Optimized for density */
+  .print-items-section {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  .print-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 10px;
+  }
+
+  .print-items-table th {
+    background-color: #e5e5e5;
+    border: 1px solid #999;
+    padding: 4px 6px;
+    font-weight: bold;
+    font-size: 10px;
+  }
+
+  .print-th-left {
+    text-align: left;
+  }
+
+  .print-th-center {
+    text-align: center;
+    width: 50px;
+  }
+
+  .print-th-right {
+    text-align: right;
+    width: 90px;
+  }
+
+  .print-items-table td {
+    border: 1px solid #ccc;
+    padding: 3px 6px;
+  }
+
+  .print-td-item {
+    text-align: left;
+  }
+
+  .print-item-name {
+    font-weight: bold;
+    margin-bottom: 1px;
+  }
+
+  .print-item-note {
+    font-size: 9px;
+    font-style: italic;
+    color: #555;
+    margin-top: 1px;
+  }
+
+  .print-td-center {
+    text-align: center;
+  }
+
+  .print-td-right {
+    text-align: right;
+    font-weight: 500;
+  }
+
+  /* Totals Section - Compact */
+  .print-totals {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .print-totals-row {
+    display: flex;
+    justify-content: space-between;
+    min-width: 250px;
+    padding: 2px 0;
+    font-size: 11px;
+  }
+
+  .print-grand-total {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 2px solid #000;
+    font-weight: bold;
+    font-size: 14px;
+  }
+
+  .print-grand-total span {
+    font-weight: 900;
+  }
+
+  /* Footer - Compact */
+  .print-footer {
+    margin-top: 12px;
+    padding-top: 6px;
+    border-top: 1px solid #999;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #555;
+  }
+
+  .print-footer-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .print-footer .print-label {
+    font-weight: bold;
+    min-width: auto;
+    margin-right: 4px;
+  }
+
+  /* Prevent page breaks within sections */
+  .print-section,
+  .print-items-table,
+  .print-totals {
+    page-break-inside: avoid;
+  }
+
+  /* If content overflows, handle gracefully */
+  .print-items-table tr {
+    page-break-inside: avoid;
+  }
+}
+
+/* Screen preview styles (optional) */
+@media screen {
+  .admin-print-view {
+    display: none;
+  }
+}

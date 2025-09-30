@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
+import { sanitizeText } from '@/utils/htmlSanitizer';
 import { DriverAssignmentSection } from './details/DriverAssignmentSection';
 import { StatusManagementSection } from './details/StatusManagementSection';
 import { useOrderPageHooks } from '@/hooks/orderPageHooks';
@@ -392,7 +393,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                           
                           {item.product?.description && (
                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                              {item.product.description}
+                              {sanitizeText(item.product.description)}
                             </p>
                           )}
 

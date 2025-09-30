@@ -31,6 +31,7 @@ import { StatusManagementSection } from './details/StatusManagementSection';
 import { useOrderPageHooks } from '@/hooks/orderPageHooks';
 import { UnifiedOrder } from '@/types/unifiedOrder';
 import { OrderWithItems } from '@/api/orders';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
@@ -44,6 +45,9 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
     return null;
   }
 
+  const { userType } = useAuth();
+  const isAdmin = userType === 'admin';
+  
   const printRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
@@ -488,23 +492,27 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
             </Card>
           )}
 
-          {/* Driver Assignment */}
-          <DriverAssignmentSection
-            orderId={safeOrder.id}
-            currentDriverId={safeOrder.assigned_rider_id}
-            currentDriverName={safeOrder.assigned_rider_name}
-            onAssignDriver={handleAssignDriver}
-            isAssigning={assignRiderMutation.isPending}
-          />
+          {/* Driver Assignment - ADMIN ONLY */}
+          {isAdmin && (
+            <DriverAssignmentSection
+              orderId={safeOrder.id}
+              currentDriverId={safeOrder.assigned_rider_id}
+              currentDriverName={safeOrder.assigned_rider_name}
+              onAssignDriver={handleAssignDriver}
+              isAssigning={assignRiderMutation.isPending}
+            />
+          )}
 
-          {/* Status Management */}
-          <StatusManagementSection
-            currentStatus={safeOrder.status}
-            orderId={safeOrder.id}
-            updatedAt={safeOrder.updated_at}
-            onUpdateStatus={handleStatusUpdate}
-            isUpdating={false}
-          />
+          {/* Status Management - ADMIN ONLY */}
+          {isAdmin && (
+            <StatusManagementSection
+              currentStatus={safeOrder.status}
+              orderId={safeOrder.id}
+              updatedAt={safeOrder.updated_at}
+              onUpdateStatus={handleStatusUpdate}
+              isUpdating={false}
+            />
+          )}
         </div>
       </AdaptiveDialog>
 

@@ -177,29 +177,33 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
       >
         <div className="space-y-6 max-h-[80vh] overflow-y-auto p-4 sm:p-6">
           {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b">
-            <div>
-              <h2 className="text-xl font-bold">Order #{safeOrder.order_number}</h2>
-              <p className="text-base text-muted-foreground">
-                {format(new Date(safeOrder.order_time), 'MMM dd, yyyy hh:mm a')}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className={`${getStatusColor(safeOrder.status)} text-white`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b">
+            <div className="flex items-center gap-3">
+              <Badge className={`${getStatusColor(safeOrder.status)} text-white text-xs sm:text-sm px-2.5 py-1`}>
                 {safeOrder.status.replace('_', ' ').toUpperCase()}
               </Badge>
-              {isAdmin && (
-                <Button variant="outline" size="sm" onClick={handlePrint}>
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span className="hidden sm:inline">
+                  {format(new Date(safeOrder.order_time), 'MMM dd, yyyy hh:mm a')}
+                </span>
+                <span className="sm:hidden">
+                  {format(new Date(safeOrder.order_time), 'MMM dd, hh:mm a')}
+                </span>
+              </div>
+            </div>
+            
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handlePrint} className="flex-1 sm:flex-none">
+                  <Printer className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Print</span>
                 </Button>
-              )}
-              {isAdmin && (
                 <Button variant="outline" size="sm" onClick={handleRefresh}>
                   <RefreshCw className="h-4 w-4" />
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {isAdmin && (

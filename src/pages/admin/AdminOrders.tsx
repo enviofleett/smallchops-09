@@ -1106,18 +1106,24 @@ function AdminOrderCard({
               </h4>
             </div>
             
-            {order.delivery_schedule ? (
+            {(order.order_type === 'delivery' || order.order_type === 'pickup') && (
               <div className="space-y-3">
-                {/* Use order's embedded delivery schedule */}
+                {/* Use order's time field for 1-hour window */}
                 <DeliveryScheduleDisplay 
-                  schedule={order.delivery_schedule}
-                  orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
+                  order={{
+                    id: order.id,
+                    order_type: order.order_type,
+                    delivery_time: order.delivery_time,
+                    pickup_time: order.pickup_time,
+                    delivery_date: order.delivery_schedule?.delivery_date,
+                    special_instructions: order.delivery_schedule?.special_instructions || order.special_instructions,
+                  }}
                   orderStatus={order.status}
                   className="mb-0" 
                 />
                 
                 {/* Schedule Request Info */}
-                {(order.delivery_schedule.requested_at || order.delivery_schedule.created_at) && (
+                {order.delivery_schedule && (order.delivery_schedule.requested_at || order.delivery_schedule.created_at) && (
                   <div className="text-xs text-muted-foreground border-t pt-3">
                     Scheduled on {(() => {
                       const dateToFormat = order.delivery_schedule.requested_at || order.delivery_schedule.created_at;
@@ -1130,17 +1136,6 @@ function AdminOrderCard({
                     })()}
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 dark:bg-amber-950 dark:border-amber-800">
-                  <p className="text-sm text-amber-800 dark:text-amber-200">
-                    No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Schedule will be confirmed after payment is verified.
-                  </p>
-                </div>
               </div>
             )}
             

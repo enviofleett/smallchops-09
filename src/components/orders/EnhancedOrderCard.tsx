@@ -314,11 +314,17 @@ export function EnhancedOrderCard({
               </div>
 
               {/* Delivery Schedule */}
-              {order.order_type === 'delivery' && deliverySchedule && (
+              {(order.order_type === 'delivery' || order.order_type === 'pickup') && (
                 <div className="space-y-4">
                   <DeliveryScheduleDisplay 
-                    schedule={deliverySchedule}
-                    orderType={order.order_type}
+                    order={{
+                      id: order.id,
+                      order_type: order.order_type,
+                      delivery_time: order.delivery_time,
+                      pickup_time: order.pickup_time,
+                      delivery_date: deliverySchedule?.delivery_date || order.delivery_date,
+                      special_instructions: deliverySchedule?.special_instructions || order.special_instructions,
+                    }}
                     orderStatus={order.status}
                     className="h-fit"
                   />

@@ -591,7 +591,15 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 totalAmount={order.total_amount}
               />
               <DeliveryScheduleDisplay 
-                schedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+                order={{
+                  id: order.id,
+                  order_type: order.order_type,
+                  delivery_time: order.delivery_time,
+                  pickup_time: order.pickup_time,
+                  delivery_date: detailedOrderData?.delivery_schedule?.delivery_date || deliverySchedule?.delivery_date,
+                  special_instructions: detailedOrderData?.delivery_schedule?.special_instructions || deliverySchedule?.special_instructions,
+                }}
+                orderStatus={order.status}
               />
             </div>
 

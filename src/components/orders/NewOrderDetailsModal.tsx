@@ -22,7 +22,8 @@ import {
   DollarSign,
   Calendar,
   Clock,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
@@ -36,6 +37,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { formatAddress } from '@/utils/formatAddress';
+import { getOrderTimeWindow, hasValidTimeField, formatDeliveryDate } from '@/utils/timeWindowUtils';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
@@ -128,6 +130,9 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
     order_time: orderData.order_time || orderData.created_at || new Date().toISOString(),
     items: items,
     delivery_address: orderData.delivery_address,
+    delivery_time: orderData.delivery_time,
+    delivery_date: orderData.delivery_date,
+    pickup_time: orderData.pickup_time,
     special_instructions: orderData.special_instructions,
     subtotal: orderData.subtotal,
     tax_amount: orderData.tax_amount || orderData.vat_amount,
@@ -297,7 +302,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                     </>
                   )}
 
-                  {/* Delivery Time Window */}
+                  {/* Delivery Time Window (1-hour window from delivery_time) */}
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
@@ -305,36 +310,36 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                       Delivery Window
                     </div>
                     
-                    {deliverySchedule ? (
+                    {!hasValidTimeField(safeOrder) ? (
+                      <div className="pl-6">
+                        <Alert variant="destructive">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription>
+                            <strong>Data Error:</strong> Missing delivery time for this order. Please contact support.
+                          </AlertDescription>
+                        </Alert>
+                      </div>
+                    ) : (
                       <div className="pl-6 space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-muted-foreground">Date:</span>
-                          <span className="font-medium">
-                            {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
-                          </span>
-                        </div>
+                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">Date:</span>
+                            <span className="font-medium">
+                              {formatDeliveryDate(safeOrder.delivery_date)}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 text-sm">
                           <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="text-muted-foreground">Time:</span>
                           <span className="font-medium">
-                            {format(new Date(`2000-01-01T${deliverySchedule.delivery_time_start}`), 'h:mm a')} - {format(new Date(`2000-01-01T${deliverySchedule.delivery_time_end}`), 'h:mm a')}
+                            {getOrderTimeWindow(safeOrder) || 'Time not available'}
                           </span>
-                          {deliverySchedule.is_flexible && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              Flexible
-                            </Badge>
-                          )}
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            1-hour window
+                          </Badge>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="pl-6">
-                        <Alert variant="default">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            No delivery window has been scheduled yet.
-                          </AlertDescription>
-                        </Alert>
                       </div>
                     )}
                   </div>
@@ -377,32 +382,47 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                     </>
                   ) : null}
 
-                  {/* Pickup Time */}
-                  {safeOrder.pickup_time && (
-                    <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          Pickup Time
-                        </div>
-                        <div className="pl-6">
-                          <div className="text-sm text-muted-foreground">
-                            {(() => {
-                              const pickupDate = new Date(safeOrder.pickup_time);
-                              if (isToday(pickupDate)) {
-                                return `Today at ${format(pickupDate, 'h:mm a')}`;
-                              } else if (isTomorrow(pickupDate)) {
-                                return `Tomorrow at ${format(pickupDate, 'h:mm a')}`;
-                              } else {
-                                return format(pickupDate, 'EEEE, MMMM d, yyyy \'at\' h:mm a');
-                              }
-                            })()}
+                  {/* Pickup Time Window (1-hour window from pickup_time) */}
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      Pickup Time
+                    </div>
+                    
+                    {!hasValidTimeField(safeOrder) ? (
+                      <div className="pl-6">
+                        <Alert variant="destructive">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription>
+                            <strong>Data Error:</strong> Missing pickup time for this order. Please contact support.
+                          </AlertDescription>
+                        </Alert>
+                      </div>
+                    ) : (
+                      <div className="pl-6 space-y-1">
+                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">Date:</span>
+                            <span className="font-medium">
+                              {formatDeliveryDate(safeOrder.delivery_date)}
+                            </span>
                           </div>
+                        )}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-muted-foreground">Time Window:</span>
+                          <span className="font-medium">
+                            {getOrderTimeWindow(safeOrder) || 'Time not available'}
+                          </span>
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            1-hour window
+                          </Badge>
                         </div>
                       </div>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </>
               ) : null}
 

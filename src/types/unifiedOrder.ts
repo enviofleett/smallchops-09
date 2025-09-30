@@ -70,7 +70,9 @@ export interface UnifiedOrder {
   order_time: string;
   items: OrderItem[];
   delivery_address?: Address | string | null;
-  pickup_time?: string;
+  delivery_time?: string | null;
+  delivery_date?: string | null;
+  pickup_time?: string | null;
   pickup_point_id?: string;
   special_instructions?: string;
   subtotal?: number;

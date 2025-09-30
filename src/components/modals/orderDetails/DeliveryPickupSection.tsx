@@ -1,7 +1,9 @@
 import React from 'react';
-import { MapPin, Clock, FileText } from 'lucide-react';
+import { MapPin, Clock, FileText, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Order } from '@/types/orderDetailsModal';
+import { getOrderTimeWindow, hasValidTimeField, formatDeliveryDate } from '@/utils/timeWindowUtils';
 
 interface DeliveryPickupSectionProps {
   order: Order;
@@ -32,29 +34,10 @@ export const DeliveryPickupSection: React.FC<DeliveryPickupSectionProps> = ({ or
     return 'Address not available';
   };
 
-  const formatTimeWindow = () => {
-    if (isDelivery) {
-      // For delivery orders, check various delivery time fields
-      if (typeof order.delivery_address === 'object' && order.delivery_address && 'delivery_window' in order.delivery_address) {
-        return (order.delivery_address as any).delivery_window;
-      }
-      // Add other delivery time logic here
-      return 'Time window not specified';
-    } else {
-      // For pickup orders
-      if (order.pickup_time) {
-        return new Date(order.pickup_time).toLocaleString('en-US', {
-          weekday: 'short',
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-      }
-      return 'Pickup time not specified';
-    }
-  };
+  // Use the new 1-hour window logic
+  const timeWindow = getOrderTimeWindow(order);
+  const hasValidTime = hasValidTimeField(order);
+  const deliveryDateFormatted = order.delivery_date ? formatDeliveryDate(order.delivery_date) : null;
 
   const getAddress = () => {
     if (isDelivery) {
@@ -74,6 +57,33 @@ export const DeliveryPickupSection: React.FC<DeliveryPickupSectionProps> = ({ or
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Critical Error: Missing Time Field */}
+        {!hasValidTime && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Data Error:</strong> Missing {isDelivery ? 'delivery' : 'pickup'} time for this order.
+              Please contact support to resolve this issue.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Delivery Date */}
+        {deliveryDateFormatted && (
+          <div className="flex items-start gap-3">
+            <Clock className="h-4 w-4 text-muted-foreground mt-1" />
+            <div className="flex-1">
+              <p className="font-medium text-foreground">
+                {deliveryDateFormatted}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isDelivery ? 'Delivery Date' : 'Pickup Date'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Address */}
         <div className="flex items-start gap-3">
           <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
           <div className="flex-1">
@@ -86,14 +96,15 @@ export const DeliveryPickupSection: React.FC<DeliveryPickupSectionProps> = ({ or
           </div>
         </div>
 
+        {/* Time Window (1-hour window) */}
         <div className="flex items-start gap-3">
           <Clock className="h-4 w-4 text-muted-foreground mt-1" />
           <div className="flex-1">
             <p className="font-medium text-foreground">
-              {formatTimeWindow()}
+              {timeWindow || 'Time not available'}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isDelivery ? 'Delivery Window' : 'Pickup Time'}
+              {isDelivery ? 'Delivery Window' : 'Pickup Time'} (1-hour window)
             </p>
           </div>
         </div>

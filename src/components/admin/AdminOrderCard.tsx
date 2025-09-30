@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Package, MapPin, User, Clock, AlertTriangle, CheckCircle, Truck } from 'lucide-react';
 import { OrderWithItems } from '@/api/orders';
 import { format } from 'date-fns';
-import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
-import { isOrderOverdue } from '@/utils/scheduleTime';
 import { AdminOrderStatusBadge } from './AdminOrderStatusBadge';
+import { getOrderTimeWindow, formatDeliveryDate } from '@/utils/timeWindowUtils';
 
 interface AdminOrderCardProps {
   order: OrderWithItems;
@@ -25,23 +24,18 @@ export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps)
     }
   };
 
-  const isOverdue = deliverySchedule && 
-    isOrderOverdue(deliverySchedule.delivery_date, deliverySchedule.delivery_time_end);
+  // Use new time window logic
+  const timeWindow = getOrderTimeWindow(order);
+  const deliveryDateFormatted = (order as any).delivery_date ? formatDeliveryDate((order as any).delivery_date) : null;
 
   return (
-    <Card className={`transition-all duration-200 hover:shadow-md ${isOverdue ? 'border-l-4 border-l-destructive' : ''}`}>
+    <Card className="transition-all duration-200 hover:shadow-md">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               {getStatusIcon(order.status)}
               <h3 className="font-semibold text-lg">#{order.order_number}</h3>
-              {isOverdue && (
-                <div className="flex items-center bg-red-100 text-red-800 border border-red-200 rounded-md px-2 py-1 text-xs">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  Overdue
-                </div>
-              )}
             </div>
             <p className="text-sm text-muted-foreground">
               {format(new Date(order.created_at), 'MMM dd, yyyy HH:mm')}
@@ -95,48 +89,26 @@ export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps)
           </div>
         </div>
 
-        {/* Delivery Schedule and Countdown */}
-        {deliverySchedule && (
+        {/* Time Window (1-hour window from delivery_time/pickup_time) */}
+        {timeWindow && (
           <div className="bg-muted/30 rounded-lg p-4 space-y-3">
             <h4 className="font-medium flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Delivery Schedule
+              {order.order_type === 'pickup' ? 'Pickup' : 'Delivery'} Schedule
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Date</p>
-                <p className="font-medium">
-                  {format(new Date(deliverySchedule.delivery_date), 'MMM dd, yyyy')}
-                </p>
-              </div>
+              {deliveryDateFormatted && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{deliveryDateFormatted}</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-muted-foreground">Time Window</p>
-                <p className="font-medium">
-                  {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                </p>
+                <p className="font-medium">{timeWindow}</p>
+                <p className="text-xs text-muted-foreground mt-1">1-hour window</p>
               </div>
             </div>
-            
-            {deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Countdown:</span>
-                <MiniCountdownTimer
-                  deliveryDate={deliverySchedule.delivery_date}
-                  deliveryTimeStart={deliverySchedule.delivery_time_start}
-                  deliveryTimeEnd={deliverySchedule.delivery_time_end}
-                  orderStatus={order.status}
-                />
-              </div>
-            )}
-
-            {deliverySchedule.special_instructions && (
-              <div>
-                <p className="text-sm text-muted-foreground">Special Instructions</p>
-                <p className="text-sm bg-background rounded px-2 py-1">
-                  {deliverySchedule.special_instructions}
-                </p>
-              </div>
-            )}
           </div>
         )}
 

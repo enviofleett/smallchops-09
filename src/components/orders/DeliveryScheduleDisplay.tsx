@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar, Clock, MapPin, FileText, Truck, Package, CheckCircle, AlertTriangle, Info, XCircle, Calendar as CalendarIcon } from 'lucide-react';
-import { format, isToday, isTomorrow, isPast, parseISO, setHours, setMinutes } from 'date-fns';
+import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { OrderStatus } from '@/types/orders';
 import { useEnhancedDeliverySchedule, ScheduleWarning } from '@/hooks/useEnhancedDeliverySchedule';
+import { calculateTimeWindow } from '@/utils/timeWindowUtils';
 
 interface DeliveryScheduleDisplayProps {
   schedule: DeliverySchedule;
@@ -21,34 +22,25 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
   orderStatus = 'pending',
   className = "" 
 }) => {
-  // Validate schedule data
-  const isValidSchedule = (schedule: any) => {
-    return schedule && 
-           schedule.delivery_date && 
-           schedule.delivery_time_start && 
-           schedule.delivery_time_end;
-  };
+  // Use new 1-hour window calculation
+  const timeWindow = schedule.delivery_time_start 
+    ? calculateTimeWindow(schedule.delivery_time_start)
+    : null;
 
-  if (!schedule || !isValidSchedule(schedule)) {
+  // Critical error if time field exists but can't be parsed
+  if (schedule.delivery_time_start && !timeWindow) {
     return (
-      <div className="text-gray-500 p-4 border border-gray-200 rounded-lg">
-        No delivery schedule available
-      </div>
+      <Alert variant="destructive" className="my-4">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>
+          <strong>Delivery Window Error:</strong> Unable to parse delivery time "{schedule.delivery_time_start}". 
+          Please contact support to resolve this critical data issue.
+        </AlertDescription>
+      </Alert>
     );
   }
+
   const { validation, loading } = useEnhancedDeliverySchedule(schedule);
-  const formatTime = (timeString: string) => {
-    if (!timeString) return '';
-    try {
-      // Handle both "HH:mm" and "HH:mm:ss" formats
-      const [hours, minutes] = timeString.split(':');
-      const time = new Date();
-      time.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-      return format(time, 'h:mm a');
-    } catch {
-      return timeString;
-    }
-  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -206,42 +198,23 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
             </div>
           </div>
 
-          {/* Delivery Window */}
+          {/* Delivery Window (1-hour window) */}
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-blue-600" />
             <div>
               <p className="text-sm font-medium text-gray-700">
                 {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Time Window
               </p>
-              <p className="text-sm text-blue-800 font-semibold">
-                {formatTime(schedule.delivery_time_start)} – {formatTime(schedule.delivery_time_end)}
-              </p>
-              {(() => {
-                // Show delivery status based on current time vs delivery window
-                if (!schedule.delivery_date || !schedule.delivery_time_start) {
-                  return <p className="text-xs text-blue-600 mt-1">1-hour window</p>;
-                }
-                
-                try {
-                  const scheduleDate = parseISO(schedule.delivery_date);
-                  const [startHours, startMinutes] = schedule.delivery_time_start.split(':').map(Number);
-                  const [endHours, endMinutes] = schedule.delivery_time_end?.split(':').map(Number) || [startHours + 1, startMinutes];
-                  
-                  const deliveryStart = setMinutes(setHours(scheduleDate, startHours), startMinutes);
-                  const deliveryEnd = setMinutes(setHours(scheduleDate, endHours), endMinutes);
-                  const now = new Date();
-                  
-                  if (now >= deliveryStart && now <= deliveryEnd) {
-                    return <p className="text-xs text-green-600 mt-1 font-medium">🟢 Active delivery window</p>;
-                  } else if (now < deliveryStart) {
-                    return <p className="text-xs text-blue-600 mt-1">⏰ Upcoming window</p>;
-                  } else {
-                    return <p className="text-xs text-gray-500 mt-1">⏳ Window closed</p>;
-                  }
-                } catch {
-                  return <p className="text-xs text-blue-600 mt-1">1-hour window</p>;
-                }
-              })()}
+              {timeWindow ? (
+                <>
+                  <p className="text-sm text-blue-800 font-semibold">
+                    {timeWindow.startFormatted} – {timeWindow.endFormatted}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">1-hour window</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Time not available</p>
+              )}
             </div>
           </div>
         </div>

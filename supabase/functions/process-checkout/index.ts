@@ -54,6 +54,17 @@ serve(async (req: Request) => {
     if (!customer?.email) throw new Error('Customer email is required')
     if (!customer?.name) throw new Error('Customer name is required')
     if (!customer?.phone) throw new Error('Customer phone is required')
+    
+    // Validate delivery/pickup time fields (CRITICAL for 1-hour window logic)
+    if (fulfillment.type === 'delivery' && !delivery_schedule?.delivery_time_start) {
+      throw new Error('Delivery time is required for delivery orders')
+    }
+    if (fulfillment.type === 'pickup' && !delivery_schedule?.delivery_time_start) {
+      throw new Error('Pickup time is required for pickup orders')
+    }
+    if (!delivery_schedule?.delivery_date) {
+      throw new Error('Delivery/pickup date is required')
+    }
 
     // Calculate amounts
     const subtotal = items.reduce((sum: number, item: any) => 
@@ -101,8 +112,10 @@ serve(async (req: Request) => {
         zone_id: fulfillment.delivery_zone_id || null
       } : null,
       delivery_zone_id: fulfillment.delivery_zone_id || null,
+      // CRITICAL: Set delivery_time/pickup_time for 1-hour window calculation
       pickup_time: fulfillment.type === 'pickup' ? new Date(delivery_schedule.delivery_date + 'T' + delivery_schedule.delivery_time_start).toISOString() : null,
       delivery_time: fulfillment.type === 'delivery' ? new Date(delivery_schedule.delivery_date + 'T' + delivery_schedule.delivery_time_start).toISOString() : null,
+      delivery_date: delivery_schedule.delivery_date || null,
       special_instructions: delivery_schedule.special_instructions || '',
       order_time: orderTime,
       created_at: orderTime,

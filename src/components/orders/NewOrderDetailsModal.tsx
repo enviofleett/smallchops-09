@@ -24,7 +24,7 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isToday, isTomorrow } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
 import { sanitizeText } from '@/utils/htmlSanitizer';
 import { DriverAssignmentSection } from './details/DriverAssignmentSection';
@@ -34,6 +34,8 @@ import { UnifiedOrder } from '@/types/unifiedOrder';
 import { OrderWithItems } from '@/api/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
+import { usePickupPoint } from '@/hooks/usePickupPoints';
+import { formatAddress } from '@/utils/formatAddress';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
@@ -58,6 +60,11 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
   );
 
   const { assignRiderMutation, handleStatusUpdate } = useOrderPageHooks(order.id);
+
+  // Fetch pickup point data if order is pickup type
+  const { data: pickupPoint, isLoading: isLoadingPickupPoint } = usePickupPoint(
+    order?.pickup_point_id
+  );
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -271,13 +278,30 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                 </div>
               </div>
 
-              {/* Delivery Window */}
-              {safeOrder.order_type === 'delivery' && (
+              {/* Delivery/Pickup Details */}
+              {safeOrder.order_type === 'delivery' ? (
                 <>
+                  {/* Delivery Address */}
+                  {safeOrder.delivery_address && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          Delivery Address
+                        </div>
+                        <p className="text-sm text-muted-foreground pl-6">
+                          {formatAddress(safeOrder.delivery_address)}
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Delivery Time Window */}
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <Clock className="h-4 w-4 text-muted-foreground" />
                       Delivery Window
                     </div>
                     
@@ -302,49 +326,109 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                             </Badge>
                           )}
                         </div>
-                        {deliverySchedule.special_instructions && (
-                          <div className="text-xs text-muted-foreground italic mt-2 bg-muted/30 px-2 py-1 rounded">
-                            📝 {deliverySchedule.special_instructions}
-                          </div>
-                        )}
                       </div>
                     ) : (
                       <div className="pl-6">
-                        <Alert variant="warning">
+                        <Alert variant="default">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            No delivery window has been scheduled for this order yet.
+                            No delivery window has been scheduled yet.
                           </AlertDescription>
                         </Alert>
                       </div>
                     )}
                   </div>
                 </>
-              )}
-
-              {safeOrder.order_type === 'delivery' && safeOrder.delivery_address && (
+              ) : safeOrder.order_type === 'pickup' ? (
                 <>
-                  <Separator />
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      Delivery Address
-                    </div>
-                    <p className="text-sm text-muted-foreground pl-6">
-                      {typeof safeOrder.delivery_address === 'string' 
-                        ? safeOrder.delivery_address 
-                        : safeOrder.delivery_address.address_line_1}
-                    </p>
-                  </div>
+                  {/* Pickup Location */}
+                  {isLoadingPickupPoint ? (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          Pickup Location
+                        </div>
+                        <div className="pl-6 text-sm text-muted-foreground animate-pulse">
+                          Loading pickup location...
+                        </div>
+                      </div>
+                    </>
+                  ) : pickupPoint ? (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          Pickup Location
+                        </div>
+                        <div className="pl-6 space-y-1">
+                          <p className="text-sm font-medium">{pickupPoint.name}</p>
+                          <p className="text-sm text-muted-foreground">{pickupPoint.address}</p>
+                          {pickupPoint.contact_phone && (
+                            <p className="text-xs text-muted-foreground">📞 {pickupPoint.contact_phone}</p>
+                          )}
+                          {pickupPoint.instructions && (
+                            <p className="text-xs text-muted-foreground italic mt-1">ℹ️ {pickupPoint.instructions}</p>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* Pickup Time */}
+                  {safeOrder.pickup_time && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          Pickup Time
+                        </div>
+                        <div className="pl-6">
+                          <div className="text-sm text-muted-foreground">
+                            {(() => {
+                              const pickupDate = new Date(safeOrder.pickup_time);
+                              if (isToday(pickupDate)) {
+                                return `Today at ${format(pickupDate, 'h:mm a')}`;
+                              } else if (isTomorrow(pickupDate)) {
+                                return `Tomorrow at ${format(pickupDate, 'h:mm a')}`;
+                              } else {
+                                return format(pickupDate, 'EEEE, MMMM d, yyyy \'at\' h:mm a');
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </>
-              )}
+              ) : null}
 
-              {safeOrder.special_instructions && (
+              {/* Special Instructions */}
+              {(safeOrder.special_instructions || deliverySchedule?.special_instructions) && (
                 <>
                   <Separator />
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">Special Instructions</div>
-                    <p className="text-sm text-muted-foreground">{safeOrder.special_instructions}</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      Special Instructions
+                    </div>
+                    <div className="pl-6 space-y-1">
+                      {safeOrder.special_instructions && (
+                        <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded">
+                          {safeOrder.special_instructions}
+                        </div>
+                      )}
+                      {deliverySchedule?.special_instructions && 
+                       deliverySchedule.special_instructions !== safeOrder.special_instructions && (
+                        <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded">
+                          <span className="text-xs font-medium">Delivery: </span>
+                          {deliverySchedule.special_instructions}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}

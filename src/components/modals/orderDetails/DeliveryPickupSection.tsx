@@ -2,7 +2,6 @@ import React from 'react';
 import { MapPin, Clock, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Order } from '@/types/orderDetailsModal';
-import { getOrderTimeWindow, formatTimeWindow } from '@/utils/timeWindowUtils';
 
 interface DeliveryPickupSectionProps {
   order: Order;
@@ -33,15 +32,28 @@ export const DeliveryPickupSection: React.FC<DeliveryPickupSectionProps> = ({ or
     return 'Address not available';
   };
 
-  const getTimeWindowDisplay = () => {
-    // Use the new time window utility for consistent 1-hour window calculation
-    const timeWindow = getOrderTimeWindow({
-      order_type: order.order_type,
-      delivery_time: order.delivery_time,
-      pickup_time: order.pickup_time,
-    });
-    
-    return formatTimeWindow(timeWindow);
+  const formatTimeWindow = () => {
+    if (isDelivery) {
+      // For delivery orders, check various delivery time fields
+      if (typeof order.delivery_address === 'object' && order.delivery_address && 'delivery_window' in order.delivery_address) {
+        return (order.delivery_address as any).delivery_window;
+      }
+      // Add other delivery time logic here
+      return 'Time window not specified';
+    } else {
+      // For pickup orders
+      if (order.pickup_time) {
+        return new Date(order.pickup_time).toLocaleString('en-US', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+      return 'Pickup time not specified';
+    }
   };
 
   const getAddress = () => {
@@ -78,10 +90,10 @@ export const DeliveryPickupSection: React.FC<DeliveryPickupSectionProps> = ({ or
           <Clock className="h-4 w-4 text-muted-foreground mt-1" />
           <div className="flex-1">
             <p className="font-medium text-foreground">
-              {getTimeWindowDisplay()}
+              {formatTimeWindow()}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isDelivery ? 'Delivery Window (1-hour)' : 'Pickup Window (1-hour)'}
+              {isDelivery ? 'Delivery Window' : 'Pickup Time'}
             </p>
           </div>
         </div>

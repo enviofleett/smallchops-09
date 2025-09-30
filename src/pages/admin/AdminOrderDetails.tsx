@@ -219,16 +219,10 @@ const AdminOrderDetails: React.FC = () => {
               fulfillmentInfo={data?.fulfillment_info}
             />
 
-            {(order.order_type === 'delivery' || order.order_type === 'pickup') && (
+            {delivery_schedule && (
               <DeliveryScheduleDisplay
-                order={{
-                  id: order.id,
-                  order_type: order.order_type,
-                  delivery_time: order.delivery_time,
-                  pickup_time: order.pickup_time,
-                  delivery_date: delivery_schedule?.delivery_date,
-                  special_instructions: delivery_schedule?.special_instructions,
-                }}
+                schedule={delivery_schedule}
+                orderType={order.order_type}
                 orderStatus={order.status}
               />
             )}

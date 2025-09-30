@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { logger } from '@/lib/logger';
+import { DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { OrderType } from '@/types/unifiedOrder';
 
 interface DeliveryWindowValidationResult {
@@ -10,51 +11,69 @@ interface DeliveryWindowValidationResult {
 }
 
 /**
- * NEW VALIDATION LOGIC (Updated for time field-based windows):
- * 
- * For delivery orders: Validates that `delivery_time` field exists
- * For pickup orders: Validates that `pickup_time` field exists
- * 
- * This hook now validates the order-level time fields instead of the
- * order_delivery_schedule table, as these fields are the source of truth
- * for calculating 1-hour time windows.
+ * Validates delivery window data with fail-fast strategy.
+ * For delivery orders, missing delivery windows are treated as CRITICAL ERRORS.
+ * For pickup orders, this validation is more lenient.
  */
 export const useDeliveryWindowValidation = (
-  orderTimeField: string | null | undefined,
+  schedule: DeliverySchedule | null | undefined,
   orderType: OrderType,
   orderId?: string
 ): DeliveryWindowValidationResult => {
   
   useEffect(() => {
     // Log validation checks for monitoring
-    if (orderType === 'delivery' && !orderTimeField) {
-      logger.error('CRITICAL: Delivery order missing delivery_time field', {
+    if (orderType === 'delivery' && !isValidDeliverySchedule(schedule)) {
+      logger.error('CRITICAL: Delivery order missing valid delivery window', {
         orderId,
         orderType,
-        hasTimeField: !!orderTimeField,
+        hasSchedule: !!schedule,
+        scheduleData: schedule,
       });
     }
-    
-    if (orderType === 'pickup' && !orderTimeField) {
-      logger.warn('Pickup order missing pickup_time field', {
-        orderId,
-        orderType,
-        hasTimeField: !!orderTimeField,
-      });
-    }
-  }, [orderTimeField, orderType, orderId]);
+  }, [schedule, orderType, orderId]);
 
-  // Delivery orders MUST have delivery_time field
+  // Delivery orders MUST have valid delivery windows
   if (orderType === 'delivery') {
-    if (!orderTimeField) {
+    if (!schedule) {
       return {
         isValid: false,
         isCriticalError: true,
-        errorMessage: 'Delivery time is missing for this delivery order. This is a critical data error.',
+        errorMessage: 'Delivery window data is completely missing for this delivery order.',
         errorContext: {
           orderId,
           orderType,
-          reason: 'MISSING_DELIVERY_TIME',
+          reason: 'NULL_SCHEDULE',
+        },
+      };
+    }
+
+    if (!schedule.delivery_date) {
+      return {
+        isValid: false,
+        isCriticalError: true,
+        errorMessage: 'Delivery date is missing from the delivery schedule.',
+        errorContext: {
+          orderId,
+          orderType,
+          reason: 'MISSING_DELIVERY_DATE',
+          schedule,
+        },
+      };
+    }
+
+    if (!schedule.delivery_time_start || !schedule.delivery_time_end) {
+      return {
+        isValid: false,
+        isCriticalError: true,
+        errorMessage: 'Delivery time window is incomplete or missing.',
+        errorContext: {
+          orderId,
+          orderType,
+          reason: 'MISSING_TIME_WINDOW',
+          hasStart: !!schedule.delivery_time_start,
+          hasEnd: !!schedule.delivery_time_end,
+          schedule,
         },
       };
     }
@@ -66,21 +85,8 @@ export const useDeliveryWindowValidation = (
     };
   }
 
-  // Pickup orders MUST have pickup_time field
+  // For pickup orders, delivery schedule is optional
   if (orderType === 'pickup') {
-    if (!orderTimeField) {
-      return {
-        isValid: false,
-        isCriticalError: true,
-        errorMessage: 'Pickup time is missing for this pickup order. This is a critical data error.',
-        errorContext: {
-          orderId,
-          orderType,
-          reason: 'MISSING_PICKUP_TIME',
-        },
-      };
-    }
-
     return {
       isValid: true,
       isCriticalError: false,
@@ -95,36 +101,37 @@ export const useDeliveryWindowValidation = (
 };
 
 /**
- * Assertion function that throws if time field is invalid for delivery/pickup orders.
+ * Helper function to check if a delivery schedule is valid
+ */
+const isValidDeliverySchedule = (schedule: DeliverySchedule | null | undefined): boolean => {
+  return !!(
+    schedule &&
+    schedule.delivery_date &&
+    schedule.delivery_time_start &&
+    schedule.delivery_time_end
+  );
+};
+
+/**
+ * Assertion function that throws if delivery window is invalid for delivery orders.
  * Use this when you want to fail fast and bubble up errors.
  */
-export const assertTimeFieldValid = (
-  orderTimeField: string | null | undefined,
+export const assertDeliveryWindowValid = (
+  schedule: DeliverySchedule | null | undefined,
   orderType: OrderType,
   orderId?: string
 ): void => {
-  if (orderType === 'delivery' && !orderTimeField) {
+  if (orderType !== 'delivery') return;
+
+  if (!isValidDeliverySchedule(schedule)) {
     const error = new Error(
-      `CRITICAL DATA INTEGRITY ERROR: Delivery order ${orderId || 'UNKNOWN'} is missing required delivery_time field. This indicates a system failure.`
+      `CRITICAL DATA INTEGRITY ERROR: Delivery order ${orderId || 'UNKNOWN'} is missing required delivery window data. This indicates a system failure.`
     );
     
-    logger.error('Assertion failed: Missing delivery_time for delivery order', {
+    logger.error('Assertion failed: Invalid delivery window for delivery order', {
       orderId,
       orderType,
-      stack: error.stack,
-    });
-
-    throw error;
-  }
-
-  if (orderType === 'pickup' && !orderTimeField) {
-    const error = new Error(
-      `CRITICAL DATA INTEGRITY ERROR: Pickup order ${orderId || 'UNKNOWN'} is missing required pickup_time field. This indicates a system failure.`
-    );
-    
-    logger.error('Assertion failed: Missing pickup_time for pickup order', {
-      orderId,
-      orderType,
+      schedule,
       stack: error.stack,
     });
 

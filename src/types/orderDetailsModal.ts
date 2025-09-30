@@ -118,8 +118,6 @@ export interface Order {
   assigned_rider_name?: string;
   // Delivery fields
   delivery_window?: string;
-  delivery_time?: string | null;
-  delivery_date?: string | null;
 }
 
 export interface OrderDetailsModalProps {

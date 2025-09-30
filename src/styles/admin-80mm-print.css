@@ -1,0 +1,368 @@
+/**
+ * ADMIN ORDER 80MM THERMAL PRINT STYLES
+ * Optimized for 80mm (3.15 inch) thermal printer output
+ * Designed for POS thermal printers with bold fonts for clarity
+ * 100% responsive for 80mm paper width
+ */
+
+/* Print Media Styles - Only applies when printing */
+@media print {
+  /* Page setup for 80mm thermal paper */
+  @page {
+    size: 80mm auto;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Reset body for thermal printing */
+  body {
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* Hide everything except the admin print content */
+  body * {
+    visibility: hidden;
+  }
+  
+  .admin-order-80mm-print,
+  .admin-order-80mm-print * {
+    visibility: visible;
+  }
+  
+  /* Main container for 80mm print */
+  .admin-order-80mm-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    max-width: 80mm;
+    background: white !important;
+    color: black !important;
+    font-family: 'Courier New', 'Consolas', monospace !important;
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    overflow: visible;
+  }
+  
+  /* Header Section */
+  .print-header-80mm {
+    text-align: center;
+    margin: 0 0 2mm 0 !important;
+    padding: 0 0 1mm 0 !important;
+    border-bottom: 1px solid #000 !important;
+  }
+  
+  .print-logo-80mm {
+    max-width: 30mm !important;
+    max-height: 15mm !important;
+    margin: 0 auto 1mm auto !important;
+    display: block !important;
+  }
+  
+  .print-business-name-80mm {
+    font-weight: 900 !important;
+    font-size: 10px !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    margin: 1mm 0 !important;
+    padding: 0 !important;
+    letter-spacing: 0.5px !important;
+    line-height: 1.2 !important;
+  }
+  
+  /* Title Section */
+  .print-title-80mm {
+    text-align: center;
+    margin: 1mm 0 2mm 0 !important;
+    padding: 1mm 0 !important;
+    border-bottom: 1px dashed #000 !important;
+  }
+  
+  .print-title-80mm div {
+    margin: 0.5mm 0 !important;
+    padding: 0 !important;
+    font-size: 8px !important;
+  }
+  
+  /* Section Containers */
+  .section-80mm {
+    margin: 2mm 0 !important;
+    padding: 0 !important;
+    font-size: 8px !important;
+  }
+  
+  .section-title-80mm {
+    font-weight: 900 !important;
+    font-size: 9px !important;
+    text-transform: uppercase !important;
+    margin: 0 0 1mm 0 !important;
+    padding: 0 !important;
+    border-bottom: 1px solid #000 !important;
+    letter-spacing: 0.3px !important;
+  }
+  
+  .section-80mm div {
+    margin: 0.5mm 0 !important;
+    padding: 0 !important;
+    line-height: 1.3 !important;
+  }
+  
+  /* Labels and values */
+  .label-80mm {
+    font-weight: 700 !important;
+    display: inline-block;
+    min-width: 20mm;
+  }
+  
+  /* Items Table */
+  .items-table-80mm {
+    width: 100% !important;
+    border-collapse: collapse;
+    margin: 1mm 0 !important;
+    font-size: 7px !important;
+  }
+  
+  .items-table-80mm th {
+    background-color: #000 !important;
+    color: #fff !important;
+    border: 1px solid #000 !important;
+    padding: 1mm !important;
+    font-weight: 900 !important;
+    font-size: 7px !important;
+    text-align: left;
+  }
+  
+  .items-table-80mm td {
+    border: 1px solid #666 !important;
+    padding: 1mm !important;
+    font-size: 7px !important;
+    line-height: 1.2 !important;
+  }
+  
+  .items-table-80mm td.center-80mm {
+    text-align: center;
+  }
+  
+  .items-table-80mm td.right-80mm {
+    text-align: right;
+  }
+  
+  .item-note-80mm {
+    font-size: 6px !important;
+    font-style: italic;
+    color: #333 !important;
+    margin: 0.5mm 0 0 0 !important;
+    padding: 0 !important;
+    line-height: 1.1 !important;
+  }
+  
+  /* Totals Section */
+  .totals-80mm {
+    margin: 2mm 0 !important;
+    padding: 1mm 0 0 0 !important;
+    border-top: 1px solid #000 !important;
+  }
+  
+  .totals-80mm div {
+    display: flex;
+    justify-content: space-between;
+    margin: 0.5mm 0 !important;
+    padding: 0 !important;
+    font-size: 8px !important;
+  }
+  
+  .grand-total-80mm {
+    font-weight: 900 !important;
+    font-size: 9px !important;
+    margin: 1mm 0 0 0 !important;
+    padding: 1mm 0 0 0 !important;
+    border-top: 2px solid #000 !important;
+  }
+  
+  /* Footer Section */
+  .footer-80mm {
+    text-align: center;
+    margin: 2mm 0 0 0 !important;
+    padding: 1mm 0 0 0 !important;
+    border-top: 1px dashed #000 !important;
+    font-size: 7px !important;
+  }
+  
+  .footer-80mm div {
+    margin: 0.5mm 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Bold text utility */
+  .bold {
+    font-weight: 900 !important;
+  }
+  
+  /* Ensure all text is black for thermal printers */
+  .admin-order-80mm-print * {
+    color: black !important;
+  }
+}
+
+/* Screen Preview Styles - Shows preview similar to 80mm paper */
+@media screen {
+  .admin-order-80mm-print {
+    width: 302px; /* ~80mm at 96 DPI */
+    max-width: 100%;
+    margin: 20px auto;
+    padding: 10px;
+    background: white;
+    color: black;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 11px;
+    line-height: 1.3;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #ddd;
+  }
+  
+  .print-header-80mm {
+    text-align: center;
+    margin: 0 0 12px 0;
+    padding: 0 0 8px 0;
+    border-bottom: 1px solid #000;
+  }
+  
+  .print-logo-80mm {
+    max-width: 100px;
+    max-height: 50px;
+    margin: 0 auto 8px auto;
+    display: block;
+  }
+  
+  .print-business-name-80mm {
+    font-weight: 900;
+    font-size: 14px;
+    text-align: center;
+    text-transform: uppercase;
+    margin: 8px 0;
+    letter-spacing: 1px;
+  }
+  
+  .print-title-80mm {
+    text-align: center;
+    margin: 8px 0 12px 0;
+    padding: 8px 0;
+    border-bottom: 1px dashed #000;
+  }
+  
+  .print-title-80mm div {
+    margin: 4px 0;
+    font-size: 11px;
+  }
+  
+  .section-80mm {
+    margin: 12px 0;
+    font-size: 11px;
+  }
+  
+  .section-title-80mm {
+    font-weight: 900;
+    font-size: 12px;
+    text-transform: uppercase;
+    margin: 0 0 6px 0;
+    padding: 0 0 4px 0;
+    border-bottom: 1px solid #000;
+    letter-spacing: 0.5px;
+  }
+  
+  .section-80mm div {
+    margin: 4px 0;
+    line-height: 1.4;
+  }
+  
+  .label-80mm {
+    font-weight: 700;
+    display: inline-block;
+    min-width: 80px;
+  }
+  
+  .items-table-80mm {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 10px;
+  }
+  
+  .items-table-80mm th {
+    background-color: #000;
+    color: #fff;
+    border: 1px solid #000;
+    padding: 4px;
+    font-weight: 900;
+    font-size: 10px;
+    text-align: left;
+  }
+  
+  .items-table-80mm td {
+    border: 1px solid #666;
+    padding: 4px;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  
+  .items-table-80mm td.center-80mm {
+    text-align: center;
+  }
+  
+  .items-table-80mm td.right-80mm {
+    text-align: right;
+  }
+  
+  .item-note-80mm {
+    font-size: 9px;
+    font-style: italic;
+    color: #555;
+    margin: 4px 0 0 0;
+    line-height: 1.2;
+  }
+  
+  .totals-80mm {
+    margin: 12px 0;
+    padding: 8px 0 0 0;
+    border-top: 1px solid #000;
+  }
+  
+  .totals-80mm div {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+    font-size: 11px;
+  }
+  
+  .grand-total-80mm {
+    font-weight: 900;
+    font-size: 13px;
+    margin: 8px 0 0 0;
+    padding: 8px 0 0 0;
+    border-top: 2px solid #000;
+  }
+  
+  .footer-80mm {
+    text-align: center;
+    margin: 12px 0 0 0;
+    padding: 8px 0 0 0;
+    border-top: 1px dashed #000;
+    font-size: 10px;
+  }
+  
+  .footer-80mm div {
+    margin: 4px 0;
+  }
+  
+  .bold {
+    font-weight: 900;
+  }
+}

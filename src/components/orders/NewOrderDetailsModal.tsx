@@ -18,7 +18,9 @@ import {
   RefreshCw,
   CreditCard,
   FileText,
-  DollarSign
+  DollarSign,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
@@ -89,6 +91,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
   const orderData = data?.order || order;
   const items = data?.items || [];
   const assignedAgent = data?.assigned_agent;
+  const deliverySchedule = data?.delivery_schedule;
 
   const safeOrder: UnifiedOrder = {
     id: orderData.id || '',
@@ -235,6 +238,45 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                   </Badge>
                 </div>
               </div>
+
+              {/* Delivery Window */}
+              {safeOrder.order_type === 'delivery' && deliverySchedule && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      Delivery Window
+                    </div>
+                    <div className="pl-6 space-y-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Date:</span>
+                        <span className="font-medium">
+                          {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Time:</span>
+                        <span className="font-medium">
+                          {format(new Date(`2000-01-01T${deliverySchedule.delivery_time_start}`), 'h:mm a')} - {format(new Date(`2000-01-01T${deliverySchedule.delivery_time_end}`), 'h:mm a')}
+                        </span>
+                        {deliverySchedule.is_flexible && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            Flexible
+                          </Badge>
+                        )}
+                      </div>
+                      {deliverySchedule.special_instructions && (
+                        <div className="text-xs text-muted-foreground italic mt-2 bg-muted/30 px-2 py-1 rounded">
+                          📝 {deliverySchedule.special_instructions}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {safeOrder.order_type === 'delivery' && safeOrder.delivery_address && (
                 <>

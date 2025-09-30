@@ -38,10 +38,34 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
     return order.items.reduce((sum: number, item: any) => sum + (item.total_price || 0), 0);
   };
 
+  // Enhanced data extraction with fallbacks
   const timeWindow = getOrderTimeWindow(order);
   const deliveryDate = formatDeliveryDate(order.delivery_date || order.created_at);
   const printedBy = adminName || adminEmail?.split('@')[0] || 'Admin';
   const printedAt = format(new Date(), 'MMM dd, yyyy h:mm a');
+
+  // Extract delivery zone from delivery_schedule or address
+  const deliveryZone = order.delivery_schedule?.delivery_zone || 
+                       order.delivery_address?.zone ||
+                       order.delivery_address?.city ||
+                       null;
+
+  // Handle address formatting
+  const getFormattedAddress = () => {
+    if (order.order_type === 'delivery' && order.delivery_address) {
+      return formatAddress(order.delivery_address);
+    }
+    if (order.order_type === 'pickup' && order.pickup_point) {
+      return order.pickup_point.address || 'Pickup location available';
+    }
+    return 'Address not provided';
+  };
+
+  // Get special instructions from multiple sources
+  const specialInstructions = order.special_instructions || 
+                              order.delivery_schedule?.special_instructions ||
+                              order.delivery_instructions ||
+                              null;
 
   return (
     <div className="admin-print-view">
@@ -80,12 +104,10 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
             <span className="print-label">Email:</span>
             <span>{order.customer_email || 'N/A'}</span>
           </div>
-          {order.order_type === 'delivery' && order.delivery_address && (
-            <div className="print-info-row">
-              <span className="print-label">Address:</span>
-              <span>{formatAddress(order.delivery_address)}</span>
-            </div>
-          )}
+          <div className="print-info-row">
+            <span className="print-label">Address:</span>
+            <span>{getFormattedAddress()}</span>
+          </div>
         </div>
 
         {/* Order Details */}
@@ -93,15 +115,15 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
           <h3 className="print-section-heading">ORDER DETAILS</h3>
           <div className="print-info-row">
             <span className="print-label">Status:</span>
-            <span className="print-status">{order.status?.toUpperCase()}</span>
+            <span className="print-status">{order.status?.toUpperCase() || 'PENDING'}</span>
           </div>
           <div className="print-info-row">
             <span className="print-label">Order Type:</span>
-            <span>{order.order_type?.toUpperCase()}</span>
+            <span>{order.order_type?.toUpperCase() || 'N/A'}</span>
           </div>
           <div className="print-info-row">
             <span className="print-label">Order Time:</span>
-            <span>{formatDateTime(order.created_at)}</span>
+            <span>{formatDateTime(order.created_at || order.order_time)}</span>
           </div>
           {deliveryDate && (
             <div className="print-info-row">
@@ -115,6 +137,12 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
               <span className="print-time-window">{timeWindow}</span>
             </div>
           )}
+          {deliveryZone && (
+            <div className="print-info-row">
+              <span className="print-label">Delivery Zone:</span>
+              <span>{deliveryZone}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -124,7 +152,7 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
           <h3 className="print-section-heading">PAYMENT INFORMATION</h3>
           <div className="print-info-row">
             <span className="print-label">Payment Status:</span>
-            <span className="print-payment-status">{order.payment_status?.toUpperCase()}</span>
+            <span className="print-payment-status">{order.payment_status?.toUpperCase() || 'PENDING'}</span>
           </div>
           {order.payment_method && (
             <div className="print-info-row">
@@ -138,6 +166,12 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
               <span className="print-reference">{order.payment_reference}</span>
             </div>
           )}
+          {order.paid_at && (
+            <div className="print-info-row">
+              <span className="print-label">Paid At:</span>
+              <span>{formatDateTime(order.paid_at)}</span>
+            </div>
+          )}
         </div>
 
         <div className="print-section">
@@ -148,10 +182,22 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
               <span>{order.assigned_rider_name}</span>
             </div>
           )}
-          {order.special_instructions && (
+          {specialInstructions && (
             <div className="print-info-row">
               <span className="print-label">Instructions:</span>
-              <span>{order.special_instructions}</span>
+              <span>{specialInstructions}</span>
+            </div>
+          )}
+          {order.pickup_point?.name && (
+            <div className="print-info-row">
+              <span className="print-label">Pickup Point:</span>
+              <span>{order.pickup_point.name}</span>
+            </div>
+          )}
+          {order.pickup_point?.contact_phone && (
+            <div className="print-info-row">
+              <span className="print-label">Pickup Contact:</span>
+              <span>{order.pickup_point.contact_phone}</span>
             </div>
           )}
         </div>
@@ -170,19 +216,32 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
             </tr>
           </thead>
           <tbody>
-            {order.items?.map((item: any, index: number) => (
-              <tr key={item.id || index}>
-                <td className="print-td-item">
-                  <div className="print-item-name">{item.product_name || item.name}</div>
-                  {item.special_instructions && (
-                    <div className="print-item-note">Note: {item.special_instructions}</div>
-                  )}
-                </td>
-                <td className="print-td-center">{item.quantity}</td>
-                <td className="print-td-right">{formatCurrency(item.unit_price)}</td>
-                <td className="print-td-right">{formatCurrency(item.total_price)}</td>
+            {(order.items && order.items.length > 0) ? (
+              order.items.map((item: any, index: number) => (
+                <tr key={item.id || index}>
+                  <td className="print-td-item">
+                    <div className="print-item-name">{item.product_name || item.name || 'Item'}</div>
+                    {item.special_instructions && (
+                      <div className="print-item-note">Note: {item.special_instructions}</div>
+                    )}
+                    {item.customizations && Object.keys(item.customizations).length > 0 && (
+                      <div className="print-item-note">
+                        {Object.entries(item.customizations).map(([key, value]) => 
+                          `${key}: ${value}`
+                        ).join(', ')}
+                      </div>
+                    )}
+                  </td>
+                  <td className="print-td-center">{item.quantity || 0}</td>
+                  <td className="print-td-right">{formatCurrency(item.unit_price || 0)}</td>
+                  <td className="print-td-right">{formatCurrency(item.total_price || 0)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="print-td-center">No items found</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
 
@@ -197,6 +256,13 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
             <div className="print-totals-row">
               <span>VAT ({order.vat_rate || 7.5}%):</span>
               <span>{formatCurrency(order.vat_amount)}</span>
+            </div>
+          )}
+
+          {order.tax_amount > 0 && (
+            <div className="print-totals-row">
+              <span>Tax:</span>
+              <span>{formatCurrency(order.tax_amount)}</span>
             </div>
           )}
 
@@ -216,7 +282,7 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
 
           <div className="print-totals-row print-grand-total">
             <span>GRAND TOTAL:</span>
-            <span>{formatCurrency(order.total_amount)}</span>
+            <span>{formatCurrency(order.total_amount || 0)}</span>
           </div>
         </div>
       </div>

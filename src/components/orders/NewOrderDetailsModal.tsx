@@ -8,6 +8,7 @@ import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
 import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { ThermalPrintReceipt } from './ThermalPrintReceipt';
+import { AdminOrderPrintView } from '@/components/admin/AdminOrderPrintView';
 import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
 import { 
   Package, 
@@ -38,6 +39,9 @@ import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { formatAddress } from '@/utils/formatAddress';
 import { getOrderTimeWindow, hasValidTimeField, formatDeliveryDate } from '@/utils/timeWindowUtils';
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { toast } from 'sonner';
+import '@/styles/admin-print.css';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
@@ -51,10 +55,11 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
     return null;
   }
 
-  const { userType } = useAuth();
+  const { userType, user } = useAuth();
   const isAdmin = userType === 'admin';
   
-  const printRef = useRef<HTMLDivElement>(null);
+  const adminPrintRef = useRef<HTMLDivElement>(null);
+  const thermalPrintRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const { data, isLoading, error, lastUpdated, connectionStatus, reconnect } = useRealTimeOrderData(
@@ -68,9 +73,24 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
     order?.pickup_point_id
   );
 
+  // Fetch business settings for print header
+  const { data: businessSettings } = useBusinessSettings();
+
+  // Enhanced print handler for admin with success/error notifications
   const handlePrint = useReactToPrint({
-    contentRef: printRef,
+    contentRef: isAdmin ? adminPrintRef : thermalPrintRef,
     documentTitle: `Order-${order?.order_number || 'Receipt'}`,
+    onAfterPrint: () => {
+      toast.success('Order printed successfully', {
+        description: `Order #${order?.order_number} has been sent to printer`,
+      });
+    },
+    onPrintError: (error) => {
+      console.error('Print error:', error);
+      toast.error('Failed to print order', {
+        description: 'Please check your printer connection and try again',
+      });
+    },
   });
 
   const handleRefresh = () => {
@@ -641,11 +661,28 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
         </div>
       </AdaptiveDialog>
 
-      {/* Hidden print component */}
+      {/* Hidden print components */}
       <div className="hidden">
-        <div ref={printRef}>
-          <ThermalPrintReceipt order={safeOrder as unknown as OrderWithItems} />
-        </div>
+        {isAdmin ? (
+          <div ref={adminPrintRef}>
+            <AdminOrderPrintView
+              order={{
+                ...safeOrder,
+                items: items,
+                assigned_rider_name: assignedAgent?.name,
+                delivery_schedule: deliverySchedule,
+                pickup_point: pickupPoint,
+              }}
+              businessSettings={businessSettings}
+              adminName={user?.name}
+              adminEmail={user?.email}
+            />
+          </div>
+        ) : (
+          <div ref={thermalPrintRef}>
+            <ThermalPrintReceipt order={safeOrder as unknown as OrderWithItems} />
+          </div>
+        )}
       </div>
     </>
   );

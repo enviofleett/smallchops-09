@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
@@ -26,146 +26,71 @@ export const AdminOrderStatusManager = ({
   onStatusUpdate
 }: AdminOrderStatusManagerProps) => {
   const queryClient = useQueryClient();
-  const { updateStatus, isUpdating, error } = useProductionStatusUpdate();
+  const { updateStatus } = useProductionStatusUpdate();
 
-  // Secure email notification mutation using edge function
-  const sendDeliveryEmailMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const { data, error } = await supabase.functions.invoke('send-out-for-delivery-email', {
-        body: { order_id: orderId }
-      });
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
-      toast.success('Out-for-delivery notification sent to customer.');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to send delivery notification.');
-    }
-  });
+  // --- Optimistic UI state ---
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(currentStatus);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleStatusUpdate = (newStatus: OrderStatus) => {
-    updateStatus({ orderId, status: newStatus });
-    onStatusUpdate?.(newStatus);
-  };
+  // --- Handle status update (optimistic UI) ---
+  const handleStatusUpdate = async (newStatus: OrderStatus) => {
+    if (isUpdating || newStatus === currentStatus) return;
 
-  const handleSendDeliveryEmail = () => {
-    sendDeliveryEmailMutation.mutate(orderId);
-  };
+    const prevStatus = selectedStatus;
+    setSelectedStatus(newStatus); // Optimistic update
+    setIsUpdating(true);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
-      case 'out_for_delivery': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'preparing': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'confirmed': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'pending': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    try {
+      await updateStatus({ orderId, status: newStatus });
+      toast.success('Order status updated!');
+      queryClient.invalidateQueries(['order', orderId]);
+      if (onStatusUpdate) onStatusUpdate(newStatus);
+    } catch (err) {
+      setSelectedStatus(prevStatus); // Rollback UI
+      toast.error('Failed to update status. Please try again.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
-  const renderStatusBadge = () => (
-    <Badge 
-      variant="outline" 
-      className={`${getStatusColor(currentStatus)} capitalize font-medium`}
-    >
-      {currentStatus.replace('_', ' ')}
-    </Badge>
-  );
+  // If the currentStatus prop changes (e.g., after refetch), sync selectedStatus
+  React.useEffect(() => {
+    setSelectedStatus(currentStatus);
+  }, [currentStatus]);
 
-  const renderActionButtons = () => {
-    const isProcessing = isUpdating || sendDeliveryEmailMutation.isPending;
-    
-    return (
-      <div className={`flex gap-1 ${className}`}>
-        {/* Confirmed -> Preparing */}
-        {currentStatus === 'confirmed' && (
-          <Button
-            size={size}
-            variant="outline"
-            onClick={() => handleStatusUpdate('preparing')}
-            disabled={isProcessing}
-          >
-            {isUpdating ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              'Start Preparing'
-            )}
-          </Button>
-        )}
+  const statusOptions: OrderStatus[] = [
+    'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'completed', 'returned'
+  ];
 
-        {/* Preparing -> Ready + Send Email */}
-        {currentStatus === 'preparing' && (
-          <>
-            <Button
-              size={size}
-              variant="outline"
-              onClick={() => handleStatusUpdate('ready')}
-              disabled={isProcessing}
-            >
-              {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Mark Ready'}
-            </Button>
-            <Button
-              size={size}
-              variant="outline"
-              onClick={handleSendDeliveryEmail}
-              disabled={isProcessing}
-              title="Send out-for-delivery email"
-            >
-              {sendDeliveryEmailMutation.isPending ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </>
-        )}
-
-        {/* Ready -> Out for Delivery */}
-        {currentStatus === 'ready' && (
-          <Button
-            size={size}
-            variant="outline"
-            onClick={() => {
-              handleStatusUpdate('out_for_delivery');
-              handleSendDeliveryEmail();
-            }}
-            disabled={isProcessing}
-          >
-            {isProcessing ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <Send className="w-4 h-4 mr-1" />
-                Out for Delivery
-              </>
-            )}
-          </Button>
-        )}
-
-        {/* Out for Delivery -> Delivered */}
-        {currentStatus === 'out_for_delivery' && (
-          <Button
-            size={size}
-            variant="outline"
-            onClick={() => handleStatusUpdate('delivered')}
-            disabled={isProcessing}
-          >
-            {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Mark Delivered'}
-          </Button>
-        )}
-      </div>
-    );
-  };
+  function getStatusLabel(status: OrderStatus) {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
 
   return (
-    <div className="flex items-center gap-2">
-      {renderStatusBadge()}
-      {renderActionButtons()}
+    <div className={`space-y-2 ${className}`}> 
+      <label className="text-sm font-medium text-muted-foreground">
+        Update Status for Order #{orderNumber}
+      </label>
+      <div className="flex gap-2">
+        <select
+          value={selectedStatus}
+          onChange={e => handleStatusUpdate(e.target.value as OrderStatus)}
+          disabled={isUpdating}
+          className="w-full p-2 border rounded-md bg-background"
+        >
+          {statusOptions.map(status => (
+            <option key={status} value={status} disabled={status === currentStatus}>
+              {getStatusLabel(status)}{status === currentStatus ? ' (Current)' : ''}
+            </option>
+          ))}
+        </select>
+        {isUpdating && (
+          <RefreshCw className="w-4 h-4 animate-spin ml-2" />
+        )}
+      </div>
+      <div>
+        <Badge>{getStatusLabel(selectedStatus)}</Badge>
+      </div>
     </div>
   );
 };

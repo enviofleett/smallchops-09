@@ -3,10 +3,14 @@ import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
 import { useRealTimeOrderData } from '@/hooks/useRealTimeOrderData';
+import { useUpdateOrderStatus } from '@/hooks/useUpdateOrderStatus';
+import { useDriverManagement } from '@/hooks/useDriverManagement';
+import { supabase } from '@/integrations/supabase/client';
 import { OrderDetailsHeader } from './details/OrderDetailsHeader';
 import { OrderDetailsTabs } from './details/OrderDetailsTabs';
 import { OrderDetailsFooter } from './details/OrderDetailsFooter';
 import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
+import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -49,10 +53,12 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   onClose
 }) => {
   const [selectedTab, setSelectedTab] = useState('summary');
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isAssigningRider, setIsAssigningRider] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const { data: detailedOrderData, isLoading, error, lastUpdated, connectionStatus, reconnect } = useRealTimeOrderData(order?.id);
+  const { updateStatus, isUpdating: isUpdatingStatus } = useUpdateOrderStatus(order?.id);
+  const { drivers, loading: driversLoading } = useDriverManagement();
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -62,15 +68,54 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   });
 
   const handleStatusUpdate = async (newStatus: string) => {
-    setIsUpdatingStatus(true);
     try {
-      // Implement your update logic here
-      // await updateOrderStatus(order.id, newStatus);
-      toast.success(`Order status updated to ${newStatus}`);
+      const success = await updateStatus(newStatus as any);
+      if (success) {
+        toast.success(`Order status updated to ${newStatus.replace(/_/g, ' ')}`);
+      }
     } catch (error) {
+      console.error('Error updating order status:', error);
       toast.error('Failed to update order status');
+    }
+  };
+
+  const handleRiderAssignment = async (riderId: string | null) => {
+    if (!order?.id) return;
+    
+    setIsAssigningRider(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (riderId) {
+        // Assign rider using RPC function
+        const { data, error } = await supabase.rpc('assign_rider_to_order', {
+          p_order_id: order.id,
+          p_rider_id: riderId,
+          p_assigned_by: user?.id
+        });
+
+        if (error) throw error;
+        
+        toast.success('Driver assigned successfully');
+      } else {
+        // Unassign rider - update order directly
+        const { error } = await supabase
+          .from('orders')
+          .update({ 
+            assigned_rider_id: null,
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', order.id);
+
+        if (error) throw error;
+        
+        toast.success('Driver unassigned successfully');
+      }
+    } catch (error: any) {
+      console.error('Error assigning driver:', error);
+      toast.error(error.message || 'Failed to assign driver');
     } finally {
-      setIsUpdatingStatus(false);
+      setIsAssigningRider(false);
     }
   };
 
@@ -95,6 +140,15 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             className="mb-2"
           />
         </div>
+
+        {/* Visual Order Status Tracker for Admin */}
+        <div className="px-6 pt-2">
+          <CustomerOrderStatusTracker
+            currentStatus={order.status}
+            orderTime={order.created_at}
+            estimatedDeliveryTime={deliverySchedule?.delivery_time_end}
+          />
+        </div>
         
         <OrderDetailsHeader
           order={order}
@@ -110,6 +164,11 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           setSelectedTab={setSelectedTab}
           isUpdatingStatus={isUpdatingStatus}
           handleStatusUpdate={handleStatusUpdate}
+          drivers={drivers}
+          driversLoading={driversLoading}
+          assignedRiderId={order.assigned_rider_id}
+          onRiderAssignment={handleRiderAssignment}
+          isAssigningRider={isAssigningRider}
         />
         <OrderDetailsFooter onClose={onClose} />
       </div>

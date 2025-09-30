@@ -95,7 +95,7 @@ export const ActionsTab: React.FC<ActionsTabProps> = ({
       {/* Quick Status Actions */}
       <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 shadow-lg">
         <div className="p-6">
-          <h2 className="text-xl font-bold mb-4">Quick Status Updates</h2>
+          <h2 className="text-lg font-semibold mb-4">Quick Status Updates</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             {STATUS_OPTIONS.map((status) => {
               const Icon = status.icon;
@@ -155,7 +155,7 @@ export const ActionsTab: React.FC<ActionsTabProps> = ({
       {/* Additional Actions */}
       <Card>
         <div className="p-6">
-          <h3 className="font-medium mb-4">Additional Actions</h3>
+          <h3 className="text-lg font-semibold mb-4">Additional Actions</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Button variant="outline" size="sm" className="h-12 flex flex-col items-center gap-1">
               <MessageSquare className="w-4 h-4" />

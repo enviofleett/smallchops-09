@@ -43,9 +43,9 @@ export const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({
     <div className="flex-shrink-0 border-b-2 bg-gradient-to-r from-primary/5 via-background to-accent/5 px-6 py-5">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2">
-              <Package className="w-7 h-7 text-primary" />
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-xl lg:text-2xl font-bold text-foreground flex items-center gap-2">
+              <Package className="w-6 h-6 text-primary" />
               Order #{order.order_number}
             </h1>
             <Badge
@@ -55,17 +55,17 @@ export const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({
               {order.status?.replace('_', ' ')}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             Complete order fulfillment details • Last updated {new Date(order.updated_at || order.created_at).toLocaleDateString()}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-4 text-base text-muted-foreground">
+            <span className="flex items-center gap-1.5">
               <CreditCard className="w-4 h-4" />
               ₦{order.total_amount?.toLocaleString()}
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5 capitalize">
               {order.order_type === 'pickup' ? (
                 <Building2 className="w-4 h-4" />
               ) : (

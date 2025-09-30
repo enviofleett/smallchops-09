@@ -696,16 +696,14 @@ export function EnhancedDeliveryManagement() {
       )}
 
       {/* Modals and Dialogs */}
-      {selectedOrder && (
-        <NewOrderDetailsModal
-          order={selectedOrder}
-          open={isDetailsModalOpen}
-          onClose={() => {
-            setIsDetailsModalOpen(false);
-            setSelectedOrder(null);
-          }}
-        />
-      )}
+      <NewOrderDetailsModal
+        order={selectedOrder}
+        open={isDetailsModalOpen && selectedOrder !== null}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedOrder(null);
+        }}
+      />
       <DeliveryAssignmentDialog
         isOpen={isAssignDialogOpen}
         onClose={() => {

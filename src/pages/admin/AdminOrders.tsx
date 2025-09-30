@@ -829,17 +829,15 @@ function AdminOrdersContent() {
         </Tabs>
 
         {/* Order Details Modal */}
-        {selectedOrder && (
-          <NewOrderDetailsModal 
-            order={selectedOrder} 
-            open={isDialogOpen} 
-            onClose={() => {
-              setIsDialogOpen(false);
-              setSelectedOrder(null);
-              refetch(); // Refresh orders after dialog closes
-            }} 
-          />
-        )}
+        <NewOrderDetailsModal 
+          order={selectedOrder} 
+          open={isDialogOpen && selectedOrder !== null}
+          onClose={() => {
+            setIsDialogOpen(false);
+            setSelectedOrder(null);
+            refetch(); // Refresh orders after dialog closes
+          }}
+        />
 
         {/* Thermal Receipt Preview Modal */}
         <ThermalReceiptPreview

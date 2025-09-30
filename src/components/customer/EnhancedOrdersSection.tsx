@@ -515,7 +515,7 @@ export function EnhancedOrdersSection() {
 
       <NewOrderDetailsModal
         order={selectedOrder}
-        open={isModalOpen}
+        open={isModalOpen && selectedOrder !== null}
         onClose={() => {
           setIsModalOpen(false);
           setSelectedOrder(null);

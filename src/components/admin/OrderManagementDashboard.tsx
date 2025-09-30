@@ -372,17 +372,15 @@ export const OrderManagementDashboard = () => {
       </Card>
 
       {/* Order Details Modal */}
-      {selectedOrder && (
-        <NewOrderDetailsModal
-          order={selectedOrder}
-          open={isDetailsModalOpen}
-          onClose={() => {
-            setIsDetailsModalOpen(false);
-            setSelectedOrder(null);
-            refetch();
-          }}
-        />
-      )}
+      <NewOrderDetailsModal
+        order={selectedOrder}
+        open={isDetailsModalOpen && selectedOrder !== null}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedOrder(null);
+          refetch();
+        }}
+      />
     </div>
   );
 };

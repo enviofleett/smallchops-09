@@ -35,10 +35,15 @@ import { OrderWithItems } from '@/api/orders';
 interface NewOrderDetailsModalProps {
   open: boolean;
   onClose: () => void;
-  order: any;
+  order: any | null;
 }
 
 export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsModalProps) {
+  // CRITICAL: Early null guard to prevent errors during modal transitions
+  if (!order) {
+    return null;
+  }
+
   const printRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
@@ -46,7 +51,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
     order?.id
   );
 
-  const { assignRiderMutation, handleStatusUpdate } = useOrderPageHooks(order?.id || '');
+  const { assignRiderMutation, handleStatusUpdate } = useOrderPageHooks(order.id);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,

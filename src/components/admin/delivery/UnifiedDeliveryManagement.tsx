@@ -547,8 +547,11 @@ export function UnifiedDeliveryManagement({
       {/* Modals */}
       <NewOrderDetailsModal
         order={selectedOrder}
-        open={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
+        open={isDetailsModalOpen && selectedOrder !== null}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedOrder(null);
+        }}
       />
       <OrderReceiptModal
         order={printingOrder}

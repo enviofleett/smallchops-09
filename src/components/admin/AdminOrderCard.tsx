@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 import { AdminOrderStatusBadge } from './AdminOrderStatusBadge';
+import { getOrderTimeWindow, formatTimeWindow } from '@/utils/timeWindowUtils';
 
 interface AdminOrderCardProps {
   order: OrderWithItems;
@@ -96,28 +97,31 @@ export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps)
         </div>
 
         {/* Delivery Schedule and Countdown */}
-        {deliverySchedule && (
+        {(order.order_type === 'delivery' || order.order_type === 'pickup') && (
           <div className="bg-muted/30 rounded-lg p-4 space-y-3">
             <h4 className="font-medium flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Delivery Schedule
+              {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Schedule
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Date</p>
-                <p className="font-medium">
-                  {format(new Date(deliverySchedule.delivery_date), 'MMM dd, yyyy')}
-                </p>
-              </div>
+              {(deliverySchedule?.delivery_date || order.delivery_date) && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">
+                    {format(new Date(deliverySchedule?.delivery_date || order.delivery_date), 'MMM dd, yyyy')}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-muted-foreground">Time Window</p>
                 <p className="font-medium">
-                  {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                  {formatTimeWindow(getOrderTimeWindow(order))}
                 </p>
+                <p className="text-xs text-muted-foreground">Fixed 1-hour window</p>
               </div>
             </div>
             
-            {deliverySchedule.delivery_time_start && deliverySchedule.delivery_time_end && (
+            {deliverySchedule?.delivery_time_start && deliverySchedule?.delivery_time_end && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Countdown:</span>
                 <MiniCountdownTimer
@@ -129,11 +133,11 @@ export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps)
               </div>
             )}
 
-            {deliverySchedule.special_instructions && (
+            {(deliverySchedule?.special_instructions || order.special_instructions) && (
               <div>
                 <p className="text-sm text-muted-foreground">Special Instructions</p>
                 <p className="text-sm bg-background rounded px-2 py-1">
-                  {deliverySchedule.special_instructions}
+                  {deliverySchedule?.special_instructions || order.special_instructions}
                 </p>
               </div>
             )}

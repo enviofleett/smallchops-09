@@ -86,92 +86,75 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
     <div className="thermal-receipt">
       <div className="receipt-content">
         {/* Business Header */}
-        <div className="text-center mb-2">
+        <div className="text-center">
           <div className="business-name">{businessInfo?.name || 'STARTERS SMALL CHOPS'}</div>
           {businessInfo?.whatsapp_support_number && (
-            <div className="contact">Contact: {businessInfo.whatsapp_support_number}</div>
+            <div className="contact">{businessInfo.whatsapp_support_number}</div>
           )}
         </div>
         
-        <div className="divider">================================</div>
+        <div className="divider">========================</div>
         
         {/* Order Info */}
         <div className="order-info">
-          <div>ORDER #: {order.order_number}</div>
-          <div>Date: {formatDate(order.created_at, 'yyyy-MM-dd HH:mm')}</div>
-          <div>Type: {getOrderTypeDisplay()}</div>
-          <div>Status: {order.status?.replace('_', ' ').toUpperCase()}</div>
+          <div>#{order.order_number}</div>
+          <div>{formatDate(order.created_at, 'dd/MM/yy HH:mm')}</div>
+          <div>{getOrderTypeDisplay()} | {order.status?.replace('_', ' ').toUpperCase()}</div>
         </div>
         
-        <div className="divider">================================</div>
+        <div className="divider">------------------------</div>
         
         {/* Customer Info */}
         <div className="customer-info">
-          <div className="section-header">CUSTOMER INFO:</div>
-          <div>Name: {order.customer_name || 'Not provided'}</div>
-          {order.customer_phone && <div>Phone: {order.customer_phone}</div>}
-          {order.customer_email && <div>Email: {order.customer_email}</div>}
+          <div className="section-header">CUSTOMER:</div>
+          <div>{order.customer_name || 'Not provided'}</div>
+          {order.customer_phone && <div>{order.customer_phone}</div>}
+          {order.customer_email && <div>{order.customer_email}</div>}
         </div>
         
-        <div className="divider">================================</div>
+        <div className="divider">------------------------</div>
         
         {/* Delivery/Pickup Schedule */}
-        <div className="schedule-info">
-          <div className="section-header">{getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
-          {deliverySchedule && (
-            <>
-              <div>Date: {formatDate(deliverySchedule.delivery_date, 'yyyy-MM-dd')}</div>
-              <div>Time: {deliverySchedule.delivery_time_start || 'Not specified'} - {deliverySchedule.delivery_time_end || 'Not specified'}</div>
-              {deliverySchedule.is_flexible && <div>Flexible: Yes</div>}
-              {deliveryInfo?.address && <div>Address: {deliveryInfo.address}</div>}
-              {deliveryInfo?.instructions && <div>Instructions: {deliveryInfo.instructions}</div>}
-              {deliverySchedule.special_instructions && (
-                <div>Special Notes: {deliverySchedule.special_instructions}</div>
+        {(deliverySchedule || deliveryInfo?.address) && (
+          <>
+            <div className="schedule-info">
+              <div className="section-header">{getOrderTypeDisplay().toUpperCase()}:</div>
+              {deliverySchedule && (
+                <>
+                  <div>{formatDate(deliverySchedule.delivery_date, 'dd/MM/yy')} {deliverySchedule.delivery_time_start || ''} - {deliverySchedule.delivery_time_end || ''}</div>
+                  {deliverySchedule.is_flexible && <div>Flexible timing</div>}
+                </>
               )}
-            </>
-          )}
-          {!deliverySchedule && order.order_type === 'delivery' && deliveryInfo?.address && (
-            <div>Address: {deliveryInfo.address}</div>
-          )}
-          {order.order_type === 'pickup' && !deliverySchedule && (
-            <div>Ready for pickup - Call for details</div>
-          )}
-        </div>
+              {deliveryInfo?.address && <div>{deliveryInfo.address}</div>}
+              {deliveryInfo?.instructions && <div>{deliveryInfo.instructions}</div>}
+              {deliverySchedule?.special_instructions && (
+                <div>{deliverySchedule.special_instructions}</div>
+              )}
+              {order.order_type === 'pickup' && !deliverySchedule && (
+                <div>Call for pickup</div>
+              )}
+            </div>
+            <div className="divider">------------------------</div>
+          </>
+        )}
         
-        <div className="divider">================================</div>
-        
-         {/* Order Items with Details */}
+         {/* Order Items */}
          <div className="items-section">
-           <div className="section-header">ORDER ITEMS & DETAILS:</div>
-           <div className="divider">--------------------------------</div>
+           <div className="section-header">ITEMS:</div>
            
-           {(order.order_items || []).map((item, index) => {
-             const itemDetails = getItemDetails(item);
-             return (
-               <div key={index} className="item-block">
-                 <div className="item-header">
-                   <span>{item.product_name || 'Item'}</span>
-                   <span className="item-total">{formatCurrency(item.total_price || 0)}</span>
-                 </div>
-                 <div className="item-meta">
-                   Qty: {item.quantity || 1}
-                   {item.unit_price && (
-                     <span> @ {formatCurrency(item.unit_price)}</span>
-                   )}
-                 </div>
-                 
-                 {itemDetails.map((detail, detailIndex) => (
-                   <div key={detailIndex} className="item-detail">
-                     {detail}
-                   </div>
-                 ))}
-                 
-                 {index < (order.order_items || []).length - 1 && <div className="item-spacer"></div>}
+           {(order.order_items || []).map((item, index) => (
+             <div key={index} className="item-block">
+               <div className="item-header">
+                 <span>{item.product_name || 'Item'}</span>
+                 <span className="item-total">{formatCurrency(item.total_price || 0)}</span>
                </div>
-            );
-          })}
+               <div className="item-meta">
+                 {item.quantity || 1}x @ {formatCurrency(item.unit_price || 0)}
+               </div>
+             </div>
+           ))}
           
-          <div className="divider">--------------------------------</div>
+          <div className="divider">------------------------</div>
         </div>
         
         {/* Order Summary */}
@@ -182,19 +165,18 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           </div>
           {order.delivery_fee && order.delivery_fee > 0 && (
             <div className="summary-line">
-              <span>Delivery Fee:</span>
+              <span>Delivery:</span>
               <span>{formatCurrency(order.delivery_fee)}</span>
             </div>
           )}
           {order.total_vat && order.total_vat > 0 && (
             <div className="summary-line">
-              <span>VAT ({((order.total_vat / Math.max(order.subtotal || 1, 1)) * 100).toFixed(1)}%):</span>
+              <span>VAT:</span>
               <span>{formatCurrency(order.total_vat)}</span>
             </div>
           )}
-          {/* Discount field not available in current order structure */}
           
-          <div className="divider">--------------------------------</div>
+          <div className="divider">------------------------</div>
           
           <div className="total-line">
             <span>TOTAL:</span>
@@ -202,55 +184,43 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
           </div>
         </div>
         
-        <div className="divider">================================</div>
+        <div className="divider">========================</div>
         
         {/* Payment Info */}
         <div className="payment-info">
-          <div>Payment: {order.payment_status?.toUpperCase()}</div>
-          {order.payment_method && <div>Method: {order.payment_method}</div>}
+          <div>{order.payment_status?.toUpperCase()}</div>
           {order.payment_reference && <div>Ref: {order.payment_reference}</div>}
         </div>
         
-        <div className="divider">================================</div>
-        
         {/* Preparation Notes */}
-        {(order.admin_notes || deliverySchedule?.special_instructions || deliveryInfo?.instructions) && (
+        {order.admin_notes && (
           <>
+            <div className="divider">------------------------</div>
             <div className="prep-notes">
-              <div className="section-header">PREPARATION NOTES:</div>
-              {order.admin_notes && <div>- {order.admin_notes}</div>}
-              {deliverySchedule?.special_instructions && (
-                <div>- {deliverySchedule.special_instructions}</div>
-              )}
-              {deliveryInfo?.instructions && (
-                <div>- Delivery: {deliveryInfo.instructions}</div>
-              )}
+              <div className="section-header">NOTES:</div>
+              <div>{order.admin_notes}</div>
             </div>
-            <div className="divider">================================</div>
           </>
         )}
         
+        <div className="divider">========================</div>
+        
         {/* Footer */}
-        <div className="receipt-footer text-center">
-          <div>Thank you for your order!</div>
-          <div>Estimated prep time: 25-30 mins</div>
+        <div className="receipt-footer">
+          <div>Thank you!</div>
           {businessInfo?.whatsapp_support_number && (
-            <div>For support: {businessInfo.whatsapp_support_number}</div>
+            <div>{businessInfo.whatsapp_support_number}</div>
           )}
-          {businessInfo?.admin_notification_email && (
-            <div>Email: {businessInfo.admin_notification_email}</div>
-          )}
-          
-          <div className="divider">================================</div>
           
           {/* Admin Print Information */}
           {businessInfo?.printed_by && (
-            <div className="admin-print-info" style={{ fontSize: '7px', marginTop: '4px' }}>
-              <div style={{ fontWeight: 'bold' }}>Printed by: {businessInfo.printed_by}</div>
-              {businessInfo.printed_on && (
-                <div>On: {businessInfo.printed_on}</div>
-              )}
-            </div>
+            <>
+              <div className="divider">------------------------</div>
+              <div className="admin-print-info">
+                <div>Printed: {businessInfo.printed_by}</div>
+                {businessInfo.printed_on && <div>{businessInfo.printed_on}</div>}
+              </div>
+            </>
           )}
         </div>
       </div>

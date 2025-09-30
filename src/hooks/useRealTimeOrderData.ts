@@ -23,6 +23,10 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   const channelRef = useRef<RealtimeChannel | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSettingUpRef = useRef<boolean>(false);
+  const reconnectDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const maxRetries = 5;
 
   // Primary query using comprehensive RPC
   const { data, isLoading, error, refetch } = useQuery({
@@ -138,15 +142,29 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
   });
 
   // Setup real-time subscriptions with performance optimization
-  const setupSubscriptions = useCallback(() => {
+  const setupSubscriptions = useCallback(async () => {
     if (!orderId) return;
 
+    // Guard: Don't setup if already in progress
+    if (isSettingUpRef.current || connectionStatus === 'connecting') {
+      console.log('⏸️ Subscription setup already in progress, skipping...');
+      return;
+    }
+
+    isSettingUpRef.current = true;
     console.log('📡 Setting up optimized real-time subscriptions for order:', orderId);
     setConnectionStatus('connecting');
 
-    // Clean up existing channel
+    // Clean up existing channel properly
     if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
+      const oldChannel = channelRef.current;
+      channelRef.current = null; // Clear ref immediately
+      
+      console.log('🧹 Removing old channel...');
+      await supabase.removeChannel(oldChannel);
+      
+      // Small delay to ensure cleanup completes
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     // Create single channel for all subscriptions (more efficient)
@@ -232,23 +250,45 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
           console.log('✅ Real-time subscriptions active for order:', orderId);
           setConnectionStatus('connected');
           
+          // Reset retry count on successful connection
+          retryCountRef.current = 0;
+          
           // Clear any pending reconnect attempts
           if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
             reconnectTimeoutRef.current = null;
           }
+          
+          // Reset setup flag after successful connection
+          setTimeout(() => {
+            isSettingUpRef.current = false;
+          }, 1000);
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Real-time subscription error for order:', orderId);
           setConnectionStatus('disconnected');
           
-          // Exponential backoff reconnection
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Attempting optimized reconnection for order:', orderId);
-            setupSubscriptions();
-          }, 3000);
+          // Reset setup flag
+          isSettingUpRef.current = false;
+          
+          // Implement exponential backoff with max retries
+          if (retryCountRef.current < maxRetries) {
+            const retryDelay = Math.min(3000 * Math.pow(2, retryCountRef.current), 30000);
+            console.log(`🔄 Reconnecting in ${retryDelay/1000}s (attempt ${retryCountRef.current + 1}/${maxRetries})`);
+            
+            reconnectTimeoutRef.current = setTimeout(() => {
+              retryCountRef.current++;
+              setupSubscriptions();
+            }, retryDelay);
+          } else {
+            console.error('❌ Max reconnection attempts reached');
+            setConnectionStatus('disconnected');
+          }
         } else if (status === 'CLOSED') {
           console.log('🔌 Real-time connection closed for order:', orderId);
           setConnectionStatus('disconnected');
+          
+          // Reset setup flag
+          isSettingUpRef.current = false;
         }
       });
 
@@ -275,15 +315,32 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
         reconnectTimeoutRef.current = null;
       }
       
+      if (reconnectDebounceRef.current) {
+        clearTimeout(reconnectDebounceRef.current);
+        reconnectDebounceRef.current = null;
+      }
+      
+      isSettingUpRef.current = false;
       setConnectionStatus('disconnected');
     };
   }, [orderId, setupSubscriptions]);
 
-  // Manual reconnect function
+  // Manual reconnect function with debouncing
   const reconnect = useCallback(() => {
-    console.log('🔄 Manual reconnect triggered for order:', orderId);
-    setupSubscriptions();
-  }, [setupSubscriptions]);
+    // Clear any pending debounce
+    if (reconnectDebounceRef.current) {
+      clearTimeout(reconnectDebounceRef.current);
+    }
+    
+    // Reset retry count for manual reconnects
+    retryCountRef.current = 0;
+    
+    // Debounce reconnect to prevent rapid calls
+    reconnectDebounceRef.current = setTimeout(() => {
+      console.log('🔄 Manual reconnect triggered for order:', orderId);
+      setupSubscriptions();
+    }, 500);
+  }, [setupSubscriptions, orderId]);
 
   return {
     data,

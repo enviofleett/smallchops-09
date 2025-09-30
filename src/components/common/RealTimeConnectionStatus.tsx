@@ -17,6 +17,8 @@ interface RealTimeConnectionStatusProps {
   className?: string;
   showLastUpdated?: boolean;
   compact?: boolean;
+  retryAttempt?: number;
+  maxRetries?: number;
 }
 
 /**
@@ -29,7 +31,9 @@ export const RealTimeConnectionStatus: React.FC<RealTimeConnectionStatusProps> =
   onReconnect,
   className,
   showLastUpdated = true,
-  compact = false
+  compact = false,
+  retryAttempt,
+  maxRetries
 }) => {
   const getStatusConfig = () => {
     switch (connectionStatus) {
@@ -41,10 +45,13 @@ export const RealTimeConnectionStatus: React.FC<RealTimeConnectionStatusProps> =
           color: 'text-green-600'
         };
       case 'connecting':
+        const connectingText = retryAttempt && maxRetries 
+          ? `Reconnecting (${retryAttempt}/${maxRetries})...`
+          : compact ? 'Connecting' : 'Connecting...';
         return {
           variant: 'secondary' as const,
           icon: Loader2,
-          text: compact ? 'Connecting' : 'Connecting...',
+          text: connectingText,
           color: 'text-yellow-600'
         };
       case 'disconnected':

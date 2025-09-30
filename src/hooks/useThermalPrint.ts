@@ -80,7 +80,7 @@ export const useThermalPrint = () => {
               `<div class="contact">Contact: ${receiptContent.contactNumber}</div>` : ''}
           </div>
           
-          <div class="divider">================================</div>
+          <div class="divider">- - - - - - - - - - - - - - - - - -</div>
           
           <div class="order-info">
             <div>ORDER #: ${order.order_number}</div>
@@ -89,7 +89,7 @@ export const useThermalPrint = () => {
             <div>Status: ${order.status?.replace('_', ' ').toUpperCase()}</div>
           </div>
           
-          <div class="divider">================================</div>
+          <div class="divider">- - - - - - - - - - - - - - - - - -</div>
           
           <div class="customer-info">
             <div class="section-header">CUSTOMER INFO:</div>
@@ -98,7 +98,7 @@ export const useThermalPrint = () => {
             ${order.customer_email ? `<div>Email: ${order.customer_email}</div>` : ''}
           </div>
           
-          <div class="divider">================================</div>
+          <div class="divider">- - - - - - - - - - - - - - - - - -</div>
           
           <div class="delivery-schedule">
             <div class="section-header">${receiptContent.getOrderTypeDisplay().toUpperCase()} SCHEDULE:</div>
@@ -134,11 +134,11 @@ export const useThermalPrint = () => {
             ` : ''}
           </div>
           
-          <div class="divider">================================</div>
+          <div class="divider">- - - - - - - - - - - - - - - - - -</div>
           
           <div class="items-section">
             <div class="section-header">ORDER ITEMS & DETAILS:</div>
-            <div class="divider">--------------------------------</div>
+            <div class="divider">- - - - - - - - - - - - - - - -</div>
             
             ${order.order_items?.map((item, index) => {
               const itemDetails = receiptContent.getItemDetails(item);
@@ -162,7 +162,7 @@ export const useThermalPrint = () => {
               `;
             }).join('') || '<div>No items found</div>'}
             
-            <div class="divider">--------------------------------</div>
+            <div class="divider">- - - - - - - - - - - - - - - -</div>
           </div>
           
           <div class="order-summary">
@@ -195,7 +195,7 @@ export const useThermalPrint = () => {
             </div>
           </div>
           
-          <div class="divider">================================</div>
+          <div class="divider">- - - - - - - - - - - - - - - - - -</div>
           
           <div class="payment-info">
             <div class="section-header">PAYMENT DETAILS:</div>
@@ -205,14 +205,14 @@ export const useThermalPrint = () => {
           </div>
           
           ${order.special_instructions ? `
-            <div class="divider">================================</div>
+            <div class="divider">- - - - - - - - - - - - - - - - - -</div>
             <div class="special-instructions">
               <div class="section-header">PREPARATION NOTES:</div>
               <div>${order.special_instructions}</div>
             </div>
           ` : ''}
           
-          <div class="divider">================================</div>
+          <div class="divider">- - - - - - - - - - - - - - - - - -</div>
           
           <div class="footer text-center">
             <div>Thank you for your order!</div>
@@ -220,7 +220,7 @@ export const useThermalPrint = () => {
             ${receiptContent.adminEmail ? 
               `<div>${receiptContent.adminEmail}</div>` : ''}
             
-            <div class="divider">================================</div>
+            <div class="divider">- - - - - - - - - - - - - - - - - -</div>
             
             ${businessInfo?.printed_by ? `
               <div class="admin-print-info" style="font-size: 7px; margin-top: 4px;">

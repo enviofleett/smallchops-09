@@ -15,7 +15,7 @@
  * 4. Simplifies data flow and reduces points of failure
  */
 
-import { parse, isValid, addHours, format as formatDate } from 'date-fns';
+import { parse, isValid, addHours, format as formatDate, parseISO } from 'date-fns';
 
 export interface TimeWindow {
   start_time: string;
@@ -26,7 +26,7 @@ export interface TimeWindow {
 
 /**
  * Calculate a 1-hour time window from a start time
- * @param startTime - The start time string (e.g., "9:00 AM", "14:30", "09:00:00")
+ * @param startTime - The start time string (e.g., "9:00 AM", "14:30", "09:00:00", "2025-10-02 10:00:00+00")
  * @returns TimeWindow object with formatted times, or null if parsing fails
  */
 export const calculateTimeWindow = (
@@ -35,15 +35,31 @@ export const calculateTimeWindow = (
   if (!startTime) return null;
 
   try {
-    // Try parsing with common formats
-    const timeFormats = ['HH:mm', 'h:mm a', 'h:mma', 'HH:mm:ss', 'h:mm:ss a', 'h a'];
     let parsedTime: Date | null = null;
+    const trimmedTime = startTime.trim();
 
-    for (const formatStr of timeFormats) {
-      const result = parse(startTime.trim(), formatStr, new Date());
-      if (isValid(result)) {
-        parsedTime = result;
-        break;
+    // First, try to parse as ISO timestamp (e.g., "2025-10-02 10:00:00+00" or "2025-10-02T10:00:00Z")
+    if (trimmedTime.includes('-') || trimmedTime.includes('T')) {
+      try {
+        const isoDate = parseISO(trimmedTime);
+        if (isValid(isoDate)) {
+          parsedTime = isoDate;
+        }
+      } catch (e) {
+        // Not an ISO timestamp, continue to other formats
+      }
+    }
+
+    // If not a timestamp, try parsing as time-only formats
+    if (!parsedTime) {
+      const timeFormats = ['HH:mm', 'h:mm a', 'h:mma', 'HH:mm:ss', 'h:mm:ss a', 'h a'];
+      
+      for (const formatStr of timeFormats) {
+        const result = parse(trimmedTime, formatStr, new Date());
+        if (isValid(result)) {
+          parsedTime = result;
+          break;
+        }
       }
     }
 

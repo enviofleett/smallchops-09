@@ -59,6 +59,18 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
     return null;
   }
 
+  // If time field exists but parsing failed, show critical error
+  if ((order.order_type === 'delivery' || order.order_type === 'pickup') && timeField && !timeWindow) {
+    return (
+      <DeliveryWindowCriticalError
+        orderId={order.id}
+        errorMessage={`Unable to parse ${order.order_type === 'delivery' ? 'delivery' : 'pickup'} time: "${timeField}". Please contact support.`}
+        onRetry={onRetry}
+        showContactSupport={true}
+      />
+    );
+  }
+
   // If no time window can be calculated (shouldn't happen after validation)
   if (!timeWindow) {
     return null;

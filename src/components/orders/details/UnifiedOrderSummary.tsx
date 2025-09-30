@@ -3,9 +3,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Package, ChevronDown, ChevronUp, Info, Calculator, ShoppingCart } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Package, ChevronDown, ChevronUp, Info, Calculator, ShoppingCart, AlertCircle } from 'lucide-react';
 import { getFirstImage } from '@/lib/imageUtils';
 import { cn } from '@/lib/utils';
+import { OrderDetailsSectionErrorBoundary } from './ErrorBoundary';
 
 interface OrderItem {
   id: string;
@@ -40,6 +42,7 @@ interface UnifiedOrderSummaryProps {
   grandTotal: number;
   vatRate?: number;
   paymentStatus?: string;
+  isLoading?: boolean;
 }
 
 export const UnifiedOrderSummary: React.FC<UnifiedOrderSummaryProps> = ({
@@ -50,17 +53,73 @@ export const UnifiedOrderSummary: React.FC<UnifiedOrderSummaryProps> = ({
   deliveryFee = 0,
   grandTotal,
   vatRate = 7.5,
-  paymentStatus
+  paymentStatus,
+  isLoading = false
 }) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
-  const formatCurrency = (value: number | string | null | undefined) => {
-    const n = Number(value);
-    const safe = Number.isFinite(n) ? n : 0;
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN'
-    }).format(safe);
+  // Validation: Calculate total and check for discrepancies
+  const calculatedTotal = subtotal + totalVat + deliveryFee - totalDiscount;
+  const hasDiscrepancy = Math.abs(calculatedTotal - grandTotal) > 0.01;
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="space-y-4 animate-pulse">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 bg-muted rounded" />
+              <div className="h-5 w-32 bg-muted rounded" />
+            </div>
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <div key={i} className="border rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-muted rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-muted rounded w-3/4" />
+                      <div className="h-3 bg-muted rounded w-1/2" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Error state
+  if (!items || items.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No order items found. Please refresh or contact support if the issue persists.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
+
+
+  const formatCurrency = (value: number | string | null | undefined): string => {
+    try {
+      const n = Number(value);
+      const safe = Number.isFinite(n) ? n : 0;
+      return new Intl.NumberFormat('en-NG', {
+        style: 'currency',
+        currency: 'NGN'
+      }).format(safe);
+    } catch (error) {
+      console.error('Currency formatting error:', error);
+      return `₦${Number(value || 0).toFixed(2)}`;
+    }
   };
 
   const toggleItemExpansion = (itemId: string) => {
@@ -123,8 +182,10 @@ export const UnifiedOrderSummary: React.FC<UnifiedOrderSummaryProps> = ({
     );
   };
 
+
   return (
-    <Card>
+    <OrderDetailsSectionErrorBoundary context="UnifiedOrderSummary">
+      <Card>
       <CardContent className="p-3 sm:p-6">
         {/* Header Section */}
         <div className="flex items-center justify-between mb-4">
@@ -314,6 +375,25 @@ export const UnifiedOrderSummary: React.FC<UnifiedOrderSummaryProps> = ({
               <span className="font-bold text-lg text-primary">{formatCurrency(grandTotal)}</span>
             </div>
 
+            {/* Calculation Discrepancy Warning */}
+            {hasDiscrepancy && (
+              <Alert className="border-yellow-200 bg-yellow-50">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-800">
+                  <div className="text-xs space-y-1">
+                    <p className="font-medium">Calculation Notice</p>
+                    <p>
+                      Calculated: {formatCurrency(calculatedTotal)} | 
+                      Recorded: {formatCurrency(grandTotal)}
+                    </p>
+                    <p className="text-yellow-600">
+                      Difference: {formatCurrency(Math.abs(calculatedTotal - grandTotal))}
+                    </p>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Payment Status */}
             {paymentStatus && (
               <div className="flex justify-between items-center text-xs pt-2">
@@ -344,5 +424,6 @@ export const UnifiedOrderSummary: React.FC<UnifiedOrderSummaryProps> = ({
         </div>
       </CardContent>
     </Card>
+    </OrderDetailsSectionErrorBoundary>
   );
 };

@@ -1,20 +1,23 @@
 import { startOfDay, endOfDay, addDays, subDays, isWithinInterval } from 'date-fns';
 import { OrderWithItems } from '@/api/orders';
+import { getLagosTime, toLagosTime, startOfDayLagos, endOfDayLagos, formatLagosTime, compareLagosDates } from './lagosTimezone';
 
 export type DeliveryFilterType = 'all' | 'today' | 'tomorrow' | 'future' | 'due_today' | 'upcoming' | 'past_due' | 'this_week' | 'next_week';
 
 /**
  * Production-ready utility functions for date-based order filtering
+ * ALL dates are handled in Lagos timezone (Africa/Lagos - WAT, UTC+1)
  */
 
 export const getScheduleDateForOrder = (order: OrderWithItems, deliverySchedules: Record<string, any>) => {
   const schedule = deliverySchedules[order.id];
   if (schedule?.delivery_date) {
     try {
-      const date = new Date(schedule.delivery_date);
+      // Parse date in Lagos timezone
+      const date = toLagosTime(schedule.delivery_date);
       return isNaN(date.getTime()) ? null : date;
     } catch (error) {
-      console.warn('Error parsing delivery date:', schedule.delivery_date, error);
+      console.warn('[LAGOS TZ] Error parsing delivery date:', schedule.delivery_date, error);
       return null;
     }
   }
@@ -22,22 +25,22 @@ export const getScheduleDateForOrder = (order: OrderWithItems, deliverySchedules
 };
 
 export const isDateInRange = (date: Date, startDate: Date, endDate: Date): boolean => {
-  const normalizedDate = startOfDay(date);
-  const normalizedStart = startOfDay(startDate);
-  const normalizedEnd = startOfDay(endDate);
+  const normalizedDate = startOfDayLagos(date);
+  const normalizedStart = startOfDayLagos(startDate);
+  const normalizedEnd = startOfDayLagos(endDate);
   return normalizedDate >= normalizedStart && normalizedDate <= normalizedEnd;
 };
 
-export const getDateRangeForFilter = (filter: DeliveryFilterType, referenceDate: Date = new Date()) => {
-  const today = startOfDay(referenceDate);
-  const tomorrow = startOfDay(addDays(referenceDate, 1));
-  const yesterday = startOfDay(subDays(referenceDate, 1));
+export const getDateRangeForFilter = (filter: DeliveryFilterType, referenceDate: Date = getLagosTime()) => {
+  const today = startOfDayLagos(referenceDate);
+  const tomorrow = startOfDayLagos(addDays(referenceDate, 1));
+  const yesterday = startOfDayLagos(subDays(referenceDate, 1));
   
-  // Calculate week boundaries (Sunday to Saturday)
-  const thisWeekStart = startOfDay(subDays(referenceDate, referenceDate.getDay()));
-  const thisWeekEnd = endOfDay(addDays(thisWeekStart, 6));
-  const nextWeekStart = startOfDay(addDays(thisWeekEnd, 1));
-  const nextWeekEnd = endOfDay(addDays(nextWeekStart, 6));
+  // Calculate week boundaries (Sunday to Saturday) in Lagos timezone
+  const thisWeekStart = startOfDayLagos(subDays(referenceDate, referenceDate.getDay()));
+  const thisWeekEnd = endOfDayLagos(addDays(thisWeekStart, 6));
+  const nextWeekStart = startOfDayLagos(addDays(thisWeekEnd, 1));
+  const nextWeekEnd = endOfDayLagos(addDays(nextWeekStart, 6));
   
   switch (filter) {
     case 'today':
@@ -79,7 +82,7 @@ export const filterOrdersByDate = (
       return false;
     }
     
-    const normalizedScheduleDate = startOfDay(scheduleDate);
+    const normalizedScheduleDate = startOfDayLagos(scheduleDate);
     
     switch (filter) {
       case 'today':
@@ -91,9 +94,9 @@ export const filterOrdersByDate = (
       case 'due_today':
         return normalizedScheduleDate.getTime() === dateRange.start.getTime();
       case 'past_due':
-        return normalizedScheduleDate.getTime() < startOfDay(new Date()).getTime();
+        return normalizedScheduleDate.getTime() < startOfDayLagos().getTime();
       case 'upcoming':
-        return normalizedScheduleDate.getTime() > startOfDay(new Date()).getTime();
+        return normalizedScheduleDate.getTime() > startOfDayLagos().getTime();
       case 'this_week':
       case 'next_week':
         return isDateInRange(scheduleDate, dateRange.start, dateRange.end);
@@ -148,9 +151,9 @@ export const getFilterStats = (
     next_week: 0
   };
   
-  const today = startOfDay(new Date());
-  const tomorrow = startOfDay(addDays(new Date(), 1));
-  const dayAfterTomorrow = startOfDay(addDays(new Date(), 2));
+  const today = startOfDayLagos();
+  const tomorrow = startOfDayLagos(addDays(getLagosTime(), 1));
+  const dayAfterTomorrow = startOfDayLagos(addDays(getLagosTime(), 2));
   const dateRanges = {
     this_week: getDateRangeForFilter('this_week'),
     next_week: getDateRangeForFilter('next_week')
@@ -161,7 +164,7 @@ export const getFilterStats = (
     const scheduleDate = getScheduleDateForOrder(order, deliverySchedules);
     if (!scheduleDate) return;
     
-    const normalizedDate = startOfDay(scheduleDate);
+    const normalizedDate = startOfDayLagos(scheduleDate);
     
     if (normalizedDate.getTime() === today.getTime()) {
       stats.today++;

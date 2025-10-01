@@ -164,55 +164,47 @@ function AdminOrdersContent() {
     }
   }, [orders, deliverySchedules]);
 
-  // Priority sort and filter orders for production
+  // PRODUCTION: Priority sort and filter orders
   const prioritySortedOrders = useMemo(() => {
     let ordersCopy = [...orders];
     
-    // Filter and sort confirmed orders - ONLY PAID ORDERS
+    // CONFIRMED TAB: Show ALL paid confirmed orders by default
     if (statusFilter === 'confirmed') {
-      // First filter: only paid confirmed orders
+      // Filter: ONLY paid confirmed orders (production requirement)
       ordersCopy = orders.filter(order => 
         order.status === 'confirmed' && order.payment_status === 'paid'
       );
       
-      // Sort with today's orders first, then by delivery schedule
+      // PRODUCTION SORT: By delivery window (earliest first)
       ordersCopy.sort((a, b) => {
         const scheduleA = deliverySchedules[a.id];
         const scheduleB = deliverySchedules[b.id];
         
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        // Check if orders are scheduled for today
-        const aIsToday = scheduleA && new Date(scheduleA.delivery_date).setHours(0, 0, 0, 0) === today.getTime();
-        const bIsToday = scheduleB && new Date(scheduleB.delivery_date).setHours(0, 0, 0, 0) === today.getTime();
-        
-        // Today's orders come first
-        if (aIsToday && !bIsToday) return -1;
-        if (!aIsToday && bIsToday) return 1;
-        
-        // Among today's orders, sort by time slot (earliest first)
-        if (aIsToday && bIsToday) {
-          // Both today - sort by time slot
-          if (scheduleA && scheduleB) {
-            const timeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
-            const timeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
-            return timeA.getTime() - timeB.getTime();
+        // Both have delivery schedules - sort by delivery window
+        if (scheduleA?.delivery_date && scheduleB?.delivery_date) {
+          try {
+            const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start || '00:00'}`);
+            const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start || '00:00'}`);
+            
+            // Validate dates
+            if (!isNaN(dateTimeA.getTime()) && !isNaN(dateTimeB.getTime())) {
+              return dateTimeA.getTime() - dateTimeB.getTime();
+            }
+          } catch (error) {
+            console.warn('Error sorting by delivery window:', error);
           }
         }
         
-        // For non-today orders, sort by delivery date + time
-        if (scheduleA && scheduleB) {
-          const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
-          const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
-          return dateTimeA.getTime() - dateTimeB.getTime();
+        // Orders with schedules come first
+        if (scheduleA?.delivery_date && !scheduleB?.delivery_date) return -1;
+        if (!scheduleA?.delivery_date && scheduleB?.delivery_date) return 1;
+        
+        // Pickup orders or orders without schedules - sort by pickup time or order time
+        if (a.pickup_time && b.pickup_time) {
+          return new Date(a.pickup_time).getTime() - new Date(b.pickup_time).getTime();
         }
         
-        // Orders with schedules come first
-        if (scheduleA && !scheduleB) return -1;
-        if (!scheduleA && scheduleB) return 1;
-        
-        // Fallback to order time (most recent first for unscheduled orders)
+        // Fallback: Most recent orders first
         return new Date(b.order_time || b.created_at).getTime() - 
                new Date(a.order_time || a.created_at).getTime();
       });
@@ -223,22 +215,23 @@ function AdminOrdersContent() {
 
   // Filter orders by delivery schedule with defensive date handling + hourly filtering
 
-  // Production-ready filtering with performance optimizations
+  // PRODUCTION: Filtering with safeguards
   const filteredOrders = useMemo(() => {
     let result = prioritySortedOrders;
     
-    // Apply comprehensive delivery/pickup date filter using utility functions
+    // CONFIRMED TAB: By default show ALL paid confirmed orders (no date filter applied)
+    // Only apply filters when explicitly selected by user
     if (deliveryFilter !== 'all') {
       try {
         result = filterOrdersByDate(result as any[], deliveryFilter, deliverySchedules) as any;
       } catch (error) {
-        console.error('Error applying date filter:', error);
-        // Fallback to showing all orders if filtering fails
+        console.error('[PRODUCTION] Error applying date filter:', error);
+        // Fallback: show all orders if filtering fails (production safety)
         result = prioritySortedOrders;
       }
     }
     
-    // Apply hourly filtering for confirmed tab
+    // HOURLY FILTER: Only apply when user explicitly selects day/hour
     if (activeTab === 'confirmed' && (selectedDay || selectedHour)) {
       const today = startOfDay(new Date());
       const tomorrow = startOfDay(addDays(new Date(), 1));
@@ -367,11 +360,16 @@ function AdminOrdersContent() {
   }, [prioritySortedOrders, deliverySchedules, activeTab]);
 
   // Calculate overdue order counts by date ranges
-  // Get order counts by status for tab badges
+  // PRODUCTION: Order counts for tab badges
   const orderCounts = useMemo(() => {
+    // Count only PAID confirmed orders (production requirement)
+    const paidConfirmedOrders = orders.filter(o => 
+      o.status === 'confirmed' && o.payment_status === 'paid'
+    );
+    
     return {
       all: totalCount,
-      confirmed: orders.filter(o => o.status === 'confirmed' && o.payment_status === 'paid').length, // Only paid confirmed orders
+      confirmed: paidConfirmedOrders.length, // Only paid confirmed orders shown
       preparing: orders.filter(o => o.status === 'preparing').length,
       ready: orders.filter(o => o.status === 'ready').length,
       out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,

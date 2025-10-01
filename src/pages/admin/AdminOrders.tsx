@@ -244,9 +244,9 @@ function AdminOrdersContent() {
       const tomorrow = startOfDay(addDays(new Date(), 1));
       
       result = result.filter(order => {
-        // Only filter delivery orders with paid status that have schedules
+        // Skip filtering for non-delivery orders or unpaid orders - keep them visible
         if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
-          return false;
+          return true; // Keep non-delivery/unpaid orders visible
         }
         
         const schedule = deliverySchedules[order.id];

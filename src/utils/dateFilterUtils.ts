@@ -72,11 +72,8 @@ export const filterOrdersByDate = (
   if (!dateRange) return orders;
   
   return orders.filter(order => {
-    // Only apply date filters to paid orders with valid schedules
-    if (order.payment_status !== 'paid') {
-      return false;
-    }
-    
+    // Only apply date filters to orders with valid schedules
+    // Payment status filtering is handled by tab selection
     const scheduleDate = getScheduleDateForOrder(order, deliverySchedules);
     if (!scheduleDate) {
       return false;
@@ -160,8 +157,7 @@ export const getFilterStats = (
   };
   
   orders.forEach(order => {
-    if (order.payment_status !== 'paid') return;
-    
+    // Count all orders with valid schedules (payment status handled by tab)
     const scheduleDate = getScheduleDateForOrder(order, deliverySchedules);
     if (!scheduleDate) return;
     

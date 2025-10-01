@@ -280,15 +280,21 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <span className="text-base">{safeOrder.customer_phone}</span>
                   {isAdmin && (
-                    <a
-                      href={`https://wa.me/${safeOrder.customer_phone.replace(/[^0-9]/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-500 hover:bg-green-600 transition-colors"
+                    <button
+                      onClick={() => {
+                        const cleanNumber = safeOrder.customer_phone.replace(/[^0-9]/g, '');
+                        const formattedNumber = cleanNumber.startsWith('234') 
+                          ? cleanNumber 
+                          : `234${cleanNumber.replace(/^0/, '')}`;
+                        const whatsappUrl = `https://web.whatsapp.com/send?phone=${formattedNumber}`;
+                        window.open(whatsappUrl, 'whatsapp_chat', 'noopener,noreferrer');
+                      }}
+                      className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-500 hover:bg-green-600 transition-colors cursor-pointer"
                       title="Chat on WhatsApp"
+                      type="button"
                     >
                       <MessageCircle className="h-4 w-4 text-white" />
-                    </a>
+                    </button>
                   )}
                 </div>
               )}

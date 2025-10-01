@@ -7,6 +7,7 @@ import { AdminOrderStatusManager } from './AdminOrderStatusManager';
 import { SimpleOrderStatusUpdater } from './SimpleOrderStatusUpdater';
 import { SecureOrderStatusUpdater } from './SecureOrderStatusUpdater';
 import ProductionOrderErrorBoundary from './ProductionOrderErrorBoundary';
+import { PaymentConfirmationButton } from './PaymentConfirmationButton';
 import { format } from 'date-fns';
 import { 
   Package, 
@@ -109,6 +110,8 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
                   orderId={order.id}
                   currentStatus={order.status}
                   orderNumber={order.order_number}
+                  paymentStatus={order.payment_status}
+                  paymentReference={order.paystack_reference || order.payment_reference}
                   size="sm"
                 />
               )
@@ -251,6 +254,15 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
                 Full Details
               </a>
             </Button>
+            
+            {order.payment_status === 'pending' && (order.paystack_reference || order.payment_reference) && (
+              <PaymentConfirmationButton
+                orderId={order.id}
+                orderNumber={order.order_number}
+                paymentReference={order.paystack_reference || order.payment_reference}
+                paymentStatus={order.payment_status}
+              />
+            )}
             
             {order.payment_status !== 'paid' && order.status === 'pending' && (
               <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">

@@ -7,11 +7,14 @@ import { RefreshCw, Send } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PaymentConfirmationButton } from './PaymentConfirmationButton';
 
 interface AdminOrderStatusManagerProps {
   orderId: string;
   currentStatus: OrderStatus;
   orderNumber: string;
+  paymentStatus?: string;
+  paymentReference?: string | null;
   className?: string;
   size?: 'sm' | 'default' | 'lg';
   onStatusUpdate?: (newStatus: OrderStatus) => void;
@@ -21,6 +24,8 @@ export const AdminOrderStatusManager = ({
   orderId, 
   currentStatus, 
   orderNumber,
+  paymentStatus,
+  paymentReference,
   className = '',
   size = 'sm',
   onStatusUpdate
@@ -163,9 +168,20 @@ export const AdminOrderStatusManager = ({
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {renderStatusBadge()}
-      {renderActionButtons()}
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        {renderStatusBadge()}
+        {renderActionButtons()}
+      </div>
+      {paymentStatus && paymentReference && (
+        <PaymentConfirmationButton
+          orderId={orderId}
+          orderNumber={orderNumber}
+          paymentReference={paymentReference}
+          paymentStatus={paymentStatus}
+          onSuccess={() => onStatusUpdate?.('confirmed' as OrderStatus)}
+        />
+      )}
     </div>
   );
 };

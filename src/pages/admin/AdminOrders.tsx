@@ -40,7 +40,6 @@ import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBound
 import ProductionOrderErrorBoundary from '@/components/admin/ProductionOrderErrorBoundary';
 import OrderErrorBoundary from '@/components/orders/OrderErrorBoundary';
 import { OrderDetailsTestButton } from '@/components/admin/OrderDetailsTestButton';
-import { getLagosTime, toLagosTime, parseDeliveryDateTime, formatLagosTime, startOfDayLagos, compareLagosDates } from '@/utils/lagosTimezone';
 
 function AdminOrdersContent() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -112,25 +111,22 @@ function AdminOrdersContent() {
     }
   }, [activeTab]);
 
-  // PRODUCTION: Fetch orders with pagination and filters (Lagos timezone aware)
+  // Fetch orders with pagination and filters
   const {
     data: ordersData,
     isLoading,
     error,
     refetch
   } = useQuery({
-    queryKey: ['admin-orders', currentPage, statusFilter, debouncedSearchQuery, activeTab],
+    queryKey: ['admin-orders', currentPage, statusFilter, debouncedSearchQuery],
     queryFn: () => getOrders({
       page: currentPage,
-      pageSize: 50, // Increased for confirmed tab to show all orders
+      pageSize: 20,
       status: statusFilter === 'all' ? undefined : statusFilter,
       searchQuery: debouncedSearchQuery || undefined
     }),
-    refetchInterval: 15000, // Refresh every 15 seconds for real-time updates
-    staleTime: 10000, // Consider data stale after 10 seconds
-    placeholderData: (previousData) => previousData, // Keep previous data while loading
-    refetchOnWindowFocus: true, // Refetch when window regains focus
-    refetchOnMount: true // Always refetch on mount
+    refetchInterval: 30000, // Refresh every 30 seconds
+    placeholderData: (previousData) => previousData // Keep previous data while loading new data
   });
   
   const orders = ordersData?.orders || [];
@@ -168,40 +164,34 @@ function AdminOrdersContent() {
     }
   }, [orders, deliverySchedules]);
 
-  // PRODUCTION: Priority sort and filter orders (LAGOS TIMEZONE)
+  // PRODUCTION: Priority sort and filter orders
   const prioritySortedOrders = useMemo(() => {
     let ordersCopy = [...orders];
     
-    // CONFIRMED TAB: Show ALL paid confirmed orders by default (latest first)
+    // CONFIRMED TAB: Show ALL paid confirmed orders by default
     if (statusFilter === 'confirmed') {
       // Filter: ONLY paid confirmed orders (production requirement)
       ordersCopy = orders.filter(order => 
         order.status === 'confirmed' && order.payment_status === 'paid'
       );
       
-      // PRODUCTION SORT: By delivery window using Lagos timezone (earliest first)
+      // PRODUCTION SORT: By delivery window (earliest first)
       ordersCopy.sort((a, b) => {
         const scheduleA = deliverySchedules[a.id];
         const scheduleB = deliverySchedules[b.id];
         
-        // Both have delivery schedules - sort by Lagos delivery window
+        // Both have delivery schedules - sort by delivery window
         if (scheduleA?.delivery_date && scheduleB?.delivery_date) {
           try {
-            // Parse delivery times in Lagos timezone
-            const dateTimeA = parseDeliveryDateTime(
-              scheduleA.delivery_date, 
-              scheduleA.delivery_time_start || '00:00'
-            );
-            const dateTimeB = parseDeliveryDateTime(
-              scheduleB.delivery_date, 
-              scheduleB.delivery_time_start || '00:00'
-            );
+            const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start || '00:00'}`);
+            const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start || '00:00'}`);
             
-            // Compare in Lagos timezone
-            const comparison = compareLagosDates(dateTimeA, dateTimeB);
-            if (comparison !== 0) return comparison;
+            // Validate dates
+            if (!isNaN(dateTimeA.getTime()) && !isNaN(dateTimeB.getTime())) {
+              return dateTimeA.getTime() - dateTimeB.getTime();
+            }
           } catch (error) {
-            console.warn('[LAGOS TZ] Error sorting by delivery window:', error);
+            console.warn('Error sorting by delivery window:', error);
           }
         }
         
@@ -209,16 +199,14 @@ function AdminOrdersContent() {
         if (scheduleA?.delivery_date && !scheduleB?.delivery_date) return -1;
         if (!scheduleA?.delivery_date && scheduleB?.delivery_date) return 1;
         
-        // Pickup orders - sort by pickup time in Lagos timezone
+        // Pickup orders or orders without schedules - sort by pickup time or order time
         if (a.pickup_time && b.pickup_time) {
-          return compareLagosDates(a.pickup_time, b.pickup_time);
+          return new Date(a.pickup_time).getTime() - new Date(b.pickup_time).getTime();
         }
         
-        // Fallback: Most recent orders first (by created_at in Lagos time)
-        return compareLagosDates(
-          b.order_time || b.created_at,
-          a.order_time || a.created_at
-        );
+        // Fallback: Most recent orders first
+        return new Date(b.order_time || b.created_at).getTime() - 
+               new Date(a.order_time || a.created_at).getTime();
       });
     }
     
@@ -243,10 +231,10 @@ function AdminOrdersContent() {
       }
     }
     
-    // HOURLY FILTER: Only apply when user explicitly selects day/hour (LAGOS TIMEZONE)
+    // HOURLY FILTER: Only apply when user explicitly selects day/hour
     if (activeTab === 'confirmed' && (selectedDay || selectedHour)) {
-      const todayLagos = startOfDayLagos();
-      const tomorrowLagos = startOfDayLagos(addDays(getLagosTime(), 1));
+      const today = startOfDay(new Date());
+      const tomorrow = startOfDay(addDays(new Date(), 1));
       
       result = result.filter(order => {
         // Skip filtering for non-delivery orders or unpaid orders - keep them visible
@@ -258,20 +246,19 @@ function AdminOrdersContent() {
         if (!schedule?.delivery_date) return false;
         
         try {
-          // Convert delivery date to Lagos timezone
-          const deliveryDateLagos = toLagosTime(schedule.delivery_date);
+          const deliveryDate = new Date(schedule.delivery_date);
           
           // Validate delivery date
-          if (isNaN(deliveryDateLagos.getTime())) {
-            console.warn('[LAGOS TZ] Invalid delivery date for order:', order.id, schedule.delivery_date);
+          if (isNaN(deliveryDate.getTime())) {
+            console.warn('Invalid delivery date for order:', order.id, schedule.delivery_date);
             return false;
           }
           
-          const normalizedDeliveryDate = startOfDayLagos(deliveryDateLagos);
+          const normalizedDeliveryDate = startOfDay(deliveryDate);
           
-          // Filter by selected day - must match exactly (Lagos timezone)
+          // Filter by selected day - must match exactly
           if (selectedDay) {
-            const targetDate = selectedDay === 'today' ? todayLagos : tomorrowLagos;
+            const targetDate = selectedDay === 'today' ? today : tomorrow;
             if (normalizedDeliveryDate.getTime() !== targetDate.getTime()) {
               return false;
             }
@@ -306,12 +293,12 @@ function AdminOrdersContent() {
     return result;
   }, [prioritySortedOrders, deliverySchedules, deliveryFilter, selectedDay, selectedHour]);
 
-  // PRODUCTION: Calculate hourly order counts for confirmed orders (LAGOS TIMEZONE)
+  // Calculate hourly order counts for confirmed orders
   const hourlyOrderCounts = useMemo(() => {
     if (activeTab !== 'confirmed') return { today: {}, tomorrow: {} };
     
-    const todayLagos = startOfDayLagos();
-    const tomorrowLagos = startOfDayLagos(addDays(getLagosTime(), 1));
+    const today = startOfDay(new Date());
+    const tomorrow = startOfDay(addDays(new Date(), 1));
     const counts = {
       today: {} as Record<string, number>,
       tomorrow: {} as Record<string, number>
@@ -333,16 +320,15 @@ function AdminOrdersContent() {
       if (!schedule?.delivery_date || !schedule.delivery_time_start) return;
       
       try {
-        // Parse delivery date in Lagos timezone
-        const deliveryDateLagos = toLagosTime(schedule.delivery_date);
+        const deliveryDate = new Date(schedule.delivery_date);
         
         // Validate delivery date
-        if (isNaN(deliveryDateLagos.getTime())) {
-          console.warn('[LAGOS TZ] Invalid delivery date for counting:', order.id, schedule.delivery_date);
+        if (isNaN(deliveryDate.getTime())) {
+          console.warn('Invalid delivery date for counting:', order.id, schedule.delivery_date);
           return;
         }
         
-        const normalizedDeliveryDate = startOfDayLagos(deliveryDateLagos);
+        const normalizedDeliveryDate = startOfDay(deliveryDate);
         
         // Parse hour more robustly
         const timeComponents = schedule.delivery_time_start.split(':');
@@ -359,10 +345,10 @@ function AdminOrdersContent() {
         
         const orderHour = `${hourInt.toString().padStart(2, '0')}:00`;
         
-        // Count for today and tomorrow only (Lagos timezone comparison)
-        if (normalizedDeliveryDate.getTime() === todayLagos.getTime()) {
+        // Count for today and tomorrow only
+        if (normalizedDeliveryDate.getTime() === today.getTime()) {
           counts.today[orderHour] = (counts.today[orderHour] || 0) + 1;
-        } else if (normalizedDeliveryDate.getTime() === tomorrowLagos.getTime()) {
+        } else if (normalizedDeliveryDate.getTime() === tomorrow.getTime()) {
           counts.tomorrow[orderHour] = (counts.tomorrow[orderHour] || 0) + 1;
         }
       } catch (error) {

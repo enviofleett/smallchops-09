@@ -1,12 +1,14 @@
 import { parseISO, format, addHours, isValid } from 'date-fns';
+import { toLagosTime, formatLagosTime } from './lagosTimezone';
 
 /**
- * DELIVERY WINDOW LOGIC (Production Rule):
+ * DELIVERY WINDOW LOGIC (Production Rule with Lagos Timezone):
  * - All delivery/pickup orders use a FIXED 1-HOUR WINDOW
+ * - Times stored in UTC, displayed in Lagos timezone (Africa/Lagos, UTC+1)
  * - For delivery orders: Uses order.delivery_time as start
  * - For pickup orders: Uses order.pickup_time as start
  * - Window end = start time + 1 hour
- * - Example: 9:00 AM → "9:00 AM - 10:00 AM"
+ * - Example: 9:00 AM Lagos → "9:00 AM - 10:00 AM"
  */
 
 interface TimeWindow {
@@ -19,6 +21,7 @@ interface TimeWindow {
 /**
  * Parses a timestamp string and calculates a 1-hour time window
  * Handles both full timestamps (2025-10-02 10:00:00+00) and time-only formats (10:00 AM)
+ * IMPORTANT: Converts UTC timestamps to Lagos timezone for display
  */
 export function calculateTimeWindow(timestamp: string | null | undefined): TimeWindow | null {
   if (!timestamp) return null;
@@ -26,23 +29,28 @@ export function calculateTimeWindow(timestamp: string | null | undefined): TimeW
   try {
     let startTime: Date;
 
-    // Try parsing as full ISO timestamp first
+    // Try parsing as full ISO timestamp first (assumed to be UTC from database)
     if (timestamp.includes('T') || timestamp.includes('+') || timestamp.includes('Z')) {
-      startTime = parseISO(timestamp);
+      const utcTime = parseISO(timestamp);
+      // Convert UTC to Lagos time for display
+      startTime = toLagosTime(utcTime);
     } 
     // Try parsing date + time format (2025-10-02 10:00:00)
     else if (timestamp.match(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/)) {
-      startTime = parseISO(timestamp.replace(' ', 'T'));
+      const utcTime = parseISO(timestamp.replace(' ', 'T'));
+      // Convert UTC to Lagos time for display
+      startTime = toLagosTime(utcTime);
     }
-    // Handle time-only format (10:00 AM or 10:00)
+    // Handle time-only format (10:00 AM or 10:00) - treat as Lagos time
     else if (timestamp.match(/^\d{1,2}:\d{2}/)) {
       const today = new Date();
       const [hours, minutes] = timestamp.split(':').map(num => parseInt(num));
       startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
     }
-    // Fallback: try direct Date parsing
+    // Fallback: try direct Date parsing and convert to Lagos time
     else {
-      startTime = new Date(timestamp);
+      const utcTime = new Date(timestamp);
+      startTime = toLagosTime(utcTime);
     }
 
     // Validate parsed date
@@ -51,7 +59,7 @@ export function calculateTimeWindow(timestamp: string | null | undefined): TimeW
       return null;
     }
 
-    // Calculate end time (start + 1 hour)
+    // Calculate end time (start + 1 hour) - already in Lagos time
     const endTime = addHours(startTime, 1);
 
     return {
@@ -103,7 +111,7 @@ export function hasValidTimeField(order: {
 }
 
 /**
- * Formats a date string for display
+ * Formats a date string for display in Lagos timezone
  */
 export function formatDeliveryDate(dateString: string | null | undefined): string | null {
   if (!dateString) return null;
@@ -111,7 +119,9 @@ export function formatDeliveryDate(dateString: string | null | undefined): strin
   try {
     const date = parseISO(dateString);
     if (!isValid(date)) return null;
-    return format(date, 'MMM dd, yyyy');
+    // Convert to Lagos time and format
+    const lagosDate = toLagosTime(date);
+    return format(lagosDate, 'MMM dd, yyyy');
   } catch {
     return null;
   }

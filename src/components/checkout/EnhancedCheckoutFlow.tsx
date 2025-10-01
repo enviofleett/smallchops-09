@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useCustomerProfile, useCustomerAddresses } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
 import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText, ChevronLeft } from "lucide-react";
+import { formatLagosTime } from "@/utils/lagosTimezone";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";

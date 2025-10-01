@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { addMinutes, isBefore, isAfter, startOfDay, addDays, isSameDay } from 'date-fns';
 import { format, parseISO } from 'date-fns';
+import { getLagosTime, toLagosTime } from './lagosTimezone';
 
 export interface BusinessHours {
   open: string;
@@ -130,17 +131,19 @@ class DeliverySchedulingService {
   getMinimumDeliveryTime(): Date {
     if (!this.config) {
       console.warn('Delivery config not loaded, using default 90 minutes');
-      return addMinutes(new Date(), 90);
+      return addMinutes(getLagosTime(), 90);
     }
-    return addMinutes(new Date(), this.config.minimum_lead_time_minutes);
+    // Use Lagos current time for minimum delivery calculation
+    return addMinutes(getLagosTime(), this.config.minimum_lead_time_minutes);
   }
 
   getMaximumDeliveryDate(): Date {
     if (!this.config) {
       console.warn('Delivery config not loaded, using default 30 days');
-      return addDays(new Date(), 30);
+      return addDays(getLagosTime(), 30);
     }
-    return addDays(new Date(), this.config.max_advance_booking_days);
+    // Use Lagos current time for maximum delivery calculation
+    return addDays(getLagosTime(), this.config.max_advance_booking_days);
   }
 
   isDateAvailable(date: Date): { available: boolean; reason?: string } {
@@ -215,8 +218,8 @@ class DeliverySchedulingService {
 
       const slotDateTime = this.combineDateAndTime(date, currentTime);
 
-      // Production logic: Check if slot meets lead time requirement  
-      const now = new Date();
+      // Production logic: Check if slot meets lead time requirement using Lagos time
+      const now = getLagosTime();
       const isToday = isSameDay(date, now);
       
       let available = true;
@@ -261,7 +264,8 @@ class DeliverySchedulingService {
     try {
       await this.initialize();
 
-      const start = startDate || new Date();
+      // Use Lagos time for slot availability calculations
+      const start = startDate || getLagosTime();
       const end = endDate || this.getMaximumDeliveryDate();
       const slots: DeliverySlot[] = [];
 

@@ -1,6 +1,27 @@
 // supabase/functions/process-checkout/index.ts - Production-ready checkout function
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { toZonedTime, fromZonedTime } from "https://esm.sh/date-fns-tz@3.2.0"
+
+// Lagos timezone constant
+const LAGOS_TIMEZONE = 'Africa/Lagos';
+
+/**
+ * Convert Lagos local time to UTC for database storage
+ * @param lagosDate - Date string in YYYY-MM-DD format
+ * @param lagosTime - Time string in HH:mm format (Lagos local time)
+ * @returns ISO string in UTC
+ */
+function lagosToUTC(lagosDate: string, lagosTime: string): string {
+  // Create date-time string and parse
+  const dateTimeStr = `${lagosDate}T${lagosTime}:00`;
+  const parsedDate = new Date(dateTimeStr);
+  
+  // Convert from Lagos time to UTC
+  const utcDate = fromZonedTime(parsedDate, LAGOS_TIMEZONE);
+  
+  return utcDate.toISOString();
+}
 
 // Enhanced CORS configuration with origin validation
 function getCorsHeaders(origin: string | null): Record<string, string> {
@@ -112,9 +133,13 @@ serve(async (req: Request) => {
         zone_id: fulfillment.delivery_zone_id || null
       } : null,
       delivery_zone_id: fulfillment.delivery_zone_id || null,
-      // CRITICAL: Set delivery_time/pickup_time for 1-hour window calculation
-      pickup_time: fulfillment.type === 'pickup' ? new Date(delivery_schedule.delivery_date + 'T' + delivery_schedule.delivery_time_start).toISOString() : null,
-      delivery_time: fulfillment.type === 'delivery' ? new Date(delivery_schedule.delivery_date + 'T' + delivery_schedule.delivery_time_start).toISOString() : null,
+      // CRITICAL: Convert Lagos local time to UTC for proper storage
+      pickup_time: fulfillment.type === 'pickup' 
+        ? lagosToUTC(delivery_schedule.delivery_date, delivery_schedule.delivery_time_start)
+        : null,
+      delivery_time: fulfillment.type === 'delivery' 
+        ? lagosToUTC(delivery_schedule.delivery_date, delivery_schedule.delivery_time_start)
+        : null,
       delivery_date: delivery_schedule.delivery_date || null,
       special_instructions: delivery_schedule.special_instructions || '',
       order_time: orderTime,

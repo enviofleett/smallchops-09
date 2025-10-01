@@ -90,74 +90,42 @@ const CategoryProductsContent = () => {
     return 999; // Non-platter items go last
   };
 
-  // Helper function to get customization group priority
-  const getCustomizationGroupPriority = (productName: string): number => {
-    const name = productName.toLowerCase();
-    
-    // Group 1: POFF POFF & PASTRIES
-    if (name.includes('poff') || name.includes('mosa') || name.includes('buns')) return 1;
-    
-    // Group 2: SPRING ROLLS
-    if (name.includes('spring roll')) return 2;
-    
-    // Group 3: SAMOSA
-    if (name.includes('samosa')) return 3;
-    
-    // Group 4: YAM BALLS & SEASONAL
-    if (name.includes('yam ball')) return 4;
-    
-    // Group 5: CORN DOGS & MINI ITEMS
-    if (name.includes('corn dog') || (name.includes('meat pie') && name.includes('mini'))) return 5;
-    
-    // Group 6: SAUSAGE ROLLS & CHICKEN PIE
-    if (name.includes('sausage roll') || (name.includes('chicken pie') && name.includes('mini'))) return 6;
-    
-    // Group 7: SHAWARMA
-    if (name.includes('shawarma')) return 7;
-    
-    // Group 8: BEEF ITEMS
-    if (name.includes('beef') || name.includes('stick meat') || name.includes('meatball') || 
-        name.includes('asun') || name.includes('kebab')) return 8;
-    
-    // Group 9: CHICKEN ITEMS
-    if (name.includes('chicken') && !name.includes('shawarma') && !name.includes('samosa')) return 9;
-    
-    // Group 10: TURKEY & GIZZARD
-    if (name.includes('turkey') || name.includes('gizdodo') || name.includes('gizzard')) return 10;
-    
-    // Group 11: FISH & SEAFOOD
-    if (name.includes('fish') || name.includes('prawn') || name.includes('tilapia') || 
-        name.includes('croaker') || name.includes('catfish') || name.includes('titus')) return 11;
-    
-    // Group 12: SNAILS & GRILLED SAUSAGE
-    if (name.includes('snail') || (name.includes('grilled') && name.includes('sausage'))) return 12;
-    
-    // Group 13: SIDES & ACCOMPANIMENTS
-    if (name.includes('yam') || name.includes('plantain') || name.includes('fries') || 
-        name.includes('potato') || name.includes('corn on') || name.includes('pepper sauce')) return 13;
-    
-    return 999; // Ungrouped items
-  };
+  // Custom sequence for customization category products
+  const customizationSequence = [
+    'POFF POFF', 'MOSA', 'BUNS',
+    'SPRING ROLLS (VEG. ONLY)', 'SPRING ROLLS CHICKEN SPECIAL', 'SPRING ROLLS (CHICKEN/VEG.)',
+    'SPRING ROLLS (PRAWNS &MAYONNAISE)', 'SPRING ROLLS (PRAWNS & VEG.)',
+    'SAMOSA (BEEF)', 'SAMOSA (CHICKEN)', 'YAM BALLS',
+    'CORN DOGS (MINI)', 'CORN DOGS (WHOLE)', 'MEAT PIE (MINI)', 'SAUSAGE ROLLS', 'CHICKEN PIE (MINI)',
+    'SHAWARMA (CHICKEN)', 'SHAWARMA (BEEF SUYA)', 'SHAWARMA (CHICKEN AND BEEF COMBO)',
+    'BEEF', 'STICK MEAT', 'MEATBALLS', 'PEPPERED BEEF ON SKEWERS', 'BEEF KEBABS', 'ASUN',
+    'CHICKEN', 'PEPPERED CHICKEN WINGS (CUT)', 'PEPPERED CHICKEN WINGS (WHOLE)',
+    'CHICKEN WINGS BARBEQUE (CUT)', 'CHICKEN WINGS BARBEQUE (WHOLE)',
+    'HONEY-GLAZED CHICKEN WINGS (CUT GRILLED)', 'HONEY-GLAZED CHICKEN WINGS (WHOLE GRILLED)',
+    'CRUNCHY CHICKEN WINGS (CUT)', 'CRUNCHY CHICKEN WINGS (WHOLE)',
+    'CHICKEN LOLLIPOP', 'CHICKEN BALLS', 'CHICKEN KEBABS', 'CHICKEN KEBABS (SPECIAL)',
+    'PEPPERED CHICKEN (Drumsticks Only)', 'PEPPERED CHICKEN (Thighs & Drumsticks)',
+    'GRILLED CHICKEN (Thighs & Drumsticks)', 'CRUNCHY CHICKEN(Thighs & Drumsticks)',
+    'PEPPERED/GRILLED TURKEY (Cut In Two)', 'PEPPERED/GRILLED TURKEY (WHOLE)',
+    'GIZDODO', 'GIZZARDS ON SKEWERS', 'PEPPERED GIZZARD',
+    'FISH BALLS', 'FISH IN BATTER', 'FISH KEBAB',
+    'PEPPERED FRIED FISH (CROAKER)', 'PEPPERED FRIED FISH (TITUS)',
+    'GRILLED CATFISH', 'CATFISH', 'TILAPIA', 'CROAKER FISH',
+    'PRAWNS TEMPURA', 'PRAWNS NUGGET', 'PRAWNS KEBAB', 'GARLIC AND GINGER', 'PRAWNS IN BATTER',
+    'PEPPERED SNAILS (MEDIUM)', 'PEPPERED SNAILS (LARGE)', 'GRILLED SAUSAGE',
+    'YAM', 'PLANTAIN', 'FRIES', 'POTATO', 'CORN ON THE COB', 'PEPPER SAUCE'
+  ];
 
-  // Helper function to get customization group name
-  const getCustomizationGroupName = (priority: number): string => {
-    const groupNames: { [key: number]: string } = {
-      1: 'POFF POFF & PASTRIES',
-      2: 'SPRING ROLLS',
-      3: 'SAMOSA',
-      4: 'YAM BALLS & SEASONAL',
-      5: 'CORN DOGS & MINI ITEMS',
-      6: 'SAUSAGE ROLLS & PASTRIES',
-      7: 'SHAWARMA',
-      8: 'BEEF ITEMS',
-      9: 'CHICKEN ITEMS',
-      10: 'TURKEY & GIZZARD',
-      11: 'FISH & SEAFOOD',
-      12: 'SNAILS & GRILLED SAUSAGE',
-      13: 'SIDES & ACCOMPANIMENTS',
-      999: 'OTHER ITEMS'
-    };
-    return groupNames[priority] || 'OTHER ITEMS';
+  const getCustomizationPriority = (productName: string): number => {
+    const name = productName.toUpperCase();
+    // Find the best matching sequence item
+    for (let i = 0; i < customizationSequence.length; i++) {
+      const sequenceItem = customizationSequence[i].toUpperCase();
+      if (name.includes(sequenceItem) || sequenceItem.includes(name)) {
+        return i;
+      }
+    }
+    return 999; // Products not in sequence go to the end
   };
 
   // Filter and sort products - Different logic for customization category vs others
@@ -168,17 +136,11 @@ const CategoryProductsContent = () => {
         (product.description || '').toLowerCase().includes(searchLower);
     })
     .sort((a, b) => {
-      // Special sorting for customization category - group by food type
+      // Special sorting for customization category - use custom sequence
       if (isCustomizationCategory) {
-        const groupPriorityA = getCustomizationGroupPriority(a.name);
-        const groupPriorityB = getCustomizationGroupPriority(b.name);
-        
-        if (groupPriorityA !== groupPriorityB) {
-          return groupPriorityA - groupPriorityB;
-        }
-        
-        // Within same group, sort alphabetically
-        return a.name.localeCompare(b.name);
+        const priorityA = getCustomizationPriority(a.name);
+        const priorityB = getCustomizationPriority(b.name);
+        return priorityA - priorityB;
       }
       
       // Original sorting logic for other categories
@@ -222,22 +184,6 @@ const CategoryProductsContent = () => {
       return priceA - priceB;
     });
 
-  // Group products by customization category (for visual display)
-  const groupedProducts = isCustomizationCategory 
-    ? filteredAndSortedProducts.reduce((groups: any[], product) => {
-        const priority = getCustomizationGroupPriority(product.name);
-        const groupName = getCustomizationGroupName(priority);
-        
-        let group = groups.find(g => g.name === groupName);
-        if (!group) {
-          group = { name: groupName, priority, products: [] };
-          groups.push(group);
-        }
-        group.products.push(product);
-        
-        return groups;
-      }, []).sort((a, b) => a.priority - b.priority)
-    : [];
 
   // Pagination - applies to filtered products
   const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
@@ -483,106 +429,7 @@ const CategoryProductsContent = () => {
               </div>
             ) : (
               <>
-                {isCustomizationCategory ? (
-                  // Grouped display for customization category
-                  <>
-                    {groupedProducts.map((group, groupIndex) => (
-                      <div key={group.name} className="col-span-full">
-                        {/* Group Header */}
-                        <div className="mb-4 mt-8 first:mt-0">
-                          <div className="flex items-center">
-                            <div className="flex-1 h-px bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20"></div>
-                            <h2 className="px-4 text-lg sm:text-xl font-bold text-primary">
-                              {group.name}
-                            </h2>
-                            <div className="flex-1 h-px bg-gradient-to-r from-primary/40 via-primary/20 to-transparent"></div>
-                          </div>
-                        </div>
-                        
-                        {/* Products Grid for this group */}
-                        <div className="grid gap-3 sm:gap-4 lg:gap-6 mb-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
-                          {group.products.map((product: any) => (
-                            <Card 
-                              key={product.id} 
-                              className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
-                              onClick={() => navigate(`/product/${product.id}`)}
-                            >
-                              <div className="aspect-square relative overflow-hidden">
-                                <ProductImageGallery
-                                  images={toImagesArray(product)}
-                                  alt={product.name}
-                                  containerClassName="aspect-square"
-                                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                />
-                                {(product.discount_percentage || 0) > 0 && (
-                                  <div className="absolute top-1 sm:top-2 left-1 sm:left-2 z-10">
-                                    <DiscountBadge 
-                                      discountPercentage={product.discount_percentage || 0}
-                                      size="sm"
-                                    />
-                                  </div>
-                                )}
-                                
-                                {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
-                                  <div className="absolute top-1 sm:top-2 right-1 sm:right-2 z-10">
-                                    <MOQBadge 
-                                      minimumQuantity={product.minimum_order_quantity}
-                                      variant="default"
-                                      showIcon={false}
-                                      className="bg-blue-100 text-blue-800 border-blue-200 text-xs"
-                                    />
-                                  </div>
-                                )}
-                                
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 z-5" />
-                              </div>
-                              <CardContent className="p-2 sm:p-3 lg:p-4">
-                                <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
-                                <div className="mb-1 sm:mb-2">
-                                  <ProductRatingDisplay productId={product.id} />
-                                </div>
-                                
-                                <div className="flex items-center justify-between">
-                                  <PriceDisplay
-                                    originalPrice={product.price}
-                                    discountedPrice={product.discounted_price}
-                                    hasDiscount={(product.discount_percentage || 0) > 0}
-                                    size="sm"
-                                  />
-                                  <Button 
-                                    size="sm" 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleAddToCart(product);
-                                    }}
-                                    className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
-                                    variant="outline"
-                                    disabled={isValidatingMOQ}
-                                  >
-                                    {isValidatingMOQ ? "..." : 
-                                      (product.minimum_order_quantity && product.minimum_order_quantity > 1) 
-                                        ? `Add ${product.minimum_order_quantity}+`
-                                        : "Add"
-                                    }
-                                  </Button>
-                                </div>
-                                
-                                {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
-                                  <div className="text-center pt-2 mt-2 border-t border-muted">
-                                    <span className="text-xs text-muted-foreground">
-                                      Min. order: {product.minimum_order_quantity} units
-                                    </span>
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  // Standard grid display for other categories
+                {/* Standard grid display for all categories */}
                   <div className="grid gap-3 sm:gap-4 lg:gap-6 mb-8 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                   {currentProducts.map((product) => (
                     <Card 
@@ -675,9 +522,8 @@ const CategoryProductsContent = () => {
                           )}
                        </CardContent>
                     </Card>
-                  ))}
-                </div>
-                )}
+                   ))}
+                 </div>
 
 
                 {/* Pagination */}

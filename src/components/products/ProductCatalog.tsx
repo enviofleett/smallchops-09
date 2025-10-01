@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckoutButton } from '@/components/ui/checkout-button';
 import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
 import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
+import { isGlobalDiscountActive, GLOBAL_DISCOUNT_CONFIG } from '@/config/globalDiscount';
 
 interface ProductCatalogProps {
   onToggleFavorite?: (productId: string) => void;
@@ -79,20 +80,23 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
   
   const handleAddToCart = async (product: ProductWithDiscount) => {
     // Add product with MOQ information
+    // Note: The global 10% discount is applied in useCart.ts addItem function
     addItem({
       id: product.id,
       name: product.name,
-      price: product.discounted_price || product.price,
-      original_price: product.price,
-      discount_amount: product.discount_amount,
+      price: product.price, // Pass original price - discount applied in cart
       vat_rate: 7.5, // Default VAT rate
       image_url: product.image_url,
       minimum_order_quantity: product.minimum_order_quantity || 1,
     });
     
+    const discountMessage = isGlobalDiscountActive() 
+      ? ` (${GLOBAL_DISCOUNT_CONFIG.badgeText} applied!)` 
+      : '';
+    
     toast({
       title: "Added to cart",
-      description: `${product.name} has been added to your cart.`,
+      description: `${product.name} has been added to your cart${discountMessage}`,
     });
   };
   
@@ -106,7 +110,12 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
         <div>
           <h2 className="text-2xl font-bold">Our Menu</h2>
           <p className="text-muted-foreground">
-            {discountedProducts.length > 0 && (
+            {isGlobalDiscountActive() && (
+              <span className="text-green-600 font-medium">
+                {GLOBAL_DISCOUNT_CONFIG.badgeText} on all products!
+              </span>
+            )}
+            {!isGlobalDiscountActive() && discountedProducts.length > 0 && (
               <span className="text-green-600 font-medium">
                 {discountedProducts.length} items on sale!
               </span>
@@ -115,10 +124,18 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
         </div>
         
         <div className="flex gap-2">
-          <Badge variant="outline" className="text-green-600 border-green-600">
-            <Tag className="w-3 h-3 mr-1" />
-            Special Offers
-          </Badge>
+          {isGlobalDiscountActive() && (
+            <Badge variant="destructive" className="bg-red-500 hover:bg-red-600 text-white">
+              <Tag className="w-3 h-3 mr-1" />
+              {GLOBAL_DISCOUNT_CONFIG.badgeText}
+            </Badge>
+          )}
+          {!isGlobalDiscountActive() && (
+            <Badge variant="outline" className="text-green-600 border-green-600">
+              <Tag className="w-3 h-3 mr-1" />
+              Special Offers
+            </Badge>
+          )}
         </div>
       </div>
       

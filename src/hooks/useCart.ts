@@ -8,6 +8,7 @@ import { useGuestSession } from './useGuestSession';
 import { useCustomerAuth } from './useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
 import { CartContext } from '@/contexts/CartContext';
+import { applyGlobalDiscount, isGlobalDiscountActive } from '@/config/globalDiscount';
 
 export interface CartItem {
   id: string;
@@ -206,6 +207,16 @@ export const useCartInternal = () => {
     try {
       const moq = product.minimum_order_quantity || 1;
       
+      // Apply global 10% discount to the price
+      const originalPrice = product.price;
+      const discountedPrice = applyGlobalDiscount(originalPrice);
+      
+      console.log('🛒 Price calculation:', { 
+        originalPrice, 
+        discountedPrice, 
+        globalDiscountActive: isGlobalDiscountActive() 
+      });
+      
       // Check if product already exists in cart
       const existingItemIndex = cart.items.findIndex(item => item.product_id === product.id);
       console.log('🛒 Existing item index:', existingItemIndex);
@@ -251,9 +262,9 @@ export const useCartInternal = () => {
           id: `${product.id}_${Date.now()}`,
           product_id: product.id,
           product_name: product.name,
-          price: product.price,
-          original_price: product.original_price,
-          discount_amount: product.discount_amount,
+          price: discountedPrice, // Use discounted price - this goes to Paystack
+          original_price: originalPrice, // Store original for display
+          discount_amount: originalPrice - discountedPrice,
           quantity: validQuantity,
           vat_rate: product.vat_rate || 7.5,
           image_url: product.image_url,

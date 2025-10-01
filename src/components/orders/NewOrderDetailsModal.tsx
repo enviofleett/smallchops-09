@@ -24,7 +24,8 @@ import {
   Calendar,
   Clock,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  MessageCircle
 } from 'lucide-react';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
@@ -278,6 +279,17 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <span className="text-base">{safeOrder.customer_phone}</span>
+                  {isAdmin && (
+                    <a
+                      href={`https://wa.me/${safeOrder.customer_phone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-500 hover:bg-green-600 transition-colors"
+                      title="Chat on WhatsApp"
+                    >
+                      <MessageCircle className="h-4 w-4 text-white" />
+                    </a>
+                  )}
                 </div>
               )}
             </CardContent>

@@ -1,68 +1,70 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import '../../styles/thermal-print.css';
 import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
-import { getOrders, OrderWithItems } from '@/api/orders';
+import { getOrders } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
 import { NewOrderDetailsModal } from '@/components/orders/NewOrderDetailsModal';
 import { EnhancedOrderCard } from '@/components/admin/EnhancedOrderCard';
 import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
-import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck, BarChart3, Send, RefreshCw, Calendar, MessageSquare, Printer, Loader2 } from 'lucide-react';
-import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
+import { Search, Download, Package, TrendingUp, Clock, CheckCircle, Plus, BarChart3, RefreshCw, Calendar, Printer, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
-import { format } from 'date-fns';
-import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
-import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
-import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
-import { useToast } from '@/hooks/use-toast';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useProductionStatusUpdate } from '@/hooks/useProductionStatusUpdate';
-import { useDebounce } from '@/hooks/useDebounce';
 import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFilter';
 import { DeliveryDateFilter } from '@/components/admin/orders/DeliveryDateFilter';
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
-import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
-import { filterOrdersByDate, getFilterDescription, getFilterStats, DeliveryFilterType } from '@/utils/dateFilterUtils';
+import { getFilterDescription, getFilterStats } from '@/utils/dateFilterUtils';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
-import { useEnhancedOrderScheduleRecovery } from '@/hooks/useEnhancedOrderScheduleRecovery';
-import { useOrderScheduleRecovery } from '@/hooks/useOrderScheduleRecovery';
-import { ProductionErrorBoundary } from '@/components/admin/ProductionErrorBoundary';
-import ProductionOrderErrorBoundary from '@/components/admin/ProductionOrderErrorBoundary';
-import OrderErrorBoundary from '@/components/orders/OrderErrorBoundary';
 import { OrderDetailsTestButton } from '@/components/admin/OrderDetailsTestButton';
+import { useAdminOrdersState } from '@/hooks/useAdminOrdersState';
+import { useAdminOrdersFilters } from '@/hooks/useAdminOrdersFilters';
+import { 
+  extractDeliverySchedules, 
+  prioritySortOrders, 
+  applyDeliveryDateFilter, 
+  applyHourlyFilter,
+  calculateHourlyOrderCounts,
+  calculateOrderCounts,
+  detectOrderWarnings 
+} from '@/utils/adminOrdersLogic';
+import { OrdersErrorBoundary } from '@/components/admin/orders/OrdersErrorBoundary';
+import { OrdersEmptyState, OrdersErrorState, OrdersLoadingSkeleton } from '@/components/admin/orders/OrdersEmptyStates';
+import { OrdersStatusIndicators } from '@/components/admin/orders/OrdersStatusIndicators';
+import { toast } from 'sonner';
 
 function AdminOrdersContent() {
-  const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
-  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilterType>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState('all');
-  const [showDeliveryReport, setShowDeliveryReport] = useState(false);
-  const [useSimpleMode, setUseSimpleMode] = useState(false);
-  
-  // Production-safe schedule recovery with circuit breaker
-  const { attemptScheduleRecovery, getRecoveryStatus } = useOrderScheduleRecovery();
-  
-  // Hourly delivery filter state for confirmed tab
-  const [selectedDay, setSelectedDay] = useState<'today' | 'tomorrow' | null>(null);
-  const [selectedHour, setSelectedHour] = useState<string | null>(null);
-  
-  
   const isMobile = useIsMobile();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  
+  // Consolidated state management
+  const {
+    state,
+    setSelectedOrder,
+    closeDialog,
+    setCurrentPage,
+    setActiveTab: setActiveTabState,
+    toggleDeliveryReport,
+    toggleSimpleMode,
+    resetToFirstPage,
+  } = useAdminOrdersState();
+
+  // Filter management with debouncing
+  const {
+    filters,
+    debouncedSearchQuery,
+    setSearchQuery,
+    setStatusFilter,
+    setDeliveryFilter,
+    setSelectedDay,
+    setSelectedHour,
+    clearFilters,
+    clearHourlyFilters,
+    hasActiveFilters,
+  } = useAdminOrdersFilters(resetToFirstPage);
   
   // Thermal printing functionality
   const { 
@@ -92,24 +94,15 @@ function AdminOrdersContent() {
       
       return data;
     },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Debounce search query to avoid excessive API calls
-  const debouncedSearchQuery = useDebounce(searchQuery, 500);
-
-  // Reset pagination when filters change
+  // Reset hourly filters when changing tabs
   useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter, debouncedSearchQuery, deliveryFilter, selectedDay, selectedHour]);
-
-  // Reset hourly filters when changing tabs (except for confirmed tab)
-  useEffect(() => {
-    if (activeTab !== 'confirmed') {
-      setSelectedDay(null);
-      setSelectedHour(null);
+    if (state.activeTab !== 'confirmed') {
+      clearHourlyFilters();
     }
-  }, [activeTab]);
+  }, [state.activeTab, clearHourlyFilters]);
 
   // Fetch orders with pagination and filters
   const {
@@ -118,15 +111,15 @@ function AdminOrdersContent() {
     error,
     refetch
   } = useQuery({
-    queryKey: ['admin-orders', currentPage, statusFilter, debouncedSearchQuery],
+    queryKey: ['admin-orders', state.currentPage, filters.statusFilter, debouncedSearchQuery],
     queryFn: () => getOrders({
-      page: currentPage,
+      page: state.currentPage,
       pageSize: 20,
-      status: statusFilter === 'all' ? undefined : statusFilter,
+      status: filters.statusFilter === 'all' ? undefined : filters.statusFilter,
       searchQuery: debouncedSearchQuery || undefined
     }),
-    refetchInterval: 30000, // Refresh every 30 seconds
-    placeholderData: (previousData) => previousData // Keep previous data while loading new data
+    refetchInterval: 30000,
+    placeholderData: (previousData) => previousData
   });
   
   const orders = ordersData?.orders || [];
@@ -134,263 +127,64 @@ function AdminOrdersContent() {
   const totalPages = Math.ceil(totalCount / 20);
 
 
-  // Extract delivery schedules from orders (now included in admin function)
-  const deliverySchedules = useMemo(() => {
-    const scheduleMap: Record<string, any> = {};
-    orders.forEach((order: any) => {
-      // Handle both embedded and separate schedule data structures
-      const schedule = order.delivery_schedule || 
-                      (order.order_delivery_schedule?.[0]) ||
-                      order.order_delivery_schedule;
-      if (schedule) {
-        scheduleMap[order.id] = schedule;
-      }
-    });
-    return scheduleMap;
-  }, [orders]);
+  // Extract delivery schedules and detect warnings
+  const deliverySchedules = useMemo(() => 
+    extractDeliverySchedules(orders), 
+  [orders]);
 
-  // Add error logging for missing schedules
-  useEffect(() => {
-    const missingSchedules = orders.filter(order => 
-      order.order_type === 'delivery' && 
-      order.status === 'confirmed' && 
-      !deliverySchedules[order.id]
-    );
+  const orderWarnings = useMemo(() => 
+    detectOrderWarnings(orders, deliverySchedules),
+  [orders, deliverySchedules]);
 
-    if (missingSchedules.length > 0) {
-      console.warn('Orders missing delivery schedules:', 
-        missingSchedules.map(o => o.order_number || o.id)
-      );
-    }
-  }, [orders, deliverySchedules]);
+  // Priority sort orders using extracted logic
+  const prioritySortedOrders = useMemo(() => 
+    prioritySortOrders(orders, deliverySchedules, filters.statusFilter),
+  [orders, deliverySchedules, filters.statusFilter]);
 
-  // PRODUCTION: Priority sort and filter orders
-  const prioritySortedOrders = useMemo(() => {
-    let ordersCopy = [...orders];
-    
-    // CONFIRMED TAB: Show ALL paid confirmed orders by default
-    if (statusFilter === 'confirmed') {
-      // Filter: ONLY paid confirmed orders (production requirement)
-      ordersCopy = orders.filter(order => 
-        order.status === 'confirmed' && order.payment_status === 'paid'
-      );
-      
-      // PRODUCTION SORT: By delivery window (earliest first)
-      ordersCopy.sort((a, b) => {
-        const scheduleA = deliverySchedules[a.id];
-        const scheduleB = deliverySchedules[b.id];
-        
-        // Both have delivery schedules - sort by delivery window
-        if (scheduleA?.delivery_date && scheduleB?.delivery_date) {
-          try {
-            const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start || '00:00'}`);
-            const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start || '00:00'}`);
-            
-            // Validate dates
-            if (!isNaN(dateTimeA.getTime()) && !isNaN(dateTimeB.getTime())) {
-              return dateTimeA.getTime() - dateTimeB.getTime();
-            }
-          } catch (error) {
-            console.warn('Error sorting by delivery window:', error);
-          }
-        }
-        
-        // Orders with schedules come first
-        if (scheduleA?.delivery_date && !scheduleB?.delivery_date) return -1;
-        if (!scheduleA?.delivery_date && scheduleB?.delivery_date) return 1;
-        
-        // Pickup orders or orders without schedules - sort by pickup time or order time
-        if (a.pickup_time && b.pickup_time) {
-          return new Date(a.pickup_time).getTime() - new Date(b.pickup_time).getTime();
-        }
-        
-        // Fallback: Most recent orders first
-        return new Date(b.order_time || b.created_at).getTime() - 
-               new Date(a.order_time || a.created_at).getTime();
-      });
-    }
-    
-    return ordersCopy;
-  }, [orders, deliverySchedules, statusFilter]);
-
-  // Filter orders by delivery schedule with defensive date handling + hourly filtering
-
-  // PRODUCTION: Filtering with safeguards
+  // Apply filters using extracted logic
   const filteredOrders = useMemo(() => {
     let result = prioritySortedOrders;
     
-    // CONFIRMED TAB: By default show ALL paid confirmed orders (no date filter applied)
-    // Only apply filters when explicitly selected by user
-    if (deliveryFilter !== 'all') {
+    // Apply delivery date filter
+    if (filters.deliveryFilter !== 'all') {
       try {
-        result = filterOrdersByDate(result as any[], deliveryFilter, deliverySchedules) as any;
+        result = applyDeliveryDateFilter(result, filters.deliveryFilter, deliverySchedules);
       } catch (error) {
         console.error('[PRODUCTION] Error applying date filter:', error);
-        // Fallback: show all orders if filtering fails (production safety)
         result = prioritySortedOrders;
       }
     }
     
-    // HOURLY FILTER: Only apply when user explicitly selects day/hour
-    if (activeTab === 'confirmed' && (selectedDay || selectedHour)) {
-      const today = startOfDay(new Date());
-      const tomorrow = startOfDay(addDays(new Date(), 1));
-      
-      result = result.filter(order => {
-        // Skip filtering for non-delivery orders or unpaid orders - keep them visible
-        if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
-          return true; // Keep non-delivery/unpaid orders visible
-        }
-        
-        const schedule = deliverySchedules[order.id];
-        if (!schedule?.delivery_date) return false;
-        
-        try {
-          const deliveryDate = new Date(schedule.delivery_date);
-          
-          // Validate delivery date
-          if (isNaN(deliveryDate.getTime())) {
-            console.warn('Invalid delivery date for order:', order.id, schedule.delivery_date);
-            return false;
-          }
-          
-          const normalizedDeliveryDate = startOfDay(deliveryDate);
-          
-          // Filter by selected day - must match exactly
-          if (selectedDay) {
-            const targetDate = selectedDay === 'today' ? today : tomorrow;
-            if (normalizedDeliveryDate.getTime() !== targetDate.getTime()) {
-              return false;
-            }
-          }
-          
-          // Filter by selected hour - more robust hour matching
-          if (selectedHour && schedule.delivery_time_start) {
-            const orderTimeComponents = schedule.delivery_time_start.split(':');
-            const selectedTimeComponents = selectedHour.split(':');
-            
-            if (orderTimeComponents.length < 2 || selectedTimeComponents.length < 2) {
-              console.warn('Invalid time format for order:', order.id, schedule.delivery_time_start);
-              return false;
-            }
-            
-            const orderHour = parseInt(orderTimeComponents[0], 10);
-            const selectedHourInt = parseInt(selectedTimeComponents[0], 10);
-            
-            if (isNaN(orderHour) || isNaN(selectedHourInt) || orderHour !== selectedHourInt) {
-              return false;
-            }
-          }
-          
-          return true;
-        } catch (error) {
-          console.warn('Error processing delivery schedule for order:', order.id, error);
-          return false;
-        }
-      });
+    // Apply hourly filter for confirmed tab
+    if (state.activeTab === 'confirmed' && (filters.selectedDay || filters.selectedHour)) {
+      result = applyHourlyFilter(result, filters.selectedDay, filters.selectedHour, deliverySchedules);
     }
     
     return result;
-  }, [prioritySortedOrders, deliverySchedules, deliveryFilter, selectedDay, selectedHour]);
+  }, [prioritySortedOrders, deliverySchedules, filters.deliveryFilter, filters.selectedDay, filters.selectedHour, state.activeTab]);
 
-  // Calculate hourly order counts for confirmed orders
+  // Calculate hourly counts using extracted logic
   const hourlyOrderCounts = useMemo(() => {
-    if (activeTab !== 'confirmed') return { today: {}, tomorrow: {} };
-    
-    const today = startOfDay(new Date());
-    const tomorrow = startOfDay(addDays(new Date(), 1));
-    const counts = {
-      today: {} as Record<string, number>,
-      tomorrow: {} as Record<string, number>
-    };
-    
-    // Initialize hourly slots (8 AM to 10 PM)
-    for (let hour = 8; hour <= 22; hour++) {
-      const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
-      counts.today[timeSlot] = 0;
-      counts.tomorrow[timeSlot] = 0;
-    }
-    
-    // Count orders for each hour - only paid delivery orders with valid schedules
-    prioritySortedOrders.forEach(order => {
-      // Only count relevant orders in confirmed tab (not just confirmed status)
-      if (order.order_type !== 'delivery' || order.payment_status !== 'paid') return;
-      
-      const schedule = deliverySchedules[order.id];
-      if (!schedule?.delivery_date || !schedule.delivery_time_start) return;
-      
-      try {
-        const deliveryDate = new Date(schedule.delivery_date);
-        
-        // Validate delivery date
-        if (isNaN(deliveryDate.getTime())) {
-          console.warn('Invalid delivery date for counting:', order.id, schedule.delivery_date);
-          return;
-        }
-        
-        const normalizedDeliveryDate = startOfDay(deliveryDate);
-        
-        // Parse hour more robustly
-        const timeComponents = schedule.delivery_time_start.split(':');
-        if (timeComponents.length < 2) {
-          console.warn('Invalid time format for counting:', order.id, schedule.delivery_time_start);
-          return;
-        }
-        
-        const hourInt = parseInt(timeComponents[0], 10);
-        if (isNaN(hourInt) || hourInt < 8 || hourInt > 22) {
-          console.warn('Hour out of range for counting:', order.id, hourInt);
-          return;
-        }
-        
-        const orderHour = `${hourInt.toString().padStart(2, '0')}:00`;
-        
-        // Count for today and tomorrow only
-        if (normalizedDeliveryDate.getTime() === today.getTime()) {
-          counts.today[orderHour] = (counts.today[orderHour] || 0) + 1;
-        } else if (normalizedDeliveryDate.getTime() === tomorrow.getTime()) {
-          counts.tomorrow[orderHour] = (counts.tomorrow[orderHour] || 0) + 1;
-        }
-      } catch (error) {
-        console.warn('Error processing order for hourly counts:', order.id, error);
-      }
-    });
-    
-    return counts;
-  }, [prioritySortedOrders, deliverySchedules, activeTab]);
+    if (state.activeTab !== 'confirmed') return { today: {}, tomorrow: {} };
+    return calculateHourlyOrderCounts(prioritySortedOrders, deliverySchedules);
+  }, [prioritySortedOrders, deliverySchedules, state.activeTab]);
 
-  // Calculate overdue order counts by date ranges
-  // PRODUCTION: Order counts for tab badges
-  const orderCounts = useMemo(() => {
-    // Count only PAID confirmed orders (production requirement)
-    const paidConfirmedOrders = orders.filter(o => 
-      o.status === 'confirmed' && o.payment_status === 'paid'
-    );
-    
-    return {
-      all: totalCount,
-      confirmed: paidConfirmedOrders.length, // Only paid confirmed orders shown
-      preparing: orders.filter(o => o.status === 'preparing').length,
-      ready: orders.filter(o => o.status === 'ready').length,
-      out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
-      delivered: orders.filter(o => o.status === 'delivered').length
-    };
-  }, [orders, totalCount]);
+  // Calculate order counts using extracted logic
+  const orderCounts = useMemo(() => 
+    calculateOrderCounts(orders, totalCount),
+  [orders, totalCount]);
 
-  const handleOrderClick = (order: OrderWithItems) => {
+  const handleOrderClick = (order: any) => {
     setSelectedOrder(order);
-    setIsDialogOpen(true);
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // No need to manually trigger refetch - debounced query will handle it
   };
 
   const handleTabChange = (value: string) => {
-    setActiveTab(value);
+    setActiveTabState(value);
     setStatusFilter(value as 'all' | OrderStatus);
-    // currentPage reset is handled by useEffect above
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -432,7 +226,7 @@ function AdminOrdersContent() {
             <Button 
               variant="outline" 
               className="w-full sm:w-auto"
-              onClick={() => setShowDeliveryReport(!showDeliveryReport)}
+              onClick={toggleDeliveryReport}
             >
               <BarChart3 className="w-4 h-4 mr-2" />
               Delivery Report
@@ -507,7 +301,7 @@ function AdminOrdersContent() {
         </div>
 
         {/* Delivery Report Section */}
-        {showDeliveryReport && (
+        {state.showDeliveryReport && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -556,7 +350,7 @@ function AdminOrdersContent() {
                   <Input 
                     type="text" 
                     placeholder="Search by order number, customer name, or email..." 
-                    value={searchQuery} 
+                    value={filters.searchQuery} 
                     onChange={e => setSearchQuery(e.target.value)} 
                     className="w-full" 
                   />
@@ -564,13 +358,13 @@ function AdminOrdersContent() {
                 <div className="flex gap-2">
                   <Button 
                     type="button" 
-                    variant={useSimpleMode ? "default" : "outline"} 
+                    variant={state.useSimpleMode ? "default" : "outline"} 
                     size="sm"
-                    onClick={() => setUseSimpleMode(!useSimpleMode)}
+                    onClick={toggleSimpleMode}
                     className="flex-1 sm:flex-none"
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">{useSimpleMode ? 'Simple' : 'Advanced'}</span>
+                    <span className="hidden sm:inline">{state.useSimpleMode ? 'Simple' : 'Advanced'}</span>
                   </Button>
                   <Button type="submit" variant="outline" className="flex-1 sm:flex-none">
                     <Search className="w-4 h-4 mr-2" />
@@ -584,7 +378,7 @@ function AdminOrdersContent() {
               </form>
               
               <DeliveryDateFilter
-                value={deliveryFilter}
+                value={filters.deliveryFilter}
                 onChange={setDeliveryFilter}
                 orderCounts={useMemo(() => {
                   const stats = getFilterStats(prioritySortedOrders, deliverySchedules);
@@ -597,25 +391,24 @@ function AdminOrdersContent() {
                 }, [prioritySortedOrders, deliverySchedules])}
               />
               
-              {/* Enhanced Filter Statistics - Production Ready */}
-              {deliveryFilter !== 'all' && (
+              {/* Filter Feedback */}
+              {filters.deliveryFilter !== 'all' && (
                 <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                   <div className="flex items-start gap-3">
                     <Calendar className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">
-                        {getFilterDescription(deliveryFilter, filteredOrders.length, prioritySortedOrders.length).split(':')[0]}
+                        {getFilterDescription(filters.deliveryFilter, filteredOrders.length, prioritySortedOrders.length).split(':')[0]}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {getFilterDescription(deliveryFilter, filteredOrders.length, prioritySortedOrders.length)}
+                        {getFilterDescription(filters.deliveryFilter, filteredOrders.length, prioritySortedOrders.length)}
                       </p>
                       {filteredOrders.length === 0 && (
-                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                            <span>No orders found for this time period. Try selecting a different date range or check if orders have delivery schedules.</span>
-                          </div>
-                        </div>
+                        <OrdersEmptyState 
+                          searchQuery={filters.searchQuery}
+                          hasFilters={hasActiveFilters}
+                          onClearFilters={clearFilters}
+                        />
                       )}
                       
                       {/* Quick Stats for Current Filter */}
@@ -640,27 +433,17 @@ function AdminOrdersContent() {
           </CardContent>
         </Card>
 
-        {/* Orders Tabs - Fully Responsive */}
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
+        {/* Orders Tabs */}
+        <Tabs value={state.activeTab} onValueChange={handleTabChange}>
           <div className="relative">
             {/* Mobile & Tablet: Dropdown */}
             <div className="block md:hidden mb-4">
               <OrderTabDropdown
-                activeTab={activeTab}
+                activeTab={state.activeTab}
                 onTabChange={handleTabChange}
                 orderCounts={orderCounts}
-        />
-
-        {/* Thermal Receipt Preview Modal */}
-        <ThermalReceiptPreview
-          isOpen={isPreviewOpen}
-          onClose={closePreview}
-          onPrint={printFromPreview}
-          order={previewOrder}
-          deliverySchedule={previewDeliverySchedule}
-          businessInfo={previewBusinessInfo}
-        />
-      </div>
+              />
+            </div>
             
             {/* Desktop: Full grid layout */}
             <div className="hidden md:block">
@@ -687,21 +470,26 @@ function AdminOrdersContent() {
             </div>
           </div>
 
+          {/* Status Indicators */}
+          {orderWarnings.length > 0 && (
+            <OrdersStatusIndicators warnings={orderWarnings} />
+          )}
+
           {/* Mobile and Desktop Content */}
           {isMobile ? (
             <MobileOrderTabs
               orders={filteredOrders}
-              activeTab={activeTab}
+              activeTab={state.activeTab}
               onTabChange={handleTabChange}
               onOrderSelect={handleOrderClick}
               deliverySchedules={deliverySchedules}
               orderCounts={orderCounts}
-              useSimpleMode={useSimpleMode}
+              useSimpleMode={state.useSimpleMode}
             />
           ) : (
-            <TabsContent value={activeTab} className="space-y-4">
+            <TabsContent value={state.activeTab} className="space-y-4">
               {/* Hourly Delivery Filter - Only show for confirmed tab */}
-              {activeTab === 'confirmed' && (
+              {state.activeTab === 'confirmed' && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -711,8 +499,8 @@ function AdminOrdersContent() {
                   </CardHeader>
                   <CardContent>
                     <HourlyDeliveryFilter
-                      selectedDay={selectedDay}
-                      selectedHour={selectedHour}
+                      selectedDay={filters.selectedDay}
+                      selectedHour={filters.selectedHour}
                       onDayChange={setSelectedDay}
                       onHourChange={setSelectedHour}
                       orderCounts={hourlyOrderCounts}
@@ -721,37 +509,16 @@ function AdminOrdersContent() {
                 </Card>
               )}
 
-              {/* Overdue Date Filter - Only show for overdue tab */}
             {isLoading ? (
-              <div className="space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <Card key={i} className="p-6">
-                    <div className="animate-pulse space-y-3">
-                      <div className="h-4 bg-muted rounded w-1/4"></div>
-                      <div className="h-4 bg-muted rounded w-1/2"></div>
-                      <div className="h-4 bg-muted rounded w-1/3"></div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+              <OrdersLoadingSkeleton />
             ) : error ? (
-              <Card className="p-6">
-                <div className="text-center">
-                  <AlertCircle className="w-8 h-8 mx-auto text-red-500 mb-2" />
-                  <p className="text-red-600 font-medium">Error loading orders</p>
-                  <p className="text-sm text-muted-foreground">Please try again later</p>
-                </div>
-              </Card>
+              <OrdersErrorState onRetry={refetch} />
             ) : filteredOrders.length === 0 ? (
-              <Card className="p-6">
-                <div className="text-center">
-                  <Package className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="font-medium">No orders found</p>
-                  <p className="text-sm text-muted-foreground">
-                    {searchQuery || deliveryFilter !== 'all' ? 'Try adjusting your search criteria or filters' : 'No orders match the current filter'}
-                  </p>
-                </div>
-              </Card>
+              <OrdersEmptyState 
+                searchQuery={filters.searchQuery}
+                hasFilters={hasActiveFilters}
+                onClearFilters={clearFilters}
+              />
             ) : (
               <>
                 {/* Orders List */}
@@ -763,7 +530,7 @@ function AdminOrdersContent() {
                           order={order} 
                           deliverySchedule={deliverySchedules[order.id]} 
                           onOrderSelect={handleOrderClick}
-                          useSimpleMode={useSimpleMode}
+                          useSimpleMode={state.useSimpleMode}
                         />
                       </div>
                       {/* Print Receipt Button */}
@@ -794,26 +561,26 @@ function AdminOrdersContent() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      Showing {(currentPage - 1) * 20 + 1} to{' '}
-                      {Math.min(currentPage * 20, totalCount)} of {totalCount} orders
+                      Showing {(state.currentPage - 1) * 20 + 1} to{' '}
+                      {Math.min(state.currentPage * 20, totalCount)} of {totalCount} orders
                     </p>
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
-                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(Math.max(1, state.currentPage - 1))} 
+                        disabled={state.currentPage === 1}
                       >
                         Previous
                       </Button>
                       <span className="px-3 py-1 text-sm">
-                        Page {currentPage} of {totalPages}
+                        Page {state.currentPage} of {totalPages}
                       </span>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
-                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(Math.min(totalPages, state.currentPage + 1))} 
+                        disabled={state.currentPage === totalPages}
                       >
                         Next
                       </Button>
@@ -828,13 +595,9 @@ function AdminOrdersContent() {
 
         {/* Order Details Modal */}
         <NewOrderDetailsModal 
-          order={selectedOrder} 
-          open={isDialogOpen && selectedOrder !== null}
-          onClose={() => {
-            setIsDialogOpen(false);
-            setSelectedOrder(null);
-            refetch(); // Refresh orders after dialog closes
-          }}
+          order={state.selectedOrder} 
+          open={state.isDialogOpen && state.selectedOrder !== null}
+          onClose={closeDialog}
         />
 
         {/* Thermal Receipt Preview Modal */}
@@ -851,317 +614,10 @@ function AdminOrdersContent() {
   );
 }
 
-// Admin-specific order card component
-function AdminOrderCard({
-  order,
-  deliverySchedule
-}: {
-  order: OrderWithItems;
-  deliverySchedule?: any;
-}) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  // PRODUCTION-SAFE: Use centralized status update hook
-  const { updateStatus, isUpdating } = useProductionStatusUpdate();
-
-  // Out-for-delivery email mutation
-  const sendDeliveryEmailMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const { data, error } = await supabase.functions.invoke('send-out-for-delivery-email', {
-        body: { order_id: orderId }
-      });
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
-      toast({
-        title: "Email Sent",
-        description: "Out-for-delivery notification sent to customer.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Email Failed",
-        description: error.message || "Failed to send delivery notification.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const handleStatusUpdate = (newStatus: OrderStatus) => {
-    updateStatus({ orderId: order.id, status: newStatus });
-  };
-
-  const handleSendDeliveryEmail = () => {
-    sendDeliveryEmailMutation.mutate(order.id);
-  };
-  // Fetch delivery zone information if we have a delivery address
-  const { data: deliveryZone } = useQuery({
-    queryKey: ['delivery-zone', order.delivery_zone_id],
-    queryFn: async () => {
-      if (!order.delivery_zone_id) return null;
-      const { data, error } = await supabase
-        .from('delivery_zones')
-        .select('name')
-        .eq('id', order.delivery_zone_id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!order.delivery_zone_id
-  });
-
-  const [showProductDetails, setShowProductDetails] = useState(false);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN'
-    }).format(amount);
-  };
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'out_for_delivery':
-        return 'bg-blue-100 text-blue-800';
-      case 'preparing':
-        return 'bg-orange-100 text-orange-800';
-      case 'confirmed':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'pending':
-        return 'bg-gray-100 text-gray-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-lg">Order #{order.order_number}</h3>
-            <p className="text-sm text-muted-foreground">
-              {format(new Date(order.order_time), 'PPp')}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className={getStatusBadgeColor(order.status)}>
-              {order.status.replace('_', ' ').toUpperCase()}
-            </Badge>
-            {/* Status update buttons */}
-            {order.status === 'confirmed' && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleStatusUpdate('preparing');
-                }}
-                 disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  'Start Preparing'
-                )}
-              </Button>
-            )}
-            {order.status === 'preparing' && (
-              <div className="flex gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStatusUpdate('ready');
-                  }}
-                   disabled={isUpdating}
-                >
-                  Mark Ready
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSendDeliveryEmail();
-                  }}
-                  disabled={sendDeliveryEmailMutation.isPending}
-                  title="Send out-for-delivery email"
-                >
-                  {sendDeliveryEmailMutation.isPending ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-            )}
-            {order.status === 'ready' && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSendDeliveryEmail();
-                }}
-                disabled={sendDeliveryEmailMutation.isPending}
-              >
-                {sendDeliveryEmailMutation.isPending ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-1" />
-                    Out for Delivery
-                  </>
-                )}
-              </Button>
-            )}
-            {order.status === 'out_for_delivery' && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleStatusUpdate('delivered');
-                }}
-                disabled={isUpdating}
-              >
-                Mark Delivered
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
-            <p className="font-medium">{order.customer_name || 'N/A'}</p>
-            <p className="text-sm text-muted-foreground">{order.customer_email}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Order Type & Amount</p>
-            <p className="font-medium capitalize">{order.order_type}</p>
-            <p className="text-lg font-bold text-primary">
-              {formatCurrency(order.total_amount)}
-            </p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Items & Payment</p>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{order.order_items?.length || 0} items</span>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={e => {
-                  e.stopPropagation();
-                  setShowProductDetails(!showProductDetails);
-                }} 
-                className="h-6 px-2 text-xs"
-              >
-                <ChevronDown className={`w-3 h-3 transition-transform ${showProductDetails ? 'rotate-180' : ''}`} />
-                Products
-              </Button>
-            </div>
-            <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
-              {order.payment_status}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Product Details Expansion */}
-        {showProductDetails && (
-          <div className="mt-4 border-t pt-4">
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm mb-2">Product Details</h4>
-              <p className="text-sm text-muted-foreground">Product details available in full order view</p>
-            </div>
-          </div>
-        )}
-
-        {/* Enhanced Delivery Information Display using DeliveryScheduleDisplay */}
-        {order.payment_status === 'paid' && (
-          <div className="mt-4 border-t pt-4">
-            {/* Order Delivery Schedule Data */}
-            <div className="flex items-center gap-2 mb-4">
-              {order.order_type === 'delivery' ? (
-                <Truck className="w-5 h-5 text-primary" />
-              ) : (
-                <Package className="w-5 h-5 text-primary" />
-              )}
-              <h4 className="font-semibold text-base">
-                {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
-              </h4>
-            </div>
-            
-            {order.delivery_schedule ? (
-              <div className="space-y-3">
-                {/* Use order's embedded delivery schedule */}
-                <DeliveryScheduleDisplay 
-                  schedule={order.delivery_schedule}
-                  orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
-                  orderStatus={order.status}
-                  className="mb-0" 
-                />
-                
-                {/* Schedule Request Info */}
-                {(order.delivery_schedule.requested_at || order.delivery_schedule.created_at) && (
-                  <div className="text-xs text-muted-foreground border-t pt-3">
-                    Scheduled on {(() => {
-                      const dateToFormat = order.delivery_schedule.requested_at || order.delivery_schedule.created_at;
-                      if (!dateToFormat) return 'Date unavailable';
-                      try {
-                        return format(new Date(dateToFormat), 'MMM d, yyyy \'at\' h:mm a');
-                      } catch {
-                        return 'Invalid date';
-                      }
-                    })()}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 dark:bg-amber-950 dark:border-amber-800">
-                  <p className="text-sm text-amber-800 dark:text-amber-200">
-                    No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Schedule will be confirmed after payment is verified.
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            {/* Special Instructions Fallback */}
-            {!order.delivery_schedule?.special_instructions && order.special_instructions && (
-              <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg mt-4">
-                <p className="text-sm font-medium text-orange-800 mb-1">Order Special Instructions:</p>
-                <p className="text-sm text-orange-700 break-words">
-                  {order.special_instructions}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-        </CardContent>
-      </Card>
-    );
-}
-
 export default function AdminOrders() {
   return (
-    <ProductionOrderErrorBoundary>
+    <OrdersErrorBoundary>
       <AdminOrdersContent />
-    </ProductionOrderErrorBoundary>
+    </OrdersErrorBoundary>
   );
 }

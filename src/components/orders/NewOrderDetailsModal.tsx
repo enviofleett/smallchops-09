@@ -290,16 +290,16 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                     const message = `Hello ${safeOrder.customer_name}, this is regarding your order #${safeOrder.order_number}. How can I assist you?`;
                     const encodedMessage = encodeURIComponent(message);
                     
-                    // Use WhatsApp Web format with named target to reuse tab
-                    const whatsappUrl = `https://web.whatsapp.com/send?phone=${formattedNumber}&text=${encodedMessage}`;
+                    // Use wa.me universal link (most reliable, rarely blocked)
+                    const whatsappUrl = `https://wa.me/${formattedNumber}?text=${encodedMessage}`;
                     
                     return (
                       <a
                         href={whatsappUrl}
-                        target="whatsappWebTab"
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-[#25D366] hover:bg-[#20BA5A] transition-all duration-200 hover:scale-110 cursor-pointer shadow-sm hover:shadow-md"
-                        title="Chat on WhatsApp (opens in reusable tab)"
+                        title="Chat on WhatsApp"
                         aria-label="Chat with customer on WhatsApp"
                       >
                         <MessageCircle className="h-4 w-4 text-white" />

@@ -214,6 +214,21 @@ serve(async (req) => {
         });
       }
 
+      case 'daily-analytics': {
+        if (req.method !== 'GET') {
+          return new Response('Method not allowed', { status: 405, headers: corsHeaders });
+        }
+
+        const startDate = url.searchParams.get('startDate') || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const endDate = url.searchParams.get('endDate') || new Date().toISOString().split('T')[0];
+        
+        const dailyAnalytics = await generateDailyAnalytics(supabase, startDate, endDate);
+
+        return new Response(JSON.stringify(dailyAnalytics), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       default: {
         return new Response(
           JSON.stringify({ error: 'Endpoint not found' }),
@@ -737,4 +752,129 @@ async function generateAlerts(supabase: any) {
   }
 
   return alerts;
+}
+
+async function generateDailyAnalytics(supabase: any, startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Get all orders in the date range
+  const { data: orders, error: ordersError } = await supabase
+    .from('orders')
+    .select('*')
+    .gte('order_time', `${startDate}T00:00:00.000Z`)
+    .lte('order_time', `${endDate}T23:59:59.999Z`)
+    .eq('payment_status', 'paid')
+    .order('order_time', { ascending: true });
+
+  if (ordersError) {
+    console.error('Error fetching orders for daily analytics:', ordersError);
+    return { dailyData: [], summary: { totalDays: 0, totalRevenue: 0, totalOrders: 0, totalCustomers: 0 } };
+  }
+
+  // Get order items to find top products
+  const orderIds = orders?.map(o => o.id) || [];
+  const { data: orderItems } = await supabase
+    .from('order_items')
+    .select('order_id, product_id, quantity, products(name)')
+    .in('order_id', orderIds);
+
+  // Group data by day
+  const dailyMap: { [key: string]: any } = {};
+  
+  // Initialize all days in range
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateKey = d.toISOString().split('T')[0];
+    dailyMap[dateKey] = {
+      date: dateKey,
+      revenue: 0,
+      orders: 0,
+      customers: new Set(),
+      products: {} as { [key: string]: { name: string; quantity: number } },
+      previousRevenue: 0
+    };
+  }
+
+  // Aggregate orders data
+  (orders || []).forEach(order => {
+    const orderDate = new Date(order.order_time);
+    const dateKey = orderDate.toISOString().split('T')[0];
+    
+    if (dailyMap[dateKey]) {
+      dailyMap[dateKey].revenue += order.total_amount || 0;
+      dailyMap[dateKey].orders += 1;
+      
+      if (order.customer_email) {
+        dailyMap[dateKey].customers.add(order.customer_email);
+      }
+    }
+  });
+
+  // Aggregate product data
+  (orderItems || []).forEach(item => {
+    const order = orders?.find(o => o.id === item.order_id);
+    if (order) {
+      const orderDate = new Date(order.order_time);
+      const dateKey = orderDate.toISOString().split('T')[0];
+      
+      if (dailyMap[dateKey] && item.products?.name) {
+        const productName = item.products.name;
+        if (!dailyMap[dateKey].products[productName]) {
+          dailyMap[dateKey].products[productName] = { name: productName, quantity: 0 };
+        }
+        dailyMap[dateKey].products[productName].quantity += item.quantity || 0;
+      }
+    }
+  });
+
+  // Calculate growth and format data
+  const sortedDates = Object.keys(dailyMap).sort();
+  const dailyData = sortedDates.map((dateKey, index) => {
+    const day = dailyMap[dateKey];
+    const previousDay = index > 0 ? dailyMap[sortedDates[index - 1]] : null;
+    
+    // Calculate growth percentage
+    let growthPercentage = 0;
+    if (previousDay && previousDay.revenue > 0) {
+      growthPercentage = ((day.revenue - previousDay.revenue) / previousDay.revenue) * 100;
+    }
+
+    // Get top 3 products for the day
+    const topProducts = Object.values(day.products)
+      .sort((a: any, b: any) => b.quantity - a.quantity)
+      .slice(0, 3)
+      .map((p: any) => ({ name: p.name, quantity: p.quantity }));
+
+    return {
+      date: dateKey,
+      revenue: day.revenue,
+      orders: day.orders,
+      customers: day.customers.size,
+      topProducts,
+      growth: growthPercentage,
+      growthDirection: growthPercentage > 0 ? 'up' : growthPercentage < 0 ? 'down' : 'flat'
+    };
+  });
+
+  // Calculate summary
+  const summary = {
+    totalDays: dailyData.length,
+    totalRevenue: dailyData.reduce((sum, day) => sum + day.revenue, 0),
+    totalOrders: dailyData.reduce((sum, day) => sum + day.orders, 0),
+    totalCustomers: new Set(dailyData.flatMap(day => 
+      orders?.filter(o => o.order_time.startsWith(day.date)).map(o => o.customer_email) || []
+    )).size,
+    averageDailyRevenue: dailyData.length > 0 
+      ? dailyData.reduce((sum, day) => sum + day.revenue, 0) / dailyData.length 
+      : 0,
+    averageDailyOrders: dailyData.length > 0 
+      ? dailyData.reduce((sum, day) => sum + day.orders, 0) / dailyData.length 
+      : 0
+  };
+
+  return {
+    dailyData,
+    summary,
+    dateRange: { startDate, endDate }
+  };
 }

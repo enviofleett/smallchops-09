@@ -279,30 +279,33 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <span className="text-base">{safeOrder.customer_phone}</span>
-                  {isAdmin && (
-                    <button
-                      onClick={() => {
-                        // Clean and format Nigerian phone number
-                        const cleanNumber = safeOrder.customer_phone.replace(/[^0-9]/g, '');
-                        const formattedNumber = cleanNumber.startsWith('234') 
-                          ? cleanNumber 
-                          : `234${cleanNumber.replace(/^0/, '')}`;
-                        
-                        // Create dynamic message
-                        const message = `Hello ${safeOrder.customer_name}, this is regarding your order #${safeOrder.order_number}. How can I assist you?`;
-                        const encodedMessage = encodeURIComponent(message);
-                        
-                        // Use the official WhatsApp API format
-                        const whatsappUrl = `https://api.whatsapp.com/send/?phone=${formattedNumber}&text=${encodedMessage}&type=phone_number&app_absent=0`;
-                        window.open(whatsappUrl, 'whatsapp_chat', 'noopener,noreferrer');
-                      }}
-                      className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-500 hover:bg-green-600 transition-colors cursor-pointer"
-                      title="Chat on WhatsApp"
-                      type="button"
-                    >
-                      <MessageCircle className="h-4 w-4 text-white" />
-                    </button>
-                  )}
+                  {isAdmin && (() => {
+                    // Clean and format Nigerian phone number
+                    const cleanNumber = safeOrder.customer_phone.replace(/[^0-9]/g, '');
+                    const formattedNumber = cleanNumber.startsWith('234') 
+                      ? cleanNumber 
+                      : `234${cleanNumber.replace(/^0/, '')}`;
+                    
+                    // Create dynamic message
+                    const message = `Hello ${safeOrder.customer_name}, this is regarding your order #${safeOrder.order_number}. How can I assist you?`;
+                    const encodedMessage = encodeURIComponent(message);
+                    
+                    // Use WhatsApp Web format with named target to reuse tab
+                    const whatsappUrl = `https://web.whatsapp.com/send?phone=${formattedNumber}&text=${encodedMessage}`;
+                    
+                    return (
+                      <a
+                        href={whatsappUrl}
+                        target="whatsappWebTab"
+                        rel="noopener noreferrer"
+                        className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-[#25D366] hover:bg-[#20BA5A] transition-all duration-200 hover:scale-110 cursor-pointer shadow-sm hover:shadow-md"
+                        title="Chat on WhatsApp (opens in reusable tab)"
+                        aria-label="Chat with customer on WhatsApp"
+                      >
+                        <MessageCircle className="h-4 w-4 text-white" />
+                      </a>
+                    );
+                  })()}
                 </div>
               )}
             </CardContent>

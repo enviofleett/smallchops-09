@@ -282,11 +282,18 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                   {isAdmin && (
                     <button
                       onClick={() => {
+                        // Clean and format Nigerian phone number
                         const cleanNumber = safeOrder.customer_phone.replace(/[^0-9]/g, '');
                         const formattedNumber = cleanNumber.startsWith('234') 
                           ? cleanNumber 
                           : `234${cleanNumber.replace(/^0/, '')}`;
-                        const whatsappUrl = `https://web.whatsapp.com/send?phone=${formattedNumber}`;
+                        
+                        // Create dynamic message
+                        const message = `Hello ${safeOrder.customer_name}, this is regarding your order #${safeOrder.order_number}. How can I assist you?`;
+                        const encodedMessage = encodeURIComponent(message);
+                        
+                        // Use the official WhatsApp API format
+                        const whatsappUrl = `https://api.whatsapp.com/send/?phone=${formattedNumber}&text=${encodedMessage}&type=phone_number&app_absent=0`;
                         window.open(whatsappUrl, 'whatsapp_chat', 'noopener,noreferrer');
                       }}
                       className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-500 hover:bg-green-600 transition-colors cursor-pointer"

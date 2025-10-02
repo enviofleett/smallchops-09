@@ -9,7 +9,8 @@ import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import ReportTabs from "@/components/ReportTabs";
 import { RevenueBreakdown } from "@/components/reports/RevenueBreakdown";
-import { fetchReportsData } from "@/api/reports";
+import { DailyAnalyticsTable } from "@/components/reports/DailyAnalyticsTable";
+import { fetchReportsData, fetchDailyAnalytics } from "@/api/reports";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
@@ -61,6 +62,19 @@ export default function Reports() {
     retry: false // Disable react-query retry since fetchReportsData handles its own retry logic
   });
 
+  // Fetch daily analytics
+  const { data: dailyAnalyticsData, isLoading: isDailyLoading, error: dailyError } = useQuery({
+    queryKey: ["reports/daily-analytics", startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]],
+    queryFn: () => fetchDailyAnalytics({ 
+      startDate: startDate.toISOString().split('T')[0], 
+      endDate: endDate.toISOString().split('T')[0],
+      retryCount: 3 
+    }),
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    retry: false
+  });
+
   // Fix: Call error handler only when error changes, not on every render
   useEffect(() => {
     if (error) {
@@ -68,6 +82,13 @@ export default function Reports() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error]); // Only run when error changes
+
+  useEffect(() => {
+    if (dailyError) {
+      handleError(dailyError, "Daily Analytics");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dailyError]);
 
   const exportToCSV = () => {
     if (!data) return;
@@ -308,6 +329,11 @@ export default function Reports() {
         <div className="xl:col-span-1 order-1 xl:order-2">
           <ReportTabs reportsData={data} isLoading={isLoading} />
         </div>
+      </div>
+
+      {/* Daily Analytics Section */}
+      <div className="mt-4 md:mt-6">
+        <DailyAnalyticsTable data={dailyAnalyticsData} isLoading={isDailyLoading} />
       </div>
     </div>
   );

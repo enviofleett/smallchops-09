@@ -2,6 +2,103 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
+ * API utility for fetching daily analytics data from the Supabase analytics-dashboard Edge Function.
+ */
+export async function fetchDailyAnalytics(
+  params: {
+    startDate?: string;
+    endDate?: string;
+    retryCount?: number;
+  } = {}
+) {
+  const { 
+    startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+    endDate = new Date().toISOString().split('T')[0],
+    retryCount = 3 
+  } = params;
+  
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= retryCount; attempt++) {
+    try {
+      console.log(`Fetching daily analytics (attempt ${attempt}/${retryCount})...`);
+      
+      // Get the Supabase client session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Call the edge function with the path parameter
+      const { data: functionData } = await supabase.functions.invoke('analytics-dashboard', {
+        body: null,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Since we can't directly pass the path in invoke, we'll use a workaround
+      // by calling the endpoint directly via fetch
+      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/analytics-dashboard/daily-analytics?startDate=${startDate}&endDate=${endDate}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      console.log(`Daily analytics data received successfully (attempt ${attempt})`);
+      
+      return data || {
+        dailyData: [],
+        summary: {
+          totalDays: 0,
+          totalRevenue: 0,
+          totalOrders: 0,
+          totalCustomers: 0,
+          averageDailyRevenue: 0,
+          averageDailyOrders: 0
+        },
+        dateRange: { startDate, endDate }
+      };
+      
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`Failed to fetch daily analytics (attempt ${attempt}/${retryCount}):`, error);
+      
+      if (attempt === retryCount) {
+        break;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+    }
+  }
+  
+  console.warn('Daily analytics API failed after all retries, returning fallback data');
+  
+  return {
+    dailyData: [],
+    summary: {
+      totalDays: 0,
+      totalRevenue: 0,
+      totalOrders: 0,
+      totalCustomers: 0,
+      averageDailyRevenue: 0,
+      averageDailyOrders: 0
+    },
+    dateRange: { startDate, endDate },
+    _fallback: true
+  };
+}
+
+/**
  * API utility for fetching analytics data from the Supabase reports Edge Function.
  * Enhanced with retry logic and better error handling for production use.
  */

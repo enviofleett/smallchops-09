@@ -51,28 +51,36 @@ export class ProductionErrorBoundary extends Component<Props, State> {
     });
 
     const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Detect hooks violation
+    const isHooksError = error.message.includes('hooks') || 
+                        error.message.includes('Rendered fewer') ||
+                        error.message.includes('Rendered more');
 
     if (import.meta.env.PROD) {
-      // Production logging - minimal console output
-      console.error(`Error ${errorId}:`, error.message);
+      // Production logging - detailed for critical errors
+      console.error(`[PROD ERROR ${errorId}]`, {
+        message: error.message,
+        type: isHooksError ? 'HOOKS_VIOLATION' : 'RUNTIME_ERROR',
+        stack: error.stack?.split('\n').slice(0, 3).join('\n'), // First 3 lines only
+      });
       
       // Report to monitoring service
       try {
-        // Send error to monitoring service (e.g., Sentry, LogRocket)
         fetch('/api/log-error', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             errorId,
             message: error.message,
+            type: isHooksError ? 'HOOKS_VIOLATION' : 'RUNTIME_ERROR',
             timestamp: new Date().toISOString(),
             userAgent: navigator.userAgent,
             url: window.location.href,
-            retryCount: this.state.retryCount
+            retryCount: this.state.retryCount,
+            componentStack: errorInfo.componentStack?.split('\n').slice(0, 5).join('\n')
           })
-        }).catch(() => {
-          // Silently fail if logging service is down
-        });
+        }).catch(() => {});
       } catch (e) {
         // Silently handle logging errors
       }
@@ -80,11 +88,13 @@ export class ProductionErrorBoundary extends Component<Props, State> {
       // Development logging - full details
       console.error('🚨 Error Boundary Caught:', {
         errorId,
+        type: isHooksError ? '⚠️ HOOKS_VIOLATION' : 'RUNTIME_ERROR',
         error: error.message,
         stack: error.stack,
         componentStack: errorInfo.componentStack,
         retryCount: this.state.retryCount,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        hint: isHooksError ? 'Check for: 1) Hooks called conditionally, 2) Early returns before hooks, 3) Hooks in loops/callbacks' : ''
       });
     }
   }

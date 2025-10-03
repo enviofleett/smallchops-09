@@ -34,9 +34,62 @@ interface DailyMetricsPanelProps {
 }
 
 export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData, isLoading }) => {
+  // CRITICAL: Always call hooks BEFORE any conditional returns to avoid hooks violations
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  
+  // Calculate all metrics first (hooks must always be called in same order)
+  const sortedData = useMemo(() => {
+    return [...dailyData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [dailyData]);
 
-  if (isLoading) {
+  const selectedMetric = useMemo(() => {
+    if (!selectedDate) return sortedData[sortedData.length - 1];
+    return sortedData.find(d => d.date === selectedDate) || sortedData[sortedData.length - 1];
+  }, [selectedDate, sortedData]);
+
+  const periodSummary = useMemo(() => {
+    if (sortedData.length === 0) {
+      return { totalRevenue: 0, totalOrders: 0, totalProducts: 0, totalCustomers: 0, avgRevenue: 0, avgOrders: 0 };
+    }
+    const totalRevenue = sortedData.reduce((sum, d) => sum + d.revenue, 0);
+    const totalOrders = sortedData.reduce((sum, d) => sum + d.orders, 0);
+    const totalProducts = sortedData.reduce((sum, d) => sum + d.newProducts, 0);
+    const totalCustomers = sortedData.reduce((sum, d) => sum + d.newCustomerRegistrations, 0);
+    return {
+      totalRevenue,
+      totalOrders,
+      totalProducts,
+      totalCustomers,
+      avgRevenue: totalRevenue / sortedData.length,
+      avgOrders: totalOrders / sortedData.length
+    };
+  }, [sortedData]);
+
+  const allTopCustomers = useMemo(() => {
+    const customerMap = new Map<string, { name: string; email: string; orders: number; spending: number }>();
+    sortedData.forEach(day => {
+      day.topCustomers?.forEach(customer => {
+        const existing = customerMap.get(customer.email);
+        if (existing) {
+          existing.orders += customer.orders;
+          existing.spending += customer.spending;
+        } else {
+          customerMap.set(customer.email, { 
+            name: customer.name, 
+            email: customer.email,
+            orders: customer.orders,
+            spending: customer.spending 
+          });
+        }
+      });
+    });
+    return Array.from(customerMap.values())
+      .sort((a, b) => b.spending - a.spending)
+      .slice(0, 10);
+  }, [sortedData]);
+
+  // NOW handle loading state after all hooks
+  if (isLoading || sortedData.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -97,62 +150,7 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
     }
   };
 
-  // Calculate period summaries
-  const periodSummary = useMemo(() => {
-    return validDailyData.reduce((acc, day) => ({
-      totalRevenue: acc.totalRevenue + (Number(day.revenue) || 0),
-      totalOrders: acc.totalOrders + (Number(day.orders) || 0),
-      totalProducts: acc.totalProducts + (Number(day.newProducts) || 0),
-      totalCustomers: acc.totalCustomers + (Number(day.newCustomerRegistrations) || 0),
-      avgDailyRevenue: 0, // Will calculate after
-      avgDailyOrders: 0,
-    }), {
-      totalRevenue: 0,
-      totalOrders: 0,
-      totalProducts: 0,
-      totalCustomers: 0,
-      avgDailyRevenue: 0,
-      avgDailyOrders: 0,
-    });
-  }, [validDailyData]);
-
-  // Calculate averages
-  periodSummary.avgDailyRevenue = validDailyData.length > 0 
-    ? periodSummary.totalRevenue / validDailyData.length 
-    : 0;
-  periodSummary.avgDailyOrders = validDailyData.length > 0 
-    ? periodSummary.totalOrders / validDailyData.length 
-    : 0;
-
-  // Collect all top customers across all days
-  const allTopCustomers = useMemo(() => {
-    const customerMap = new Map();
-    validDailyData.forEach(day => {
-      if (Array.isArray(day.topCustomers)) {
-        day.topCustomers.forEach(customer => {
-          const existing = customerMap.get(customer.email);
-          if (existing) {
-            existing.orders += Number(customer.orders) || 0;
-            existing.spending += Number(customer.spending) || 0;
-          } else {
-            customerMap.set(customer.email, {
-              name: customer.name,
-              email: customer.email,
-              orders: Number(customer.orders) || 0,
-              spending: Number(customer.spending) || 0,
-            });
-          }
-        });
-      }
-    });
-    return Array.from(customerMap.values())
-      .sort((a, b) => b.spending - a.spending)
-      .slice(0, 10);
-  }, [validDailyData]);
-
-  const selectedMetric = selectedDate 
-    ? validDailyData.find(d => d.date === selectedDate) 
-    : validDailyData[validDailyData.length - 1];
+  // Use selectedMetric from useMemo at top (already calculated)
 
   // Date navigation
   const currentIndex = selectedDate 
@@ -205,12 +203,12 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Total Revenue</p>
               <p className="text-2xl font-bold">{formatCurrency(periodSummary.totalRevenue)}</p>
-              <p className="text-xs text-muted-foreground">Avg: {formatCurrency(periodSummary.avgDailyRevenue)}/day</p>
+              <p className="text-xs text-muted-foreground">Avg: {formatCurrency(periodSummary.avgRevenue)}/day</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Total Orders</p>
               <p className="text-2xl font-bold">{periodSummary.totalOrders}</p>
-              <p className="text-xs text-muted-foreground">Avg: {periodSummary.avgDailyOrders.toFixed(1)}/day</p>
+              <p className="text-xs text-muted-foreground">Avg: {periodSummary.avgOrders.toFixed(1)}/day</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">New Products</p>

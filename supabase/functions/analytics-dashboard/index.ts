@@ -784,6 +784,16 @@ async function generateAlerts(supabase: any) {
   return alerts;
 }
 
+/**
+ * Generate daily analytics metrics with Lagos timezone handling
+ * @param supabase - Supabase client instance
+ * @param startDate - Start date in YYYY-MM-DD format (will be treated as Lagos date)
+ * @param endDate - End date in YYYY-MM-DD format (will be treated as Lagos date)
+ * @returns Daily metrics aggregated by Lagos timezone days
+ * 
+ * Note: All dates are converted from Lagos time (UTC+1) to UTC for database queries,
+ * then converted back to Lagos time for aggregation and display.
+ */
 async function generateDailyAnalytics(supabase: any, startDate: string, endDate: string) {
   try {
     // Validate date inputs

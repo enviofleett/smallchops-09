@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { data, isLoading, error, refresh } = useDashboardData();
+  // Date range in YYYY-MM-DD format (client local dates)
+  // Backend will convert these to Lagos timezone (UTC+1) for querying
   const [dateRange, setDateRange] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]

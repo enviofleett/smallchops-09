@@ -276,33 +276,86 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
           </CardTitle>
           <CardDescription>Total metrics for the selected period</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
-              <p className="text-2xl font-bold">{formatCurrency(periodSummary.totalRevenue)}</p>
-              <p className="text-xs text-muted-foreground">Avg: {formatCurrency(periodSummary.avgRevenue)}/day</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Orders</p>
-              <p className="text-2xl font-bold">{periodSummary.totalOrders}</p>
-              <p className="text-xs text-muted-foreground">Avg: {periodSummary.avgOrders.toFixed(1)}/day</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">New Products</p>
-              <p className="text-2xl font-bold">{periodSummary.totalProducts}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">New Customers</p>
-              <p className="text-2xl font-bold">{periodSummary.totalCustomers}</p>
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <UserPlus className="h-4 w-4 text-accent" />
-                <span>First-Time Orders</span>
+        <CardContent className="p-4 sm:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
+            {/* Total Revenue */}
+            <div className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/50 hover:border-border transition-all hover:shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </div>
               </div>
-              <p className="text-2xl font-bold text-accent">{firstTimeCustomers.length}</p>
-              <p className="text-xs text-muted-foreground">Customers</p>
+              <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+                {formatCurrency(periodSummary.totalRevenue)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Avg: <span className="font-semibold text-foreground">{formatCurrency(periodSummary.avgRevenue)}</span>/day
+              </p>
+            </div>
+
+            {/* Total Orders */}
+            <div className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/50 hover:border-border transition-all hover:shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
+                <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <ShoppingCart className="h-4 w-4 text-blue-600" />
+                </div>
+              </div>
+              <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+                {periodSummary.totalOrders.toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Avg: <span className="font-semibold text-foreground">{periodSummary.avgOrders.toFixed(1)}</span>/day
+              </p>
+            </div>
+
+            {/* New Products */}
+            <div className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/50 hover:border-border transition-all hover:shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">New Products</p>
+                <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <Package className="h-4 w-4 text-purple-600" />
+                </div>
+              </div>
+              <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+                {periodSummary.totalProducts.toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Added in period
+              </p>
+            </div>
+
+            {/* New Customers */}
+            <div className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/50 hover:border-border transition-all hover:shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">New Customers</p>
+                <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <Users className="h-4 w-4 text-orange-600" />
+                </div>
+              </div>
+              <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+                {periodSummary.totalCustomers.toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Registered
+              </p>
+            </div>
+
+            {/* First-Time Orders - Enhanced Visibility */}
+            <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-accent/10 p-4 rounded-xl border-2 border-primary/30 hover:border-primary/50 transition-all hover:shadow-lg shadow-primary/5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-primary">First-Time Orders</p>
+                <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center ring-2 ring-primary/30">
+                  <UserPlus className="h-4 w-4 text-primary" />
+                </div>
+              </div>
+              <p className="text-3xl sm:text-4xl font-bold text-primary mb-1 tracking-tight">
+                {firstTimeCustomers.length}
+              </p>
+              <p className="text-xs font-medium text-primary/80">
+                New Customers
+              </p>
             </div>
           </div>
         </CardContent>

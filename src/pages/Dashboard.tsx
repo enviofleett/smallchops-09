@@ -22,14 +22,37 @@ const Dashboard = () => {
     endDate: new Date().toISOString().split('T')[0]
   });
 
-  // Fetch daily analytics data
-  const { data: dailyMetrics, isLoading: isDailyLoading } = useQuery({
+  // Fetch daily analytics data with proper error handling and retry logic
+  const { 
+    data: dailyMetrics, 
+    isLoading: isDailyLoading,
+    error: dailyError,
+    refetch: refetchDaily
+  } = useQuery({
     queryKey: ['daily-metrics', dateRange],
-    queryFn: () => fetchDailyAnalytics({
-      startDate: dateRange.startDate,
-      endDate: dateRange.endDate
-    }),
+    queryFn: async () => {
+      try {
+        const result = await fetchDailyAnalytics({
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          retryCount: 3
+        });
+        
+        // Validate response structure
+        if (!result || typeof result !== 'object') {
+          throw new Error('Invalid response from analytics API');
+        }
+        
+        return result;
+      } catch (err) {
+        console.error('Failed to fetch daily metrics:', err);
+        throw err;
+      }
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    enabled: !!data, // Only fetch daily metrics after main dashboard data loads
   });
 
   if (isLoading) {
@@ -111,25 +134,25 @@ const Dashboard = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <DashboardCard
                 title="Total Products"
-                value={formatNumber(data?.stats.totalProducts || 0)}
+                value={formatNumber(data?.stats?.totalProducts || 0)}
                 icon={<Package />}
                 className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900"
               />
               <DashboardCard
                 title="Total Orders"
-                value={formatNumber(data?.stats.totalOrders || 0)}
+                value={formatNumber(data?.stats?.totalOrders || 0)}
                 icon={<ShoppingCart />}
                 className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900"
               />
               <DashboardCard
                 title="Total Customers"
-                value={formatNumber(data?.stats.totalCustomers || 0)}
+                value={formatNumber(data?.stats?.totalCustomers || 0)}
                 icon={<Users />}
                 className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900"
               />
               <DashboardCard
                 title="Total Revenue"
-                value={formatCurrency(data?.stats.totalRevenue || 0)}
+                value={formatCurrency(data?.stats?.totalRevenue || 0)}
                 icon={<TrendingUp />}
                 className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900"
               />
@@ -144,19 +167,33 @@ const Dashboard = () => {
         </TabsContent>
 
         <TabsContent value="daily" className="space-y-4 md:space-y-6 mt-6">
-          <DailyMetricsPanel 
-            dailyData={dailyMetrics?.dailyData || []} 
-            isLoading={isDailyLoading}
-          />
+          {dailyError ? (
+            <div className="text-center py-12 space-y-4">
+              <div className="text-destructive">
+                <p className="font-medium mb-2">Failed to load daily metrics</p>
+                <p className="text-sm text-muted-foreground mb-4">{dailyError instanceof Error ? dailyError.message : 'Unknown error occurred'}</p>
+                <Button onClick={() => refetchDaily()} variant="outline" size="sm">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <DailyMetricsPanel 
+              dailyData={dailyMetrics?.dailyData || []} 
+              isLoading={isDailyLoading}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
-      {(!data || (!data.stats.totalProducts && !data.stats.totalOrders)) && !isLoading && (
+      {(!data || (!data.stats?.totalProducts && !data.stats?.totalOrders)) && !isLoading && (
         <div className="text-center py-8 space-y-4">
           <div className="text-muted-foreground">
             <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />
             <h3 className="text-lg font-medium">No Data Available</h3>
-            <p>Your dashboard will show data once you start adding products and receiving orders.</p>
+            <p className="text-sm">Your dashboard will show data once you start adding products and receiving orders.</p>
+            <p className="text-xs mt-2">Check back after your first sale!</p>
           </div>
         </div>
       )}

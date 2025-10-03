@@ -43,6 +43,11 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-24 bg-muted rounded"></div>
+              ))}
+            </div>
             <div className="h-64 bg-muted rounded"></div>
           </div>
         </CardContent>
@@ -50,7 +55,12 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
     );
   }
 
-  if (!dailyData || dailyData.length === 0) {
+  // Validate and sanitize daily data
+  const validDailyData = Array.isArray(dailyData) 
+    ? dailyData.filter(day => day && typeof day === 'object' && day.date)
+    : [];
+
+  if (validDailyData.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -61,6 +71,7 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
           <div className="text-center py-12">
             <Calendar className="mx-auto h-12 w-12 opacity-50 mb-4" />
             <p className="text-muted-foreground">Start receiving orders to see daily metrics</p>
+            <p className="text-xs text-muted-foreground mt-2">Data will appear here once you have orders in the system</p>
           </div>
         </CardContent>
       </Card>
@@ -85,18 +96,18 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
   };
 
   const selectedMetric = selectedDate 
-    ? dailyData.find(d => d.date === selectedDate) 
-    : dailyData[dailyData.length - 1];
+    ? validDailyData.find(d => d.date === selectedDate) 
+    : validDailyData[validDailyData.length - 1];
 
-  // Prepare chart data
-  const chartData = dailyData.map(day => ({
-    date: formatDate(day.date),
-    fullDate: day.date,
-    orders: day.orders,
-    revenue: day.revenue / 100, // Convert to thousands for better display
-    customers: day.customers,
-    newProducts: day.newProducts,
-    newCustomers: day.newCustomerRegistrations
+  // Prepare chart data with safe access and validation
+  const chartData = validDailyData.map(day => ({
+    date: formatDate(day.date || ''),
+    fullDate: day.date || '',
+    orders: Number(day.orders) || 0,
+    revenue: (Number(day.revenue) || 0) / 100, // Convert to thousands for better display
+    customers: Number(day.customers) || 0,
+    newProducts: Number(day.newProducts) || 0,
+    newCustomers: Number(day.newCustomerRegistrations) || 0
   }));
 
   return (
@@ -294,28 +305,28 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
           </Card>
 
           {/* Top Customers for Selected Day */}
-          {selectedMetric && selectedMetric.topCustomers.length > 0 && (
+          {selectedMetric && Array.isArray(selectedMetric.topCustomers) && selectedMetric.topCustomers.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Top Customers - {formatDate(selectedMetric.date)}</CardTitle>
+                <CardTitle>Top Customers - {formatDate(selectedMetric.date || '')}</CardTitle>
                 <CardDescription>Customers with highest spending</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {selectedMetric.topCustomers.map((customer, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div key={`${customer.email}-${idx}`} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
                           #{idx + 1}
                         </div>
                         <div>
-                          <p className="font-medium text-sm">{customer.name}</p>
-                          <p className="text-xs text-muted-foreground">{customer.email}</p>
+                          <p className="font-medium text-sm">{customer.name || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground">{customer.email || 'No email'}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(customer.spending)}</p>
-                        <p className="text-xs text-muted-foreground">{customer.orders} orders</p>
+                        <p className="font-semibold">{formatCurrency(Number(customer.spending) || 0)}</p>
+                        <p className="text-xs text-muted-foreground">{Number(customer.orders) || 0} orders</p>
                       </div>
                     </div>
                   ))}

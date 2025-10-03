@@ -21,44 +21,51 @@ export async function fetchDailyAnalytics(
   
   for (let attempt = 1; attempt <= retryCount; attempt++) {
     try {
-      console.log(`Fetching daily analytics (attempt ${attempt}/${retryCount})...`);
+      console.log(`Fetching daily analytics (attempt ${attempt}/${retryCount})...`, { startDate, endDate });
       
       // Get the Supabase client session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw new Error(`Session error: ${sessionError.message}`);
+      }
       if (!session) {
-        throw new Error('No active session');
+        throw new Error('No active session. Please log in to view analytics.');
       }
 
-      // Call the edge function with the path parameter
-      const { data: functionData } = await supabase.functions.invoke('analytics-dashboard', {
-        body: null,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      // Since we can't directly pass the path in invoke, we'll use a workaround
-      // by calling the endpoint directly via fetch
-      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/analytics-dashboard/daily-analytics?startDate=${startDate}&endDate=${endDate}`, {
+      // Call the endpoint directly via fetch with proper error handling
+      const supabaseUrl = 'https://oknnklksdiqaifhxaccs.supabase.co';
+      const url = `${supabaseUrl}/functions/v1/analytics-dashboard/daily-analytics?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA'
         },
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Analytics API error (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
       
-      console.log(`Daily analytics data received successfully (attempt ${attempt})`);
+      // Validate response structure
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response format from analytics API');
+      }
       
-      return data || {
-        dailyData: [],
-        summary: {
+      console.log(`Daily analytics data received successfully (attempt ${attempt}):`, {
+        hasDailyData: Array.isArray(data.dailyData),
+        dataCount: data.dailyData?.length || 0
+      });
+      
+      // Return with proper structure and defaults
+      return {
+        dailyData: Array.isArray(data.dailyData) ? data.dailyData : [],
+        summary: data.summary || {
           totalDays: 0,
           totalRevenue: 0,
           totalOrders: 0,
@@ -66,22 +73,31 @@ export async function fetchDailyAnalytics(
           averageDailyRevenue: 0,
           averageDailyOrders: 0
         },
-        dateRange: { startDate, endDate }
+        dateRange: data.dateRange || { startDate, endDate }
       };
       
     } catch (error) {
       lastError = error as Error;
-      console.error(`Failed to fetch daily analytics (attempt ${attempt}/${retryCount}):`, error);
+      console.error(`Failed to fetch daily analytics (attempt ${attempt}/${retryCount}):`, {
+        error: error instanceof Error ? error.message : String(error),
+        attempt,
+        retryCount
+      });
       
       if (attempt === retryCount) {
         break;
       }
       
+      // Exponential backoff: 1s, 2s, 4s
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
     }
   }
   
-  console.warn('Daily analytics API failed after all retries, returning fallback data');
+  // All retries failed - return fallback data
+  console.warn('Daily analytics API failed after all retries, returning fallback data', {
+    lastError: lastError?.message,
+    retryCount
+  });
   
   return {
     dailyData: [],
@@ -94,6 +110,7 @@ export async function fetchDailyAnalytics(
       averageDailyOrders: 0
     },
     dateRange: { startDate, endDate },
+    error: lastError?.message || 'Failed to fetch analytics data',
     _fallback: true
   };
 }

@@ -755,119 +755,189 @@ async function generateAlerts(supabase: any) {
 }
 
 async function generateDailyAnalytics(supabase: any, startDate: string, endDate: string) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  // Get all orders in the date range
-  const { data: orders, error: ordersError } = await supabase
-    .from('orders')
-    .select('*')
-    .gte('order_time', `${startDate}T00:00:00.000Z`)
-    .lte('order_time', `${endDate}T23:59:59.999Z`)
-    .eq('payment_status', 'paid')
-    .order('order_time', { ascending: true });
-
-  if (ordersError) {
-    console.error('Error fetching orders for daily analytics:', ordersError);
-    return { dailyData: [], summary: { totalDays: 0, totalRevenue: 0, totalOrders: 0, totalCustomers: 0 } };
-  }
-
-  // Get order items to find top products
-  const orderIds = orders?.map(o => o.id) || [];
-  const { data: orderItems } = await supabase
-    .from('order_items')
-    .select('order_id, product_id, quantity, products(name)')
-    .in('order_id', orderIds);
-
-  // Get daily product additions
-  const { data: products } = await supabase
-    .from('products')
-    .select('created_at')
-    .gte('created_at', `${startDate}T00:00:00.000Z`)
-    .lte('created_at', `${endDate}T23:59:59.999Z`)
-    .order('created_at', { ascending: true });
-
-  // Get daily customer registrations
-  const { data: customers } = await supabase
-    .from('customers')
-    .select('created_at, email, name')
-    .gte('created_at', `${startDate}T00:00:00.000Z`)
-    .lte('created_at', `${endDate}T23:59:59.999Z`)
-    .order('created_at', { ascending: true });
-
-  // Group data by day
-  const dailyMap: { [key: string]: any } = {};
-  
-  // Initialize all days in range
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dateKey = d.toISOString().split('T')[0];
-    dailyMap[dateKey] = {
-      date: dateKey,
-      revenue: 0,
-      orders: 0,
-      customers: new Set(),
-      customerDetails: [] as any[],
-      products: {} as { [key: string]: { name: string; quantity: number } },
-      newProducts: 0,
-      newCustomerRegistrations: 0,
-      previousRevenue: 0
-    };
-  }
-
-  // Aggregate orders data
-  (orders || []).forEach(order => {
-    const orderDate = new Date(order.order_time);
-    const dateKey = orderDate.toISOString().split('T')[0];
+  try {
+    // Validate date inputs
+    const start = new Date(startDate);
+    const end = new Date(endDate);
     
-    if (dailyMap[dateKey]) {
-      dailyMap[dateKey].revenue += order.total_amount || 0;
-      dailyMap[dateKey].orders += 1;
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      console.error('Invalid date format:', { startDate, endDate });
+      return { 
+        dailyData: [], 
+        summary: { totalDays: 0, totalRevenue: 0, totalOrders: 0, totalCustomers: 0 },
+        error: 'Invalid date format'
+      };
+    }
+    
+    if (start > end) {
+      console.error('Start date cannot be after end date:', { startDate, endDate });
+      return { 
+        dailyData: [], 
+        summary: { totalDays: 0, totalRevenue: 0, totalOrders: 0, totalCustomers: 0 },
+        error: 'Invalid date range'
+      };
+    }
+  
+    // Get all orders in the date range
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .gte('order_time', `${startDate}T00:00:00.000Z`)
+      .lte('order_time', `${endDate}T23:59:59.999Z`)
+      .eq('payment_status', 'paid')
+      .order('order_time', { ascending: true });
+
+    if (ordersError) {
+      console.error('Error fetching orders for daily analytics:', ordersError);
+      return { 
+        dailyData: [], 
+        summary: { totalDays: 0, totalRevenue: 0, totalOrders: 0, totalCustomers: 0 },
+        error: ordersError.message
+      };
+    }
+
+    // Get order items to find top products - with error handling
+    const orderIds = (orders || []).map(o => o.id).filter(Boolean);
+    let orderItems = [];
+    
+    if (orderIds.length > 0) {
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('order_items')
+        .select('order_id, product_id, quantity, products(name)')
+        .in('order_id', orderIds);
       
-      if (order.customer_email) {
-        dailyMap[dateKey].customers.add(order.customer_email);
-        dailyMap[dateKey].customerDetails.push({
-          email: order.customer_email,
-          name: order.customer_name,
-          orderValue: order.total_amount || 0
-        });
+      if (itemsError) {
+        console.error('Error fetching order items:', itemsError);
+      } else {
+        orderItems = itemsData || [];
       }
     }
-  });
 
-  // Aggregate product data
-  (orderItems || []).forEach(item => {
-    const order = orders?.find(o => o.id === item.order_id);
-    if (order) {
-      const orderDate = new Date(order.order_time);
-      const dateKey = orderDate.toISOString().split('T')[0];
-      
-      if (dailyMap[dateKey] && item.products?.name) {
-        const productName = item.products.name;
-        if (!dailyMap[dateKey].products[productName]) {
-          dailyMap[dateKey].products[productName] = { name: productName, quantity: 0 };
+    // Get daily product additions - with error handling
+    let products = [];
+    const { data: productsData, error: productsError } = await supabase
+      .from('products')
+      .select('created_at')
+      .gte('created_at', `${startDate}T00:00:00.000Z`)
+      .lte('created_at', `${endDate}T23:59:59.999Z`)
+      .order('created_at', { ascending: true });
+    
+    if (productsError) {
+      console.error('Error fetching products:', productsError);
+    } else {
+      products = productsData || [];
+    }
+
+    // Get daily customer registrations - with error handling
+    let customers = [];
+    const { data: customersData, error: customersError } = await supabase
+      .from('customers')
+      .select('created_at, email, name')
+      .gte('created_at', `${startDate}T00:00:00.000Z`)
+      .lte('created_at', `${endDate}T23:59:59.999Z`)
+      .order('created_at', { ascending: true });
+    
+    if (customersError) {
+      console.error('Error fetching customers:', customersError);
+    } else {
+      customers = customersData || [];
+    }
+
+    // Group data by day
+    const dailyMap: { [key: string]: any } = {};
+    
+    // Initialize all days in range
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toISOString().split('T')[0];
+      dailyMap[dateKey] = {
+        date: dateKey,
+        revenue: 0,
+        orders: 0,
+        customers: new Set(),
+        customerDetails: [] as any[],
+        products: {} as { [key: string]: { name: string; quantity: number } },
+        newProducts: 0,
+        newCustomerRegistrations: 0,
+        previousRevenue: 0
+      };
+    }
+
+    // Aggregate orders data with validation
+    (orders || []).forEach(order => {
+      try {
+        if (!order.order_time) return;
+        
+        const orderDate = new Date(order.order_time);
+        const dateKey = orderDate.toISOString().split('T')[0];
+        
+        if (dailyMap[dateKey]) {
+          dailyMap[dateKey].revenue += Number(order.total_amount) || 0;
+          dailyMap[dateKey].orders += 1;
+          
+          if (order.customer_email) {
+            dailyMap[dateKey].customers.add(order.customer_email);
+            dailyMap[dateKey].customerDetails.push({
+              email: order.customer_email,
+              name: order.customer_name || 'Unknown',
+              orderValue: Number(order.total_amount) || 0
+            });
+          }
         }
-        dailyMap[dateKey].products[productName].quantity += item.quantity || 0;
+      } catch (err) {
+        console.error('Error processing order:', err, order.id);
       }
-    }
-  });
+    });
 
-  // Aggregate new products per day
-  (products || []).forEach(product => {
-    const productDate = new Date(product.created_at);
-    const dateKey = productDate.toISOString().split('T')[0];
-    if (dailyMap[dateKey]) {
-      dailyMap[dateKey].newProducts += 1;
-    }
-  });
+    // Aggregate product data with validation
+    (orderItems || []).forEach(item => {
+      try {
+        const order = orders?.find(o => o.id === item.order_id);
+        if (order && order.order_time) {
+          const orderDate = new Date(order.order_time);
+          const dateKey = orderDate.toISOString().split('T')[0];
+          
+          if (dailyMap[dateKey] && item.products?.name) {
+            const productName = item.products.name;
+            if (!dailyMap[dateKey].products[productName]) {
+              dailyMap[dateKey].products[productName] = { name: productName, quantity: 0 };
+            }
+            dailyMap[dateKey].products[productName].quantity += Number(item.quantity) || 0;
+          }
+        }
+      } catch (err) {
+        console.error('Error processing order item:', err);
+      }
+    });
 
-  // Aggregate new customer registrations per day
-  (customers || []).forEach(customer => {
-    const customerDate = new Date(customer.created_at);
-    const dateKey = customerDate.toISOString().split('T')[0];
-    if (dailyMap[dateKey]) {
-      dailyMap[dateKey].newCustomerRegistrations += 1;
-    }
-  });
+    // Aggregate new products per day with validation
+    (products || []).forEach(product => {
+      try {
+        if (!product.created_at) return;
+        
+        const productDate = new Date(product.created_at);
+        const dateKey = productDate.toISOString().split('T')[0];
+        if (dailyMap[dateKey]) {
+          dailyMap[dateKey].newProducts += 1;
+        }
+      } catch (err) {
+        console.error('Error processing product:', err);
+      }
+    });
+
+    // Aggregate new customer registrations per day with validation
+    (customers || []).forEach(customer => {
+      try {
+        if (!customer.created_at) return;
+        
+        const customerDate = new Date(customer.created_at);
+        const dateKey = customerDate.toISOString().split('T')[0];
+        if (dailyMap[dateKey]) {
+          dailyMap[dateKey].newCustomerRegistrations += 1;
+        }
+      } catch (err) {
+        console.error('Error processing customer:', err);
+      }
+    });
 
   // Calculate growth and format data
   const sortedDates = Object.keys(dailyMap).sort();
@@ -942,9 +1012,25 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       : 0
   };
 
-  return {
-    dailyData,
-    summary,
-    dateRange: { startDate, endDate }
-  };
+    return {
+      dailyData,
+      summary,
+      dateRange: { startDate, endDate }
+    };
+  } catch (error) {
+    console.error('Critical error in generateDailyAnalytics:', error);
+    return {
+      dailyData: [],
+      summary: {
+        totalDays: 0,
+        totalRevenue: 0,
+        totalOrders: 0,
+        totalCustomers: 0,
+        averageDailyRevenue: 0,
+        averageDailyOrders: 0
+      },
+      dateRange: { startDate, endDate },
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 }

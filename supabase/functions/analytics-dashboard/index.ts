@@ -831,13 +831,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     });
   
     // Get all orders in the date range (using UTC boundaries that match Lagos time)
-    // Include all legitimate orders: paid, confirmed, completed (not just 'paid')
+    // Include all orders except cancelled ones (they're tracked separately)
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('*')
       .gte('order_time', startUTC)
       .lte('order_time', endUTC)
-      .in('payment_status', ['paid', 'confirmed', 'completed'])
+      .neq('status', 'cancelled')
       .order('order_time', { ascending: true });
 
     if (ordersError) {

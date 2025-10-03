@@ -267,95 +267,134 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
     <div className="space-y-6">
       {/* Period Summary Cards */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Period Summary</span>
-            <span className="text-sm text-muted-foreground font-normal">
-              {formatDate(validDailyData[0]?.date || '')} - {formatDate(validDailyData[validDailyData.length - 1]?.date || '')}
-            </span>
-          </CardTitle>
-          <CardDescription>Total metrics for the selected period</CardDescription>
+        <CardHeader className="border-b bg-gradient-to-r from-background to-muted/20">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">
+                Period Summary
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm mt-1">
+                Aggregate metrics across selected date range
+              </CardDescription>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-xs sm:text-sm font-medium text-muted-foreground">
+              <Calendar className="h-3.5 w-3.5" />
+              <span className="whitespace-nowrap">
+                {formatDate(validDailyData[0]?.date || '')} - {formatDate(validDailyData[validDailyData.length - 1]?.date || '')}
+              </span>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
+        <CardContent className="p-3 sm:p-6">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
             {/* Total Revenue */}
-            <div className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/50 hover:border-border transition-all hover:shadow-md">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+            <div className="group relative bg-gradient-to-br from-emerald-50/50 via-background to-background dark:from-emerald-950/20 dark:via-background dark:to-background p-4 sm:p-5 rounded-xl border border-emerald-200/50 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <p className="text-xs sm:text-sm font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                    Total Revenue
+                  </p>
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center border border-emerald-200/50 dark:border-emerald-800/50 group-hover:scale-110 transition-transform">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                </div>
+                <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-emerald-700 dark:text-emerald-300 mb-2 tracking-tight">
+                  {formatCurrency(periodSummary.totalRevenue)}
+                </p>
+                <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
+                  <span className="text-muted-foreground">Avg:</span>
+                  <span className="font-bold text-foreground">{formatCurrency(periodSummary.avgRevenue)}</span>
+                  <span className="text-muted-foreground">/day</span>
                 </div>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
-                {formatCurrency(periodSummary.totalRevenue)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Avg: <span className="font-semibold text-foreground">{formatCurrency(periodSummary.avgRevenue)}</span>/day
-              </p>
             </div>
 
             {/* Total Orders */}
-            <div className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/50 hover:border-border transition-all hover:shadow-md">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
-                <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <ShoppingCart className="h-4 w-4 text-blue-600" />
+            <div className="group relative bg-gradient-to-br from-blue-50/50 via-background to-background dark:from-blue-950/20 dark:via-background dark:to-background p-4 sm:p-5 rounded-xl border border-blue-200/50 dark:border-blue-800/30 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <p className="text-xs sm:text-sm font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider">
+                    Total Orders
+                  </p>
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center border border-blue-200/50 dark:border-blue-800/50 group-hover:scale-110 transition-transform">
+                    <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+                <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-blue-700 dark:text-blue-300 mb-2 tracking-tight">
+                  {periodSummary.totalOrders.toLocaleString()}
+                </p>
+                <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
+                  <span className="text-muted-foreground">Avg:</span>
+                  <span className="font-bold text-foreground">{periodSummary.avgOrders.toFixed(1)}</span>
+                  <span className="text-muted-foreground">/day</span>
                 </div>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
-                {periodSummary.totalOrders.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Avg: <span className="font-semibold text-foreground">{periodSummary.avgOrders.toFixed(1)}</span>/day
-              </p>
             </div>
 
             {/* New Products */}
-            <div className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/50 hover:border-border transition-all hover:shadow-md">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">New Products</p>
-                <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <Package className="h-4 w-4 text-purple-600" />
+            <div className="group relative bg-gradient-to-br from-purple-50/50 via-background to-background dark:from-purple-950/20 dark:via-background dark:to-background p-4 sm:p-5 rounded-xl border border-purple-200/50 dark:border-purple-800/30 hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <p className="text-xs sm:text-sm font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wider">
+                    New Products
+                  </p>
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center border border-purple-200/50 dark:border-purple-800/50 group-hover:scale-110 transition-transform">
+                    <Package className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+                <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-purple-700 dark:text-purple-300 mb-2 tracking-tight">
+                  {periodSummary.totalProducts.toLocaleString()}
+                </p>
+                <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
+                  <span className="text-muted-foreground font-medium">Added in period</span>
                 </div>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
-                {periodSummary.totalProducts.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Added in period
-              </p>
             </div>
 
             {/* New Customers */}
-            <div className="bg-gradient-to-br from-background to-muted/30 p-4 rounded-xl border border-border/50 hover:border-border transition-all hover:shadow-md">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">New Customers</p>
-                <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                  <Users className="h-4 w-4 text-orange-600" />
+            <div className="group relative bg-gradient-to-br from-orange-50/50 via-background to-background dark:from-orange-950/20 dark:via-background dark:to-background p-4 sm:p-5 rounded-xl border border-orange-200/50 dark:border-orange-800/30 hover:border-orange-300 dark:hover:border-orange-700 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <p className="text-xs sm:text-sm font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wider">
+                    New Customers
+                  </p>
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center border border-orange-200/50 dark:border-orange-800/50 group-hover:scale-110 transition-transform">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                </div>
+                <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-orange-700 dark:text-orange-300 mb-2 tracking-tight">
+                  {periodSummary.totalCustomers.toLocaleString()}
+                </p>
+                <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
+                  <span className="text-muted-foreground font-medium">Registered</span>
                 </div>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
-                {periodSummary.totalCustomers.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Registered
-              </p>
             </div>
 
-            {/* First-Time Orders - Enhanced Visibility */}
-            <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-accent/10 p-4 rounded-xl border-2 border-primary/30 hover:border-primary/50 transition-all hover:shadow-lg shadow-primary/5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-primary">First-Time Orders</p>
-                <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center ring-2 ring-primary/30">
-                  <UserPlus className="h-4 w-4 text-primary" />
+            {/* First-Time Orders - Premium Highlight */}
+            <div className="group relative bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 dark:from-primary/20 dark:via-primary/10 dark:to-accent/20 p-4 sm:p-5 rounded-xl border-2 border-primary/40 dark:border-primary/50 hover:border-primary dark:hover:border-primary transition-all duration-300 hover:shadow-xl hover:shadow-primary/20 hover:-translate-y-0.5 overflow-hidden xs:col-span-2 lg:col-span-1">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-accent/10 rounded-full blur-2xl -ml-12 -mb-12" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <p className="text-xs sm:text-sm font-bold text-primary uppercase tracking-wider">
+                    First-Time Orders
+                  </p>
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary/20 dark:bg-primary/30 flex items-center justify-center border-2 border-primary/50 dark:border-primary/60 group-hover:scale-110 transition-transform ring-4 ring-primary/10">
+                    <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                  </div>
+                </div>
+                <p className="text-3xl sm:text-4xl lg:text-5xl font-black text-primary mb-2 tracking-tight">
+                  {firstTimeCustomers.length}
+                </p>
+                <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
+                  <span className="text-primary/80 font-bold">New Customer Acquisitions</span>
                 </div>
               </div>
-              <p className="text-3xl sm:text-4xl font-bold text-primary mb-1 tracking-tight">
-                {firstTimeCustomers.length}
-              </p>
-              <p className="text-xs font-medium text-primary/80">
-                New Customers
-              </p>
             </div>
           </div>
         </CardContent>

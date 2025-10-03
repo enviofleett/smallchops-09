@@ -470,10 +470,10 @@ function AdminOrdersContent() {
             </div>
           </div>
 
-          {/* Status Indicators */}
-          {orderWarnings.length > 0 && (
+          {/* Status Indicators - Temporarily disabled */}
+          {/* {orderWarnings.length > 0 && (
             <OrdersStatusIndicators warnings={orderWarnings} />
-          )}
+          )} */}
 
           {/* Mobile and Desktop Content */}
           {isMobile ? (

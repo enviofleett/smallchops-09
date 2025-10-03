@@ -286,7 +286,7 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
           </div>
         </CardHeader>
         <CardContent className="p-3 sm:p-6">
-          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
             {/* Total Revenue */}
             <div className="group relative bg-gradient-to-br from-emerald-50/50 via-background to-background dark:from-emerald-950/20 dark:via-background dark:to-background p-4 sm:p-5 rounded-xl border border-emerald-200/50 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
@@ -333,50 +333,8 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
               </div>
             </div>
 
-            {/* New Products */}
-            <div className="group relative bg-gradient-to-br from-purple-50/50 via-background to-background dark:from-purple-950/20 dark:via-background dark:to-background p-4 sm:p-5 rounded-xl border border-purple-200/50 dark:border-purple-800/30 hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <p className="text-xs sm:text-sm font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wider">
-                    New Products
-                  </p>
-                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center border border-purple-200/50 dark:border-purple-800/50 group-hover:scale-110 transition-transform">
-                    <Package className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-purple-700 dark:text-purple-300 mb-2 tracking-tight">
-                  {periodSummary.totalProducts.toLocaleString()}
-                </p>
-                <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
-                  <span className="text-muted-foreground font-medium">Added in period</span>
-                </div>
-              </div>
-            </div>
-
-            {/* New Customers */}
-            <div className="group relative bg-gradient-to-br from-orange-50/50 via-background to-background dark:from-orange-950/20 dark:via-background dark:to-background p-4 sm:p-5 rounded-xl border border-orange-200/50 dark:border-orange-800/30 hover:border-orange-300 dark:hover:border-orange-700 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <p className="text-xs sm:text-sm font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wider">
-                    New Customers
-                  </p>
-                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center border border-orange-200/50 dark:border-orange-800/50 group-hover:scale-110 transition-transform">
-                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-orange-700 dark:text-orange-300 mb-2 tracking-tight">
-                  {periodSummary.totalCustomers.toLocaleString()}
-                </p>
-                <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
-                  <span className="text-muted-foreground font-medium">Registered</span>
-                </div>
-              </div>
-            </div>
-
             {/* First-Time Orders - Premium Highlight */}
-            <div className="group relative bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 dark:from-primary/20 dark:via-primary/10 dark:to-accent/20 p-4 sm:p-5 rounded-xl border-2 border-primary/40 dark:border-primary/50 hover:border-primary dark:hover:border-primary transition-all duration-300 hover:shadow-xl hover:shadow-primary/20 hover:-translate-y-0.5 overflow-hidden xs:col-span-2 lg:col-span-1">
+            <div className="group relative bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 dark:from-primary/20 dark:via-primary/10 dark:to-accent/20 p-4 sm:p-5 rounded-xl border-2 border-primary/40 dark:border-primary/50 hover:border-primary dark:hover:border-primary transition-all duration-300 hover:shadow-xl hover:shadow-primary/20 hover:-translate-y-0.5 overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-accent/10 rounded-full blur-2xl -ml-12 -mb-12" />
               <div className="relative">
@@ -392,7 +350,28 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
                   {firstTimeCustomers.length}
                 </p>
                 <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
-                  <span className="text-primary/80 font-bold">New Customer Acquisitions</span>
+                  <span className="text-primary/80 font-bold">New Acquisitions</span>
+                </div>
+              </div>
+            </div>
+
+            {/* New Customers */}
+            <div className="group relative bg-gradient-to-br from-orange-50/50 via-background to-background dark:from-orange-950/20 dark:via-background dark:to-background p-4 sm:p-5 rounded-xl border border-orange-200/50 dark:border-orange-800/30 hover:border-orange-300 dark:hover:border-orange-700 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl -mr-12 -mt-12" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <p className="text-xs sm:text-sm font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wider">
+                    Total Customers
+                  </p>
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center border border-orange-200/50 dark:border-orange-800/50 group-hover:scale-110 transition-transform">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                </div>
+                <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-orange-700 dark:text-orange-300 mb-2 tracking-tight">
+                  {periodSummary.totalCustomers.toLocaleString()}
+                </p>
+                <div className="flex items-baseline gap-1.5 text-xs sm:text-sm">
+                  <span className="text-muted-foreground font-medium">Registered in period</span>
                 </div>
               </div>
             </div>

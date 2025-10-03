@@ -117,7 +117,7 @@ export const CustomerAnalytics = ({
     );
   }
 
-  // Enhanced stats with growth indicators and new customers
+  // Streamlined stats - production ready with 3 key metrics
   const stats = [
     {
       title: 'Total Customers',
@@ -149,43 +149,10 @@ export const CustomerAnalytics = ({
       bgColor: 'bg-orange-100',
       key: 'guest',
       customers: allCustomers.filter(c => c.isGuest),
-    },
-    {
-      title: 'Authenticated',
-      value: metrics.authenticatedCustomers.toLocaleString(),
-      subtitle: 'Registered',
-      icon: Users,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
-      key: 'authenticated',
-      customers: allCustomers.filter(c => !c.isGuest),
-    },
-    {
-      title: 'Top by Orders',
-      value: topCustomersByOrders[0]?.totalOrders
-        ? `${topCustomersByOrders[0].totalOrders}`
-        : "—",
-      subtitle: topCustomersByOrders[0]?.name || 'No orders yet',
-      icon: DollarSign,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
-      key: 'orders',
-      customers: topCustomersByOrders,
-    },
-    {
-      title: 'Repeat Rate',
-      value: `${metrics.repeatCustomerRate.toFixed(1)}%`,
-      subtitle: `${repeatCustomers.length} customers`,
-      icon: Repeat,
-      color: 'text-pink-600',
-      bgColor: 'bg-pink-100',
-      key: 'repeat',
-      customers: repeatCustomers,
-      growth: repeatCustomersGrowth,
     }
   ];
 
-  // Modal mapping for all stats including new customers
+  // Modal mapping for stats
   const modalMap: Record<
     string,
     { title: string; customers: Customer[] }
@@ -201,18 +168,6 @@ export const CustomerAnalytics = ({
     guest: {
       title: "Guest Customers",
       customers: allCustomers.filter(c => c.isGuest),
-    },
-    authenticated: {
-      title: "Authenticated Customers",
-      customers: allCustomers.filter(c => !c.isGuest),
-    },
-    orders: {
-      title: "Top Customers by Orders",
-      customers: topCustomersByOrders,
-    },
-    repeat: {
-      title: "Repeat Customers",
-      customers: repeatCustomers,
     }
   };
 
@@ -232,8 +187,8 @@ export const CustomerAnalytics = ({
         </div>
       </div>
 
-      {/* Main Stats Grid - Mobile Responsive */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-4">
+      {/* Main Stats Grid - Production Ready Mobile Responsive (3 cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           const hasGrowth = stat.growth !== undefined;
@@ -241,26 +196,26 @@ export const CustomerAnalytics = ({
           return (
             <button
               key={stat.title}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 w-full text-left focus:outline-none hover:shadow-lg hover:border-gray-200 active:scale-[0.98] transition-all group"
+              className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 w-full text-left focus:outline-none hover:shadow-xl hover:border-blue-200 active:scale-[0.98] transition-all duration-200 group"
               onClick={() => setModal(stat.key as any)}
               type="button"
               aria-label={`View ${stat.title} details`}
             >
-              <div className="flex items-start justify-between mb-3">
-                <div className={`p-2 rounded-lg ${stat.bgColor} group-hover:scale-110 transition-transform`}>
-                  <Icon className={`h-5 w-5 ${stat.color}`} />
+              <div className="flex items-start justify-between mb-4">
+                <div className={`p-3 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-200`}>
+                  <Icon className={`h-6 w-6 ${stat.color}`} />
                 </div>
                 {hasGrowth && renderGrowthIndicator(stat.growth)}
               </div>
               
-              <div className="space-y-1">
-                <p className="text-xl md:text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+              <div className="space-y-2">
+                <p className="text-3xl md:text-4xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
                   {stat.value}
                 </p>
-                <p className="text-xs font-medium text-gray-900 truncate">
+                <p className="text-sm font-semibold text-gray-900">
                   {stat.title}
                 </p>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-sm text-gray-500">
                   {stat.subtitle}
                 </p>
               </div>

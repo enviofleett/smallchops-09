@@ -9,6 +9,7 @@ interface DailyMetric {
   date: string;
   revenue: number;
   orders: number;
+  cancelledOrders?: number;
   customers: number;
   newProducts: number;
   newCustomerRegistrations: number;
@@ -104,6 +105,7 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
     date: formatDate(day.date || ''),
     fullDate: day.date || '',
     orders: Number(day.orders) || 0,
+    cancelledOrders: Number(day.cancelledOrders) || 0,
     revenue: (Number(day.revenue) || 0) / 100, // Convert to thousands for better display
     customers: Number(day.customers) || 0,
     newProducts: Number(day.newProducts) || 0,
@@ -118,20 +120,22 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <ShoppingCart className="h-4 w-4" />
-              Today's Orders
+              Orders
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{selectedMetric?.orders || 0}</div>
             <div className="flex items-center text-xs text-muted-foreground mt-1">
-              {selectedMetric && selectedMetric.growthDirection === 'up' && (
-                <><TrendingUp className="h-3 w-3 mr-1 text-green-600" /> {Math.abs(selectedMetric.growth).toFixed(1)}%</>
-              )}
-              {selectedMetric && selectedMetric.growthDirection === 'down' && (
-                <><TrendingDown className="h-3 w-3 mr-1 text-red-600" /> {Math.abs(selectedMetric.growth).toFixed(1)}%</>
-              )}
-              {selectedMetric && selectedMetric.growthDirection === 'flat' && (
-                <><Minus className="h-3 w-3 mr-1" /> No change</>
+              {selectedMetric && selectedMetric.cancelledOrders ? (
+                <span className="text-orange-600">{selectedMetric.cancelledOrders} cancelled</span>
+              ) : (
+                selectedMetric && selectedMetric.growthDirection === 'up' ? (
+                  <><TrendingUp className="h-3 w-3 mr-1 text-green-600" /> {Math.abs(selectedMetric.growth).toFixed(1)}%</>
+                ) : selectedMetric && selectedMetric.growthDirection === 'down' ? (
+                  <><TrendingDown className="h-3 w-3 mr-1 text-red-600" /> {Math.abs(selectedMetric.growth).toFixed(1)}%</>
+                ) : (
+                  <><Minus className="h-3 w-3 mr-1" /> No change</>
+                )
               )}
             </div>
           </CardContent>
@@ -196,7 +200,7 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
           <Card>
             <CardHeader>
               <CardTitle>Daily Orders Trend</CardTitle>
-              <CardDescription>Number of orders placed each day</CardDescription>
+              <CardDescription>Completed vs cancelled orders each day</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-80">
@@ -214,9 +218,10 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '6px'
                       }}
-                      formatter={(value: any) => [value, 'Orders']}
                     />
-                    <Bar dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Legend />
+                    <Bar dataKey="orders" fill="hsl(var(--primary))" name="Completed Orders" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="cancelledOrders" fill="hsl(var(--destructive))" name="Cancelled Orders" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

@@ -11,17 +11,30 @@ const AdminLayout = () => {
   const isMobile = useIsMobile();
 
   return (
-    <SidebarProvider className="min-h-screen">
+    <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
+        {/* Sidebar - Collapsible on mobile */}
         <AppSidebar />
+        
+        {/* Main Content Area */}
         <SidebarInset className="flex-1 min-w-0">
-          <div className="flex flex-col min-h-screen">
+          <div className="flex flex-col min-h-screen w-full">
+            {/* Top Navigation */}
             <TopNav />
+            
+            {/* Main Content with Responsive Padding */}
             <main className={cn(
-              "flex-1 admin-content transition-all duration-200",
-              isMobile ? "p-4" : "p-6 lg:p-8"
+              "flex-1 w-full transition-all duration-200 ease-in-out",
+              "overflow-x-hidden", // Prevent horizontal scroll
+              isMobile 
+                ? "px-3 py-4 space-y-4" 
+                : "px-4 py-6 space-y-6 sm:px-6 lg:px-8 lg:py-8"
             )}>
-              <div className="admin-container">
+              {/* Content Container with Max Width */}
+              <div className={cn(
+                "w-full mx-auto",
+                "max-w-[2000px]", // Max width for ultra-wide screens
+              )}>
                 <ProductionErrorBoundary>
                   <Outlet />
                 </ProductionErrorBoundary>

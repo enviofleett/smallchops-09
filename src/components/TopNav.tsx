@@ -30,13 +30,13 @@ const TopNav = () => {
     await logout();
     setShowUserMenu(false);
   };
-  return <header className="bg-background border-b border-border px-4 md:px-6 py-4 sticky top-0 z-40 min-h-[73px] flex items-center">
-      <div className="flex items-center justify-between gap-4 w-full">
-        {/* Mobile menu trigger */}
-        <div className="flex items-center gap-4">
-          <SidebarTrigger className="md:hidden" />
+  return <header className="bg-background border-b border-border sticky top-0 z-40 w-full">
+      <div className="flex items-center justify-between gap-2 md:gap-4 px-3 py-3 md:px-6 md:py-4 min-h-[60px] md:min-h-[73px]">
+        {/* Left Side: Mobile trigger + Navigation */}
+        <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+          <SidebarTrigger className="shrink-0" />
           
-          {/* Navigation Menu - Desktop */}
+          {/* Navigation Menu - Desktop Only */}
           {!isMobile && (
             <NavigationMenu>
               <NavigationMenuList>
@@ -99,21 +99,21 @@ const TopNav = () => {
             </NavigationMenu>
           )}
           
-          {/* Search - responsive */}
-          <div className="flex-1 max-w-md">
+          {/* Search - Responsive */}
+          <div className="flex-1 max-w-md min-w-0">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3 w-3 md:h-4 md:w-4" />
               <input 
                 type="text" 
                 placeholder={isMobile ? "Search..." : "Search orders, customers, products..."} 
-                className="w-full pl-10 pr-4 py-2 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-sm"
+                className="w-full pl-7 md:pl-10 pr-3 md:pr-4 py-1.5 md:py-2 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-xs md:text-sm"
               />
             </div>
           </div>
         </div>
 
-        {/* Right side */}
-        <div className="flex items-center gap-2 md:gap-4">
+        {/* Right Side: Notifications + User */}
+        <div className="flex items-center gap-1 md:gap-4 shrink-0">
           {/* Notifications */}
           <NotificationBell />
 
@@ -121,14 +121,14 @@ const TopNav = () => {
           <div className="relative">
             <button 
               onClick={() => setShowUserMenu(!showUserMenu)} 
-              className="flex items-center gap-2 md:gap-3 p-2 rounded-lg hover:bg-accent transition-colors"
+              className="flex items-center gap-2 md:gap-3 p-1.5 md:p-2 rounded-lg hover:bg-accent transition-colors"
             >
-              <div className="w-7 h-7 md:w-8 md:h-8 bg-primary/10 rounded-full flex items-center justify-center">
+              <div className="w-7 h-7 md:w-8 md:h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
                 <User className="h-3 w-3 md:h-4 md:w-4 text-primary" />
               </div>
               {!isMobile && (
                 <div className="text-left">
-                  <p className="text-sm font-medium text-foreground">{user?.name}</p>
+                  <p className="text-sm font-medium text-foreground truncate max-w-[120px]">{user?.name}</p>
                   <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
                 </div>
               )}
@@ -141,7 +141,7 @@ const TopNav = () => {
                     navigate('/settings');
                     setShowUserMenu(false);
                   }}
-                  className="w-full px-4 py-2 text-left text-popover-foreground hover:bg-accent flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-popover-foreground hover:bg-accent flex items-center gap-2"
                 >
                   <User className="h-4 w-4" />
                   <span>Profile</span>
@@ -149,7 +149,7 @@ const TopNav = () => {
                 <hr className="my-2 border-border" />
                 <button 
                   onClick={handleLogout} 
-                  className="w-full px-4 py-2 text-left text-destructive hover:bg-destructive/10 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2"
                 >
                   <LogOut className="h-4 w-4" />
                   <span>Logout</span>

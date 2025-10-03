@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Users, ShoppingCart, TrendingUp, TrendingDown, Minus, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, Users, ShoppingCart, TrendingUp, TrendingDown, Minus, Calendar, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, TooltipProps } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -134,6 +134,35 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
     });
     return Array.from(productMap.values())
       .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 10);
+  }, [sortedData]);
+
+  // Track first-time customers for the period
+  const firstTimeCustomers = useMemo(() => {
+    const customerFirstOrder = new Map<string, { 
+      name: string; 
+      email: string; 
+      firstOrderDate: string;
+      spending: number;
+    }>();
+    
+    // Process each day to find first appearances
+    sortedData.forEach(day => {
+      day.topCustomers?.forEach(customer => {
+        if (!customerFirstOrder.has(customer.email)) {
+          customerFirstOrder.set(customer.email, {
+            name: customer.name,
+            email: customer.email,
+            firstOrderDate: day.date,
+            spending: customer.spending
+          });
+        }
+      });
+    });
+
+    // Return customers sorted by first order date (most recent first)
+    return Array.from(customerFirstOrder.values())
+      .sort((a, b) => new Date(b.firstOrderDate).getTime() - new Date(a.firstOrderDate).getTime())
       .slice(0, 10);
   }, [sortedData]);
 
@@ -434,6 +463,45 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
                   <div className="text-right">
                     <p className="font-semibold">{formatCurrency(customer.spending)}</p>
                     <p className="text-xs text-muted-foreground">{customer.orders} orders</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* First-Time Customers for Period */}
+      {firstTimeCustomers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-accent" />
+              First-Time Customers
+            </CardTitle>
+            <CardDescription>New customers who placed their first order in this period</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {firstTimeCustomers.map((customer, idx) => (
+                <div 
+                  key={`${customer.email}-${idx}`} 
+                  className="flex items-center justify-between p-3 bg-accent/5 hover:bg-accent/10 transition-colors rounded-lg border border-accent/20"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-accent/20 flex items-center justify-center text-sm font-medium text-accent">
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{customer.name || 'Unknown'}</p>
+                      <p className="text-xs text-muted-foreground">{customer.email || 'No email'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-accent">{formatCurrency(customer.spending)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(parseISO(customer.firstOrderDate), 'MMM dd, yyyy')}
+                    </p>
                   </div>
                 </div>
               ))}

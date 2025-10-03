@@ -277,7 +277,7 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
           <CardDescription>Total metrics for the selected period</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Total Revenue</p>
               <p className="text-2xl font-bold">{formatCurrency(periodSummary.totalRevenue)}</p>
@@ -295,6 +295,14 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">New Customers</p>
               <p className="text-2xl font-bold">{periodSummary.totalCustomers}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <UserPlus className="h-4 w-4 text-accent" />
+                <span>First-Time Orders</span>
+              </div>
+              <p className="text-2xl font-bold text-accent">{firstTimeCustomers.length}</p>
+              <p className="text-xs text-muted-foreground">Customers</p>
             </div>
           </div>
         </CardContent>

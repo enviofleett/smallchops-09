@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, AlertTriangle, RefreshCw, User, Search } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle, RefreshCw, User, Search, Package } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useCart } from "@/hooks/useCart";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
@@ -287,18 +287,18 @@ export default function PaymentSuccess() {
             {status === 'success' && orderData && (
               <div className="space-y-3 p-4 bg-green-50 rounded-lg border border-green-200">
                 {orderData.order_number && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Order Number:</span>
-                    <span className="text-green-700 font-mono">{orderData.order_number}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-gray-700">Order Number:</span>
+                    <span className="text-green-700 font-mono font-semibold text-lg">{orderData.order_number}</span>
                   </div>
                 )}
                 {orderData.amount && (
                   <div className="flex justify-between">
-                    <span className="font-medium">Amount Paid:</span>
+                    <span className="font-medium text-gray-700">Amount Paid:</span>
                     <span className="text-green-700 font-semibold">{formatCurrency(orderData.amount)}</span>
                   </div>
                 )}
-                <div className="text-sm text-green-600 mt-2">
+                <div className="text-sm text-green-600 mt-2 font-medium">
                   ✅ Payment confirmed and order is being processed
                 </div>
               </div>
@@ -317,34 +317,42 @@ export default function PaymentSuccess() {
               )}
               
               {status === 'success' ? (
-                <div className="flex flex-col gap-2">
-                  <Button 
-                    onClick={handleContinue}
-                    className="w-full"
-                  >
+                <div className="flex flex-col gap-3">
                   {userContext === 'customer' ? (
-                    <>
-                      <User className="h-4 w-4 mr-2" />
+                    <Button 
+                      onClick={handleContinue}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-base font-semibold"
+                      size="lg"
+                    >
+                      <User className="h-5 w-5 mr-2" />
                       View My Orders
-                    </>
+                    </Button>
                   ) : (
-                    <>
-                      <Search className="h-4 w-4 mr-2" />
-                      Track Order {orderData?.order_number ? orderData.order_number : ''}
-                    </>
+                    <Button 
+                      onClick={handleContinue}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-base font-semibold shadow-lg hover:shadow-xl transition-all"
+                      size="lg"
+                    >
+                      <Package className="h-5 w-5 mr-2" />
+                      Track This Order
+                    </Button>
                   )}
-                  </Button>
+                  
                   <Button 
                     onClick={() => navigate('/')}
                     variant="outline"
-                    className="w-full"
+                    className="w-full py-5 text-green-600 border-green-600 hover:bg-green-50"
+                    size="lg"
                   >
                     Continue Shopping
                   </Button>
+                  
                   {userContext === 'guest' && (
-                    <p className="text-xs text-muted-foreground text-center mt-2">
-                      💡 <strong>Tip:</strong> Create an account to permanently save your order history
-                    </p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
+                      <p className="text-xs text-blue-800 text-center">
+                        💡 <strong>Tip:</strong> Create an account to permanently save your order history
+                      </p>
+                    </div>
                   )}
                 </div>
               ) : (

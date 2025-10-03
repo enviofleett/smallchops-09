@@ -102,15 +102,17 @@ const Customers = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 md:space-y-6 px-3 sm:px-0">
+      {/* Page Header - Mobile Optimized */}
+      <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Customer Management</h1>
-          <p className="text-gray-600 mt-2">Comprehensive customer management with security controls</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Customer Management</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">
+            Comprehensive customer management with security controls
+          </p>
         </div>
         <Button
-          className="mt-4 sm:mt-0 flex items-center space-x-2"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2"
           onClick={openAddCustomer}
           disabled={!rateLimitStatus.isAllowed || rateLimitStatus.isChecking}
         >
@@ -144,20 +146,20 @@ const Customers = () => {
         />
       )}
 
-      {/* Repeat Business Analysis - Production Ready with Paid Orders Only */}
+      {/* Repeat Business Analysis - Mobile Responsive */}
       {analytics && analytics.repeatCustomers.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
             <div>
-              <h3 className="text-lg font-semibold text-gray-800">Repeat Business Champions</h3>
-              <p className="text-sm text-gray-500 mt-1">Based on paid orders only • Updated in real-time</p>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800">Repeat Business Champions</h3>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">Based on paid orders only • Updated in real-time</p>
             </div>
             <div className="flex items-center space-x-2 text-xs text-gray-500">
               <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Paid Only</span>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {analytics.repeatCustomers.slice(0, 3).map((customer, index) => {
               // Production-ready validation and safety checks
               const safeCustomer = {
@@ -217,11 +219,11 @@ const Customers = () => {
           
           {/* Production footer with data integrity info */}
           <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-gray-500">
               <span>
                 Showing top {Math.min(3, analytics.repeatCustomers.length)} of {analytics.repeatCustomers.length} repeat customers
               </span>
-              <span>
+              <span className="text-right sm:text-left">
                 Last updated: {new Date().toLocaleTimeString()}
               </span>
             </div>
@@ -229,15 +231,15 @@ const Customers = () => {
         </div>
       )}
 
-      {/* No repeat customers state - Production ready */}
+      {/* No repeat customers state - Mobile Responsive */}
       {analytics && analytics.repeatCustomers.length === 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
+          <div className="text-center py-6 sm:py-8">
+            <div className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-3 sm:mb-4">
               <Users className="h-full w-full" />
             </div>
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No Repeat Customers Yet</h3>
-            <p className="text-gray-600 max-w-md mx-auto">
+            <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-2">No Repeat Customers Yet</h3>
+            <p className="text-sm sm:text-base text-gray-600 max-w-md mx-auto px-4">
               Once customers make multiple paid orders, they'll appear here as your repeat business champions.
             </p>
             <div className="mt-4 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 max-w-md mx-auto">
@@ -261,25 +263,25 @@ const Customers = () => {
         />
       )}
 
-      {/* Search and Customer Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 mb-6">
-          <h3 className="text-lg font-semibold text-gray-800">All Customers</h3>
+      {/* Search and Customer Table - Mobile Responsive */}
+      <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
+        <div className="flex flex-col space-y-4 mb-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800">All Customers</h3>
           
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
               <input
                 type="text"
                 placeholder="Search customers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <Button 
               variant="outline"
-              className="flex items-center space-x-2"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2"
               onClick={openAddCustomer}
               disabled={!rateLimitStatus.isAllowed || rateLimitStatus.isChecking}
             >

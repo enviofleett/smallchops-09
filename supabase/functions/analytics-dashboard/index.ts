@@ -779,6 +779,22 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     .select('order_id, product_id, quantity, products(name)')
     .in('order_id', orderIds);
 
+  // Get daily product additions
+  const { data: products } = await supabase
+    .from('products')
+    .select('created_at')
+    .gte('created_at', `${startDate}T00:00:00.000Z`)
+    .lte('created_at', `${endDate}T23:59:59.999Z`)
+    .order('created_at', { ascending: true });
+
+  // Get daily customer registrations
+  const { data: customers } = await supabase
+    .from('customers')
+    .select('created_at, email, name')
+    .gte('created_at', `${startDate}T00:00:00.000Z`)
+    .lte('created_at', `${endDate}T23:59:59.999Z`)
+    .order('created_at', { ascending: true });
+
   // Group data by day
   const dailyMap: { [key: string]: any } = {};
   
@@ -790,7 +806,10 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       revenue: 0,
       orders: 0,
       customers: new Set(),
+      customerDetails: [] as any[],
       products: {} as { [key: string]: { name: string; quantity: number } },
+      newProducts: 0,
+      newCustomerRegistrations: 0,
       previousRevenue: 0
     };
   }
@@ -806,6 +825,11 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       
       if (order.customer_email) {
         dailyMap[dateKey].customers.add(order.customer_email);
+        dailyMap[dateKey].customerDetails.push({
+          email: order.customer_email,
+          name: order.customer_name,
+          orderValue: order.total_amount || 0
+        });
       }
     }
   });
@@ -827,6 +851,24 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     }
   });
 
+  // Aggregate new products per day
+  (products || []).forEach(product => {
+    const productDate = new Date(product.created_at);
+    const dateKey = productDate.toISOString().split('T')[0];
+    if (dailyMap[dateKey]) {
+      dailyMap[dateKey].newProducts += 1;
+    }
+  });
+
+  // Aggregate new customer registrations per day
+  (customers || []).forEach(customer => {
+    const customerDate = new Date(customer.created_at);
+    const dateKey = customerDate.toISOString().split('T')[0];
+    if (dailyMap[dateKey]) {
+      dailyMap[dateKey].newCustomerRegistrations += 1;
+    }
+  });
+
   // Calculate growth and format data
   const sortedDates = Object.keys(dailyMap).sort();
   const dailyData = sortedDates.map((dateKey, index) => {
@@ -845,12 +887,40 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       .slice(0, 3)
       .map((p: any) => ({ name: p.name, quantity: p.quantity }));
 
+    // Calculate top customers for the day by total spending
+    const customerSpending: { [email: string]: { name: string; email: string; totalSpent: number; orders: number } } = {};
+    day.customerDetails.forEach((cust: any) => {
+      if (!customerSpending[cust.email]) {
+        customerSpending[cust.email] = {
+          email: cust.email,
+          name: cust.name || 'Unknown',
+          totalSpent: 0,
+          orders: 0
+        };
+      }
+      customerSpending[cust.email].totalSpent += cust.orderValue;
+      customerSpending[cust.email].orders += 1;
+    });
+
+    const topCustomers = Object.values(customerSpending)
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 3)
+      .map(c => ({
+        name: c.name,
+        email: c.email,
+        orders: c.orders,
+        spending: c.totalSpent
+      }));
+
     return {
       date: dateKey,
       revenue: day.revenue,
       orders: day.orders,
       customers: day.customers.size,
+      newProducts: day.newProducts,
+      newCustomerRegistrations: day.newCustomerRegistrations,
       topProducts,
+      topCustomers,
       growth: growthPercentage,
       growthDirection: growthPercentage > 0 ? 'up' : growthPercentage < 0 ? 'down' : 'flat'
     };

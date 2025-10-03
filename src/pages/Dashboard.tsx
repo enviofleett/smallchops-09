@@ -10,7 +10,7 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { useQuery } from '@tanstack/react-query';
 import { fetchDailyAnalytics } from '@/api/reports';
 import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
@@ -145,58 +145,51 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="daily">Daily Breakdown</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4 md:space-y-6">
-          <ProgressiveLoader
-            isLoading={isLoading}
-            error={error ? new Error(error) : null}
-            data={data}
-            skeletonType="card"
-            retryFn={() => refresh(true)}
-            timeout={15000}
-          >
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <DashboardCard
-                title="Total Products"
-                value={formatNumber(data?.stats?.totalProducts || 0)}
-                icon={<Package />}
-                className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900"
-              />
-              <DashboardCard
-                title="Total Orders"
-                value={formatNumber(data?.stats?.totalOrders || 0)}
-                icon={<ShoppingCart />}
-                className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900"
-              />
-              <DashboardCard
-                title="Total Customers"
-                value={formatNumber(data?.stats?.totalCustomers || 0)}
-                icon={<Users />}
-                className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900"
-              />
-              <DashboardCard
-                title="Total Revenue"
-                value={formatCurrency(data?.stats?.totalRevenue || 0)}
-                icon={<TrendingUp />}
-                className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900"
-              />
-            </div>
-
-            <TopCustomersChart 
-              customers={data?.topCustomersByOrders || []} 
-              type="orders"
-              title="Top Customers by Orders"
+      <div className="space-y-4 md:space-y-6">
+        <ProgressiveLoader
+          isLoading={isLoading}
+          error={error ? new Error(error) : null}
+          data={data}
+          skeletonType="card"
+          retryFn={() => refresh(true)}
+          timeout={15000}
+        >
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <DashboardCard
+              title="Total Products"
+              value={formatNumber(data?.stats?.totalProducts || 0)}
+              icon={<Package />}
+              className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900"
             />
-          </ProgressiveLoader>
-        </TabsContent>
+            <DashboardCard
+              title="Total Orders"
+              value={formatNumber(data?.stats?.totalOrders || 0)}
+              icon={<ShoppingCart />}
+              className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900"
+            />
+            <DashboardCard
+              title="Total Customers"
+              value={formatNumber(data?.stats?.totalCustomers || 0)}
+              icon={<Users />}
+              className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900"
+            />
+            <DashboardCard
+              title="Total Revenue"
+              value={formatCurrency(data?.stats?.totalRevenue || 0)}
+              icon={<TrendingUp />}
+              className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900"
+            />
+          </div>
 
-        <TabsContent value="daily" className="space-y-4 md:space-y-6 mt-6">
-          {/* Date Range Selector */}
+          <TopCustomersChart 
+            customers={data?.topCustomersByOrders || []} 
+            type="orders"
+            title="Top Customers by Orders"
+          />
+        </ProgressiveLoader>
+
+        {/* Daily Metrics Section */}
+        <div className="space-y-4 md:space-y-6 mt-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Daily Metrics</h3>
             <DateRangeSelector
@@ -248,8 +241,8 @@ const Dashboard = () => {
               isLoading={isDailyLoading}
             />
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
 
       {(!data || (!data.stats?.totalProducts && !data.stats?.totalOrders)) && !isLoading && (
         <div className="text-center py-8 space-y-4">

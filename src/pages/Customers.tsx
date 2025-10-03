@@ -143,6 +143,7 @@ const Customers = () => {
           repeatCustomers={analytics.repeatCustomers}
           allCustomers={allCustomers}
           isLoading={isLoading}
+          dateRange={dateRange}
         />
       )}
 

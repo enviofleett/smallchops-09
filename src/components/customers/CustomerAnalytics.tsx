@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { TrendingUp, Users, DollarSign, Repeat, UserPlus, TrendingDown, Minus } from 'lucide-react';
-import { CustomerMetrics, Customer } from '@/types/customers';
+import { TrendingUp, Users, DollarSign, Repeat, UserPlus, TrendingDown, Minus, Calendar } from 'lucide-react';
+import { CustomerMetrics, Customer, DateRange } from '@/types/customers';
 import { CustomerListModal } from './CustomerListModal';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
@@ -11,6 +11,7 @@ interface CustomerAnalyticsProps {
   repeatCustomers: Customer[];
   allCustomers: Customer[];
   isLoading?: boolean;
+  dateRange?: DateRange;
 }
 
 export const CustomerAnalytics = ({
@@ -19,9 +20,23 @@ export const CustomerAnalytics = ({
   topCustomersBySpending,
   repeatCustomers,
   allCustomers,
-  isLoading
+  isLoading,
+  dateRange
 }: CustomerAnalyticsProps) => {
   const [modal, setModal] = useState<null | "total" | "guest" | "authenticated" | "orders" | "repeat" | "new">(null);
+
+  // Format date range for display
+  const formatDateRange = () => {
+    if (!dateRange) return 'All time';
+    const start = new Date(dateRange.from);
+    const end = new Date(dateRange.to);
+    const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    
+    if (start.getFullYear() !== end.getFullYear()) {
+      return `${start.toLocaleDateString('en-US', { ...options, year: 'numeric' })} - ${end.toLocaleDateString('en-US', { ...options, year: 'numeric' })}`;
+    }
+    return `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}, ${end.getFullYear()}`;
+  };
 
   // Calculate new customers and growth metrics (production-ready)
   const { newCustomers, newCustomersGrowth, repeatCustomersGrowth } = useMemo(() => {
@@ -84,14 +99,20 @@ export const CustomerAnalytics = ({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
-            <div className="h-10 bg-gray-200 rounded mb-3"></div>
-            <div className="h-6 bg-gray-200 rounded mb-2"></div>
-            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-          </div>
-        ))}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between text-sm bg-muted/30 px-3 py-2 rounded-lg animate-pulse">
+          <div className="h-4 w-48 bg-muted rounded"></div>
+          <div className="h-3 w-24 bg-muted rounded"></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
+              <div className="h-10 bg-gray-200 rounded mb-3"></div>
+              <div className="h-6 bg-gray-200 rounded mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -198,6 +219,19 @@ export const CustomerAnalytics = ({
   // Production-ready responsive grid
   return (
     <div className="space-y-4">
+      {/* Date Range Context - Shows what data is being displayed */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-primary" />
+          <span className="font-medium text-foreground">Data Period:</span>
+          <span className="text-foreground font-semibold">{formatDateRange()}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
+          <span className="text-xs">Live data • Just now</span>
+        </div>
+      </div>
+
       {/* Main Stats Grid - Mobile Responsive */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-4">
         {stats.map((stat) => {

@@ -293,9 +293,12 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       throw new Error(`Failed to get analytics: ${analyticsError.message}`);
     }
 
-    // Get all customers for display
+    // Get all customers for display WITH DATE FILTERING
     const { data: customersResult, error: customersError } = await supabase
-      .rpc('get_all_customers_display');
+      .rpc('get_all_customers_display', {
+        p_start_date: from.toISOString(),
+        p_end_date: to.toISOString()
+      });
 
     if (customersError) {
       console.error('Customers function error:', customersError);

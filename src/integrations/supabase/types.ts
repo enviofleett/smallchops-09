@@ -10260,7 +10260,7 @@ export type Database = {
         }[]
       }
       get_all_customers_display: {
-        Args: Record<PropertyKey, never>
+        Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
           email: string
           id: string

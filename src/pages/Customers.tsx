@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
-import { Search, Filter, Plus, Edit, UserPlus, Users, BarChart3 } from 'lucide-react';
+import { Search, Filter, Plus, Edit, UserPlus, Users, BarChart3, Trophy } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { CustomerAnalytics } from '@/components/customers/CustomerAnalytics';
 import { CustomerFilters } from '@/components/customers/CustomerFilters';
 import { CustomerTable } from '@/components/customers/CustomerTable';
 import { CustomerTypeFilter, CustomerTypeFilter as CustomerTypeFilterType } from '@/components/customers/CustomerTypeFilter';
 import { CustomerRateLimitWarning } from '@/components/customers/CustomerRateLimitWarning';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 import { getCustomerAnalytics } from '@/api/customers';
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useCustomerRateLimit } from '@/hooks/useCustomerRateLimit';
 
 const Customers = () => {
+  const isMobile = useIsMobile();
   const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
     to: new Date()
@@ -102,22 +104,33 @@ const Customers = () => {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6 px-3 sm:px-0">
-      {/* Page Header - Mobile Optimized */}
-      <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Customer Management</h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">
-            Comprehensive customer management with security controls
-          </p>
+    <div className="space-y-6 md:space-y-8">
+      {/* Page Header - Refined Typography & Layout */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
+              <Users className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                Customer Management
+              </h1>
+              <p className="text-sm md:text-base text-muted-foreground mt-1 leading-relaxed">
+                Track, analyze, and engage with your customer base
+              </p>
+            </div>
+          </div>
         </div>
+        
         <Button
-          className="w-full sm:w-auto flex items-center justify-center space-x-2"
+          size={isMobile ? "default" : "lg"}
+          className="w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 gap-2"
           onClick={openAddCustomer}
           disabled={!rateLimitStatus.isAllowed || rateLimitStatus.isChecking}
         >
-          <UserPlus className="h-4 w-4" />
-          <span>Add Customer</span>
+          <UserPlus className="h-4 w-4 md:h-5 md:w-5" />
+          <span className="font-semibold">Add New Customer</span>
         </Button>
       </div>
 
@@ -134,7 +147,8 @@ const Customers = () => {
         isAllowed={rateLimitStatus.isAllowed}
         onRefresh={rateLimitStatus.checkRateLimit}
       />
-      {/* Analytics Overview */}
+      
+      {/* Analytics Overview with Enhanced Spacing */}
       {analytics && (
         <CustomerAnalytics
           metrics={analytics.metrics}
@@ -147,22 +161,32 @@ const Customers = () => {
         />
       )}
 
-      {/* Repeat Business Analysis - Mobile Responsive */}
+      {/* Repeat Business Analysis - Refined Design */}
       {analytics && analytics.repeatCustomers.length > 0 && (
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
-            <div>
-              <h3 className="text-base sm:text-lg font-semibold text-gray-800">Repeat Business Champions</h3>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">Based on paid orders only • Updated in real-time</p>
+        <div className="bg-gradient-to-br from-white to-muted/30 rounded-2xl shadow-lg border border-border/50 p-5 md:p-7 backdrop-blur-sm">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                  <Trophy className="h-5 w-5 text-purple-600" />
+                </div>
+                <h3 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
+                  Repeat Business Champions
+                </h3>
+              </div>
+              <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+                Top customers driving recurring revenue • Live data
+              </p>
             </div>
-            <div className="flex items-center space-x-2 text-xs text-gray-500">
-              <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Paid Only</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full border border-emerald-200">
+                ✓ Verified Payments
+              </span>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
             {analytics.repeatCustomers.slice(0, 3).map((customer, index) => {
-              // Production-ready validation and safety checks
               const safeCustomer = {
                 id: customer.id || `repeat-${index}`,
                 name: customer.name || 'Unknown Customer',
@@ -171,63 +195,56 @@ const Customers = () => {
                 isGuest: Boolean(customer.isGuest)
               };
 
-              // Calculate average order value safely
               const avgOrderValue = safeCustomer.totalOrders > 0 
                 ? Math.round(safeCustomer.totalSpent / safeCustomer.totalOrders)
                 : 0;
 
               return (
-                <div key={safeCustomer.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-gray-800 truncate" title={safeCustomer.name}>
-                        {safeCustomer.name.length > 20 
-                          ? `${safeCustomer.name.substring(0, 20)}...` 
-                          : safeCustomer.name
-                        }
-                      </span>
+                <div 
+                  key={safeCustomer.id} 
+                  className="group relative bg-white rounded-xl border border-border p-5 hover:shadow-xl hover:border-primary/50 transition-all duration-300"
+                >
+                  {/* Rank Badge */}
+                  <div className="absolute -top-3 -right-3 w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+                    <span className="text-white font-bold text-sm">#{index + 1}</span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Customer Name & Type */}
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-bold text-base text-foreground leading-tight line-clamp-2 flex-1" title={safeCustomer.name}>
+                        {safeCustomer.name}
+                      </h4>
                       {safeCustomer.isGuest && (
-                        <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                        <span className="text-[10px] font-medium bg-orange-100 text-orange-700 px-2 py-1 rounded-md border border-orange-200 shrink-0">
                           Guest
                         </span>
                       )}
                     </div>
-                    <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                      #{index + 1}
-                    </span>
-                  </div>
-                  
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span>Orders:</span>
-                      <span className="font-semibold">{safeCustomer.totalOrders}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Total Paid:</span>
-                      <span className="font-semibold text-green-600">₦{safeCustomer.totalSpent.toLocaleString()}</span>
-                    </div>
-                    <div className="text-xs text-gray-500 pt-1 border-t">
-                      <div className="flex items-center justify-between">
-                        <span>Avg per order:</span>
-                        <span>₦{avgOrderValue.toLocaleString()}</span>
+                    
+                    {/* Metrics */}
+                    <div className="space-y-2.5 text-sm">
+                      <div className="flex items-center justify-between p-2.5 bg-muted/50 rounded-lg">
+                        <span className="text-muted-foreground font-medium">Orders</span>
+                        <span className="font-bold text-foreground">{safeCustomer.totalOrders}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 bg-emerald-50 rounded-lg border border-emerald-100">
+                        <span className="text-emerald-700 font-medium">Total Paid</span>
+                        <span className="font-bold text-emerald-700">
+                          ₦{safeCustomer.totalSpent.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 bg-blue-50 rounded-lg border border-blue-100">
+                        <span className="text-blue-700 font-medium">Avg/Order</span>
+                        <span className="font-bold text-blue-700">
+                          ₦{avgOrderValue.toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
               );
             })}
-          </div>
-          
-          {/* Production footer with data integrity info */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-gray-500">
-              <span>
-                Showing top {Math.min(3, analytics.repeatCustomers.length)} of {analytics.repeatCustomers.length} repeat customers
-              </span>
-              <span className="text-right sm:text-left">
-                Last updated: {new Date().toLocaleTimeString()}
-              </span>
-            </div>
           </div>
         </div>
       )}
@@ -264,31 +281,44 @@ const Customers = () => {
         />
       )}
 
-      {/* Search and Customer Table - Mobile Responsive */}
-      <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
-        <div className="flex flex-col space-y-4 mb-6">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-800">All Customers</h3>
-          
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
-              <input
-                type="text"
-                placeholder="Search customers..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+      {/* Search and Customer Table - Refined Design */}
+      <div className="bg-gradient-to-br from-white to-muted/20 rounded-2xl shadow-lg border border-border/50 p-5 md:p-7">
+        <div className="flex flex-col gap-5 mb-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
+                <Users className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
+                  Customer Directory
+                </h3>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  {filteredCustomers.length} of {allCustomers.length} customers
+                </p>
+              </div>
             </div>
-            <Button 
-              variant="outline"
-              className="w-full sm:w-auto flex items-center justify-center space-x-2"
-              onClick={openAddCustomer}
-              disabled={!rateLimitStatus.isAllowed || rateLimitStatus.isChecking}
-            >
-              <UserPlus className="h-4 w-4" />
-              <span>Add Customer</span>
-            </Button>
+          </div>
+          
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 md:h-5 md:w-5" />
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 md:pl-12 pr-4 py-3 md:py-3.5 text-sm md:text-base bg-background border-2 border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground/60"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span className="text-lg">×</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -3,7 +3,7 @@ import { Package, ShoppingCart, Users, TrendingUp, RefreshCw } from 'lucide-reac
 import DashboardCard from '@/components/DashboardCard';
 import RevenueChart from '@/components/charts/RevenueChart';
 import OrdersChart from '@/components/charts/OrdersChart';
-import { TopCustomersChart } from '@/components/customers/TopCustomersChart';
+
 import { DailyMetricsPanel } from '@/components/dashboard/DailyMetricsPanel';
 import DashboardHeader from '@/components/DashboardHeader';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -181,11 +181,6 @@ const Dashboard = () => {
             />
           </div>
 
-          <TopCustomersChart 
-            customers={data?.topCustomersByOrders || []} 
-            type="orders"
-            title="Top Customers by Orders"
-          />
         </ProgressiveLoader>
 
         {/* Daily Metrics Section */}

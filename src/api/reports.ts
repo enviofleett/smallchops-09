@@ -21,36 +21,70 @@ export async function fetchDailyAnalytics(
   
   for (let attempt = 1; attempt <= retryCount; attempt++) {
     try {
-      console.log(`Fetching daily analytics (attempt ${attempt}/${retryCount})...`, { startDate, endDate });
+      console.log(`[Analytics API] Fetching daily analytics (attempt ${attempt}/${retryCount})...`, { startDate, endDate });
       
-      // Get the Supabase client session for authentication
+      // Get the Supabase client session for authentication with enhanced error handling
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
       if (sessionError) {
+        console.error('[Auth Error] Session retrieval failed:', sessionError);
+        // Check for specific auth errors
+        if (sessionError.message?.includes('session') || sessionError.name === 'AuthSessionMissingError') {
+          throw new Error('Your session has expired. Please refresh the page or log in again.');
+        }
         throw new Error(`Session error: ${sessionError.message}`);
       }
+      
       if (!session) {
+        console.warn('[Auth Warning] No active session found');
         throw new Error('No active session. Please log in to view analytics.');
       }
 
+      console.log('[Analytics API] Session validated successfully');
+
       // Call the endpoint directly via fetch with proper error handling
-      const supabaseUrl = 'https://oknnklksdiqaifhxaccs.supabase.co';
+      // Use environment variable or fallback to production URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://oknnklksdiqaifhxaccs.supabase.co';
       const url = `${supabaseUrl}/functions/v1/analytics-dashboard/daily-analytics?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+      
+      console.log('[Analytics API] Calling endpoint:', { url, startDate, endDate });
+      
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA'
+          'apikey': supabaseAnonKey
         },
       });
 
+      console.log('[Analytics API] Response status:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[Analytics API] Error response:', { status: response.status, errorText });
+        
+        // Provide more helpful error messages based on status code
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please log in again.');
+        } else if (response.status === 403) {
+          throw new Error('Access denied. You may not have permission to view analytics.');
+        } else if (response.status >= 500) {
+          throw new Error(`Server error (${response.status}). Please try again later.`);
+        }
+        
         throw new Error(`Analytics API error (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('[Analytics API] Received data structure:', {
+        hasDailyData: !!data?.dailyData,
+        dailyDataLength: data?.dailyData?.length,
+        hasSummary: !!data?.summary,
+        hasError: !!data?.error
+      });
       
       // Validate response structure
       if (!data || typeof data !== 'object') {

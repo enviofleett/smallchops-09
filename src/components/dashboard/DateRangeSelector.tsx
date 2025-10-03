@@ -52,19 +52,34 @@ export function DateRangeSelector({
         return; // Don't auto-apply for custom
     }
 
-    onRangeChange(
-      format(newStartDate, 'yyyy-MM-dd'),
-      format(newEndDate, 'yyyy-MM-dd')
-    );
+    const formattedStart = format(newStartDate, 'yyyy-MM-dd');
+    const formattedEnd = format(newEndDate, 'yyyy-MM-dd');
+    
+    console.log('[DateRangeSelector] Preset changed:', {
+      preset: newPreset,
+      startDate: formattedStart,
+      endDate: formattedEnd,
+      clientTime: new Date().toISOString()
+    });
+
+    onRangeChange(formattedStart, formattedEnd);
   };
 
   const handleCustomDateChange = (type: 'start' | 'end', date: Date | undefined) => {
     if (!date) return;
 
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    
+    console.log('[DateRangeSelector] Custom date selected:', {
+      type,
+      selectedDate: formattedDate,
+      clientTime: new Date().toISOString()
+    });
+
     if (type === 'start') {
-      onRangeChange(format(date, 'yyyy-MM-dd'), endDate);
+      onRangeChange(formattedDate, endDate);
     } else {
-      onRangeChange(startDate, format(date, 'yyyy-MM-dd'));
+      onRangeChange(startDate, formattedDate);
     }
     setPreset('custom');
   };

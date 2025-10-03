@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { data, isLoading, error, refresh } = useDashboardData();
+  // Date range in YYYY-MM-DD format (client local dates)
+  // Backend will convert these to Lagos timezone (UTC+1) for querying
   const [dateRange, setDateRange] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
@@ -103,6 +105,24 @@ const Dashboard = () => {
   };
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {
+    console.log('[Dashboard] Date range changed:', { startDate, endDate });
+    
+    // Validate date range
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      console.error('[Dashboard] Invalid date format:', { startDate, endDate });
+      toast.error('Invalid date format. Please select valid dates.');
+      return;
+    }
+    
+    if (start > end) {
+      console.error('[Dashboard] Start date after end date:', { startDate, endDate });
+      toast.error('Start date must be before end date.');
+      return;
+    }
+    
     setDateRange({ startDate, endDate });
     toast.success('Date range updated');
   };
@@ -194,14 +214,32 @@ const Dashboard = () => {
                   {dailyError instanceof Error ? dailyError.message : 'Unknown error occurred'}
                 </p>
                 <p className="text-xs text-muted-foreground mb-4">
-                  {dailyError instanceof Error && dailyError.message.includes('session') ? 
+                  {dailyError instanceof Error && (
+                    dailyError.message.includes('session') || 
+                    dailyError.message.includes('Authentication') ||
+                    dailyError.message.includes('AuthSessionMissingError')
+                  ) ? 
                     'Your session may have expired. Please refresh the page or log in again.' : 
+                  dailyError instanceof Error && dailyError.message.includes('403') ?
+                    'You do not have permission to view analytics. Please contact your administrator.' :
+                  dailyError instanceof Error && dailyError.message.includes('500') ?
+                    'The server encountered an error. Please try again in a few moments.' :
                     'Please check your connection and try again.'}
                 </p>
-                <Button onClick={() => refetchDaily()} variant="outline" size="sm">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Retry
-                </Button>
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={() => refetchDaily()} variant="outline" size="sm">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </Button>
+                  {dailyError instanceof Error && (
+                    dailyError.message.includes('session') || 
+                    dailyError.message.includes('Authentication')
+                  ) && (
+                    <Button onClick={() => window.location.reload()} variant="default" size="sm">
+                      Refresh Page
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ) : (

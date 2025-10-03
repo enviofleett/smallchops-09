@@ -784,6 +784,16 @@ async function generateAlerts(supabase: any) {
   return alerts;
 }
 
+/**
+ * Generate daily analytics metrics with Lagos timezone handling
+ * @param supabase - Supabase client instance
+ * @param startDate - Start date in YYYY-MM-DD format (will be treated as Lagos date)
+ * @param endDate - End date in YYYY-MM-DD format (will be treated as Lagos date)
+ * @returns Daily metrics aggregated by Lagos timezone days
+ * 
+ * Note: All dates are converted from Lagos time (UTC+1) to UTC for database queries,
+ * then converted back to Lagos time for aggregation and display.
+ */
 async function generateDailyAnalytics(supabase: any, startDate: string, endDate: string) {
   try {
     // Validate date inputs
@@ -812,29 +822,48 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     const startUTC = lagosDateToUTC(startDate, '00:00');
     const endUTC = lagosDateToUTC(endDate, '23:59');
     
-    console.log('Querying with Lagos timezone:', { 
+    console.log('[Lagos Timezone Debug] Querying with Lagos timezone:', { 
       lagosStart: `${startDate} 00:00`, 
       lagosEnd: `${endDate} 23:59`,
       utcStart: startUTC,
-      utcEnd: endUTC
+      utcEnd: endUTC,
+      lagosOffsetHours: LAGOS_OFFSET_HOURS
     });
   
     // Get all orders in the date range (using UTC boundaries that match Lagos time)
+    // Include all legitimate orders: paid, confirmed, completed (not just 'paid')
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('*')
       .gte('order_time', startUTC)
       .lte('order_time', endUTC)
-      .eq('payment_status', 'paid')
+      .in('payment_status', ['paid', 'confirmed', 'completed'])
       .order('order_time', { ascending: true });
 
     if (ordersError) {
-      console.error('Error fetching orders for daily analytics:', ordersError);
+      console.error('[Error] Failed to fetch orders for daily analytics:', ordersError);
       return { 
         dailyData: [], 
         summary: { totalDays: 0, totalRevenue: 0, totalOrders: 0, totalCustomers: 0 },
         error: ordersError.message
       };
+    }
+
+    console.log(`[Debug] Fetched ${orders?.length || 0} orders with legitimate payment status`);
+
+    // Get cancelled orders separately to track cancellations
+    const { data: cancelledOrders, error: cancelledError } = await supabase
+      .from('orders')
+      .select('*')
+      .gte('order_time', startUTC)
+      .lte('order_time', endUTC)
+      .eq('status', 'cancelled')
+      .order('order_time', { ascending: true });
+
+    if (cancelledError) {
+      console.error('[Warning] Failed to fetch cancelled orders:', cancelledError);
+    } else {
+      console.log(`[Debug] Fetched ${cancelledOrders?.length || 0} cancelled orders`);
     }
 
     // Get order items to find top products - with error handling
@@ -894,6 +923,7 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
         date: dateKey,
         revenue: 0,
         orders: 0,
+        cancelledOrders: 0,
         customers: new Set(),
         customerDetails: [] as any[],
         products: {} as { [key: string]: { name: string; quantity: number } },
@@ -902,6 +932,8 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
         previousRevenue: 0
       };
     }
+
+    console.log(`[Debug] Initialized ${Object.keys(dailyMap).length} days in date range`);
 
     // Aggregate orders data with validation (using Lagos timezone for grouping)
     (orders || []).forEach(order => {
@@ -925,9 +957,29 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
           }
         }
       } catch (err) {
-        console.error('Error processing order:', err, order.id);
+        console.error('[Error] Failed to process order:', err, order.id);
       }
     });
+
+    console.log(`[Debug] Aggregated ${orders?.length || 0} legitimate orders`);
+
+    // Aggregate cancelled orders with validation (using Lagos timezone for grouping)
+    (cancelledOrders || []).forEach(order => {
+      try {
+        if (!order.order_time) return;
+        
+        const orderDateUTC = new Date(order.order_time);
+        const dateKey = formatLagosDate(orderDateUTC); // Convert to Lagos date
+        
+        if (dailyMap[dateKey]) {
+          dailyMap[dateKey].cancelledOrders += 1;
+        }
+      } catch (err) {
+        console.error('[Error] Failed to process cancelled order:', err, order.id);
+      }
+    });
+
+    console.log(`[Debug] Aggregated ${cancelledOrders?.length || 0} cancelled orders`);
 
     // Aggregate product data with validation (using Lagos timezone)
     (orderItems || []).forEach(item => {
@@ -1027,6 +1079,7 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       date: dateKey,
       revenue: day.revenue,
       orders: day.orders,
+      cancelledOrders: day.cancelledOrders,
       customers: day.customers.size,
       newProducts: day.newProducts,
       newCustomerRegistrations: day.newCustomerRegistrations,
@@ -1042,6 +1095,7 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     totalDays: dailyData.length,
     totalRevenue: dailyData.reduce((sum, day) => sum + day.revenue, 0),
     totalOrders: dailyData.reduce((sum, day) => sum + day.orders, 0),
+    totalCancelledOrders: dailyData.reduce((sum, day) => sum + day.cancelledOrders, 0),
     totalCustomers: new Set(dailyData.flatMap(day => 
       orders?.filter(o => o.order_time.startsWith(day.date)).map(o => o.customer_email) || []
     )).size,
@@ -1052,6 +1106,14 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       ? dailyData.reduce((sum, day) => sum + day.orders, 0) / dailyData.length 
       : 0
   };
+
+  console.log('[Debug] Daily analytics summary:', {
+    totalDays: summary.totalDays,
+    totalRevenue: summary.totalRevenue,
+    totalOrders: summary.totalOrders,
+    totalCancelledOrders: summary.totalCancelledOrders,
+    totalCustomers: summary.totalCustomers
+  });
 
     return {
       dailyData,

@@ -7,6 +7,36 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
+// Lagos Timezone Utilities (Africa/Lagos, UTC+1)
+const LAGOS_OFFSET_HOURS = 1; // UTC+1
+
+function toLagosTime(utcDate: Date): Date {
+  const lagosTime = new Date(utcDate.getTime() + LAGOS_OFFSET_HOURS * 60 * 60 * 1000);
+  return lagosTime;
+}
+
+function lagosDateToUTC(lagosDateStr: string, lagosTimeStr: string): string {
+  // Parse the Lagos date and time
+  const [year, month, day] = lagosDateStr.split('-').map(Number);
+  const [hours, minutes] = lagosTimeStr.split(':').map(Number);
+  
+  // Create a date in Lagos time
+  const lagosDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+  
+  // Subtract the offset to get UTC
+  const utcDate = new Date(lagosDate.getTime() - LAGOS_OFFSET_HOURS * 60 * 60 * 1000);
+  
+  return utcDate.toISOString();
+}
+
+function formatLagosDate(utcDate: Date): string {
+  const lagosTime = toLagosTime(utcDate);
+  const year = lagosTime.getUTCFullYear();
+  const month = String(lagosTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(lagosTime.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -778,12 +808,23 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       };
     }
   
-    // Get all orders in the date range
+    // Convert Lagos date boundaries to UTC for database query
+    const startUTC = lagosDateToUTC(startDate, '00:00');
+    const endUTC = lagosDateToUTC(endDate, '23:59');
+    
+    console.log('Querying with Lagos timezone:', { 
+      lagosStart: `${startDate} 00:00`, 
+      lagosEnd: `${endDate} 23:59`,
+      utcStart: startUTC,
+      utcEnd: endUTC
+    });
+  
+    // Get all orders in the date range (using UTC boundaries that match Lagos time)
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('*')
-      .gte('order_time', `${startDate}T00:00:00.000Z`)
-      .lte('order_time', `${endDate}T23:59:59.999Z`)
+      .gte('order_time', startUTC)
+      .lte('order_time', endUTC)
       .eq('payment_status', 'paid')
       .order('order_time', { ascending: true });
 
@@ -813,13 +854,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       }
     }
 
-    // Get daily product additions - with error handling
+    // Get daily product additions - with error handling (using Lagos timezone)
     let products = [];
     const { data: productsData, error: productsError } = await supabase
       .from('products')
       .select('created_at')
-      .gte('created_at', `${startDate}T00:00:00.000Z`)
-      .lte('created_at', `${endDate}T23:59:59.999Z`)
+      .gte('created_at', startUTC)
+      .lte('created_at', endUTC)
       .order('created_at', { ascending: true });
     
     if (productsError) {
@@ -828,13 +869,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       products = productsData || [];
     }
 
-    // Get daily customer registrations - with error handling
+    // Get daily customer registrations - with error handling (using Lagos timezone)
     let customers = [];
     const { data: customersData, error: customersError } = await supabase
       .from('customers')
       .select('created_at, email, name')
-      .gte('created_at', `${startDate}T00:00:00.000Z`)
-      .lte('created_at', `${endDate}T23:59:59.999Z`)
+      .gte('created_at', startUTC)
+      .lte('created_at', endUTC)
       .order('created_at', { ascending: true });
     
     if (customersError) {
@@ -862,13 +903,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       };
     }
 
-    // Aggregate orders data with validation
+    // Aggregate orders data with validation (using Lagos timezone for grouping)
     (orders || []).forEach(order => {
       try {
         if (!order.order_time) return;
         
-        const orderDate = new Date(order.order_time);
-        const dateKey = orderDate.toISOString().split('T')[0];
+        const orderDateUTC = new Date(order.order_time);
+        const dateKey = formatLagosDate(orderDateUTC); // Convert to Lagos date
         
         if (dailyMap[dateKey]) {
           dailyMap[dateKey].revenue += Number(order.total_amount) || 0;
@@ -888,13 +929,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       }
     });
 
-    // Aggregate product data with validation
+    // Aggregate product data with validation (using Lagos timezone)
     (orderItems || []).forEach(item => {
       try {
         const order = orders?.find(o => o.id === item.order_id);
         if (order && order.order_time) {
-          const orderDate = new Date(order.order_time);
-          const dateKey = orderDate.toISOString().split('T')[0];
+          const orderDateUTC = new Date(order.order_time);
+          const dateKey = formatLagosDate(orderDateUTC); // Convert to Lagos date
           
           if (dailyMap[dateKey] && item.products?.name) {
             const productName = item.products.name;
@@ -909,13 +950,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       }
     });
 
-    // Aggregate new products per day with validation
+    // Aggregate new products per day with validation (using Lagos timezone)
     (products || []).forEach(product => {
       try {
         if (!product.created_at) return;
         
-        const productDate = new Date(product.created_at);
-        const dateKey = productDate.toISOString().split('T')[0];
+        const productDateUTC = new Date(product.created_at);
+        const dateKey = formatLagosDate(productDateUTC); // Convert to Lagos date
         if (dailyMap[dateKey]) {
           dailyMap[dateKey].newProducts += 1;
         }
@@ -924,13 +965,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       }
     });
 
-    // Aggregate new customer registrations per day with validation
+    // Aggregate new customer registrations per day with validation (using Lagos timezone)
     (customers || []).forEach(customer => {
       try {
         if (!customer.created_at) return;
         
-        const customerDate = new Date(customer.created_at);
-        const dateKey = customerDate.toISOString().split('T')[0];
+        const customerDateUTC = new Date(customer.created_at);
+        const dateKey = formatLagosDate(customerDateUTC); // Convert to Lagos date
         if (dailyMap[dateKey]) {
           dailyMap[dateKey].newCustomerRegistrations += 1;
         }

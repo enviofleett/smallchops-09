@@ -116,6 +116,13 @@ verify_jwt = false
 [functions.production-monitoring-alerts]
 verify_jwt = false
 
+# Analytics and Reports - Allow admin access via RLS
+[functions.analytics-dashboard]
+verify_jwt = false
+
+[functions.reports]
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327

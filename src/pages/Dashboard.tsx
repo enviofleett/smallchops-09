@@ -13,11 +13,13 @@ import { ProgressiveLoader } from '@/components/ui/progressive-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
 import { fetchDailyAnalytics } from '@/api/reports';
+import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
+import { toast } from 'sonner';
 
 
 const Dashboard = () => {
   const { data, isLoading, error, refresh } = useDashboardData();
-  const [dateRange] = useState({
+  const [dateRange, setDateRange] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   });
@@ -100,20 +102,27 @@ const Dashboard = () => {
     return new Intl.NumberFormat('en-NG').format(num);
   };
 
+  const handleDateRangeChange = (startDate: string, endDate: string) => {
+    setDateRange({ startDate, endDate });
+    toast.success('Date range updated');
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <DashboardHeader />
-        <Button
-          onClick={() => refresh(true)}
-          disabled={isLoading}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => refresh(true)}
+            disabled={isLoading}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
@@ -167,11 +176,28 @@ const Dashboard = () => {
         </TabsContent>
 
         <TabsContent value="daily" className="space-y-4 md:space-y-6 mt-6">
+          {/* Date Range Selector */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Daily Metrics</h3>
+            <DateRangeSelector
+              startDate={dateRange.startDate}
+              endDate={dateRange.endDate}
+              onRangeChange={handleDateRangeChange}
+            />
+          </div>
+
           {dailyError ? (
             <div className="text-center py-12 space-y-4">
               <div className="text-destructive">
                 <p className="font-medium mb-2">Failed to load daily metrics</p>
-                <p className="text-sm text-muted-foreground mb-4">{dailyError instanceof Error ? dailyError.message : 'Unknown error occurred'}</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {dailyError instanceof Error ? dailyError.message : 'Unknown error occurred'}
+                </p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  {dailyError instanceof Error && dailyError.message.includes('session') ? 
+                    'Your session may have expired. Please refresh the page or log in again.' : 
+                    'Please check your connection and try again.'}
+                </p>
                 <Button onClick={() => refetchDaily()} variant="outline" size="sm">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Retry

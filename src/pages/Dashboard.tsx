@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { Package, ShoppingCart, Users, TrendingUp, RefreshCw } from 'lucide-react';
-
 import RevenueChart from '@/components/charts/RevenueChart';
 import OrdersChart from '@/components/charts/OrdersChart';
-
 import { DailyMetricsPanel } from '@/components/dashboard/DailyMetricsPanel';
 import DashboardHeader from '@/components/DashboardHeader';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
-
 import { useQuery } from '@tanstack/react-query';
 import { fetchDailyAnalytics } from '@/api/reports';
 import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
 import { toast } from 'sonner';
-
-
 const Dashboard = () => {
-  const { data, isLoading, error, refresh } = useDashboardData();
+  const {
+    data,
+    isLoading,
+    error,
+    refresh
+  } = useDashboardData();
   // Date range in YYYY-MM-DD format (client local dates)
   // Backend will convert these to Lagos timezone (UTC+1) for querying
   const [dateRange, setDateRange] = useState({
@@ -27,8 +27,8 @@ const Dashboard = () => {
   });
 
   // Fetch daily analytics data with proper error handling and retry logic
-  const { 
-    data: dailyMetrics, 
+  const {
+    data: dailyMetrics,
     isLoading: isDailyLoading,
     error: dailyError,
     refetch: refetchDaily
@@ -41,38 +41,34 @@ const Dashboard = () => {
           endDate: dateRange.endDate,
           retryCount: 3
         });
-        
+
         // Validate response structure
         if (!result || typeof result !== 'object') {
           throw new Error('Invalid response from analytics API');
         }
-        
         return result;
       } catch (err) {
         console.error('Failed to fetch daily metrics:', err);
         throw err;
       }
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
+    // 5 minutes
     retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    enabled: !!data, // Only fetch daily metrics after main dashboard data loads
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    enabled: !!data // Only fetch daily metrics after main dashboard data loads
   });
-
   if (isLoading) {
-    return (
-      <div className="space-y-6">
+    return <div className="space-y-6">
         <DashboardHeader />
         
         {/* Loading Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-card rounded-2xl shadow-sm border border-border p-4 md:p-6">
+          {[...Array(4)].map((_, i) => <div key={i} className="bg-card rounded-2xl shadow-sm border border-border p-4 md:p-6">
               <Skeleton className="h-4 w-24 mb-2" />
               <Skeleton className="h-6 md:h-8 w-16 mb-2" />
               <Skeleton className="h-3 w-20" />
-            </div>
-          ))}
+            </div>)}
         </div>
 
         {/* Loading Charts */}
@@ -86,59 +82,56 @@ const Dashboard = () => {
             <Skeleton className="h-48 md:h-64 w-full" />
           </div>
         </div>
-      </div>
-    );
+      </div>;
   }
-
   const formatCurrency = (amount: number) => {
     if (amount === 0) return "₦0";
-    return new Intl.NumberFormat('en-NG', { 
-      style: 'currency', 
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
       currency: 'NGN',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0 
+      maximumFractionDigits: 0
     }).format(amount);
   };
-
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat('en-NG').format(num);
   };
-
   const handleDateRangeChange = (startDate: string, endDate: string) => {
-    console.log('[Dashboard] Date range changed:', { startDate, endDate });
-    
+    console.log('[Dashboard] Date range changed:', {
+      startDate,
+      endDate
+    });
+
     // Validate date range
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      console.error('[Dashboard] Invalid date format:', { startDate, endDate });
+      console.error('[Dashboard] Invalid date format:', {
+        startDate,
+        endDate
+      });
       toast.error('Invalid date format. Please select valid dates.');
       return;
     }
-    
     if (start > end) {
-      console.error('[Dashboard] Start date after end date:', { startDate, endDate });
+      console.error('[Dashboard] Start date after end date:', {
+        startDate,
+        endDate
+      });
       toast.error('Start date must be before end date.');
       return;
     }
-    
-    setDateRange({ startDate, endDate });
+    setDateRange({
+      startDate,
+      endDate
+    });
     toast.success('Date range updated');
   };
-
-  return (
-    <div className="space-y-4 md:space-y-6">
+  return <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <DashboardHeader />
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => refresh(true)}
-            disabled={isLoading}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
+          <Button onClick={() => refresh(true)} disabled={isLoading} variant="outline" size="sm" className="flex items-center gap-2">
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -150,71 +143,41 @@ const Dashboard = () => {
         {/* Daily Metrics Section */}
         <div className="space-y-4 md:space-y-6 mt-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Daily Metrics</h3>
-            <DateRangeSelector
-              startDate={dateRange.startDate}
-              endDate={dateRange.endDate}
-              onRangeChange={handleDateRangeChange}
-            />
+            
+            <DateRangeSelector startDate={dateRange.startDate} endDate={dateRange.endDate} onRangeChange={handleDateRangeChange} />
           </div>
 
-          {dailyError ? (
-            <div className="text-center py-12 space-y-4">
+          {dailyError ? <div className="text-center py-12 space-y-4">
               <div className="text-destructive">
                 <p className="font-medium mb-2">Failed to load daily metrics</p>
                 <p className="text-sm text-muted-foreground mb-4">
                   {dailyError instanceof Error ? dailyError.message : 'Unknown error occurred'}
                 </p>
                 <p className="text-xs text-muted-foreground mb-4">
-                  {dailyError instanceof Error && (
-                    dailyError.message.includes('session') || 
-                    dailyError.message.includes('Authentication') ||
-                    dailyError.message.includes('AuthSessionMissingError')
-                  ) ? 
-                    'Your session may have expired. Please refresh the page or log in again.' : 
-                  dailyError instanceof Error && dailyError.message.includes('403') ?
-                    'You do not have permission to view analytics. Please contact your administrator.' :
-                  dailyError instanceof Error && dailyError.message.includes('500') ?
-                    'The server encountered an error. Please try again in a few moments.' :
-                    'Please check your connection and try again.'}
+                  {dailyError instanceof Error && (dailyError.message.includes('session') || dailyError.message.includes('Authentication') || dailyError.message.includes('AuthSessionMissingError')) ? 'Your session may have expired. Please refresh the page or log in again.' : dailyError instanceof Error && dailyError.message.includes('403') ? 'You do not have permission to view analytics. Please contact your administrator.' : dailyError instanceof Error && dailyError.message.includes('500') ? 'The server encountered an error. Please try again in a few moments.' : 'Please check your connection and try again.'}
                 </p>
                 <div className="flex gap-2 justify-center">
                   <Button onClick={() => refetchDaily()} variant="outline" size="sm">
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Retry
                   </Button>
-                  {dailyError instanceof Error && (
-                    dailyError.message.includes('session') || 
-                    dailyError.message.includes('Authentication')
-                  ) && (
-                    <Button onClick={() => window.location.reload()} variant="default" size="sm">
+                  {dailyError instanceof Error && (dailyError.message.includes('session') || dailyError.message.includes('Authentication')) && <Button onClick={() => window.location.reload()} variant="default" size="sm">
                       Refresh Page
-                    </Button>
-                  )}
+                    </Button>}
                 </div>
               </div>
-            </div>
-          ) : (
-            <DailyMetricsPanel 
-              dailyData={dailyMetrics?.dailyData || []} 
-              isLoading={isDailyLoading}
-            />
-          )}
+            </div> : <DailyMetricsPanel dailyData={dailyMetrics?.dailyData || []} isLoading={isDailyLoading} />}
         </div>
       </div>
 
-      {(!data || (!data.stats?.totalProducts && !data.stats?.totalOrders)) && !isLoading && (
-        <div className="text-center py-8 space-y-4">
+      {(!data || !data.stats?.totalProducts && !data.stats?.totalOrders) && !isLoading && <div className="text-center py-8 space-y-4">
           <div className="text-muted-foreground">
             <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />
             <h3 className="text-lg font-medium">No Data Available</h3>
             <p className="text-sm">Your dashboard will show data once you start adding products and receiving orders.</p>
             <p className="text-xs mt-2">Check back after your first sale!</p>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>}
+    </div>;
 };
-
 export default Dashboard;

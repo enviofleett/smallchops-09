@@ -94,30 +94,46 @@ export function DateRangeSelector({
     return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
   };
 
+  const getMobileDisplayText = () => {
+    if (preset === 'today') return 'Today';
+    if (preset === '7days') return '7D';
+    if (preset === '30days') return '30D';
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return `${format(start, 'MMM d')} - ${format(end, 'MMM d')}`;
+  };
+
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      {/* Preset Buttons */}
-      <div className="hidden sm:flex items-center gap-2">
+    <div className={cn("flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto", className)}>
+      {/* Preset Buttons - Compact on mobile */}
+      <div className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-initial">
         <Button
           variant={preset === 'today' ? 'default' : 'outline'}
           size="sm"
           onClick={() => handlePresetChange('today')}
+          className="text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9 flex-1 sm:flex-initial"
         >
-          Today
+          <span className="hidden xs:inline">Today</span>
+          <span className="inline xs:hidden">1D</span>
         </Button>
         <Button
           variant={preset === '7days' ? 'default' : 'outline'}
           size="sm"
           onClick={() => handlePresetChange('7days')}
+          className="text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9 flex-1 sm:flex-initial"
         >
-          7 Days
+          7D
+          <span className="hidden sm:inline">ays</span>
         </Button>
         <Button
           variant={preset === '30days' ? 'default' : 'outline'}
           size="sm"
           onClick={() => handlePresetChange('30days')}
+          className="text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9 flex-1 sm:flex-initial"
         >
-          30 Days
+          30D
+          <span className="hidden sm:inline">ays</span>
         </Button>
       </div>
 
@@ -128,40 +144,41 @@ export function DateRangeSelector({
             variant="outline"
             size="sm"
             className={cn(
-              "justify-start text-left font-normal min-w-[200px]",
+              "justify-start text-left font-normal min-w-0 w-auto text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9 flex-shrink-0",
               preset === 'custom' && "border-primary"
             )}
           >
-            <Calendar className="mr-2 h-4 w-4" />
-            {getDisplayText()}
-            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+            <span className="hidden sm:inline">{getDisplayText()}</span>
+            <span className="inline sm:hidden ml-1">{getMobileDisplayText()}</span>
+            <ChevronDown className="ml-1 sm:ml-auto h-3 w-3 sm:h-4 sm:w-4 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
-          <div className="flex flex-col sm:flex-row">
-            <div className="p-3 border-b sm:border-b-0 sm:border-r">
-              <div className="text-sm font-medium mb-2">Start Date</div>
+        <PopoverContent className="w-auto max-w-[calc(100vw-2rem)] p-0" align="end" sideOffset={5}>
+          <div className="flex flex-col">
+            <div className="p-2 sm:p-3 border-b">
+              <div className="text-xs sm:text-sm font-medium mb-1 sm:mb-2">Start Date</div>
               <CalendarComponent
                 mode="single"
                 selected={new Date(startDate)}
                 onSelect={(date) => handleCustomDateChange('start', date)}
                 disabled={(date) => date > new Date(endDate)}
                 initialFocus
-                className="pointer-events-auto"
+                className="pointer-events-auto scale-90 sm:scale-100 origin-top"
               />
             </div>
-            <div className="p-3">
-              <div className="text-sm font-medium mb-2">End Date</div>
+            <div className="p-2 sm:p-3 border-b">
+              <div className="text-xs sm:text-sm font-medium mb-1 sm:mb-2">End Date</div>
               <CalendarComponent
                 mode="single"
                 selected={new Date(endDate)}
                 onSelect={(date) => handleCustomDateChange('end', date)}
                 disabled={(date) => date < new Date(startDate) || date > new Date()}
-                className="pointer-events-auto"
+                className="pointer-events-auto scale-90 sm:scale-100 origin-top"
               />
             </div>
           </div>
-          <div className="p-3 border-t flex justify-end gap-2">
+          <div className="p-2 sm:p-3 border-t flex justify-end gap-1.5 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -169,12 +186,14 @@ export function DateRangeSelector({
                 handlePresetChange('30days');
                 setIsOpen(false);
               }}
+              className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
             >
               Reset
             </Button>
             <Button
               size="sm"
               onClick={() => setIsOpen(false)}
+              className="text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
             >
               Apply
             </Button>

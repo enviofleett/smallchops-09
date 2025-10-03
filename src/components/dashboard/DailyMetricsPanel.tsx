@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, Users, ShoppingCart, TrendingUp, TrendingDown, Minus, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, TooltipProps } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 
@@ -32,6 +32,35 @@ interface DailyMetricsPanelProps {
   dailyData: DailyMetric[];
   isLoading?: boolean;
 }
+
+// Custom Tooltip Component for enhanced UX
+const CustomTooltip = ({ active, payload, label, formatter }: TooltipProps<any, any> & { formatter?: (value: any) => [string, string] }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-popover border border-border rounded-lg shadow-lg p-3 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-200">
+        <p className="font-semibold text-sm mb-2 text-foreground">{label}</p>
+        {payload.map((entry: any, index: number) => {
+          const formattedValue = formatter ? formatter(entry.value) : [entry.value.toString(), entry.name || ''];
+          return (
+            <div key={index} className="flex items-center justify-between gap-4 py-1">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="text-xs text-muted-foreground">{formattedValue[1]}:</span>
+              </div>
+              <span className="text-sm font-bold text-foreground">
+                {formattedValue[0]}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  return null;
+};
 
 export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData, isLoading }) => {
   // CRITICAL: Always call hooks BEFORE any conditional returns to avoid hooks violations
@@ -432,22 +461,41 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
                     <XAxis 
                       dataKey="date" 
-                      tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
                     />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
                     <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px'
-                      }}
+                      content={<CustomTooltip />}
+                      cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
                     />
-                    <Legend />
-                    <Bar dataKey="orders" fill="hsl(var(--primary))" name="Completed Orders" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="cancelledOrders" fill="hsl(var(--destructive))" name="Cancelled Orders" radius={[4, 4, 0, 0]} />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      iconType="circle"
+                    />
+                    <Bar 
+                      dataKey="orders" 
+                      fill="hsl(var(--primary))" 
+                      name="Completed Orders" 
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={800}
+                      animationBegin={0}
+                    />
+                    <Bar 
+                      dataKey="cancelledOrders" 
+                      fill="hsl(var(--destructive))" 
+                      name="Cancelled Orders" 
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={800}
+                      animationBegin={200}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -465,26 +513,47 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <defs>
+                      <linearGradient id="productGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
                     <XAxis 
                       dataKey="date" 
-                      tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
                     />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
                     <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px'
-                      }}
-                      formatter={(value: any) => [value, 'Products']}
+                      content={<CustomTooltip formatter={(value: any) => [value.toString(), 'Products'] as [string, string]} />}
+                      cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5 5' }}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="newProducts" 
                       stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))' }}
+                      strokeWidth={3}
+                      dot={{ 
+                        fill: 'hsl(var(--background))', 
+                        stroke: 'hsl(var(--primary))',
+                        strokeWidth: 2,
+                        r: 4
+                      }}
+                      activeDot={{ 
+                        r: 6, 
+                        stroke: 'hsl(var(--primary))',
+                        strokeWidth: 2,
+                        fill: 'hsl(var(--primary))',
+                        className: 'animate-pulse'
+                      }}
+                      fill="url(#productGradient)"
+                      animationDuration={1000}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -503,31 +572,40 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
                     <XAxis 
                       dataKey="date" 
-                      tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
                     />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
                     <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px'
-                      }}
+                      content={<CustomTooltip />}
+                      cursor={{ fill: 'hsl(var(--accent))', opacity: 0.1 }}
                     />
-                    <Legend />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      iconType="circle"
+                    />
                     <Bar 
                       dataKey="newCustomers" 
                       fill="hsl(var(--primary))" 
                       name="New Registrations"
-                      radius={[4, 4, 0, 0]} 
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={800}
+                      animationBegin={0}
                     />
                     <Bar 
                       dataKey="customers" 
                       fill="hsl(var(--secondary))" 
                       name="Active Customers"
-                      radius={[4, 4, 0, 0]} 
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={800}
+                      animationBegin={200}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -577,29 +655,48 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <defs>
+                      <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
                     <XAxis 
                       dataKey="date" 
-                      tick={{ fontSize: 12, fill: "hsl(var(--foreground))" }}
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
                     />
                     <YAxis 
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
                       tickFormatter={(value) => `₦${value}k`}
+                      tickLine={false}
+                      axisLine={false}
                     />
                     <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px'
-                      }}
-                      formatter={(value: any) => [formatCurrency(value * 100), 'Revenue']}
+                      content={<CustomTooltip formatter={(value: any) => [formatCurrency(value * 100), 'Revenue'] as [string, string]} />}
+                      cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5 5' }}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="revenue" 
                       stroke="hsl(var(--primary))" 
                       strokeWidth={3}
-                      dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                      dot={{ 
+                        fill: 'hsl(var(--background))', 
+                        stroke: 'hsl(var(--primary))',
+                        strokeWidth: 2,
+                        r: 5
+                      }}
+                      activeDot={{ 
+                        r: 8, 
+                        stroke: 'hsl(var(--primary))',
+                        strokeWidth: 3,
+                        fill: 'hsl(var(--primary))',
+                        className: 'animate-pulse'
+                      }}
+                      fill="url(#revenueGradient)"
+                      animationDuration={1200}
                     />
                   </LineChart>
                 </ResponsiveContainer>

@@ -618,37 +618,6 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
               </div>
             </CardContent>
           </Card>
-
-          {/* Top Customers for Selected Day */}
-          {selectedMetric && Array.isArray(selectedMetric.topCustomers) && selectedMetric.topCustomers.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Customers - {formatDate(selectedMetric.date || '')}</CardTitle>
-                <CardDescription>Customers with highest spending</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {selectedMetric.topCustomers.map((customer, idx) => (
-                    <div key={`${customer.email}-${idx}`} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                          #{idx + 1}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{customer.name || 'Unknown'}</p>
-                          <p className="text-xs text-muted-foreground">{customer.email || 'No email'}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(Number(customer.spending) || 0)}</p>
-                        <p className="text-xs text-muted-foreground">{Number(customer.orders) || 0} orders</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="revenue" className="space-y-4">

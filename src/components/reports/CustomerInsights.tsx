@@ -1,7 +1,8 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { UserPlus } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface DailyMetric {
   date: string;
@@ -28,6 +29,8 @@ interface CustomerInsightsProps {
 }
 
 export function CustomerInsights({ dailyMetrics }: CustomerInsightsProps) {
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -35,6 +38,14 @@ export function CustomerInsights({ dailyMetrics }: CustomerInsightsProps) {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(parseISO(dateString), 'MMM dd, yyyy');
+    } catch {
+      return dateString;
+    }
   };
 
   // Calculate top customers across entire period
@@ -95,12 +106,69 @@ export function CustomerInsights({ dailyMetrics }: CustomerInsightsProps) {
       .slice(0, 10);
   }, [dailyMetrics]);
 
+  const selectedMetric = dailyMetrics && dailyMetrics.length > 0 ? dailyMetrics[selectedDayIndex] : null;
+
   if (!dailyMetrics?.length) {
     return null;
   }
 
   return (
-    <div className="grid gap-4 md:gap-6 grid-cols-1 xl:grid-cols-2">
+    <div className="space-y-4 md:space-y-6">
+      {/* Top Customers for Selected Day */}
+      {selectedMetric && Array.isArray(selectedMetric.top_customers) && selectedMetric.top_customers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Top Customers - {formatDate(selectedMetric.date)}</CardTitle>
+                <CardDescription>Customers with highest spending on this day</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedDayIndex(Math.max(0, selectedDayIndex - 1))}
+                  disabled={selectedDayIndex === 0}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedDayIndex(Math.min(dailyMetrics.length - 1, selectedDayIndex + 1))}
+                  disabled={selectedDayIndex === dailyMetrics.length - 1}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {selectedMetric.top_customers.map((customer, idx) => (
+                <div key={`${customer.email}-${idx}`} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{customer.name || 'Unknown'}</p>
+                      <p className="text-xs text-muted-foreground">{customer.email || 'No email'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{formatCurrency(Number(customer.spending) || 0)}</p>
+                    <p className="text-xs text-muted-foreground">{Number(customer.orders) || 0} orders</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Period Overview */}
+      <div className="grid gap-4 md:gap-6 grid-cols-1 xl:grid-cols-2">
       {/* Top Customers for Entire Period */}
       {allTopCustomers.length > 0 && (
         <Card>
@@ -170,6 +238,7 @@ export function CustomerInsights({ dailyMetrics }: CustomerInsightsProps) {
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 }

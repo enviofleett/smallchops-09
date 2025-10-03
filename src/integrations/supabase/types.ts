@@ -5504,6 +5504,7 @@ export type Database = {
           customer_name: string
           customer_phone: string
           delivery_address: Json | null
+          delivery_date: string | null
           delivery_fee: number | null
           delivery_status: string | null
           delivery_time: string | null
@@ -5557,6 +5558,7 @@ export type Database = {
           customer_name: string
           customer_phone: string
           delivery_address?: Json | null
+          delivery_date?: string | null
           delivery_fee?: number | null
           delivery_status?: string | null
           delivery_time?: string | null
@@ -5610,6 +5612,7 @@ export type Database = {
           customer_name?: string
           customer_phone?: string
           delivery_address?: Json | null
+          delivery_date?: string | null
           delivery_fee?: number | null
           delivery_status?: string | null
           delivery_time?: string | null

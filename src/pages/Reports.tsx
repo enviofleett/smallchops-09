@@ -10,6 +10,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import ReportTabs from "@/components/ReportTabs";
 import { RevenueBreakdown } from "@/components/reports/RevenueBreakdown";
 import { DailyAnalyticsTable } from "@/components/reports/DailyAnalyticsTable";
+import { CustomerInsights } from "@/components/reports/CustomerInsights";
 import { fetchReportsData, fetchDailyAnalytics } from "@/api/reports";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -330,6 +331,13 @@ export default function Reports() {
           <ReportTabs reportsData={data} isLoading={isLoading} />
         </div>
       </div>
+
+      {/* Customer Insights Section */}
+      {!isDailyLoading && dailyAnalyticsData?.dailyData && (
+        <div className="mt-4 md:mt-6">
+          <CustomerInsights dailyMetrics={dailyAnalyticsData.dailyData} />
+        </div>
+      )}
 
       {/* Daily Analytics Section */}
       <div className="mt-4 md:mt-6">

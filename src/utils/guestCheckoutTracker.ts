@@ -29,8 +29,11 @@ export const getRecentGuestOrder = (maxAgeMinutes: number = 5): GuestOrderResult
     const recentPaymentSuccess = sessionStorage.getItem('paymentSuccess');
     if (recentPaymentSuccess) {
       const paymentData: OrderTrackingData = JSON.parse(recentPaymentSuccess);
-      // PRODUCTION FIX: Prioritize formatted order_number, avoid UUID
-      const orderIdentifier = paymentData.order_number || paymentData.orderNumber;
+      // PRODUCTION FIX: Prioritize formatted order_number, check fallback fields
+      const orderIdentifier = paymentData.order_number || 
+                             paymentData.orderNumber || 
+                             paymentData.orderId ||      
+                             paymentData.order_id;
       
       // Validate it's not a UUID (production safety check)
       if (orderIdentifier && !orderIdentifier.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
@@ -42,6 +45,9 @@ export const getRecentGuestOrder = (maxAgeMinutes: number = 5): GuestOrderResult
         };
       } else if (orderIdentifier) {
         console.warn('⚠️ Found UUID instead of formatted order number:', orderIdentifier);
+        console.warn('⚠️ Cleaning up bad data - user will need manual entry');
+        // Clean up the bad data immediately
+        sessionStorage.removeItem('paymentSuccess');
       }
     }
 
@@ -49,8 +55,11 @@ export const getRecentGuestOrder = (maxAgeMinutes: number = 5): GuestOrderResult
     const lastPaymentSuccess = localStorage.getItem('lastPaymentSuccess');
     if (lastPaymentSuccess) {
       const paymentData: OrderTrackingData = JSON.parse(lastPaymentSuccess);
-      // PRODUCTION FIX: Prioritize formatted order_number, avoid UUID
-      const orderIdentifier = paymentData.order_number || paymentData.orderNumber;
+      // PRODUCTION FIX: Prioritize formatted order_number, check fallback fields
+      const orderIdentifier = paymentData.order_number || 
+                             paymentData.orderNumber || 
+                             paymentData.orderId ||      
+                             paymentData.order_id;
       
       // Only return if payment was within the specified time window and not a UUID
       const paymentTime = paymentData.paidAt || paymentData.timestamp;
@@ -68,6 +77,9 @@ export const getRecentGuestOrder = (maxAgeMinutes: number = 5): GuestOrderResult
         }
       } else if (orderIdentifier) {
         console.warn('⚠️ Found UUID instead of formatted order number:', orderIdentifier);
+        console.warn('⚠️ Cleaning up bad data - user will need manual entry');
+        // Clean up the bad data immediately
+        localStorage.removeItem('lastPaymentSuccess');
       }
     }
 

@@ -302,13 +302,11 @@ export default function PaymentCallback() {
       try {
         storeGuestOrderTracking({
           order_number: payload.order_number,
-          orderId: payload.order_id,
           paidAt: new Date().toISOString()
         });
         
         logGuestTrackingEvent('auto_populated', {
           orderNumber: payload.order_number,
-          orderId: payload.order_id,
           source: 'payment_success'
         });
         

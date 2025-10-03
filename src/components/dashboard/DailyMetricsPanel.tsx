@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Users, ShoppingCart, TrendingUp, TrendingDown, Minus, Calendar } from 'lucide-react';
+import { Package, Users, ShoppingCart, TrendingUp, TrendingDown, Minus, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { Button } from '@/components/ui/button';
 
 interface DailyMetric {
   date: string;
@@ -96,9 +97,83 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
     }
   };
 
+  // Calculate period summaries
+  const periodSummary = useMemo(() => {
+    return validDailyData.reduce((acc, day) => ({
+      totalRevenue: acc.totalRevenue + (Number(day.revenue) || 0),
+      totalOrders: acc.totalOrders + (Number(day.orders) || 0),
+      totalProducts: acc.totalProducts + (Number(day.newProducts) || 0),
+      totalCustomers: acc.totalCustomers + (Number(day.newCustomerRegistrations) || 0),
+      avgDailyRevenue: 0, // Will calculate after
+      avgDailyOrders: 0,
+    }), {
+      totalRevenue: 0,
+      totalOrders: 0,
+      totalProducts: 0,
+      totalCustomers: 0,
+      avgDailyRevenue: 0,
+      avgDailyOrders: 0,
+    });
+  }, [validDailyData]);
+
+  // Calculate averages
+  periodSummary.avgDailyRevenue = validDailyData.length > 0 
+    ? periodSummary.totalRevenue / validDailyData.length 
+    : 0;
+  periodSummary.avgDailyOrders = validDailyData.length > 0 
+    ? periodSummary.totalOrders / validDailyData.length 
+    : 0;
+
+  // Collect all top customers across all days
+  const allTopCustomers = useMemo(() => {
+    const customerMap = new Map();
+    validDailyData.forEach(day => {
+      if (Array.isArray(day.topCustomers)) {
+        day.topCustomers.forEach(customer => {
+          const existing = customerMap.get(customer.email);
+          if (existing) {
+            existing.orders += Number(customer.orders) || 0;
+            existing.spending += Number(customer.spending) || 0;
+          } else {
+            customerMap.set(customer.email, {
+              name: customer.name,
+              email: customer.email,
+              orders: Number(customer.orders) || 0,
+              spending: Number(customer.spending) || 0,
+            });
+          }
+        });
+      }
+    });
+    return Array.from(customerMap.values())
+      .sort((a, b) => b.spending - a.spending)
+      .slice(0, 10);
+  }, [validDailyData]);
+
   const selectedMetric = selectedDate 
     ? validDailyData.find(d => d.date === selectedDate) 
     : validDailyData[validDailyData.length - 1];
+
+  // Date navigation
+  const currentIndex = selectedDate 
+    ? validDailyData.findIndex(d => d.date === selectedDate)
+    : validDailyData.length - 1;
+
+  const goToPreviousDay = () => {
+    if (currentIndex > 0) {
+      setSelectedDate(validDailyData[currentIndex - 1].date);
+    }
+  };
+
+  const goToNextDay = () => {
+    if (currentIndex < validDailyData.length - 1) {
+      setSelectedDate(validDailyData[currentIndex + 1].date);
+    }
+  };
+
+  const goToToday = () => {
+    setSelectedDate(validDailyData[validDailyData.length - 1].date);
+  };
 
   // Prepare chart data with safe access and validation
   const chartData = validDailyData.map(day => ({
@@ -114,8 +189,78 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Period Summary Cards */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Period Summary</span>
+            <span className="text-sm text-muted-foreground font-normal">
+              {formatDate(validDailyData[0]?.date || '')} - {formatDate(validDailyData[validDailyData.length - 1]?.date || '')}
+            </span>
+          </CardTitle>
+          <CardDescription>Total metrics for the selected period</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Total Revenue</p>
+              <p className="text-2xl font-bold">{formatCurrency(periodSummary.totalRevenue)}</p>
+              <p className="text-xs text-muted-foreground">Avg: {formatCurrency(periodSummary.avgDailyRevenue)}/day</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Total Orders</p>
+              <p className="text-2xl font-bold">{periodSummary.totalOrders}</p>
+              <p className="text-xs text-muted-foreground">Avg: {periodSummary.avgDailyOrders.toFixed(1)}/day</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">New Products</p>
+              <p className="text-2xl font-bold">{periodSummary.totalProducts}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">New Customers</p>
+              <p className="text-2xl font-bold">{periodSummary.totalCustomers}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Date Navigation */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Daily View</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPreviousDay}
+                disabled={currentIndex === 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToToday}
+              >
+                Today
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextDay}
+                disabled={currentIndex === validDailyData.length - 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <CardDescription>
+            Viewing: {selectedMetric ? format(parseISO(selectedMetric.date), 'MMMM dd, yyyy') : 'No date selected'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -185,7 +330,40 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
             </p>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Top Customers for Entire Period */}
+      {allTopCustomers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Customers - Entire Period</CardTitle>
+            <CardDescription>Customers with highest spending across all dates</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {allTopCustomers.map((customer, idx) => (
+                <div key={`${customer.email}-${idx}`} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{customer.name || 'Unknown'}</p>
+                      <p className="text-xs text-muted-foreground">{customer.email || 'No email'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{formatCurrency(customer.spending)}</p>
+                    <p className="text-xs text-muted-foreground">{customer.orders} orders</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts */}
       <Tabs defaultValue="orders" className="w-full">

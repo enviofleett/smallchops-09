@@ -41,6 +41,7 @@ import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { formatAddress } from '@/utils/formatAddress';
 import { getOrderTimeWindow, hasValidTimeField, formatDeliveryDate } from '@/utils/timeWindowUtils';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { useDeliveryZones } from '@/hooks/useDeliveryZones';
 import { toast } from 'sonner';
 import '@/styles/admin-print.css';
 import '@/styles/admin-80mm-print.css';
@@ -77,6 +78,10 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
 
   // Fetch business settings for print header
   const { data: businessSettings } = useBusinessSettings();
+  
+  // Fetch delivery zones to display zone name
+  const { zones } = useDeliveryZones();
+  const deliveryZone = zones.find(zone => zone.id === order?.delivery_zone_id);
 
   // Enhanced print handler for admin with success/error notifications
   const handlePrint = useReactToPrint({
@@ -620,9 +625,17 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                   </div>
                 )}
                 {safeOrder.delivery_fee !== undefined && safeOrder.delivery_fee > 0 && (
-                  <div className="flex justify-between text-base">
-                    <span className="text-muted-foreground">Delivery Fee:</span>
-                    <span>₦{safeOrder.delivery_fee.toLocaleString()}</span>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-base">
+                      <span className="text-muted-foreground">Delivery Fee:</span>
+                      <span>₦{safeOrder.delivery_fee.toLocaleString()}</span>
+                    </div>
+                    {deliveryZone && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground/70">Delivery Zone:</span>
+                        <span className="text-muted-foreground">{deliveryZone.name}</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 {safeOrder.discount_amount !== undefined && safeOrder.discount_amount > 0 && (

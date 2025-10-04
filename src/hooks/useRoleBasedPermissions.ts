@@ -1,6 +1,8 @@
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
-export type UserRole = 'super_admin' | 'admin' | 'manager' | 'support_officer';
+export type UserRole = 'super_admin' | 'admin' | 'manager' | 'support_officer' | 'staff';
 
 export interface RolePermission {
   role: UserRole;
@@ -94,25 +96,76 @@ const ROLE_PERMISSIONS: RolePermission[] = [
       'settingsPayments': 'none',
       'settingsCommunications': 'none',
     }
+  },
+  {
+    role: 'staff',
+    permissions: {
+      // Staff role has limited access - similar to support officer
+      'dashboard': 'view',
+      'orders': 'view',
+      'categories': 'none',
+      'products': 'none',
+      'customers': 'view',
+      'bookings': 'none',
+      'delivery': 'none',
+      'promotions': 'none',
+      'reports': 'none',
+      'auditLogs': 'none',
+      'settings': 'none',
+      'settingsAdmin': 'none',
+      'settingsPermissions': 'none',
+      'settingsPayments': 'none',
+      'settingsCommunications': 'none',
+    }
   }
 ];
 
 export const useRoleBasedPermissions = () => {
   const { user } = useAuth();
+  const [userRole, setUserRole] = React.useState<UserRole | null>(null);
 
-  const getUserRole = (): UserRole | null => {
-    if (!user) return null;
-    
-    // Special case for toolbuxdev@gmail.com - always super_admin
-    if (user.email === 'toolbuxdev@gmail.com') {
-      return 'super_admin';
-    }
-    
-    return user.role as UserRole || 'support_officer';
-  };
+  // Fetch user role from user_roles table
+  React.useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user?.id) {
+        setUserRole(null);
+        return;
+      }
+
+      // Special case for toolbuxdev@gmail.com - always super_admin
+      if (user.email === 'toolbuxdev@gmail.com') {
+        setUserRole('super_admin');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .or('expires_at.is.null,expires_at.gt.now()')
+          .order('role', { ascending: true }) // super_admin first
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching user role:', error);
+          setUserRole(null);
+          return;
+        }
+
+        setUserRole(data?.role as UserRole || null);
+      } catch (err) {
+        console.error('Error fetching user role:', err);
+        setUserRole(null);
+      }
+    };
+
+    fetchUserRole();
+  }, [user?.id, user?.email]);
 
   const hasPermission = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view'): boolean => {
-    const userRole = getUserRole();
     if (!userRole) return false;
 
     // Special case for toolbuxdev@gmail.com - always has access
@@ -133,17 +186,14 @@ export const useRoleBasedPermissions = () => {
   };
 
   const canCreateUsers = (): boolean => {
-    const userRole = getUserRole();
     return userRole === 'super_admin' || userRole === 'admin' || user?.email === 'toolbuxdev@gmail.com';
   };
 
   const canAssignRoles = (): boolean => {
-    const userRole = getUserRole();
     return userRole === 'super_admin' || userRole === 'admin' || user?.email === 'toolbuxdev@gmail.com';
   };
 
   const getAccessibleMenus = (): string[] => {
-    const userRole = getUserRole();
     if (!userRole) return [];
 
     // Special case for toolbuxdev@gmail.com - all menus
@@ -160,7 +210,7 @@ export const useRoleBasedPermissions = () => {
   };
 
   return {
-    userRole: getUserRole(),
+    userRole,
     hasPermission,
     canCreateUsers,
     canAssignRoles,

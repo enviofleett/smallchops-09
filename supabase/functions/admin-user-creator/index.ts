@@ -152,7 +152,6 @@ serve(async (req) => {
         id: newUser.user.id,
         name: body.username || body.email.split('@')[0],
         email: body.email,
-        role: body.role,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -183,6 +182,21 @@ serve(async (req) => {
         success: false, 
         error: `Failed to create user profile: ${profileError.message}` 
       }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // Assign role in user_roles table
+    const { error: roleError } = await supabase
+      .from('user_roles')
+      .insert({
+        user_id: newUser.user.id,
+        role: body.role,
+        assigned_by: user.id,
+        is_active: true,
+      })
+
+    if (roleError) {
+      console.error('[ADMIN-CREATOR] Role assignment failed:', roleError)
+      // Don't fail the whole operation, just log it
     }
 
     // Log the creation

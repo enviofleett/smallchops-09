@@ -9023,6 +9023,42 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       vehicle_assignments: {
         Row: {
           assigned_at: string
@@ -10599,8 +10635,8 @@ export type Database = {
         }[]
       }
       get_user_role: {
-        Args: { user_uuid: string }
-        Returns: string
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
       }
       handle_email_webhook: {
         Args: { webhook_data: Json; webhook_type?: string }
@@ -10635,6 +10671,13 @@ export type Database = {
       }
       has_email_consent: {
         Args: { consent_type?: string; email_address: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
         Returns: boolean
       }
       hash_password: {
@@ -11558,6 +11601,12 @@ export type Database = {
       }
     }
     Enums: {
+      app_role:
+        | "super_admin"
+        | "admin"
+        | "manager"
+        | "support_officer"
+        | "staff"
       assignment_status: "active" | "inactive"
       communication_event_status: "queued" | "processing" | "sent" | "failed"
       communication_log_status:
@@ -11747,6 +11796,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["super_admin", "admin", "manager", "support_officer", "staff"],
       assignment_status: ["active", "inactive"],
       communication_event_status: ["queued", "processing", "sent", "failed"],
       communication_log_status: [

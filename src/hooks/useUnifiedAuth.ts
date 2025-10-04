@@ -15,16 +15,16 @@ export const useUnifiedAuth = () => {
   // Consolidate loading states
   const isAuthLoading = isLoading || permissionsLoading;
 
-  // Production-safe admin check
+  // Production-safe admin check using role-based permissions
   const isAdmin = useMemo(() => {
     if (!isAuthenticated || !user) return false;
     
     // Special case for toolbuxdev@gmail.com
     if (user.email === 'toolbuxdev@gmail.com') return true;
     
-    // Check admin user type and role
-    return userType === 'admin' && user.role && ['super_admin', 'manager', 'support_officer', 'admin'].includes(user.role);
-  }, [isAuthenticated, user, userType]);
+    // Check if user has any admin role from user_roles table
+    return userType === 'admin' && userRole !== null;
+  }, [isAuthenticated, user, userType, userRole]);
 
   // Unified permission check
   const hasMenuPermission = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view'): boolean => {
@@ -37,7 +37,7 @@ export const useUnifiedAuth = () => {
     return roleBasedPermission(menuKey, requiredLevel);
   };
 
-  // Production-ready role check
+  // Production-ready role check using user_roles table
   const hasRole = (requiredRole: UserRole): boolean => {
     if (!isAdmin || !user) return false;
     
@@ -45,10 +45,10 @@ export const useUnifiedAuth = () => {
     if (user.email === 'toolbuxdev@gmail.com') return true;
     
     // Super admin has all roles
-    if (user.role === 'super_admin') return true;
+    if (userRole === 'super_admin') return true;
     
     // Exact role match
-    return user.role === requiredRole;
+    return userRole === requiredRole;
   };
 
   // Check if user can access admin panel at all
@@ -58,9 +58,9 @@ export const useUnifiedAuth = () => {
     // Special case for toolbuxdev@gmail.com
     if (user.email === 'toolbuxdev@gmail.com') return true;
     
-    // Must be admin type with valid role
-    return isAdmin && user.role && ['super_admin', 'manager', 'support_officer', 'admin'].includes(user.role);
-  }, [isAuthenticated, user, isAdmin]);
+    // Must be admin type with valid role from user_roles table
+    return isAdmin && userRole !== null;
+  }, [isAuthenticated, user, isAdmin, userRole]);
 
   return {
     // Core auth state

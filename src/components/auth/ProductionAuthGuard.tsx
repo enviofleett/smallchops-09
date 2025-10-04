@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
+import { UserRole } from '@/hooks/useRoleBasedPermissions';
 import { storeRedirectUrl } from '@/utils/redirect';
 import { Loader2, Shield, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ProductionAuthGuardProps {
   children: React.ReactNode;
-  requiredRole?: 'super_admin' | 'manager' | 'support_officer' | 'admin';
+  requiredRole?: UserRole;
   menuPermission?: string;
   permissionLevel?: 'view' | 'edit';
   fallbackPath?: string;

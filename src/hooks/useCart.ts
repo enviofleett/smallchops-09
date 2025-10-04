@@ -199,6 +199,7 @@ export const useCartInternal = () => {
     image_url?: string;
     customizations?: Record<string, any>;
     special_instructions?: string;
+    minimum_order_quantity?: number;
     minimum_order_quantity?: number; // Add MOQ to product interface
   }, quantity = 1) => {
     console.log('🛒 addItem called with:', { product, quantity });

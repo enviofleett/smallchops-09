@@ -8,6 +8,7 @@ import { StarRating } from '@/components/ui/star-rating';
 import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { toImagesArray } from '@/lib/imageUtils';
+import { MOQBadge } from '@/components/ui/moq-badge';
 
 interface DiscountedProductCardProps {
   product: ProductWithDiscount;
@@ -111,6 +112,15 @@ export function DiscountedProductCard({
               size="sm"
             />
             
+            {/* MOQ Badge */}
+            {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+              <MOQBadge 
+                minimumQuantity={product.minimum_order_quantity}
+                showIcon={true}
+                className="w-fit"
+              />
+            )}
+            
             {/* Promotion Details */}
             {product.has_discount && product.active_promotion && (
               <div className="text-xs text-green-600 font-medium">
@@ -136,7 +146,10 @@ export function DiscountedProductCard({
                 onClick={() => onAddToCart(product)}
               >
                 <ShoppingCart className="w-3 h-3 mr-1" />
-                Add to Cart
+                {product.minimum_order_quantity && product.minimum_order_quantity > 1 
+                  ? `Add ${product.minimum_order_quantity} to Cart`
+                  : 'Add to Cart'
+                }
               </Button>
             )}
           </div>

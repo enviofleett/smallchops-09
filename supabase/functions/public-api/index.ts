@@ -530,6 +530,40 @@ serve(async (req) => {
       }
 
       try {
+        // CRITICAL: Validate MOQ requirements before creating order
+        const moqValidationItems = items.map((item: any) => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity
+        }));
+
+        const moqResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/validate-moq-requirements`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
+            },
+            body: JSON.stringify({ items: moqValidationItems })
+          }
+        );
+
+        const moqResult = await moqResponse.json();
+
+        if (!moqResult.success || !moqResult.valid) {
+          logStep("MOQ validation failed", { violations: moqResult.violations });
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "Minimum order quantity requirements not met",
+              violations: moqResult.violations
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        logStep("MOQ validation passed", { itemCount: items.length });
         // Generate order number using service client
         const { data: orderNumber } = await serviceClient.rpc('generate_order_number');
 

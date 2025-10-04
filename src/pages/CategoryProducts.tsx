@@ -239,7 +239,10 @@ const CategoryProductsContent = () => {
         setIsValidatingMOQ(false);
       }
     } else {
-      // For regular categories, add directly to cart (existing logic)
+      // For regular categories, enforce MOQ when adding to cart
+      const moq = product.minimum_order_quantity || 1;
+      const quantityToAdd = Math.max(1, moq);
+      
       addItem({
         id: product.id,
         name: product.name,
@@ -248,11 +251,14 @@ const CategoryProductsContent = () => {
         discount_amount: product.discount_amount,
         vat_rate: product.vat_rate || 7.5,
         image_url: product.image_url,
-      });
+        minimum_order_quantity: moq,
+      }, quantityToAdd);
       
       toast({
         title: "Added to cart",
-        description: `${product.name} has been added to your cart.`,
+        description: moq > 1 
+          ? `Added ${quantityToAdd} ${product.name} to meet minimum order quantity.`
+          : `${product.name} has been added to your cart.`,
       });
     }
   };

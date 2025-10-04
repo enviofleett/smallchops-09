@@ -150,20 +150,20 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
               <span className="print-label">Type:</span>
               <span>{order.order_type?.toUpperCase() || 'N/A'}</span>
             </div>
+            {deliveryZone && (
+              <div className="print-info-row">
+                <span className="print-label">Delivery Zone:</span>
+                <span>{deliveryZone}</span>
+              </div>
+            )}
             <div className="print-info-row">
-              <span className="print-label">Order Time:</span>
+              <span className="print-label">{order.order_type === 'pickup' ? 'Pickup' : 'Order'} Time:</span>
               <span>{formatDateTime(order.created_at || order.order_time)}</span>
             </div>
             {deliveryDate && (
               <div className="print-info-row">
                 <span className="print-label">{order.order_type === 'pickup' ? 'Pickup' : 'Delivery'} Date:</span>
                 <span>{deliveryDate}</span>
-              </div>
-            )}
-            {deliveryZone && (
-              <div className="print-info-row">
-                <span className="print-label">Delivery Zone:</span>
-                <span className="print-status">{deliveryZone.toUpperCase()}</span>
               </div>
             )}
             {timeWindow && (

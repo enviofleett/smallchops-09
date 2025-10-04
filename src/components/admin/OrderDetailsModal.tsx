@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
 import { Button } from '@/components/ui/button';
@@ -18,8 +17,8 @@ import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnection
 import { AdminOrderPrintView } from './AdminOrderPrintView';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { usePrint } from '@/hooks/usePrint';
 import '@/styles/admin-print.css';
-import '@/styles/admin-80mm-print.css';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -50,12 +49,11 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return null;
   }
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: `Order-${order.order_number}`,
-    onAfterPrint: () => toast.success('Order details printed successfully'),
-    onPrintError: () => toast.error('Failed to print order details')
-  });
+  // Use production-ready print hook with A4 configuration
+  const { handlePrint, isPrinting } = usePrint(
+    printRef,
+    `Order-${order.order_number}`
+  );
 
   const handleStatusUpdate = async (newStatus: string) => {
     try {
@@ -130,6 +128,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           <OrderDetailsHeader
             order={order}
             onPrint={handlePrint}
+            isPrinting={isPrinting}
           />
           <OrderDetailsTabs
             order={order}

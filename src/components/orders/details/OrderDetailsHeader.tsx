@@ -13,6 +13,7 @@ interface OrderDetailsHeaderProps {
     created_at: string;
   };
   onPrint: () => void;
+  isPrinting?: boolean;
 }
 
 /**
@@ -37,7 +38,8 @@ interface OrderDetailsHeaderProps {
  */
 export const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({ 
   order, 
-  onPrint 
+  onPrint,
+  isPrinting = false
 }) => {
   return (
     <div className="border-b px-6 py-4">
@@ -79,10 +81,11 @@ export const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({
             variant="outline" 
             size="sm" 
             onClick={onPrint}
+            disabled={isPrinting}
             className="flex items-center gap-2"
           >
             <Printer className="w-4 h-4" />
-            Print
+            {isPrinting ? 'Printing...' : 'Print'}
           </Button>
         </div>
       </div>

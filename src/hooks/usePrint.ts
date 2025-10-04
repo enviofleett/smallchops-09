@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { PrintOptions } from '@/types/orderDetailsModal';
@@ -13,60 +13,82 @@ export const usePrint = (
   documentTitle?: string,
   options?: PrintOptions
 ): UsePrintReturn => {
+  const [isPrinting, setIsPrinting] = useState(false);
   
   const reactToPrintFn = useReactToPrint({
     contentRef,
     documentTitle: documentTitle || 'Order Details',
-    onBeforePrint: () => {
-      // Add print-specific styles
-      const printStyles = document.createElement('style');
-      printStyles.innerHTML = `
-        @media print {
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          body { -webkit-print-color-adjust: exact; }
-          .bg-primary { background-color: #3b82f6 !important; }
-          .text-primary { color: #3b82f6 !important; }
-          .border { border: 1px solid #e5e7eb !important; }
-          .shadow { box-shadow: none !important; }
-          .rounded { border-radius: 0 !important; }
-          .page-break { page-break-before: always; }
-          .keep-together { page-break-inside: avoid; }
+    pageStyle: `
+      @page {
+        size: A4 portrait;
+        margin: 0.5in;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
         }
-      `;
-      document.head.appendChild(printStyles);
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+      }
+    `,
+    onBeforePrint: async () => {
+      console.log('🖨️ Preparing A4 print...');
+      setIsPrinting(true);
+      
+      // Ensure print styles are loaded
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       return Promise.resolve();
     },
     onAfterPrint: () => {
-      // Clean up print styles
-      const printStyles = document.head.querySelector('style:last-child');
-      if (printStyles) {
-        document.head.removeChild(printStyles);
-      }
-      toast.success('Order details printed successfully');
+      console.log('✅ Print completed successfully');
+      setIsPrinting(false);
+      toast.success('Document printed successfully', {
+        description: 'Order details sent to printer'
+      });
     },
-    onPrintError: (error) => {
-      console.error('Print error:', error);
-      toast.error('Failed to print order details');
+    onPrintError: (errorLocation, error) => {
+      console.error('❌ Print error:', errorLocation, error);
+      setIsPrinting(false);
+      toast.error('Print failed', {
+        description: 'Unable to print document. Please try again.'
+      });
     },
   });
 
   const handlePrint = useCallback(() => {
     if (!contentRef.current) {
-      toast.error('Nothing to print');
+      toast.error('Nothing to print', {
+        description: 'No content available for printing'
+      });
+      return;
+    }
+
+    if (isPrinting) {
+      toast.info('Print in progress', {
+        description: 'Please wait for current print to complete'
+      });
       return;
     }
 
     try {
+      console.log('🖨️ Initiating A4 print for:', documentTitle);
       reactToPrintFn();
     } catch (error) {
-      console.error('Print error:', error);
-      toast.error('Failed to print order details');
+      console.error('❌ Print initiation error:', error);
+      setIsPrinting(false);
+      toast.error('Failed to start print', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
     }
-  }, [reactToPrintFn, contentRef]);
+  }, [reactToPrintFn, contentRef, isPrinting, documentTitle]);
 
   return {
     handlePrint,
-    isPrinting: false, // react-to-print doesn't provide loading state
+    isPrinting,
   };
 };

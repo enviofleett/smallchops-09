@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, User, LogOut, Home, Package, Users, Settings } from 'lucide-react';
+import { User, LogOut, Home, Package, Users, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -98,18 +98,6 @@ const TopNav = () => {
               </NavigationMenuList>
             </NavigationMenu>
           )}
-          
-          {/* Search - Responsive */}
-          <div className="flex-1 max-w-md min-w-0">
-            <div className="relative">
-              <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-3 w-3 md:h-4 md:w-4" />
-              <input 
-                type="text" 
-                placeholder={isMobile ? "Search..." : "Search orders, customers, products..."} 
-                className="w-full pl-7 md:pl-10 pr-3 md:pr-4 py-1.5 md:py-2 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-xs md:text-sm"
-              />
-            </div>
-          </div>
         </div>
 
         {/* Right Side: Notifications + User */}

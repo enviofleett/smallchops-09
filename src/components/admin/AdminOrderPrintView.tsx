@@ -159,16 +159,16 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
                 <span>{deliveryDate}</span>
               </div>
             )}
+            {deliveryZone && (
+              <div className="print-info-row">
+                <span className="print-label">Delivery Zone:</span>
+                <span className="print-status">{deliveryZone.toUpperCase()}</span>
+              </div>
+            )}
             {timeWindow && (
               <div className="print-info-row">
                 <span className="print-label">Time Window:</span>
                 <span className="print-time-window">{timeWindow}</span>
-              </div>
-            )}
-            {deliveryZone && (
-              <div className="print-info-row">
-                <span className="print-label">Zone:</span>
-                <span>{deliveryZone}</span>
               </div>
             )}
           </div>
@@ -224,6 +224,11 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
                     <div className="print-item-name">
                       {item.product_name || item.name || item.product?.name || 'Unknown Item'}
                     </div>
+                    {item.product?.features && Array.isArray(item.product.features) && item.product.features.length > 0 && (
+                      <div className="print-item-features">
+                        Features: {item.product.features.join(', ')}
+                      </div>
+                    )}
                     {(item.special_instructions || (item.customizations && Object.keys(item.customizations).length > 0)) && (
                       <div className="print-item-note">
                         {item.special_instructions && `Note: ${item.special_instructions}`}

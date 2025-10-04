@@ -2,6 +2,7 @@ import React from 'react';
 import { formatAddress } from '@/utils/formatAddress';
 import { getOrderTimeWindow, formatDeliveryDate } from '@/utils/timeWindowUtils';
 import { format } from 'date-fns';
+import starterLogo from '@/assets/starter-logo.png';
 
 interface AdminOrderPrintViewProps {
   order: any;
@@ -69,14 +70,12 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
     <div className="admin-print-view">
       {/* Business Header */}
       <div className="print-header">
-        {businessSettings?.logo_url && (
-          <img
-            src={businessSettings.logo_url}
-            alt={businessSettings.name || 'Business Logo'}
-            className="print-logo"
-          />
-        )}
-        <div className="print-business-name">{businessSettings?.name?.toUpperCase() || 'BUSINESS'}</div>
+        <img
+          src={businessSettings?.logo_url || starterLogo}
+          alt={businessSettings?.name || 'Starter Small Chops'}
+          className="print-logo"
+        />
+        <div className="print-business-name">{businessSettings?.name?.toUpperCase() || 'STARTER SMALL CHOPS'}</div>
       </div>
 
       {/* Order Title */}
@@ -228,7 +227,9 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
                     </div>
                     {item.product?.features && Array.isArray(item.product.features) && item.product.features.length > 0 && (
                       <div className="print-item-features">
-                        Features: {item.product.features.join(', ')}
+                        {item.product.features.map((feature: string, fidx: number) => (
+                          <div key={fidx} className="print-feature-line">• {feature}</div>
+                        ))}
                       </div>
                     )}
                     {(item.special_instructions || (item.customizations && Object.keys(item.customizations).length > 0)) && (

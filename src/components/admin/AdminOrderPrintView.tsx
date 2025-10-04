@@ -43,7 +43,9 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
   const deliveryDate = formatDeliveryDate(order.delivery_date || order.created_at);
   const printedBy = adminName || adminEmail?.split('@')[0] || 'Admin';
   const printedAt = format(new Date(), 'MMM dd, yyyy h:mm a');
-  const deliveryZone = order.delivery_schedule?.delivery_zone ||
+  
+  // Get delivery zone from the joined delivery_zone table (customer's checkout selection)
+  const deliveryZone = order.delivery_zone?.name || 
     order.delivery_address?.zone ||
     order.delivery_address?.city ||
     null;

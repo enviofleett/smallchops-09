@@ -55,6 +55,13 @@ export interface Address {
   landmark?: string;
 }
 
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  base_fee?: number;
+  description?: string;
+}
+
 export interface UnifiedOrder {
   id: string;
   order_number: string;
@@ -87,4 +94,6 @@ export interface UnifiedOrder {
   assigned_rider_id?: string;
   assigned_rider_name?: string;
   delivery_window?: string;
+  delivery_zone_id?: string;
+  delivery_zone?: DeliveryZone;
 }

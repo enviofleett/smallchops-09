@@ -82,6 +82,13 @@ export interface PickupInfo {
   special_instructions?: string;
 }
 
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  base_fee?: number;
+  description?: string;
+}
+
 export interface Order {
   id: string;
   order_number: string;
@@ -120,6 +127,8 @@ export interface Order {
   assigned_rider_name?: string;
   // Delivery fields
   delivery_window?: string;
+  delivery_zone_id?: string;
+  delivery_zone?: DeliveryZone;
 }
 
 export interface OrderDetailsModalProps {

@@ -43,9 +43,17 @@ export const useRealTimeOrderData = (orderId: string | undefined): RealTimeOrder
       if (rpcError || (comprehensiveData && typeof comprehensiveData === 'object' && comprehensiveData && 'error' in comprehensiveData)) {
         console.warn('⚠️ Comprehensive RPC failed, using fallback:', rpcError || comprehensiveData);
         
-        // Enhanced fallback with comprehensive data
+        // Enhanced fallback with comprehensive data including delivery zone
         const [orderResult, scheduleResult, itemsResult, communicationResult, auditResult] = await Promise.all([
-          supabase.from('orders').select('*').eq('id', orderId).maybeSingle(),
+          supabase.from('orders').select(`
+            *,
+            delivery_zone:delivery_zones (
+              id,
+              name,
+              base_fee,
+              description
+            )
+          `).eq('id', orderId).maybeSingle(),
           supabase.from('order_delivery_schedule').select('*').eq('order_id', orderId).maybeSingle(),
           supabase.from('order_items').select(`
             *,

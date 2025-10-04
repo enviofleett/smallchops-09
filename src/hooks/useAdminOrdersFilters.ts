@@ -30,14 +30,6 @@ export const useAdminOrdersFilters = (resetToFirstPage: () => void) => {
     setFilters(prev => ({ ...prev, deliveryFilter: filter }));
   }, []);
 
-  const setSelectedDay = useCallback((day: DayFilterType) => {
-    setFilters(prev => ({ ...prev, selectedDay: day }));
-  }, []);
-
-  const setSelectedHour = useCallback((hour: string | null) => {
-    setFilters(prev => ({ ...prev, selectedHour: hour }));
-  }, []);
-
   const clearFilters = useCallback(() => {
     setFilters({
       searchQuery: '',
@@ -48,25 +40,15 @@ export const useAdminOrdersFilters = (resetToFirstPage: () => void) => {
     });
   }, []);
 
-  const clearHourlyFilters = useCallback(() => {
-    setFilters(prev => ({
-      ...prev,
-      selectedDay: null,
-      selectedHour: null,
-    }));
-  }, []);
-
   const hasActiveFilters = useMemo(() => {
     return filters.searchQuery !== '' || 
-           filters.deliveryFilter !== 'all' ||
-           filters.selectedDay !== null ||
-           filters.selectedHour !== null;
+           filters.deliveryFilter !== 'all';
   }, [filters]);
 
   // Reset pagination when filters change
   useEffect(() => {
     resetToFirstPage();
-  }, [filters.statusFilter, debouncedSearchQuery, filters.deliveryFilter, filters.selectedDay, filters.selectedHour, resetToFirstPage]);
+  }, [filters.statusFilter, debouncedSearchQuery, filters.deliveryFilter, resetToFirstPage]);
 
   return {
     filters,
@@ -74,10 +56,7 @@ export const useAdminOrdersFilters = (resetToFirstPage: () => void) => {
     setSearchQuery,
     setStatusFilter,
     setDeliveryFilter,
-    setSelectedDay,
-    setSelectedHour,
     clearFilters,
-    clearHourlyFilters,
     hasActiveFilters,
   };
 };

@@ -47,7 +47,6 @@ export const prioritySortOrders = (
   let ordersCopy = [...orders];
   
   if (statusFilter === 'confirmed') {
-    // PRODUCTION FIX: Trust database query - don't double-filter by payment_status
     // Sort confirmed orders by payment status (paid first), then by delivery window
     ordersCopy.sort((a, b) => {
       // Priority 1: Paid orders come first
@@ -77,6 +76,12 @@ export const prioritySortOrders = (
       if (!scheduleA?.delivery_date && scheduleB?.delivery_date) return 1;
       
       // Fallback: Most recent orders first
+      return new Date(b.order_time || b.created_at).getTime() - 
+             new Date(a.order_time || a.created_at).getTime();
+    });
+  } else {
+    // For all other tabs: Sort by most recent first
+    ordersCopy.sort((a, b) => {
       return new Date(b.order_time || b.created_at).getTime() - 
              new Date(a.order_time || a.created_at).getTime();
     });
@@ -245,6 +250,27 @@ export const detectOrderWarnings = (
   });
   
   return warnings;
+};
+
+export const isOrderExpired = (
+  order: OrderWithItems,
+  deliverySchedules: Record<string, any>
+): boolean => {
+  if (order.status === 'delivered' || order.status === 'cancelled') {
+    return false;
+  }
+  
+  const schedule = deliverySchedules[order.id];
+  if (!schedule?.delivery_date || !schedule?.delivery_time_end) {
+    return false;
+  }
+  
+  try {
+    const deliveryEndTime = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
+    return !isNaN(deliveryEndTime.getTime()) && deliveryEndTime < new Date();
+  } catch {
+    return false;
+  }
 };
 
 export const calculateOrderCounts = (orders: OrderWithItems[], totalCount: number) => {

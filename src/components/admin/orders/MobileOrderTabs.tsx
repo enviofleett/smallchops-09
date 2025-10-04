@@ -60,13 +60,27 @@ export const MobileOrderTabs = ({
 
   const renderOrderCard = (order: OrderWithItems) => {
     const schedule = deliverySchedules[order.id];
+    const isExpired = schedule && 
+      isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end);
     
     return (
-      <MobileCard key={order.id} onClick={() => onOrderSelect?.(order)}>
+      <MobileCard 
+        key={order.id} 
+        onClick={() => onOrderSelect?.(order)}
+        className={isExpired ? 'border-destructive bg-destructive/5' : ''}
+      >
         <MobileCardHeader>
           <div className="flex items-center justify-between w-full">
             <div>
-              <h3 className="font-semibold text-sm">#{order.order_number}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-sm">#{order.order_number}</h3>
+                {isExpired && (
+                  <Badge variant="destructive" className="text-xs animate-pulse">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    EXPIRED
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {format(new Date(order.created_at), 'MMM dd, HH:mm')}
               </p>

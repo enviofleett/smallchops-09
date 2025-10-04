@@ -15,6 +15,7 @@ interface OrdersListProps {
   error: Error | null;
   onOrderSelect: (order: OrderWithItems) => void;
   onRefresh: () => void;
+  deliverySchedules?: Record<string, any>;
 }
 
 const getStatusColor = (status: string) => {
@@ -36,9 +37,28 @@ export const OrdersList: React.FC<OrdersListProps> = ({
   isLoading,
   error,
   onOrderSelect,
-  onRefresh
+  onRefresh,
+  deliverySchedules = {}
 }) => {
   const isMobile = useIsMobile();
+  
+  const isExpired = (order: OrderWithItems) => {
+    if (order.status === 'delivered' || order.status === 'cancelled') {
+      return false;
+    }
+    
+    const schedule = deliverySchedules[order.id];
+    if (!schedule?.delivery_date || !schedule?.delivery_time_end) {
+      return false;
+    }
+    
+    try {
+      const deliveryEndTime = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
+      return !isNaN(deliveryEndTime.getTime()) && deliveryEndTime < new Date();
+    } catch {
+      return false;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -70,19 +90,28 @@ export const OrdersList: React.FC<OrdersListProps> = ({
   if (isMobile) {
     return (
       <div className="space-y-4">
-        {orders.map((order) => (
-          <MobileCard key={order.id} className="border border-border">
-            <MobileCardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold">{order.order_number}</h3>
-                  <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+        {orders.map((order) => {
+          const expired = isExpired(order);
+          return (
+            <MobileCard key={order.id} className={`border ${expired ? 'border-destructive bg-destructive/5' : 'border-border'}`}>
+              <MobileCardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{order.order_number}</h3>
+                      {expired && (
+                        <Badge variant="destructive" className="text-xs">
+                          EXPIRED
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+                  </div>
+                  <Badge className={getStatusColor(order.status)}>
+                    {order.status.replace('_', ' ').toUpperCase()}
+                  </Badge>
                 </div>
-                <Badge className={getStatusColor(order.status)}>
-                  {order.status.replace('_', ' ').toUpperCase()}
-                </Badge>
-              </div>
-            </MobileCardHeader>
+              </MobileCardHeader>
             
             <MobileCardContent>
               <MobileCardRow 
@@ -135,27 +164,37 @@ export const OrdersList: React.FC<OrdersListProps> = ({
               />
             </MobileCardContent>
           </MobileCard>
-        ))}
+        );
+        })}
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {orders.map((order) => (
-        <div 
-          key={order.id} 
-          className="border border-border rounded-lg p-4 hover:bg-accent/50 transition-colors"
-        >
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <h3 className="font-semibold text-lg">{order.order_number}</h3>
-              <p className="text-muted-foreground">{order.customer_name}</p>
+      {orders.map((order) => {
+        const expired = isExpired(order);
+        return (
+          <div 
+            key={order.id} 
+            className={`border rounded-lg p-4 hover:bg-accent/50 transition-colors ${expired ? 'border-destructive bg-destructive/5' : 'border-border'}`}
+          >
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-lg">{order.order_number}</h3>
+                  {expired && (
+                    <Badge variant="destructive" className="text-xs">
+                      EXPIRED
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground">{order.customer_name}</p>
+              </div>
+              <Badge className={getStatusColor(order.status)}>
+                {order.status.replace('_', ' ').toUpperCase()}
+              </Badge>
             </div>
-            <Badge className={getStatusColor(order.status)}>
-              {order.status.replace('_', ' ').toUpperCase()}
-            </Badge>
-          </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div className="flex items-center gap-2">
@@ -189,7 +228,8 @@ export const OrdersList: React.FC<OrdersListProps> = ({
             </Button>
           </div>
         </div>
-      ))}
+      );
+      })}
     </div>
   );
 };

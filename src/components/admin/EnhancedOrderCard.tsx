@@ -81,7 +81,7 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
                 {isOverdue && (
                   <Badge variant="destructive" className="animate-pulse">
                     <AlertTriangle className="w-3 h-3 mr-1" />
-                    Overdue
+                    EXPIRED
                   </Badge>
                 )}
                 {order.payment_status === 'paid' && (

@@ -124,6 +124,16 @@ function AdminOrdersContent() {
     enableAutoRefresh: useRealTime
   });
 
+  // Calculate delivery date for backend filtering
+  const deliveryDateForQuery = useMemo(() => {
+    if (!filters.selectedDay) return undefined;
+    const today = new Date();
+    if (filters.selectedDay === 'tomorrow') {
+      today.setDate(today.getDate() + 1);
+    }
+    return today.toISOString().split('T')[0]; // YYYY-MM-DD
+  }, [filters.selectedDay]);
+
   // Polling fallback for other tabs
   const {
     data: pollingData,
@@ -131,12 +141,14 @@ function AdminOrdersContent() {
     error: pollingError,
     refetch: pollingRefetch
   } = useQuery({
-    queryKey: ['admin-orders-polling', state.currentPage, filters.statusFilter, debouncedSearchQuery, state.activeTab],
+    queryKey: ['admin-orders-polling', state.currentPage, filters.statusFilter, debouncedSearchQuery, state.activeTab, filters.selectedDay, filters.selectedHour],
     queryFn: () => getOrders({
       page: state.currentPage,
       pageSize: 20,
       status: filters.statusFilter === 'all' ? undefined : filters.statusFilter,
-      searchQuery: debouncedSearchQuery || undefined
+      searchQuery: debouncedSearchQuery || undefined,
+      deliveryDate: deliveryDateForQuery,
+      deliveryHour: filters.selectedHour ? parseInt(filters.selectedHour.split(':')[0]) : undefined
     }),
     refetchInterval: useRealTime ? false : 30000, // Only poll for non-confirmed tabs
     enabled: !useRealTime,
@@ -170,7 +182,8 @@ function AdminOrdersContent() {
   const filteredOrders = useMemo(() => {
     let result = prioritySortedOrders;
     
-    // Apply delivery date filter
+    // Apply delivery date filter (only for non-hourly filters)
+    // Hourly filters are now handled at the backend query level
     if (filters.deliveryFilter !== 'all') {
       try {
         result = applyDeliveryDateFilter(result, filters.deliveryFilter, deliverySchedules);
@@ -180,13 +193,11 @@ function AdminOrdersContent() {
       }
     }
     
-    // Apply hourly filter for confirmed tab
-    if (state.activeTab === 'confirmed' && (filters.selectedDay || filters.selectedHour)) {
-      result = applyHourlyFilter(result, filters.selectedDay, filters.selectedHour, deliverySchedules);
-    }
+    // Note: Hourly filtering is now handled at the backend level via getOrders params
+    // No need for client-side hourly filtering anymore
     
     return result;
-  }, [prioritySortedOrders, deliverySchedules, filters.deliveryFilter, filters.selectedDay, filters.selectedHour, state.activeTab]);
+  }, [prioritySortedOrders, deliverySchedules, filters.deliveryFilter]);
 
   // Calculate hourly counts using extracted logic
   const hourlyOrderCounts = useMemo(() => {

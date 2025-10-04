@@ -8,6 +8,8 @@ interface OrderQueryParams {
     searchQuery: string;
     startDate?: string;
     endDate?: string;
+    deliveryDate?: string;
+    deliveryHour?: number;
   };
   pagination?: {
     page: number;
@@ -24,10 +26,12 @@ export const useOrdersQuery = ({
     queryFn: () => getOrders({
       page: pagination.page,
       pageSize: pagination.pageSize,
-      status: filters.status,
-      searchQuery: filters.searchQuery,
+      status: filters.status === 'all' ? undefined : filters.status,
+      searchQuery: filters.searchQuery || undefined,
       startDate: filters.startDate,
       endDate: filters.endDate,
+      deliveryDate: filters.deliveryDate,
+      deliveryHour: filters.deliveryHour,
     }),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime)

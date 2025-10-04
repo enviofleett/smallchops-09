@@ -81,6 +81,8 @@ interface GetOrdersParams {
   searchQuery?: string;
   startDate?: string;
   endDate?: string;
+  deliveryDate?: string; // YYYY-MM-DD format for specific delivery date
+  deliveryHour?: number; // Hour (0-23) for hourly filtering
 }
 
 // Enhanced helper function with proper error handling and JSON validation
@@ -117,6 +119,9 @@ function normalizeOrderItems(order: any): OrderWithItems {
 }
 
 export async function getOrders(params?: GetOrdersParams) {
+  // For delivery date/hour filtering, we need to fetch delivery schedules
+  const needsDeliveryFilter = params?.deliveryDate || params?.deliveryHour !== undefined;
+  
   let query = supabase
     .from('orders')
     .select(`
@@ -144,7 +149,7 @@ export async function getOrders(params?: GetOrdersParams) {
           features,
           ingredients
         )
-      )
+      )${needsDeliveryFilter ? ',\n      delivery_schedules!inner(delivery_date, delivery_time_start)' : ''}
     `, { count: 'exact' });
 
   // Apply filters if params are provided
@@ -162,6 +167,25 @@ export async function getOrders(params?: GetOrdersParams) {
 
   if (params?.endDate) {
     query = query.lte('created_at', params.endDate);
+  }
+
+  // Delivery date filter - filter by specific delivery date
+  if (params?.deliveryDate) {
+    query = query.eq('delivery_schedules.delivery_date', params.deliveryDate);
+    
+    // Only include delivery orders and paid orders for delivery filtering
+    query = query.eq('order_type', 'delivery').eq('payment_status', 'paid');
+  }
+
+  // Delivery hour filter - filter by hour range in delivery_time_start
+  if (params?.deliveryHour !== undefined && params?.deliveryDate) {
+    const hourStart = `${String(params.deliveryHour).padStart(2, '0')}:00`;
+    const hourEnd = `${String(params.deliveryHour).padStart(2, '0')}:59`;
+    query = query.gte('delivery_schedules.delivery_time_start', hourStart)
+                 .lte('delivery_schedules.delivery_time_start', hourEnd);
+    
+    // Ensure only delivery orders and paid orders
+    query = query.eq('order_type', 'delivery').eq('payment_status', 'paid');
   }
 
   // Apply pagination

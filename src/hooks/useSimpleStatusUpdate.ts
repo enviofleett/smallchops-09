@@ -37,10 +37,18 @@ export const useSimpleStatusUpdate = () => {
       const statusLabel = variables.status.replace('_', ' ');
       toast.success(`Order status updated to ${statusLabel}`);
       
-      // Invalidate queries to refresh UI
+      // Invalidate ALL query patterns to ensure UI updates across all tabs
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-orders-polling'] });
+      queryClient.invalidateQueries({ queryKey: ['orders-list'] });
       queryClient.invalidateQueries({ queryKey: ['unified-orders'] });
       queryClient.invalidateQueries({ queryKey: ['detailed-order', variables.orderId] });
+      
+      // Force immediate refetch of real-time orders
+      queryClient.refetchQueries({ 
+        queryKey: ['orders-list'],
+        type: 'active'
+      });
     },
     onError: (error: any) => {
       console.error('Simple status update failed:', error);

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { OrderStatus, OrderStatusUpdatePayload } from '@/types/orderDetailsModal';
 import { toast } from 'sonner';
@@ -12,6 +13,7 @@ interface UseUpdateOrderStatusReturn {
 export const useUpdateOrderStatus = (orderId: string): UseUpdateOrderStatusReturn => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const updateStatus = useCallback(async (newStatus: OrderStatus, notes?: string): Promise<boolean> => {
     if (!orderId) {
@@ -39,6 +41,21 @@ export const useUpdateOrderStatus = (orderId: string): UseUpdateOrderStatusRetur
         throw new Error((result as any)?.error || 'Failed to update order status');
       }
 
+      // Invalidate ALL relevant query keys to ensure UI updates across all tabs
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-orders-polling'] }),
+        queryClient.invalidateQueries({ queryKey: ['orders-list'] }),
+        queryClient.invalidateQueries({ queryKey: ['unified-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['detailed-order', orderId] }),
+      ]);
+      
+      // Force immediate refetch of real-time orders
+      await queryClient.refetchQueries({ 
+        queryKey: ['orders-list'],
+        type: 'active'
+      });
+
       toast.success('Order status updated successfully');
       return true;
 
@@ -52,7 +69,7 @@ export const useUpdateOrderStatus = (orderId: string): UseUpdateOrderStatusRetur
     } finally {
       setIsUpdating(false);
     }
-  }, [orderId]);
+  }, [orderId, queryClient]);
 
   return {
     updateStatus,

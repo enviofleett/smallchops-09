@@ -33,7 +33,7 @@ import { sanitizeText } from '@/utils/htmlSanitizer';
 import { DriverAssignmentSection } from './details/DriverAssignmentSection';
 import { StatusManagementSection } from './details/StatusManagementSection';
 import { useOrderPageHooks } from '@/hooks/orderPageHooks';
-import { UnifiedOrder } from '@/types/unifiedOrder';
+import { UnifiedOrder, OrderStatus } from '@/types/unifiedOrder';
 import { OrderWithItems } from '@/api/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
@@ -70,6 +70,18 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
   );
 
   const { assignRiderMutation, handleStatusUpdate } = useOrderPageHooks(order.id);
+
+  // Enhanced status update that closes modal immediately for confirmed tab
+  const handleStatusUpdateWithClose = async (newStatus: OrderStatus) => {
+    const success = await handleStatusUpdate(newStatus);
+    if (success && order.status === 'confirmed' && newStatus !== 'confirmed') {
+      // Close modal immediately when moving from confirmed to another status
+      setTimeout(() => {
+        onClose();
+      }, 500); // Small delay to show success toast
+    }
+    return success;
+  };
 
   // Fetch pickup point data if order is pickup type
   const { data: pickupPoint, isLoading: isLoadingPickupPoint } = usePickupPoint(
@@ -696,7 +708,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
               currentStatus={safeOrder.status}
               orderId={safeOrder.id}
               updatedAt={safeOrder.updated_at}
-              onUpdateStatus={handleStatusUpdate}
+              onUpdateStatus={handleStatusUpdateWithClose}
               isUpdating={false}
             />
           )}

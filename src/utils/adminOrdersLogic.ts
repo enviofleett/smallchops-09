@@ -47,14 +47,21 @@ export const prioritySortOrders = (
   let ordersCopy = [...orders];
   
   if (statusFilter === 'confirmed') {
-    // Sort confirmed orders by payment status (paid first), then by delivery window
+    // PRODUCTION FIX: Sort confirmed orders by payment status, then most recent first
     ordersCopy.sort((a, b) => {
       // Priority 1: Paid orders come first
       const aPaid = a.payment_status === 'paid' ? 1 : 0;
       const bPaid = b.payment_status === 'paid' ? 1 : 0;
       if (aPaid !== bPaid) return bPaid - aPaid;
       
-      // Priority 2: Sort by delivery window (earliest first)
+      // Priority 2: Most recent orders first (regardless of delivery schedule)
+      const aTime = new Date(a.order_time || a.created_at).getTime();
+      const bTime = new Date(b.order_time || b.created_at).getTime();
+      const timeDiff = bTime - aTime;
+      
+      if (timeDiff !== 0) return timeDiff;
+      
+      // Tie-breaker: Only if created at same time, use delivery window (earliest first)
       const scheduleA = deliverySchedules[a.id];
       const scheduleB = deliverySchedules[b.id];
       
@@ -71,14 +78,22 @@ export const prioritySortOrders = (
         }
       }
       
-      // Orders with schedules come first
-      if (scheduleA?.delivery_date && !scheduleB?.delivery_date) return -1;
-      if (!scheduleA?.delivery_date && scheduleB?.delivery_date) return 1;
-      
-      // Fallback: Most recent orders first
-      return new Date(b.order_time || b.created_at).getTime() - 
-             new Date(a.order_time || a.created_at).getTime();
+      return 0;
     });
+    
+    // Production-safe logging for debugging
+    if (ordersCopy.length > 0) {
+      console.log(`[Admin Orders] Sorted ${ordersCopy.length} confirmed orders. First 5:`, 
+        ordersCopy.slice(0, 5).map(o => ({
+          id: o.id.slice(0, 8),
+          order_number: o.order_number,
+          payment: o.payment_status,
+          type: o.order_type,
+          created: o.order_time || o.created_at,
+          delivery_date: deliverySchedules[o.id]?.delivery_date || 'N/A'
+        }))
+      );
+    }
   } else {
     // For all other tabs: Sort by most recent first
     ordersCopy.sort((a, b) => {

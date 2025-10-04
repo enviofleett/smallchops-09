@@ -387,13 +387,14 @@ function AdminOrdersContent() {
           <CardContent className="p-4">
             <div className="space-y-4">
               <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                <div className="flex-1">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input 
                     type="text" 
                     placeholder="Search by order number, customer name, or email..." 
                     value={filters.searchQuery} 
                     onChange={e => setSearchQuery(e.target.value)} 
-                    className="w-full" 
+                    className="w-full pl-10" 
                   />
                 </div>
                 <div className="flex gap-2">

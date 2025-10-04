@@ -221,7 +221,9 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
               order.items.map((item: any, idx: number) => (
                 <tr key={item.id || idx}>
                   <td className="print-td-item">
-                    <div className="print-item-name">{item.product_name || item.name || 'Item'}</div>
+                    <div className="print-item-name">
+                      {item.product_name || item.name || item.product?.name || 'Unknown Item'}
+                    </div>
                     {(item.special_instructions || (item.customizations && Object.keys(item.customizations).length > 0)) && (
                       <div className="print-item-note">
                         {item.special_instructions && `Note: ${item.special_instructions}`}

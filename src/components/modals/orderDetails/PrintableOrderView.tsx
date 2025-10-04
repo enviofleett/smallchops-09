@@ -84,7 +84,9 @@ export const PrintableOrderView: React.FC<PrintableOrderViewProps> = ({ order })
                 <tr key={item.id || index}>
                   <td className="border border-gray-300 px-4 py-2">
                     <div>
-                      <div className="font-medium">{item.name}</div>
+                      <div className="font-medium">
+                        {item.product_name || item.name || item.product?.name || 'Unknown Item'}
+                      </div>
                       {item.special_instructions && (
                         <div className="text-sm text-gray-600 italic">
                           Note: {item.special_instructions}

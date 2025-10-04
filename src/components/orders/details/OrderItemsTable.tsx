@@ -44,7 +44,9 @@ export const OrderItemsTable: React.FC<OrderItemsTableProps> = ({ items }) => {
         <tbody className="divide-y">
           {items.map((item, i) => (
             <tr key={i} className="hover:bg-muted/30 transition-colors">
-              <td className="px-4 py-3">{item.name}</td>
+              <td className="px-4 py-3">
+                {(item as any).product_name || item.name || (item as any).product?.name || 'Unknown Item'}
+              </td>
               <td className="px-4 py-3 text-right">{item.quantity}</td>
               <td className="px-4 py-3 text-right font-medium">₦{item.price?.toLocaleString()}</td>
             </tr>

@@ -19,7 +19,8 @@ import {
   Phone,
   Mail,
   AlertTriangle,
-  Calendar
+  Calendar,
+  UserCircle
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -32,8 +33,9 @@ import { EnhancedOrdersSection } from '@/components/customer/EnhancedOrdersSecti
 import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistSection';
 import { TransactionHistoryTab } from '@/components/purchase-history/TransactionHistoryTab';
 import { CustomerBookingsSection } from '@/components/customer/CustomerBookingsSection';
+import { ProfileEditSection } from '@/components/customer/ProfileEditSection';
 
-type ProfileSection = 'orders' | 'tracking' | 'address' | 'help' | 'bookings';
+type ProfileSection = 'orders' | 'tracking' | 'address' | 'help' | 'bookings' | 'profile';
 
 // Loading skeleton component
 const ContentSkeleton = () => (
@@ -61,6 +63,7 @@ export default function CustomerProfile() {
   const sidebarItems = useMemo(() => [
     { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: undefined },
     { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar, path: undefined },
+    { id: 'profile' as const, label: 'Edit Profile', icon: UserCircle, path: undefined },
     { id: 'address' as const, label: 'Delivery Address', icon: MapPin, path: undefined },
     { id: 'help' as const, label: 'Help', icon: HelpCircle, path: undefined },
   ], []);
@@ -126,6 +129,8 @@ export default function CustomerProfile() {
         return <EnhancedOrdersSection />;
       case 'bookings':
         return <CustomerBookingsSection />;
+      case 'profile':
+        return <ProfileEditSection />;
       case 'address':
         return <AddressManager />;
       case 'help':

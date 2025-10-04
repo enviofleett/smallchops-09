@@ -2176,6 +2176,47 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_profile_audit: {
+        Row: {
+          changed_at: string
+          changed_fields: Json
+          customer_id: string
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          user_agent: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_fields: Json
+          customer_id: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          user_agent?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_fields?: Json
+          customer_id?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_profile_audit_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_purchase_analytics: {
         Row: {
           average_order_value: number | null

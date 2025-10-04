@@ -2,7 +2,7 @@ import React from 'react';
 import { formatAddress } from '@/utils/formatAddress';
 import { getOrderTimeWindow, formatDeliveryDate } from '@/utils/timeWindowUtils';
 import { format } from 'date-fns';
-import starterLogo from '@/assets/starter-logo.png';
+import startersLogo from '@/assets/starters-logo.png';
 
 interface AdminOrderPrintViewProps {
   order: any;
@@ -71,7 +71,7 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
       {/* Business Header */}
       <div className="print-header">
         <img
-          src={businessSettings?.logo_url || starterLogo}
+          src={businessSettings?.logo_url || startersLogo}
           alt={businessSettings?.name || 'Starter Small Chops'}
           className="print-logo"
         />

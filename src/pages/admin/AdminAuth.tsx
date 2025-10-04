@@ -3,14 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, Lock, User, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import startersLogo from '@/assets/starters-logo.png';
+import { EnhancedInputField } from '@/components/auth/EnhancedInputField';
+import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 
 const AdminAuth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -43,20 +43,56 @@ const AdminAuth = () => {
     };
   }, []);
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      return { valid: false, message: 'Email is required' };
+    }
+    if (!emailRegex.test(email)) {
+      return { valid: false, message: 'Please enter a valid email address' };
+    }
+    return { valid: true };
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) {
+      return { valid: false, message: 'Password is required' };
+    }
+    if (password.length < 8) {
+      return { valid: false, message: 'Password must be at least 8 characters' };
+    }
+    return { valid: true };
+  };
+
+  const validateName = (name: string) => {
+    if (!name) {
+      return { valid: false, message: 'Name is required' };
+    }
+    if (name.trim().length < 2) {
+      return { valid: false, message: 'Name must be at least 2 characters' };
+    }
+    return { valid: true };
+  };
+
   const validateForm = () => {
-    if (!email || !email.includes('@')) {
-      setError('Please enter a valid email address');
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      setError(emailValidation.message || 'Invalid email');
       return false;
     }
     
-    if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      setError(passwordValidation.message || 'Invalid password');
       return false;
     }
     
-    if (!isLogin && (!name || name.trim().length < 2)) {
-      setError('Name must be at least 2 characters long');
-      return false;
+    if (!isLogin) {
+      const nameValidation = validateName(name);
+      if (!nameValidation.valid) {
+        setError(nameValidation.message || 'Invalid name');
+        return false;
+      }
     }
     
     return true;
@@ -247,66 +283,61 @@ const AdminAuth = () => {
             )}
 
             {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your full name"
-                    className="pl-10"
-                    required
-                    disabled={isLoading}
-                    minLength={2}
-                    maxLength={100}
-                  />
-                </div>
-              </div>
+              <>
+                <EnhancedInputField
+                  id="name"
+                  label="Full Name"
+                  type="text"
+                  value={name}
+                  onChange={setName}
+                  placeholder="Enter your full name"
+                  icon={<User className="h-4 w-4" />}
+                  required
+                  disabled={isLoading}
+                  minLength={2}
+                  maxLength={100}
+                  validate={validateName}
+                  helperText="Your full name as it should appear in the system"
+                />
+              </>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="pl-10"
-                  required
-                  disabled={isLoading}
-                  autoComplete={isLogin ? 'username' : 'email'}
-                />
-              </div>
-            </div>
+            <EnhancedInputField
+              id="email"
+              label="Email"
+              type="email"
+              value={email}
+              onChange={setEmail}
+              placeholder="admin@example.com"
+              icon={<Mail className="h-4 w-4" />}
+              required
+              disabled={isLoading}
+              autoComplete={isLogin ? 'username' : 'email'}
+              validate={validateEmail}
+              helperText="Your admin email address"
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="pl-10"
-                  required
-                  disabled={isLoading}
-                  minLength={6}
-                  maxLength={128}
-                  autoComplete={isLogin ? 'current-password' : 'new-password'}
-                />
-              </div>
-              {!isLogin && (
-                <p className="text-xs text-muted-foreground">
-                  Password must be at least 6 characters long
-                </p>
+            <div className="space-y-3">
+              <EnhancedInputField
+                id="password"
+                label="Password"
+                type="password"
+                value={password}
+                onChange={setPassword}
+                placeholder={isLogin ? 'Enter your password' : 'Create a strong password'}
+                icon={<Lock className="h-4 w-4" />}
+                required
+                disabled={isLoading}
+                minLength={8}
+                maxLength={128}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+                validate={validatePassword}
+                showPasswordToggle
+                helperText={isLogin ? undefined : 'Choose a strong password for your admin account'}
+              />
+              
+              {!isLogin && password && (
+                <PasswordStrengthIndicator password={password} />
               )}
             </div>
 

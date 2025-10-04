@@ -2,18 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
-// Removed OTP registration in favor of direct signup
 import { usePasswordReset } from '@/hooks/usePasswordReset';
 import { useToast } from '@/hooks/use-toast';
 import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
-import AuthFormValidation from '@/components/auth/AuthFormValidation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2, Shield, Users, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, Mail, Lock, User, Phone } from 'lucide-react';
+import { EnhancedInputField } from '@/components/auth/EnhancedInputField';
+import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 
 type AuthView = 'customer-login' | 'customer-register' | 'forgot-password';
 
@@ -31,8 +29,6 @@ const AuthPage = () => {
 
 
   // State
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -41,7 +37,6 @@ const AuthPage = () => {
     confirmPassword: '',
     name: '',
     phone: '',
-    otp: ''
   });
 
   // Removed OTP-related state for direct registration
@@ -68,34 +63,89 @@ const AuthPage = () => {
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'phone') {
-      // Format Nigerian phone number
+      // Format Nigerian phone number - only allow digits
       const digits = value.replace(/\D/g, '');
       if (digits.length <= 11) {
         setFormData(prev => ({ ...prev, [field]: digits }));
-        return;
       }
+      return;
     }
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      return { valid: false, message: 'Email is required' };
+    }
+    if (!emailRegex.test(email)) {
+      return { valid: false, message: 'Please enter a valid email address' };
+    }
+    return { valid: true };
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) {
+      return { valid: false, message: 'Password is required' };
+    }
+    if (password.length < 8) {
+      return { valid: false, message: 'Password must be at least 8 characters' };
+    }
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+      return { valid: false, message: 'Password must contain uppercase, lowercase, and number' };
+    }
+    return { valid: true };
+  };
+
+  const validateName = (name: string) => {
+    if (!name) {
+      return { valid: false, message: 'Name is required' };
+    }
+    if (name.trim().length < 2) {
+      return { valid: false, message: 'Name must be at least 2 characters' };
+    }
+    return { valid: true };
+  };
+
+  const validatePhone = (phone: string) => {
+    if (!phone) {
+      return { valid: false, message: 'Phone number is required' };
+    }
+    if (phone.length !== 11) {
+      return { valid: false, message: 'Please enter a valid 11-digit Nigerian phone number' };
+    }
+    if (!phone.startsWith('0')) {
+      return { valid: false, message: 'Phone number must start with 0' };
+    }
+    return { valid: true };
+  };
+
   const validateCustomerRegistration = () => {
-    if (!formData.name.trim()) {
-      toast({ title: "Name required", description: "Please enter your full name.", variant: "destructive" });
+    const nameValidation = validateName(formData.name);
+    if (!nameValidation.valid) {
+      toast({ title: "Invalid name", description: nameValidation.message, variant: "destructive" });
       return false;
     }
     
-    if (!formData.phone.trim()) {
-      toast({ title: "Phone required", description: "Phone number is required for customer registration.", variant: "destructive" });
+    const emailValidation = validateEmail(formData.email);
+    if (!emailValidation.valid) {
+      toast({ title: "Invalid email", description: emailValidation.message, variant: "destructive" });
       return false;
     }
     
-    if (formData.phone.length !== 11) {
-      toast({ title: "Invalid phone", description: "Please enter a valid 11-digit Nigerian phone number.", variant: "destructive" });
+    const phoneValidation = validatePhone(formData.phone);
+    if (!phoneValidation.valid) {
+      toast({ title: "Invalid phone", description: phoneValidation.message, variant: "destructive" });
       return false;
     }
     
-    if (formData.password.length < 8) {
-      toast({ title: "Password too short", description: "Password must be at least 8 characters.", variant: "destructive" });
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.valid) {
+      toast({ title: "Weak password", description: passwordValidation.message, variant: "destructive" });
       return false;
     }
     
@@ -143,7 +193,6 @@ const AuthPage = () => {
         confirmPassword: '',
         name: '',
         phone: '',
-        otp: ''
       });
     }
   };
@@ -176,49 +225,33 @@ const AuthPage = () => {
 
   const renderLoginForm = () => (
     <form onSubmit={handleCustomerLogin} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="Enter your email"
-            className="pl-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-        </div>
-      </div>
+      <EnhancedInputField
+        id="email"
+        label="Email"
+        type="email"
+        value={formData.email}
+        onChange={(value) => handleInputChange('email', value)}
+        placeholder="your.email@example.com"
+        icon={<Mail className="h-4 w-4" />}
+        required
+        disabled={getCurrentLoadingState()}
+        validate={validateEmail}
+        autoComplete="username"
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            value={formData.password}
-            onChange={(e) => handleInputChange('password', e.target.value)}
-            placeholder="Enter your password"
-            className="pl-10 pr-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword(!showPassword)}
-            disabled={getCurrentLoadingState()}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
+      <EnhancedInputField
+        id="password"
+        label="Password"
+        type="password"
+        value={formData.password}
+        onChange={(value) => handleInputChange('password', value)}
+        placeholder="Enter your password"
+        icon={<Lock className="h-4 w-4" />}
+        required
+        disabled={getCurrentLoadingState()}
+        showPasswordToggle
+        autoComplete="current-password"
+      />
 
 
       <Button 
@@ -266,125 +299,93 @@ const AuthPage = () => {
 
   const renderCustomerRegisterForm = () => (
     <form onSubmit={handleCustomerRegistration} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="name">Full Name</Label>
-        <div className="relative">
-          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="name"
-            type="text"
-            value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-            placeholder="Enter your full name"
-            className="pl-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-        </div>
-      </div>
+      <EnhancedInputField
+        id="name"
+        label="Full Name"
+        type="text"
+        value={formData.name}
+        onChange={(value) => handleInputChange('name', value)}
+        placeholder="John Doe"
+        icon={<User className="h-4 w-4" />}
+        required
+        disabled={getCurrentLoadingState()}
+        validate={validateName}
+        helperText="Your full name as it appears on your ID"
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="Enter your email"
-            className="pl-10"
-            required
-            disabled={getCurrentLoadingState()}
-            onFocus={() => setShowValidation(true)}
-          />
-        </div>
-      </div>
+      <EnhancedInputField
+        id="email"
+        label="Email"
+        type="email"
+        value={formData.email}
+        onChange={(value) => handleInputChange('email', value)}
+        placeholder="your.email@example.com"
+        icon={<Mail className="h-4 w-4" />}
+        required
+        disabled={getCurrentLoadingState()}
+        validate={validateEmail}
+        autoComplete="email"
+        helperText="We'll send order confirmations to this email"
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="phone">Phone Number</Label>
-        <div className="relative">
-          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="phone"
-            type="tel"
-            value={formData.phone}
-            onChange={(e) => handleInputChange('phone', e.target.value)}
-            placeholder="09120020048"
-            className="pl-10"
-            required
-            disabled={getCurrentLoadingState()}
-            maxLength={11}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Enter your Nigerian phone number
-        </p>
-      </div>
+      <EnhancedInputField
+        id="phone"
+        label="Phone Number"
+        type="tel"
+        value={formData.phone}
+        onChange={(value) => handleInputChange('phone', value)}
+        placeholder="09012345678"
+        icon={<Phone className="h-4 w-4" />}
+        required
+        disabled={getCurrentLoadingState()}
+        maxLength={11}
+        validate={validatePhone}
+        helperText="11-digit Nigerian phone number"
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            value={formData.password}
-            onChange={(e) => handleInputChange('password', e.target.value)}
-            placeholder="Create a password"
-            className="pl-10 pr-10"
-            required
-            disabled={getCurrentLoadingState()}
-            onFocus={() => setShowValidation(true)}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword(!showPassword)}
-            disabled={getCurrentLoadingState()}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="confirmPassword"
-            type={showConfirmPassword ? 'text' : 'password'}
-            value={formData.confirmPassword}
-            onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-            placeholder="Confirm your password"
-            className="pl-10 pr-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            disabled={getCurrentLoadingState()}
-          >
-            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
-
-      {showValidation && (
-        <AuthFormValidation
-          email={formData.email}
-          password={formData.password}
-          confirmPassword={formData.confirmPassword}
-          showValidation={showValidation}
+      <div className="space-y-3">
+        <EnhancedInputField
+          id="password"
+          label="Password"
+          type="password"
+          value={formData.password}
+          onChange={(value) => handleInputChange('password', value)}
+          placeholder="Create a strong password"
+          icon={<Lock className="h-4 w-4" />}
+          required
+          disabled={getCurrentLoadingState()}
+          showPasswordToggle
+          validate={validatePassword}
+          autoComplete="new-password"
+          helperText="Minimum 8 characters with uppercase, lowercase, and number"
         />
-      )}
+        
+        {formData.password && (
+          <PasswordStrengthIndicator password={formData.password} />
+        )}
+      </div>
+
+      <EnhancedInputField
+        id="confirmPassword"
+        label="Confirm Password"
+        type="password"
+        value={formData.confirmPassword}
+        onChange={(value) => handleInputChange('confirmPassword', value)}
+        placeholder="Re-enter your password"
+        icon={<Lock className="h-4 w-4" />}
+        required
+        disabled={getCurrentLoadingState()}
+        showPasswordToggle
+        autoComplete="new-password"
+        error={
+          formData.confirmPassword && formData.password !== formData.confirmPassword
+            ? 'Passwords do not match'
+            : undefined
+        }
+        success={
+          formData.confirmPassword && formData.password === formData.confirmPassword
+        }
+      />
 
       <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
         {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -422,22 +423,19 @@ const AuthPage = () => {
 
   const renderForgotPasswordForm = () => (
     <form onSubmit={handleForgotPassword} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="Enter your email"
-            className="pl-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-        </div>
-      </div>
+      <EnhancedInputField
+        id="email"
+        label="Email"
+        type="email"
+        value={formData.email}
+        onChange={(value) => handleInputChange('email', value)}
+        placeholder="your.email@example.com"
+        icon={<Mail className="h-4 w-4" />}
+        required
+        disabled={getCurrentLoadingState()}
+        validate={validateEmail}
+        helperText="We'll send password reset instructions to this email"
+      />
 
       <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
         {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

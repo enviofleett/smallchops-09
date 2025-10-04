@@ -12,7 +12,7 @@ export interface RolePermission {
 }
 
 // Define role-based permissions according to requirements
-const ROLE_PERMISSIONS: RolePermission[] = [
+export const ROLE_PERMISSIONS: RolePermission[] = [
   {
     role: 'super_admin',
     permissions: {

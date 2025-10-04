@@ -47,13 +47,15 @@ export const prioritySortOrders = (
   let ordersCopy = [...orders];
   
   if (statusFilter === 'confirmed') {
-    // Filter: ONLY paid confirmed orders
-    ordersCopy = orders.filter(order => 
-      order.status === 'confirmed' && order.payment_status === 'paid'
-    );
-    
-    // Sort by delivery window (earliest first)
+    // PRODUCTION FIX: Trust database query - don't double-filter by payment_status
+    // Sort confirmed orders by payment status (paid first), then by delivery window
     ordersCopy.sort((a, b) => {
+      // Priority 1: Paid orders come first
+      const aPaid = a.payment_status === 'paid' ? 1 : 0;
+      const bPaid = b.payment_status === 'paid' ? 1 : 0;
+      if (aPaid !== bPaid) return bPaid - aPaid;
+      
+      // Priority 2: Sort by delivery window (earliest first)
       const scheduleA = deliverySchedules[a.id];
       const scheduleB = deliverySchedules[b.id];
       
@@ -246,13 +248,12 @@ export const detectOrderWarnings = (
 };
 
 export const calculateOrderCounts = (orders: OrderWithItems[], totalCount: number) => {
-  const paidConfirmedOrders = orders.filter(o => 
-    o.status === 'confirmed' && o.payment_status === 'paid'
-  );
+  // PRODUCTION FIX: Count ALL confirmed orders, not just paid ones
+  const confirmedOrders = orders.filter(o => o.status === 'confirmed');
   
   return {
     all: totalCount,
-    confirmed: paidConfirmedOrders.length,
+    confirmed: confirmedOrders.length,
     preparing: orders.filter(o => o.status === 'preparing').length,
     ready: orders.filter(o => o.status === 'ready').length,
     out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,

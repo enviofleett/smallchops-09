@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
-import { getOrders } from '@/api/orders';
+import { getOrders, OrderWithItems } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
+import { useRealTimeOrderList } from '@/hooks/useRealTimeOrderList';
 import { NewOrderDetailsModal } from '@/components/orders/NewOrderDetailsModal';
 import { EnhancedOrderCard } from '@/components/admin/EnhancedOrderCard';
 import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
@@ -104,26 +105,50 @@ function AdminOrdersContent() {
     }
   }, [state.activeTab, clearHourlyFilters]);
 
-  // Fetch orders with pagination and filters
+  // PRODUCTION FIX: Use real-time updates for confirmed tab, fallback to polling for others
+  const useRealTime = state.activeTab === 'confirmed';
+  
+  // Real-time hook for confirmed orders
   const {
-    data: ordersData,
-    isLoading,
-    error,
-    refetch
+    orders: realtimeOrders,
+    isLoading: realtimeLoading,
+    error: realtimeError,
+    refetch: realtimeRefetch,
+    isConnected,
+    connectionStatus
+  } = useRealTimeOrderList({
+    filters: {
+      status: filters.statusFilter === 'all' ? undefined : [filters.statusFilter as OrderStatus],
+    },
+    limit: 50,
+    enableAutoRefresh: useRealTime
+  });
+
+  // Polling fallback for other tabs
+  const {
+    data: pollingData,
+    isLoading: pollingLoading,
+    error: pollingError,
+    refetch: pollingRefetch
   } = useQuery({
-    queryKey: ['admin-orders', state.currentPage, filters.statusFilter, debouncedSearchQuery],
+    queryKey: ['admin-orders-polling', state.currentPage, filters.statusFilter, debouncedSearchQuery, state.activeTab],
     queryFn: () => getOrders({
       page: state.currentPage,
       pageSize: 20,
       status: filters.statusFilter === 'all' ? undefined : filters.statusFilter,
       searchQuery: debouncedSearchQuery || undefined
     }),
-    refetchInterval: 30000,
+    refetchInterval: useRealTime ? false : 30000, // Only poll for non-confirmed tabs
+    enabled: !useRealTime,
     placeholderData: (previousData) => previousData
   });
-  
-  const orders = ordersData?.orders || [];
-  const totalCount = ordersData?.count || 0;
+
+  // Choose data source based on active tab - cast real-time data to OrderWithItems
+  const orders = useRealTime ? (realtimeOrders as any as OrderWithItems[]) : (pollingData?.orders || []);
+  const isLoading = useRealTime ? realtimeLoading : pollingLoading;
+  const error = useRealTime ? realtimeError : pollingError;
+  const refetch = useRealTime ? realtimeRefetch : pollingRefetch;
+  const totalCount = useRealTime ? realtimeOrders.length : (pollingData?.count || 0);
   const totalPages = Math.ceil(totalCount / 20);
 
 
@@ -217,7 +242,23 @@ function AdminOrdersContent() {
         {/* Header - Mobile Responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Order Management</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold">Order Management</h1>
+              {/* Real-time connection indicator for confirmed tab */}
+              {useRealTime && (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium" 
+                  style={{
+                    backgroundColor: isConnected ? 'hsl(var(--success) / 0.1)' : 'hsl(var(--warning) / 0.1)',
+                    color: isConnected ? 'hsl(var(--success))' : 'hsl(var(--warning))'
+                  }}>
+                  <span className={`h-2 w-2 rounded-full ${isConnected ? 'animate-pulse' : ''}`} 
+                    style={{
+                      backgroundColor: isConnected ? 'hsl(var(--success))' : 'hsl(var(--warning))'
+                    }} />
+                  {isConnected ? 'Live' : 'Connecting...'}
+                </div>
+              )}
+            </div>
             <p className="text-muted-foreground text-sm sm:text-base">
               Monitor and manage all customer orders and deliveries
             </p>

@@ -8,6 +8,7 @@ export interface CartItem {
   quantity: number;
   customizations?: Record<string, any>;
   special_instructions?: string;
+  minimum_order_quantity?: number;
 }
 
 export interface CheckoutData {

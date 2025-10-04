@@ -1,1 +1,4 @@
 project_id = "oknnklksdiqaifhxaccs"
+
+[functions.validate-moq-requirements]
+verify_jwt = false

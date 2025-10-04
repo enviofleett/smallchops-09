@@ -7421,7 +7421,7 @@ export type Database = {
           image_url: string | null
           ingredients: string | null
           is_promotional: boolean | null
-          minimum_order_quantity: number | null
+          minimum_order_quantity: number
           name: string
           nutritional_info: Json | null
           preparation_time: number | null
@@ -7446,7 +7446,7 @@ export type Database = {
           image_url?: string | null
           ingredients?: string | null
           is_promotional?: boolean | null
-          minimum_order_quantity?: number | null
+          minimum_order_quantity?: number
           name: string
           nutritional_info?: Json | null
           preparation_time?: number | null
@@ -7471,7 +7471,7 @@ export type Database = {
           image_url?: string | null
           ingredients?: string | null
           is_promotional?: boolean | null
-          minimum_order_quantity?: number | null
+          minimum_order_quantity?: number
           name?: string
           nutritional_info?: Json | null
           preparation_time?: number | null

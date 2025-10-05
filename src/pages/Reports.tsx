@@ -11,6 +11,7 @@ import ReportTabs from "@/components/ReportTabs";
 import { RevenueBreakdown } from "@/components/reports/RevenueBreakdown";
 import { DailyAnalyticsTable } from "@/components/reports/DailyAnalyticsTable";
 import { CustomerInsights } from "@/components/reports/CustomerInsights";
+import { TopProductsPeriod } from "@/components/reports/TopProductsPeriod";
 import { fetchReportsData, fetchDailyAnalytics } from "@/api/reports";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -330,6 +331,14 @@ export default function Reports() {
         <div className="xl:col-span-1 order-1 xl:order-2">
           <ReportTabs reportsData={data} isLoading={isLoading} />
         </div>
+      </div>
+
+      {/* Top Products Section */}
+      <div className="mt-4 md:mt-6">
+        <TopProductsPeriod 
+          dailyMetrics={dailyAnalyticsData?.dailyData} 
+          isLoading={isDailyLoading} 
+        />
       </div>
 
       {/* Customer Insights Section */}

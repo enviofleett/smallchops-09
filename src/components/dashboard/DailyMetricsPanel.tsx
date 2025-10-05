@@ -489,35 +489,6 @@ export const DailyMetricsPanel: React.FC<DailyMetricsPanelProps> = ({ dailyData,
         </CardContent>
       </Card>
 
-      {/* Top Products for Entire Period */}
-      {allTopProducts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Products - Entire Period</CardTitle>
-            <CardDescription>Most purchased products by quantity across all dates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {allTopProducts.map((product, idx) => (
-                <div key={`${product.name}-${idx}`} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                      #{idx + 1}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{product.name}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{product.quantity} units</p>
-                    <p className="text-xs text-muted-foreground">Total sold</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Charts */}
       <Tabs defaultValue="orders" className="w-full">

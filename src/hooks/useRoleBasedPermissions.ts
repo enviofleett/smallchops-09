@@ -132,8 +132,9 @@ export const useRoleBasedPermissions = () => {
         return;
       }
 
-      // Special case for toolbuxdev@gmail.com - always super_admin
+      // CRITICAL PRODUCTION: Special case for toolbuxdev@gmail.com - always super_admin
       if (user.email === 'toolbuxdev@gmail.com') {
+        console.log('🔐 SUPER ADMIN ACCESS: toolbuxdev@gmail.com detected, granting super_admin role');
         setUserRole('super_admin');
         return;
       }
@@ -155,7 +156,9 @@ export const useRoleBasedPermissions = () => {
           return;
         }
 
-        setUserRole(data?.role as UserRole || null);
+        const fetchedRole = data?.role as UserRole || null;
+        console.log(`✅ User role fetched from user_roles table: ${fetchedRole} for user ${user.id}`);
+        setUserRole(fetchedRole);
       } catch (err) {
         console.error('Error fetching user role:', err);
         setUserRole(null);
@@ -166,11 +169,15 @@ export const useRoleBasedPermissions = () => {
   }, [user?.id, user?.email]);
 
   const hasPermission = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view'): boolean => {
-    if (!userRole) return false;
-
-    // Special case for toolbuxdev@gmail.com - always has access
+    // CRITICAL: Special case for toolbuxdev@gmail.com - always has access
     if (user?.email === 'toolbuxdev@gmail.com') {
+      console.log(`✅ Permission granted for ${menuKey} (super admin: toolbuxdev@gmail.com)`);
       return true;
+    }
+
+    if (!userRole) {
+      console.log(`❌ Permission denied for ${menuKey}: No user role found`);
+      return false;
     }
 
     const rolePermission = ROLE_PERMISSIONS.find(rp => rp.role === userRole);

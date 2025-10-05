@@ -11355,6 +11355,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      test_admin_access: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       test_registration_system: {
         Args: Record<PropertyKey, never>
         Returns: {

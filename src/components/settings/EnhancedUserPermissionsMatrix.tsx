@@ -353,23 +353,29 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
         return;
       }
 
-      // PRODUCTION VALIDATION: Check permissions for admin users
-      const isAdminUser = currentUser.role === 'admin';
-      const validation = validatePermissionsForProduction(permissions, isAdminUser);
+      // PRODUCTION VALIDATION: Skip validation for super_admin, apply strict checks for admin/manager
+      const isAdminUser = currentUser.role === 'admin' || currentUser.role === 'manager';
+      let validation = { isValid: true, warnings: [] as string[], errors: [] as string[] };
       
-      if (!validation.isValid) {
-        toast({
-          title: "Permission validation failed",
-          description: validation.errors.join('. '),
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Show warnings for admin permission assignments
-      if (validation.warnings.length > 0) {
-        console.warn('Permission warnings:', validation.warnings);
-        // Could add a confirmation dialog here for warnings
+      if (currentUser.role !== 'super_admin') {
+        validation = validatePermissionsForProduction(permissions, isAdminUser);
+        
+        if (!validation.isValid) {
+          toast({
+            title: "Permission validation failed",
+            description: validation.errors.join('. '),
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        // Show warnings for admin permission assignments
+        if (validation.warnings.length > 0) {
+          console.warn('Permission warnings:', validation.warnings);
+          // Could add a confirmation dialog here for warnings
+        }
+      } else {
+        console.log('🔐 SUPER ADMIN: Bypassing permission validation for', currentUser.id);
       }
 
       // Check rate limit first (skip if function not available)

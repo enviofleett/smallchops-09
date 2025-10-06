@@ -37,7 +37,6 @@ export function DeliveryFeesTable({ startDate, endDate, interval }: DeliveryFees
       Date: format(parseISO(order.order_date), 'MMM d, yyyy HH:mm'),
       Customer: order.customer_name,
       'Delivery Fee (₦)': order.delivery_fee.toLocaleString(),
-      'Total Amount (₦)': order.total_amount.toLocaleString(),
       Status: order.status,
     }));
     exportToCSV(exportData, `delivery-fees-${format(new Date(), 'yyyy-MM-dd')}.csv`);
@@ -95,7 +94,7 @@ export function DeliveryFeesTable({ startDate, endDate, interval }: DeliveryFees
         ) : (
           <>
             <div className="mb-4 p-4 bg-muted rounded-lg">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Orders</p>
                   <p className="text-2xl font-bold">{driverOrders.length}</p>
@@ -104,12 +103,6 @@ export function DeliveryFeesTable({ startDate, endDate, interval }: DeliveryFees
                   <p className="text-sm text-muted-foreground">Total Fees</p>
                   <p className="text-2xl font-bold text-blue-600">
                     ₦{driverOrders.reduce((sum, o) => sum + Number(o.delivery_fee), 0).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    ₦{driverOrders.reduce((sum, o) => sum + Number(o.total_amount), 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
@@ -128,7 +121,6 @@ export function DeliveryFeesTable({ startDate, endDate, interval }: DeliveryFees
                     <TableHead>Date</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead className="text-right">Delivery Fee</TableHead>
-                    <TableHead className="text-right">Total Amount</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -147,9 +139,6 @@ export function DeliveryFeesTable({ startDate, endDate, interval }: DeliveryFees
                       <TableCell>{order.customer_name}</TableCell>
                       <TableCell className="text-right text-blue-600 font-semibold">
                         ₦{Number(order.delivery_fee).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right text-green-600">
-                        ₦{Number(order.total_amount).toLocaleString()}
                       </TableCell>
                       <TableCell>
                         <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>

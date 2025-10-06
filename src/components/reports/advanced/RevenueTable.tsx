@@ -34,12 +34,15 @@ export function RevenueTable({ data, isLoading }: RevenueTableProps) {
       if (!orderDetails[date]) {
         setLoadingOrders(prev => new Set(prev).add(date));
         try {
+          const startOfDay = new Date(`${date}T00:00:00`);
+          const endOfDay = new Date(`${date}T23:59:59.999`);
+          
           const { data: orders, error } = await supabase
             .from('orders')
             .select('id, order_number, customer_name, total_amount, status, payment_status, created_at')
-            .gte('created_at', `${date}T00:00:00`)
-            .lt('created_at', `${date}T23:59:59`)
-            .eq('payment_status', 'paid')
+            .gte('created_at', startOfDay.toISOString())
+            .lte('created_at', endOfDay.toISOString())
+            .in('payment_status', ['paid', 'completed'])
             .order('created_at', { ascending: false });
           
           if (error) throw error;

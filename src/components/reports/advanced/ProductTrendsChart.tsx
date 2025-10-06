@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { useTopProducts, useProductTrends } from '@/hooks/useAdvancedReports';
 
@@ -74,36 +74,57 @@ export function ProductTrendsChart({ startDate, endDate, interval }: ProductTren
             No trend data available for this product
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis 
+                dataKey="date" 
+                className="text-xs"
+                tick={{ fill: 'hsl(var(--foreground))' }}
+              />
+              <YAxis 
+                yAxisId="left"
+                label={{ value: 'Units Sold', angle: -90, position: 'insideLeft', fill: 'hsl(var(--foreground))' }}
+                tick={{ fill: 'hsl(var(--foreground))' }}
+              />
+              <YAxis 
+                yAxisId="right" 
+                orientation="right"
+                label={{ value: 'Revenue (₦)', angle: 90, position: 'insideRight', fill: 'hsl(var(--foreground))' }}
+                tick={{ fill: 'hsl(var(--foreground))' }}
+              />
               <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--popover))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '6px',
+                }}
                 formatter={(value: number, name: string) => {
-                  if (name === 'revenue') return `₦${value.toLocaleString()}`;
-                  return value;
+                  if (name === 'Revenue (₦)') return [`₦${Number(value).toLocaleString()}`, name];
+                  return [Number(value).toLocaleString(), name];
                 }}
               />
-              <Legend />
-              <Line
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="rect"
+              />
+              <Bar
                 yAxisId="left"
-                type="monotone"
                 dataKey="units"
-                stroke="hsl(var(--primary))"
+                fill="hsl(var(--primary))"
                 name="Units Sold"
-                strokeWidth={2}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={60}
               />
-              <Line
+              <Bar
                 yAxisId="right"
-                type="monotone"
                 dataKey="revenue"
-                stroke="hsl(var(--chart-2))"
+                fill="hsl(var(--chart-2))"
                 name="Revenue (₦)"
-                strokeWidth={2}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={60}
               />
-            </LineChart>
+            </BarChart>
           </ResponsiveContainer>
         )}
       </CardContent>

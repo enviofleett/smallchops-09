@@ -10361,6 +10361,10 @@ export type Database = {
           registration_date: string
         }[]
       }
+      get_analytics_dashboard: {
+        Args: { p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
       get_available_delivery_slots: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -10425,6 +10429,15 @@ export type Database = {
           processing_stage: string
         }[]
       }
+      get_daily_revenue_report: {
+        Args: { p_end_date: string; p_start_date: string }
+        Returns: {
+          avg_order_value: number
+          date: string
+          total_orders: number
+          total_revenue: number
+        }[]
+      }
       get_dashboard_data: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -10441,6 +10454,31 @@ export type Database = {
       get_detailed_order_with_products: {
         Args: { p_order_id: string }
         Returns: Json
+      }
+      get_driver_orders_detail: {
+        Args: { p_driver_id: string; p_end_date: string; p_start_date: string }
+        Returns: {
+          customer_name: string
+          delivery_address: Json
+          delivery_fee: number
+          order_date: string
+          order_id: string
+          order_number: string
+          status: string
+          total_amount: number
+        }[]
+      }
+      get_driver_revenue_report: {
+        Args: { p_end_date: string; p_interval?: string; p_start_date: string }
+        Returns: {
+          avg_delivery_fee: number
+          driver_id: string
+          driver_name: string
+          interval_start: string
+          total_deliveries: number
+          total_delivery_fees: number
+          total_revenue: number
+        }[]
       }
       get_email_health_status: {
         Args: Record<PropertyKey, never>
@@ -10557,9 +10595,34 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_product_sales_trends: {
+        Args: {
+          p_end_date: string
+          p_interval?: string
+          p_product_id: string
+          p_start_date: string
+        }
+        Returns: {
+          interval_start: string
+          orders_count: number
+          revenue: number
+          units_sold: number
+        }[]
+      }
       get_production_health_status: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      get_products_sold_report: {
+        Args: { p_end_date: string; p_interval?: string; p_start_date: string }
+        Returns: {
+          avg_price: number
+          interval_start: string
+          product_id: string
+          product_name: string
+          total_revenue: number
+          units_sold: number
+        }[]
       }
       get_public_business_info: {
         Args: Record<PropertyKey, never>
@@ -10655,6 +10718,17 @@ export type Database = {
       get_time_ago: {
         Args: { target_time: string }
         Returns: string
+      }
+      get_top_selling_products: {
+        Args: { p_end_date: string; p_limit?: number; p_start_date: string }
+        Returns: {
+          avg_order_quantity: number
+          number_of_orders: number
+          product_id: string
+          product_name: string
+          total_revenue: number
+          total_units_sold: number
+        }[]
       }
       get_user_favorites_with_products: {
         Args: { p_user_id?: string }

@@ -6,6 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { CreateAdminDialog } from "./CreateAdminDialog";
+import { CreateAdminUserDialog } from "../admin/CreateAdminUserDialog";
+import { AdminUsersList } from "../admin/AdminUsersList";
 import { AdminPasswordResetDialog } from "./AdminPasswordResetDialog";
 import { EnhancedUserPermissionsMatrix } from "./EnhancedUserPermissionsMatrix";
 import { AdminActionsLog } from "./AdminActionsLog";
@@ -14,6 +16,7 @@ import { AdminInvitationMonitor } from "./AdminInvitationMonitor";
 import { ProductionAdminSecurity } from "../admin/ProductionAdminSecurity";
 import { useAdminManagement } from '@/hooks/useAdminManagement';
 import { useAdminInvitation } from '@/hooks/useAdminInvitation';
+import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { UserPlus, Shield, Activity, Trash2, Search, Download, RotateCcw, Copy, Filter, CheckCircle, Key } from "lucide-react";
 import {
@@ -57,6 +60,8 @@ export const AdminUserControl = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [invitationSearchQuery, setInvitationSearchQuery] = useState("");
   
+  const { canCreateUsers, canAssignRoles } = useRoleBasedPermissions();
+  
   const {
     admins: adminUsers,
     invitations,
@@ -72,6 +77,11 @@ export const AdminUserControl = () => {
     isResending,
     copyInvitationLink
   } = useAdminInvitation();
+
+  const handleCreateSuccess = () => {
+    // Refresh the admin users list
+    window.location.reload();
+  };
 
   // Handle user selection for password reset
   const handlePasswordResetRequest = (user: AdminUser) => {
@@ -199,10 +209,12 @@ export const AdminUserControl = () => {
               Production-grade admin management with security controls and monitoring
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Create Admin User
-          </Button>
+          {canCreateUsers() && (
+            <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Create Admin User
+            </Button>
+          )}
         </div>
 
         {/* Tabs - Mobile Responsive */}
@@ -221,128 +233,16 @@ export const AdminUserControl = () => {
           <TabsContent value="users">
             <Card>
               <CardHeader>
-                <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Shield className="w-5 h-5" />
-                      Admin Users
-                    </CardTitle>
-                    <CardDescription>
-                      Manage existing admin users and their status
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
-                    <div className="relative flex-1 sm:w-64">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        placeholder="Search admins..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    <Button variant="outline" onClick={exportAdminsToCSV} className="w-full sm:w-auto">
-                      <Download className="w-4 h-4 mr-2" />
-                      Export CSV
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  <CardTitle>Admin Users</CardTitle>
                 </div>
+                <CardDescription>
+                  Manage admin users with role-based permissions
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {loadingUsers ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="text-muted-foreground">Loading admin users...</div>
-                  </div>
-                ) : filteredAdminUsers.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Shield className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-2 text-sm font-semibold text-muted-foreground">No admin users found</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {searchQuery ? 'Try adjusting your search query.' : 'Create your first admin user to get started.'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead className="hidden sm:table-cell">Role</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="hidden md:table-cell">Created</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredAdminUsers.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="font-medium min-w-[120px]">
-                              <div>
-                                <div>{user.name || 'Unnamed Admin'}</div>
-                                <div className="sm:hidden text-xs text-muted-foreground">{user.email}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <Badge variant="secondary">{user.role}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
-                                {user.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              {new Date(user.created_at).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col space-y-1 sm:flex-row sm:space-y-0 sm:space-x-2">
-                                 <Button
-                                   variant="outline"
-                                   size="sm"
-                                   onClick={() => handleViewPermissions(user)}
-                                   className="w-full sm:w-auto text-xs"
-                                 >
-                                   <Shield className="w-3 h-3 mr-1" />
-                                   Permissions
-                                 </Button>
-                                 <Button
-                                   variant="outline"
-                                   size="sm"
-                                   onClick={() => handlePasswordResetRequest(user)}
-                                   className="w-full sm:w-auto text-xs"
-                                 >
-                                   <Key className="w-3 h-3 mr-1" />
-                                   Reset Password
-                                 </Button>
-                                 <AlertDialog>
-                                   <AlertDialogTrigger asChild>
-                                     <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs">
-                                       <Trash2 className="w-3 h-3 mr-1" />
-                                       Deactivate
-                                     </Button>
-                                   </AlertDialogTrigger>
-                                   <AlertDialogContent>
-                                     <AlertDialogHeader>
-                                       <AlertDialogTitle>Deactivate Admin User</AlertDialogTitle>
-                                       <AlertDialogDescription>
-                                         Are you sure you want to deactivate this admin user? This action will prevent them from accessing admin features.
-                                       </AlertDialogDescription>
-                                     </AlertDialogHeader>
-                                     <AlertDialogFooter>
-                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                       <AlertDialogAction onClick={() => updateAdmin({ userId: user.id, action: 'deactivate' })} disabled={isUpdatingAdmin}>
-                                         {isUpdatingAdmin ? 'Deactivating...' : 'Deactivate'}
-                                       </AlertDialogAction>
-                                     </AlertDialogFooter>
-                                   </AlertDialogContent>
-                                 </AlertDialog>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
+                <AdminUsersList />
               </CardContent>
             </Card>
           </TabsContent>
@@ -498,9 +398,11 @@ export const AdminUserControl = () => {
           </TabsContent>
         </Tabs>
 
-        <CreateAdminDialog 
+        {/* Create Admin User Dialog - New Role-Based System */}
+        <CreateAdminUserDialog 
           open={showCreateDialog} 
           onOpenChange={setShowCreateDialog}
+          onSuccess={handleCreateSuccess}
         />
 
         <AdminPasswordResetDialog

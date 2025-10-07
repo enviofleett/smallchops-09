@@ -1,8 +1,10 @@
 
+import { UserRole } from '@/hooks/useRoleBasedPermissions';
+
 export interface User {
   id: string;
   name: string;
-  role?: 'super_admin' | 'admin' | 'manager' | 'support_officer' | 'staff';
+  role?: UserRole;
   avatar_url?: string | null;
   email: string;
 }

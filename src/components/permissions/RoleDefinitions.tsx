@@ -5,60 +5,98 @@ import { ROLE_PERMISSIONS, UserRole } from '@/hooks/useRoleBasedPermissions';
 
 const roleDescriptions: Record<UserRole, { description: string; capabilities: string[] }> = {
   super_admin: {
-    description: 'Full system access with the ability to manage all aspects of the platform including user roles and permissions.',
+    description: 'Full system access with ability to manage all aspects including user roles and permissions.',
     capabilities: [
-      'Access to all features and menus',
+      'All menus and submenus with edit access',
       'Can create and manage admin users',
       'Can assign and revoke all roles',
-      'Full access to settings and configurations',
-      'Can view and modify all system data',
+      'Full access to settings including dev section',
+      'Complete audit trail access',
+    ],
+  },
+  store_owner: {
+    description: 'Full operational access to manage the entire store except development settings.',
+    capabilities: [
+      'All menus except dev section',
+      'Can create and manage admin users',
+      'Can assign roles to other users',
+      'Full access to settings (except dev)',
+      'Complete store management',
+    ],
+  },
+  admin_manager: {
+    description: 'Focused on product, category, booking, delivery, and promotions management.',
+    capabilities: [
+      'Dashboard access',
+      'Product & category management',
+      'Catering bookings management',
+      'Delivery zones configuration',
+      'Promotions management',
+      'No access to orders, customers, or reports',
+    ],
+  },
+  account_manager: {
+    description: 'Focused on financial operations with order and sales reporting access.',
+    capabilities: [
+      'Dashboard access',
+      'Order management',
+      'Sales reports and analytics',
+      'No access to products or settings',
+      'Limited to financial operations',
+    ],
+  },
+  support_staff: {
+    description: 'Customer support focused access for handling orders and customer inquiries.',
+    capabilities: [
+      'View-only dashboard access',
+      'Full order management',
+      'Full customer management',
+      'No access to products, settings, or reports',
+      'Focused on support operations',
     ],
   },
   admin: {
-    description: 'Comprehensive access to all operational features with the ability to manage users and perform administrative tasks.',
+    description: 'Legacy: Comprehensive access to operational features (mapped to admin_manager + more).',
     capabilities: [
-      'Access to all features and menus',
-      'Can create and manage admin users',
-      'Can assign roles to other users',
-      'Full access to settings and configurations',
-      'Can manage orders, products, and customers',
+      'Access to most operational features',
+      'Product and order management',
+      'Settings access (limited)',
+      'Legacy role - consider upgrading',
     ],
   },
   manager: {
-    description: 'Operational management access to handle day-to-day business operations without access to sensitive settings.',
+    description: 'Legacy: Operational management access (mapped to admin_manager functionality).',
     capabilities: [
-      'Full access to operational features',
-      'Can manage orders, products, and categories',
-      'Can view and manage customers',
-      'Can access reports and analytics',
-      'View-only access to audit logs',
-      'No access to settings pages',
+      'Full operational feature access',
+      'Order and product management',
+      'View access to reports',
+      'Legacy role - consider upgrading',
     ],
   },
   support_officer: {
-    description: 'Limited access focused on customer support and order management tasks.',
+    description: 'Legacy: Support-focused access (now mapped to support_staff).',
     capabilities: [
-      'View access to dashboard',
-      'Full access to order management',
-      'View access to customer information',
-      'Can process orders and updates',
-      'No access to products, settings, or reports',
+      'Order and customer management',
+      'View dashboard access',
+      'Legacy role - consider upgrading to support_staff',
     ],
   },
   staff: {
-    description: 'Basic read-only access for viewing orders and customer information.',
+    description: 'Legacy: Basic read-only access (minimal permissions).',
     capabilities: [
-      'View access to dashboard',
-      'View-only access to orders',
-      'View-only access to customer information',
+      'View-only dashboard and orders',
       'No modification permissions',
-      'No access to sensitive data or settings',
+      'Legacy role - consider upgrading',
     ],
   },
 };
 
 const roleIcons: Record<UserRole, any> = {
   super_admin: Shield,
+  store_owner: Shield,
+  admin_manager: Users,
+  account_manager: Edit,
+  support_staff: Eye,
   admin: Shield,
   manager: Users,
   support_officer: Eye,
@@ -67,8 +105,12 @@ const roleIcons: Record<UserRole, any> = {
 
 const roleColors: Record<UserRole, string> = {
   super_admin: 'bg-purple-500',
-  admin: 'bg-blue-500',
-  manager: 'bg-green-500',
+  store_owner: 'bg-indigo-500',
+  admin_manager: 'bg-blue-500',
+  account_manager: 'bg-cyan-500',
+  support_staff: 'bg-green-500',
+  admin: 'bg-blue-400',
+  manager: 'bg-green-400',
   support_officer: 'bg-yellow-500',
   staff: 'bg-gray-500',
 };

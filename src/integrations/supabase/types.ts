@@ -9725,6 +9725,10 @@ export type Database = {
         Args: { cart_items: Json; delivery_fee?: number }
         Returns: Json
       }
+      can_create_admin_users: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       can_send_email_to: {
         Args: { email_address: string; email_type?: string }
         Returns: boolean
@@ -11426,6 +11430,10 @@ export type Database = {
       }
       setup_admin_permissions: {
         Args: { admin_user_id: string }
+        Returns: undefined
+      }
+      setup_admin_role_permissions: {
+        Args: { p_role: string; p_user_id: string }
         Returns: undefined
       }
       start_delivery: {

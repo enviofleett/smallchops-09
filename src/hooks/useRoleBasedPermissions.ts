@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-export type UserRole = 'super_admin' | 'admin' | 'manager' | 'support_officer' | 'staff';
+export type UserRole = 'super_admin' | 'store_owner' | 'admin_manager' | 'account_manager' | 'support_staff' | 'admin' | 'manager' | 'support_officer' | 'staff';
 
 export interface RolePermission {
   role: UserRole;
@@ -16,106 +16,191 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
   {
     role: 'super_admin',
     permissions: {
-      // Super admin has access to all menus and features
-      'dashboard': 'edit',
-      'orders': 'edit',
-      'categories': 'edit',
-      'products': 'edit',
-      'customers': 'edit',
-      'bookings': 'edit',
-      'delivery': 'edit',
-      'promotions': 'edit',
-      'reports': 'edit',
-      'auditLogs': 'edit',
-      'settings': 'edit',
-      'settingsAdmin': 'edit',
-      'settingsPermissions': 'edit',
-      'settingsPayments': 'edit',
-      'settingsCommunications': 'edit',
+      dashboard: 'edit',
+      orders_view: 'edit',
+      categories_view: 'edit',
+      products_view: 'edit',
+      customers_view: 'edit',
+      catering_bookings: 'edit',
+      delivery_zones: 'edit',
+      promotions_view: 'edit',
+      'reports-sales': 'edit',
+      audit_logs: 'edit',
+      settings: 'edit',
+      settings_admin_users: 'edit',
+      settings_admin_permissions: 'edit',
+      settings_payments_providers: 'edit',
+      settings_communications_branding: 'edit',
+      settings_dev: 'edit' // Dev section access
     }
   },
   {
+    role: 'store_owner',
+    permissions: {
+      dashboard: 'edit',
+      orders_view: 'edit',
+      categories_view: 'edit',
+      products_view: 'edit',
+      customers_view: 'edit',
+      catering_bookings: 'edit',
+      delivery_zones: 'edit',
+      promotions_view: 'edit',
+      'reports-sales': 'edit',
+      audit_logs: 'edit',
+      settings: 'edit',
+      settings_admin_users: 'edit',
+      settings_admin_permissions: 'edit',
+      settings_payments_providers: 'edit',
+      settings_communications_branding: 'edit',
+      settings_dev: 'none' // No dev section access
+    }
+  },
+  {
+    role: 'support_staff',
+    permissions: {
+      dashboard: 'view',
+      orders_view: 'edit',
+      customers_view: 'edit',
+      categories_view: 'none',
+      products_view: 'none',
+      catering_bookings: 'none',
+      delivery_zones: 'none',
+      promotions_view: 'none',
+      'reports-sales': 'none',
+      audit_logs: 'none',
+      settings: 'none',
+      settings_admin_users: 'none',
+      settings_admin_permissions: 'none',
+      settings_payments_providers: 'none',
+      settings_communications_branding: 'none',
+      settings_dev: 'none'
+    }
+  },
+  {
+    role: 'admin_manager',
+    permissions: {
+      dashboard: 'edit',
+      products_view: 'edit',
+      categories_view: 'edit',
+      catering_bookings: 'edit',
+      delivery_zones: 'edit',
+      promotions_view: 'edit',
+      orders_view: 'none',
+      customers_view: 'none',
+      'reports-sales': 'none',
+      audit_logs: 'none',
+      settings: 'none',
+      settings_admin_users: 'none',
+      settings_admin_permissions: 'none',
+      settings_payments_providers: 'none',
+      settings_communications_branding: 'none',
+      settings_dev: 'none'
+    }
+  },
+  {
+    role: 'account_manager',
+    permissions: {
+      dashboard: 'edit',
+      orders_view: 'edit',
+      'reports-sales': 'edit',
+      categories_view: 'none',
+      products_view: 'none',
+      customers_view: 'none',
+      catering_bookings: 'none',
+      delivery_zones: 'none',
+      promotions_view: 'none',
+      audit_logs: 'none',
+      settings: 'none',
+      settings_admin_users: 'none',
+      settings_admin_permissions: 'none',
+      settings_payments_providers: 'none',
+      settings_communications_branding: 'none',
+      settings_dev: 'none'
+    }
+  },
+  // Legacy roles mapping to new system
+  {
     role: 'admin',
     permissions: {
-      // Admin role has full access to everything
-      'dashboard': 'edit',
-      'orders': 'edit',
-      'categories': 'edit',
-      'products': 'edit',
-      'customers': 'edit',
-      'bookings': 'edit',
-      'delivery': 'edit',
-      'promotions': 'edit',
-      'reports': 'edit',
-      'auditLogs': 'edit',
-      'settings': 'edit',
-      'settingsAdmin': 'edit',
-      'settingsPermissions': 'edit',
-      'settingsPayments': 'edit',
-      'settingsCommunications': 'edit',
+      dashboard: 'edit',
+      orders_view: 'edit',
+      categories_view: 'edit',
+      products_view: 'edit',
+      customers_view: 'edit',
+      catering_bookings: 'edit',
+      delivery_zones: 'edit',
+      promotions_view: 'edit',
+      'reports-sales': 'edit',
+      audit_logs: 'view',
+      settings: 'edit',
+      settings_admin_users: 'none',
+      settings_admin_permissions: 'none',
+      settings_payments_providers: 'edit',
+      settings_communications_branding: 'edit',
+      settings_dev: 'none'
     }
   },
   {
     role: 'manager',
     permissions: {
-      // Manager has access to all pages except the settings page
-      'dashboard': 'edit',
-      'orders': 'edit',
-      'categories': 'edit',
-      'products': 'edit',
-      'customers': 'edit',
-      'bookings': 'edit',
-      'delivery': 'edit',
-      'promotions': 'edit',
-      'reports': 'edit',
-      'auditLogs': 'view',
-      'settings': 'none',  // No access to settings
-      'settingsAdmin': 'none',
-      'settingsPermissions': 'none',
-      'settingsPayments': 'none',
-      'settingsCommunications': 'none',
+      dashboard: 'edit',
+      orders_view: 'edit',
+      categories_view: 'edit',
+      products_view: 'edit',
+      customers_view: 'view',
+      catering_bookings: 'edit',
+      delivery_zones: 'edit',
+      promotions_view: 'edit',
+      'reports-sales': 'view',
+      audit_logs: 'none',
+      settings: 'view',
+      settings_admin_users: 'none',
+      settings_admin_permissions: 'none',
+      settings_payments_providers: 'none',
+      settings_communications_branding: 'none',
+      settings_dev: 'none'
     }
   },
   {
     role: 'support_officer',
     permissions: {
-      // Support officer can access only dashboard and order management
-      'dashboard': 'view',
-      'orders': 'edit',  // Order management access
-      'categories': 'none',
-      'products': 'none',
-      'customers': 'view',  // May need to view customer info for orders
-      'bookings': 'none',
-      'delivery': 'none',
-      'promotions': 'none',
-      'reports': 'none',
-      'auditLogs': 'none',
-      'settings': 'none',
-      'settingsAdmin': 'none',
-      'settingsPermissions': 'none',
-      'settingsPayments': 'none',
-      'settingsCommunications': 'none',
+      dashboard: 'view',
+      orders_view: 'edit',
+      customers_view: 'edit',
+      categories_view: 'none',
+      products_view: 'none',
+      catering_bookings: 'none',
+      delivery_zones: 'none',
+      promotions_view: 'none',
+      'reports-sales': 'none',
+      audit_logs: 'none',
+      settings: 'none',
+      settings_admin_users: 'none',
+      settings_admin_permissions: 'none',
+      settings_payments_providers: 'none',
+      settings_communications_branding: 'none',
+      settings_dev: 'none'
     }
   },
   {
     role: 'staff',
     permissions: {
-      // Staff role has limited access - similar to support officer
-      'dashboard': 'view',
-      'orders': 'view',
-      'categories': 'none',
-      'products': 'none',
-      'customers': 'view',
-      'bookings': 'none',
-      'delivery': 'none',
-      'promotions': 'none',
-      'reports': 'none',
-      'auditLogs': 'none',
-      'settings': 'none',
-      'settingsAdmin': 'none',
-      'settingsPermissions': 'none',
-      'settingsPayments': 'none',
-      'settingsCommunications': 'none',
+      dashboard: 'view',
+      orders_view: 'view',
+      categories_view: 'none',
+      products_view: 'none',
+      customers_view: 'none',
+      catering_bookings: 'none',
+      delivery_zones: 'none',
+      promotions_view: 'none',
+      'reports-sales': 'none',
+      audit_logs: 'none',
+      settings: 'none',
+      settings_admin_users: 'none',
+      settings_admin_permissions: 'none',
+      settings_payments_providers: 'none',
+      settings_communications_branding: 'none',
+      settings_dev: 'none'
     }
   }
 ];

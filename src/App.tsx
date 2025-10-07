@@ -44,6 +44,8 @@ const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"
 const Products = withLazyLoading(() => import("./pages/Products"), undefined, false, 10000);
 const Customers = withLazyLoading(() => import("./pages/Customers"), undefined, false, 10000);
 const Reports = withLazyLoading(() => import("./pages/Reports"), undefined, false, 10000);
+const ChangePassword = withLazyLoading(() => import("./pages/admin/ChangePassword"), undefined, false, 10000);
+import { PasswordChangeRequired } from "./components/auth/PasswordChangeRequired";
 const PaymentSettings = withLazyLoading(() => import("./pages/PaymentSettings").then(m => ({ default: m.PaymentSettings })), undefined, false, 10000);
 const Index = withLazyLoading(() => import("./pages/Index"), undefined, true, 8000); // Critical page - fast loader
 const ProductDetail = withLazyLoading(() => import("./pages/ProductDetail"), undefined, true, 10000);
@@ -277,8 +279,11 @@ const App = () => {
               <Route path="/orders" element={<Navigate to="/admin/orders" replace />} />
               <Route path="/delivery-pickup" element={<Navigate to="/admin/delivery" replace />} />
 
+              {/* Password change route (no AdminLayout wrapper) */}
+              <Route path="/admin/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
+
               {/* Protected admin routes with unified authentication */}
-              <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+              <Route element={<ProtectedRoute><PasswordChangeRequired><AdminLayout /></PasswordChangeRequired></ProtectedRoute>}>
                 <Route path="/admin" element={<Index />} />
                 <Route path="/dashboard" element={<Index />} />
                 <Route path="/admin/orders" element={<AdminOrders />} />

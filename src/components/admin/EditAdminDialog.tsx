@@ -23,10 +23,14 @@ interface EditAdminDialogProps {
 
 const roleLabels: Record<UserRole, string> = {
   super_admin: 'Super Admin',
-  admin: 'Admin',
-  manager: 'Manager',
-  support_officer: 'Support Officer',
-  staff: 'Staff',
+  store_owner: 'Store Owner',
+  admin_manager: 'Admin Manager',
+  account_manager: 'Account Manager',
+  support_staff: 'Support Staff',
+  admin: 'Admin (Legacy)',
+  manager: 'Manager (Legacy)',
+  support_officer: 'Support Officer (Legacy)',
+  staff: 'Staff (Legacy)',
 };
 
 export function EditAdminDialog({ user, open, onOpenChange }: EditAdminDialogProps) {

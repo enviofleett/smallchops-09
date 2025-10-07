@@ -31,14 +31,22 @@ interface RoleRow {
 
 const roleLabels: Record<UserRole, string> = {
   super_admin: 'Super Admin',
-  admin: 'Admin',
-  manager: 'Manager',
-  support_officer: 'Support Officer',
-  staff: 'Staff',
+  store_owner: 'Store Owner',
+  admin_manager: 'Admin Manager',
+  account_manager: 'Account Manager',
+  support_staff: 'Support Staff',
+  admin: 'Admin (Legacy)',
+  manager: 'Manager (Legacy)',
+  support_officer: 'Support Officer (Legacy)',
+  staff: 'Staff (Legacy)',
 };
 
 const roleColors: Record<UserRole, string> = {
   super_admin: 'bg-purple-500',
+  store_owner: 'bg-indigo-500',
+  admin_manager: 'bg-blue-500',
+  account_manager: 'bg-cyan-500',
+  support_staff: 'bg-green-500',
   admin: 'bg-blue-500',
   manager: 'bg-green-500',
   support_officer: 'bg-yellow-500',

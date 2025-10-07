@@ -26,7 +26,7 @@ export function OrderReceiptModal({ isOpen, onClose, order }: OrderReceiptModalP
   };
 
   const businessInfo = businessSettings ? {
-    name: businessSettings.name,
+    name: 'Starters',
     address: '2B Close Off 11Crescent Kado Estate, Kado',
     phone: '0807 301 1100',
     email: 'store@startersmallchops.com',

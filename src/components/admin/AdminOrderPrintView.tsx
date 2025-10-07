@@ -72,10 +72,10 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
       <div className="print-header">
         <img
           src={businessSettings?.logo_url || startersLogo}
-          alt={businessSettings?.name || 'Starter Small Chops'}
+          alt={businessSettings?.name || 'Starters'}
           className="print-logo"
         />
-        <div className="print-business-name">{businessSettings?.name?.toUpperCase() || 'STARTER SMALL CHOPS'}</div>
+        <div className="print-business-name">{businessSettings?.name?.toUpperCase() || 'STARTERS'}</div>
       </div>
 
       {/* Order Title */}
@@ -107,33 +107,6 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
               <span className="print-label">Address:</span>
               <span>{getFormattedAddress()}</span>
             </div>
-          </div>
-
-          {/* Payment Info */}
-          <div className="print-section">
-            <div className="print-section-heading">PAYMENT</div>
-            <div className="print-info-row">
-              <span className="print-label">Status:</span>
-              <span className="print-payment-status">{order.payment_status?.toUpperCase() || 'PENDING'}</span>
-            </div>
-            {order.payment_method && (
-              <div className="print-info-row">
-                <span className="print-label">Method:</span>
-                <span>{order.payment_method}</span>
-              </div>
-            )}
-            {order.payment_reference && (
-              <div className="print-info-row">
-                <span className="print-label">Reference:</span>
-                <span className="print-reference">{order.payment_reference}</span>
-              </div>
-            )}
-            {order.paid_at && (
-              <div className="print-info-row">
-                <span className="print-label">Paid At:</span>
-                <span>{formatDateTime(order.paid_at)}</span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -213,8 +186,6 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
             <tr>
               <th className="print-th-left">Item</th>
               <th className="print-th-center">Qty</th>
-              <th className="print-th-right">Unit Price</th>
-              <th className="print-th-right">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -242,53 +213,15 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
                     )}
                   </td>
                   <td className="print-td-center">{item.quantity || 0}</td>
-                  <td className="print-td-right">{formatCurrency(item.unit_price || 0)}</td>
-                  <td className="print-td-right">{formatCurrency(item.total_price || 0)}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="print-td-center">No items</td>
+                <td colSpan={2} className="print-td-center">No items</td>
               </tr>
             )}
           </tbody>
         </table>
-
-        {/* Totals */}
-        <div className="print-totals">
-          <div className="print-totals-row">
-            <span>Subtotal:</span>
-            <span>{formatCurrency(order.subtotal || calculateSubtotal())}</span>
-          </div>
-          {order.vat_amount > 0 && (
-            <div className="print-totals-row">
-              <span>VAT:</span>
-              <span>{formatCurrency(order.vat_amount)}</span>
-            </div>
-          )}
-          {order.tax_amount > 0 && (
-            <div className="print-totals-row">
-              <span>Tax:</span>
-              <span>{formatCurrency(order.tax_amount)}</span>
-            </div>
-          )}
-          {order.delivery_fee > 0 && (
-            <div className="print-totals-row">
-              <span>Delivery Fee:</span>
-              <span>{formatCurrency(order.delivery_fee)}</span>
-            </div>
-          )}
-          {order.discount_amount > 0 && (
-            <div className="print-totals-row">
-              <span>Discount:</span>
-              <span>-{formatCurrency(order.discount_amount)}</span>
-            </div>
-          )}
-          <div className="print-totals-row print-grand-total">
-            <span>GRAND TOTAL:</span>
-            <span>{formatCurrency(order.total_amount || 0)}</span>
-          </div>
-        </div>
       </div>
 
       {/* Footer */}

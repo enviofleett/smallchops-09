@@ -87,7 +87,7 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
       <div className="receipt-content">
         {/* Business Header */}
         <div className="text-center">
-          <div className="business-name">{businessInfo?.name || 'STARTERS SMALL CHOPS'}</div>
+          <div className="business-name">{businessInfo?.name || 'STARTERS'}</div>
           {businessInfo?.whatsapp_support_number && (
             <div className="contact">{businessInfo.whatsapp_support_number}</div>
           )}
@@ -146,42 +146,14 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
              <div key={index} className="item-block">
                <div className="item-header">
                  <span>{item.product_name || 'Item'}</span>
-                 <span className="item-total">{formatCurrency(item.total_price || 0)}</span>
                </div>
                <div className="item-meta">
-                 {item.quantity || 1}x @ {formatCurrency(item.unit_price || 0)}
+                 Qty: {item.quantity || 1}
                </div>
              </div>
            ))}
           
           <div className="divider">------------------------</div>
-        </div>
-        
-        {/* Order Summary */}
-        <div className="order-summary">
-          <div className="summary-line">
-            <span>Subtotal:</span>
-            <span>{formatCurrency(order.subtotal || 0)}</span>
-          </div>
-          {order.delivery_fee && order.delivery_fee > 0 && (
-            <div className="summary-line">
-              <span>Delivery:</span>
-              <span>{formatCurrency(order.delivery_fee)}</span>
-            </div>
-          )}
-          {order.total_vat && order.total_vat > 0 && (
-            <div className="summary-line">
-              <span>VAT:</span>
-              <span>{formatCurrency(order.total_vat)}</span>
-            </div>
-          )}
-          
-          <div className="divider">------------------------</div>
-          
-          <div className="total-line">
-            <span>TOTAL:</span>
-            <span>{formatCurrency(order.total_amount || 0)}</span>
-          </div>
         </div>
         
         <div className="divider">========================</div>

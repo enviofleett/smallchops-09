@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,64 +11,140 @@ interface RoleUpdateRequest {
   expiresAt?: string;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID();
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Authenticate request
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Client for auth verification (anon key)
+    const client = createClient(supabaseUrl, supabaseAnonKey);
+    
+    // Admin client for DB operations (service role)
+    const admin = createClient(supabaseUrl, supabaseServiceKey);
 
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    // Authenticate request using anon key client
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error(`[${requestId}] Missing Authorization header`);
+      return new Response(JSON.stringify({ 
+        error: 'Unauthorized',
+        request_id: requestId 
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Check if user is super_admin using has_role function
-    const { data: isSuperAdmin, error: roleError } = await supabase
-      .rpc('has_role', { _user_id: user.id, _role: 'super_admin' });
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Set session on anon key client
+    const { error: sessionError } = await client.auth.setSession({
+      access_token: token,
+      refresh_token: ''
+    });
 
-    if (roleError || !isSuperAdmin) {
-      // Special case for toolbuxdev@gmail.com
-      if (user.email !== 'toolbuxdev@gmail.com') {
-        return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    if (sessionError) {
+      console.error(`[${requestId}] Session error:`, sessionError);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid session',
+        request_id: requestId 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const { userId, newRole, expiresAt }: RoleUpdateRequest = await req.json();
+    const { data: { user }, error: authError } = await client.auth.getUser();
 
-    if (!userId || !newRole) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    if (authError || !user) {
+      console.error(`[${requestId}] Auth error:`, authError);
+      return new Response(JSON.stringify({ 
+        error: 'Unauthorized',
+        request_id: requestId 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`[${requestId}] User authenticated:`, user.email);
+
+    // Check authorization using admin client
+    const { data: isSuperAdmin, error: roleError } = await admin
+      .rpc('has_role', { _user_id: user.id, _role: 'super_admin' });
+
+    const userEmail = (user.email ?? '').toLowerCase();
+    const isAuthorized = isSuperAdmin || userEmail === 'toolbuxdev@gmail.com';
+
+    if (roleError) {
+      console.error(`[${requestId}] Role check error:`, roleError);
+    }
+
+    if (!isAuthorized) {
+      console.warn(`[${requestId}] Unauthorized access attempt by:`, user.email);
+      return new Response(JSON.stringify({ 
+        error: 'Insufficient permissions',
+        request_id: requestId 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = await req.json();
+    const { userId, newRole, expiresAt }: RoleUpdateRequest = body;
+
+    // Validate input
+    if (!userId || typeof userId !== 'string') {
+      console.error(`[${requestId}] Invalid userId:`, userId);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid or missing userId',
+        request_id: requestId 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Check if role already exists
-    const { data: existingRole } = await supabase
+    if (!newRole || !['super_admin', 'admin', 'manager', 'support_officer', 'staff'].includes(newRole)) {
+      console.error(`[${requestId}] Invalid role:`, newRole);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid role. Must be one of: super_admin, admin, manager, support_officer, staff',
+        request_id: requestId 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`[${requestId}] Processing role update for user:`, userId, 'to role:', newRole);
+
+    // Check if role already exists (using admin client)
+    const { data: existingRole, error: fetchError } = await admin
       .from('user_roles')
       .select('id, role')
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle();
 
+    if (fetchError) {
+      console.error(`[${requestId}] Error fetching existing role:`, fetchError);
+      throw fetchError;
+    }
+
     let result;
 
     if (existingRole) {
-      // Update existing role
-      const { data, error } = await supabase
+      console.log(`[${requestId}] Updating existing role:`, existingRole.id);
+      // Update existing role (using admin client)
+      const { data, error } = await admin
         .from('user_roles')
         .update({
           role: newRole,
@@ -81,11 +156,15 @@ serve(async (req) => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`[${requestId}] Error updating role:`, error);
+        throw error;
+      }
       result = data;
     } else {
-      // Insert new role
-      const { data, error } = await supabase
+      console.log(`[${requestId}] Inserting new role`);
+      // Insert new role (using admin client)
+      const { data, error } = await admin
         .from('user_roles')
         .insert({
           user_id: userId,
@@ -97,33 +176,45 @@ serve(async (req) => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`[${requestId}] Error inserting role:`, error);
+        throw error;
+      }
       result = data;
     }
 
-    // Log the action
-    await supabase.from('audit_logs').insert({
+    // Log the action (using admin client)
+    const { error: auditError } = await admin.from('audit_logs').insert({
       action: existingRole ? 'role_updated' : 'role_assigned',
       category: 'User Management',
       message: `Role ${existingRole ? 'updated to' : 'assigned:'} ${newRole}`,
       user_id: user.id,
       entity_id: userId,
-      new_values: { role: newRole, expires_at: expiresAt },
+      new_values: { role: newRole, expires_at: expiresAt, request_id: requestId },
     });
+
+    if (auditError) {
+      console.error(`[${requestId}] Error logging audit:`, auditError);
+      // Don't fail the request if audit logging fails
+    }
+
+    console.log(`[${requestId}] Role operation completed successfully`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       message: 'Role updated successfully',
-      data: result 
+      data: result,
+      request_id: requestId
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in role-management-v2:', error);
+    console.error(`[${requestId}] Error in role-management-v2:`, error);
     return new Response(JSON.stringify({ 
-      error: error.message || 'Internal server error' 
+      error: error.message || 'Internal server error',
+      request_id: requestId
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

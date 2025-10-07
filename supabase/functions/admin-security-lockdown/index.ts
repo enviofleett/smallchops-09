@@ -1,5 +1,4 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,33 +14,46 @@ interface LockdownRequest {
 }
 
 // Validate admin permissions
-async function validateAdminUser(supabase: any, authHeader: string) {
+async function validateAdminUser(client: any, admin: any, authHeader: string) {
   if (!authHeader) {
     throw new Error('Authorization header required');
   }
 
   const token = authHeader.replace('Bearer ', '');
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  
+  // Set session on anon key client
+  const { error: sessionError } = await client.auth.setSession({
+    access_token: token,
+    refresh_token: ''
+  });
+
+  if (sessionError) {
+    throw new Error('Invalid session');
+  }
+
+  const { data: { user }, error: userError } = await client.auth.getUser();
   
   if (userError || !user) {
     throw new Error('Invalid authentication token');
   }
 
-  // Check if user is admin
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role, is_active')
-    .eq('id', user.id)
-    .single();
+  // Check if user has admin privileges using admin client
+  const { data: isAdmin, error: roleError } = await admin
+    .rpc('has_role', { _user_id: user.id, _role: 'super_admin' });
 
-  if (profileError || !profile || profile.role !== 'admin' || !profile.is_active) {
+  const userEmail = (user.email ?? '').toLowerCase();
+  const hasAdminAccess = isAdmin || userEmail === 'toolbuxdev@gmail.com';
+
+  if (roleError || !hasAdminAccess) {
     throw new Error('Admin privileges required');
   }
 
   return user;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID();
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -49,15 +61,19 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('[ADMIN-SECURITY] Missing environment variables');
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+      console.error(`[${requestId}] Missing environment variables`);
       throw new Error('Server configuration error');
     }
 
-    // Initialize Supabase client with service role
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    // Client for auth verification (anon key)
+    const client = createClient(supabaseUrl, supabaseAnonKey);
+    
+    // Admin client for DB operations (service role)
+    const admin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
@@ -66,7 +82,9 @@ serve(async (req) => {
 
     // Validate requesting admin
     const authHeader = req.headers.get('Authorization');
-    const requestingAdmin = await validateAdminUser(supabase, authHeader || '');
+    const requestingAdmin = await validateAdminUser(client, admin, authHeader || '');
+    
+    console.log(`[${requestId}] Security action requested by:`, requestingAdmin.email);
 
     // Parse request body
     const body: LockdownRequest = await req.json();
@@ -75,14 +93,14 @@ serve(async (req) => {
       throw new Error('Action is required');
     }
 
-    console.log(`[ADMIN-SECURITY] ${body.action} requested by admin: ${requestingAdmin.id}`);
+    console.log(`[${requestId}] Action: ${body.action}`);
 
     let result = { success: false, message: '', data: {} };
 
     switch (body.action) {
       case 'emergency_lockdown':
-        // Terminate all active admin sessions
-        const { data: sessions, error: sessionsError } = await supabase
+        // Terminate all active admin sessions using admin client
+        const { data: sessions, error: sessionsError } = await admin
           .from('admin_sessions')
           .update({ 
             is_active: false, 
@@ -96,8 +114,8 @@ serve(async (req) => {
           throw new Error(`Failed to terminate sessions: ${sessionsError.message}`);
         }
 
-        // Log the emergency action
-        await supabase
+        // Log the emergency action using admin client
+        await admin
           .from('audit_logs')
           .insert({
             action: 'emergency_lockdown_activated',
@@ -123,7 +141,7 @@ serve(async (req) => {
           throw new Error('Session ID is required for session termination');
         }
 
-        const { error: terminateError } = await supabase
+        const { error: terminateError } = await admin
           .from('admin_sessions')
           .update({ 
             is_active: false, 
@@ -136,8 +154,8 @@ serve(async (req) => {
           throw new Error(`Failed to terminate session: ${terminateError.message}`);
         }
 
-        // Log the action
-        await supabase
+        // Log the action using admin client
+        await admin
           .from('audit_logs')
           .insert({
             action: 'admin_session_terminated',
@@ -163,8 +181,8 @@ serve(async (req) => {
           throw new Error('User ID is required for user suspension');
         }
 
-        // Suspend the user
-        const { error: suspendError } = await supabase
+        // Suspend the user using admin client
+        const { error: suspendError } = await admin
           .from('profiles')
           .update({ 
             is_active: false,
@@ -176,8 +194,8 @@ serve(async (req) => {
           throw new Error(`Failed to suspend user: ${suspendError.message}`);
         }
 
-        // Terminate all their sessions
-        await supabase
+        // Terminate all their sessions using admin client
+        await admin
           .from('admin_sessions')
           .update({ 
             is_active: false, 
@@ -187,8 +205,8 @@ serve(async (req) => {
           .eq('user_id', body.user_id)
           .eq('is_active', true);
 
-        // Log the action
-        await supabase
+        // Log the action using admin client
+        await admin
           .from('audit_logs')
           .insert({
             action: 'admin_user_suspended',
@@ -213,9 +231,9 @@ serve(async (req) => {
         throw new Error(`Unknown action: ${body.action}`);
     }
 
-    console.log(`[ADMIN-SECURITY] ${body.action} completed successfully`);
+    console.log(`[${requestId}] ${body.action} completed successfully`);
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({ ...result, request_id: requestId }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -224,12 +242,13 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('[ADMIN-SECURITY] Error:', error);
+    console.error(`[${requestId}] Error:`, error);
     
     return new Response(JSON.stringify({
       success: false,
       error: error.message || 'An unexpected error occurred',
-      code: 'ADMIN_SECURITY_ERROR'
+      code: 'ADMIN_SECURITY_ERROR',
+      request_id: requestId
     }), {
       status: error.message.includes('required') || error.message.includes('Invalid') ? 400 : 500,
       headers: {

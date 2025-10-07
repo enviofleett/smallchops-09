@@ -87,7 +87,7 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
       <div className="receipt-content">
         {/* Business Header */}
         <div className="text-center">
-          <div className="business-name">{businessInfo?.name || 'STARTERS'}</div>
+          <div className="business-name">STARTERS</div>
           {businessInfo?.whatsapp_support_number && (
             <div className="contact">{businessInfo.whatsapp_support_number}</div>
           )}

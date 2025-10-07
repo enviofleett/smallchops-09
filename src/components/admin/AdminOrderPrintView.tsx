@@ -75,7 +75,7 @@ export const AdminOrderPrintView: React.FC<AdminOrderPrintViewProps> = ({
           alt={businessSettings?.name || 'Starters'}
           className="print-logo"
         />
-        <div className="print-business-name">{businessSettings?.name?.toUpperCase() || 'STARTERS'}</div>
+        <div className="print-business-name">STARTERS</div>
       </div>
 
       {/* Order Title */}

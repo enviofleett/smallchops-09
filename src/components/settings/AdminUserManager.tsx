@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CreateAdminDialog } from '../admin/CreateAdminDialog';
 import { CreateAdminUserDialog } from '../admin/CreateAdminUserDialog';
 import { Shield, UserPlus, Users, AlertTriangle } from 'lucide-react';
 import { useAdminUserCreation } from '@/hooks/useAdminUserCreation';

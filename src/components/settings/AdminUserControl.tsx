@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { CreateAdminDialog } from "./CreateAdminDialog";
 import { CreateAdminUserDialog } from "../admin/CreateAdminUserDialog";
 import { AdminUsersList } from "../admin/AdminUsersList";
 import { AdminPasswordResetDialog } from "./AdminPasswordResetDialog";

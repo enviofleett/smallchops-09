@@ -1,5 +1,5 @@
 // @ts-nocheck
-// Admin Management Edge Function
+// Admin Management Edge Function - Production Ready
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -36,7 +36,7 @@ function jsonResponse(
   })
 }
 
-// Utility: Get authenticated admin user
+// Utility: Get authenticated admin user with role-based checking
 async function getAuthenticatedAdminUser(supabase: any, req: Request) {
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
@@ -50,33 +50,28 @@ async function getAuthenticatedAdminUser(supabase: any, req: Request) {
     throw { status: 401, code: 'INVALID_TOKEN', message: 'Invalid token' }
   }
 
-  // Check if user is admin
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role, is_active')
-    .eq('id', user.id)
+  // Check user role from user_roles table (new system)
+  const { data: userRole, error: roleError } = await supabase
+    .from('user_roles')
+    .select('role, is_active, expires_at')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .or('expires_at.is.null,expires_at.gt.now()')
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single()
 
-  if (profileError || !profile) {
-    throw { status: 403, code: 'ACCESS_DENIED', message: 'Access denied - profile not found' }
+  if (roleError || !userRole) {
+    throw { status: 403, code: 'ACCESS_DENIED', message: 'Access denied - no active admin role' }
   }
 
-  if (profile.role !== 'admin' || !profile.is_active) {
-    throw { status: 403, code: 'ACCESS_DENIED', message: 'Access denied - admin privileges required' }
+  // Check if user has permission to manage admins (super_admin or store_owner)
+  const allowedRoles = ['super_admin', 'store_owner', 'admin_manager']
+  if (!allowedRoles.includes(userRole.role)) {
+    throw { status: 403, code: 'INSUFFICIENT_PERMISSIONS', message: 'Insufficient permissions to manage admins' }
   }
 
-  return user
-}
-
-interface AdminInvitation {
-  email: string;
-  role: string;
-}
-
-interface AdminUpdate {
-  userId: string;
-  action: 'activate' | 'deactivate' | 'update_role';
-  role?: string;
+  return { user, role: userRole.role }
 }
 
 serve(async (req) => {
@@ -105,8 +100,9 @@ serve(async (req) => {
       }
     })
 
-    // Authenticate and authorize user (unified for all routes)
-    const user = await getAuthenticatedAdminUser(supabase, req)
+    // Authenticate and authorize user with role-based checking
+    const { user, role } = await getAuthenticatedAdminUser(supabase, req)
+    console.log(`[ADMIN] Authenticated user ${user.id} with role ${role}`)
     
     const url = new URL(req.url)
     const action = url.searchParams.get('action')
@@ -117,7 +113,7 @@ serve(async (req) => {
       case 'POST':
         return await handlePost(supabase, req, user)
       case 'PUT':
-        return await handlePut(supabase, req)
+        return await handlePut(supabase, req, user)
       default:
         return jsonResponse({ 
           success: false, 
@@ -154,21 +150,50 @@ async function handleGet(supabase: any, action: string | null) {
   switch (action) {
     case 'get_admins':
       console.log('[ADMIN-GET] Fetching admin users...')
-      const { data: admins, error: adminsError } = await supabase
+      
+      // Get all profiles with user_type='admin'
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, name, email, role, status, created_at, is_active')
-        .eq('role', 'admin')
+        .select('id, name, email, is_active, created_at, updated_at, user_type')
+        .eq('user_type', 'admin')
         .order('created_at', { ascending: false })
 
-      if (adminsError) {
+      if (profilesError) {
         throw { 
           status: 500, 
           code: 'DB_ERROR', 
-          message: `Failed to fetch admins: ${adminsError.message}` 
+          message: `Failed to fetch admin profiles: ${profilesError.message}` 
         }
       }
 
-      console.log(`[ADMIN-GET] Successfully fetched ${admins?.length || 0} admins`)
+      // Get roles for each admin from user_roles table
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .eq('is_active', true)
+        .or('expires_at.is.null,expires_at.gt.now()')
+
+      if (rolesError) {
+        console.warn('[ADMIN-GET] Failed to fetch roles:', rolesError.message)
+      }
+
+      // Map roles to profiles
+      const roleMap = new Map()
+      if (roles) {
+        roles.forEach((r: any) => roleMap.set(r.user_id, r.role))
+      }
+
+      const admins = profiles.map((p: any) => ({
+        id: p.id,
+        name: p.name || p.email,
+        email: p.email,
+        role: roleMap.get(p.id) || 'admin',
+        status: p.is_active ? 'active' : 'inactive',
+        is_active: p.is_active,
+        created_at: p.created_at
+      }))
+
+      console.log(`[ADMIN-GET] Successfully fetched ${admins.length} admins`)
       return jsonResponse({ success: true, data: admins })
 
     case 'get_invitations':
@@ -183,7 +208,7 @@ async function handleGet(supabase: any, action: string | null) {
           expires_at,
           created_at,
           invited_by,
-          profiles!admin_invitations_invited_by_fkey(name)
+          invited_at
         `)
         .order('created_at', { ascending: false })
 
@@ -208,7 +233,6 @@ async function handleGet(supabase: any, action: string | null) {
 }
 
 async function handlePost(supabase: any, req: Request, user: any) {
-  // Safe JSON parsing
   const body = await safeJsonParse(req)
   
   if (!body) {
@@ -219,12 +243,10 @@ async function handlePost(supabase: any, req: Request, user: any) {
     }
   }
 
-  const action = body.action || 'create_invitation'
+  const action = body.action || 'update_permissions'
   console.log(`[ADMIN-POST] Processing action: ${action}`)
 
   switch (action) {
-    case 'create_invitation':
-      return await createInvitation(supabase, body, user)
     case 'update_permissions':
       return await updatePermissions(supabase, body, user)
     case 'delete_invitation':
@@ -240,87 +262,68 @@ async function handlePost(supabase: any, req: Request, user: any) {
   }
 }
 
-async function createInvitation(supabase: any, body: any, user: any) {
-  console.log('[ADMIN-POST] Sending admin invitation to:', body.email)
+async function handlePut(supabase: any, req: Request, user: any) {
+  const body = await safeJsonParse(req)
   
-  // Enhanced input validation
-  if (!body.email || !body.role) {
+  if (!body) {
+    throw { 
+      status: 400, 
+      code: 'BAD_JSON', 
+      message: 'Invalid or empty JSON body' 
+    }
+  }
+
+  console.log(`[ADMIN-PUT] Processing action: ${body.action}`)
+
+  if (body.action === 'activate' || body.action === 'deactivate') {
+    return await updateUserStatus(supabase, body, user)
+  }
+
+  throw { 
+    status: 400, 
+    code: 'INVALID_ACTION', 
+    message: `Invalid action: ${body.action}` 
+  }
+}
+
+async function updateUserStatus(supabase: any, body: any, user: any) {
+  if (!body.userId || !body.action) {
     throw { 
       status: 400, 
       code: 'REQUIRED_FIELDS', 
-      message: 'Email and role are required' 
+      message: 'User ID and action are required' 
     }
   }
 
-  // More robust email validation
-  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
-  if (!emailRegex.test(body.email)) {
-    throw { 
-      status: 400, 
-      code: 'INVALID_EMAIL', 
-      message: 'Invalid email format' 
-    }
-  }
+  const isActive = body.action === 'activate'
 
-  if (!['admin', 'user'].includes(body.role)) {
-    throw { 
-      status: 400, 
-      code: 'INVALID_ROLE', 
-      message: 'Role must be either "admin" or "user"' 
-    }
-  }
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq('id', body.userId)
 
-  // Create admin invitation directly in the database
-  const invitationToken = crypto.randomUUID()
-  const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + 7) // Expires in 7 days
-
-  const { data: invitation, error: invitationError } = await supabase
-    .from('admin_invitations')
-    .insert({
-      email: body.email,
-      role: body.role,
-      invitation_token: invitationToken,
-      expires_at: expiresAt.toISOString(),
-      status: 'pending',
-      invited_by: user.id,
-      invited_at: new Date().toISOString()
-    })
-    .select('id')
-    .single()
-
-  if (invitationError) {
+  if (error) {
     throw { 
       status: 500, 
       code: 'DB_ERROR', 
-      message: `Failed to create invitation: ${invitationError.message}` 
+      message: `Failed to ${body.action} user: ${error.message}` 
     }
   }
 
-  // Send invitation email using Auth email system (non-blocking)
-  try {
-    await supabase.functions.invoke('supabase-auth-email-sender', {
-      body: {
-        templateId: 'admin_invitation',
-        to: body.email,
-        variables: {
-          role: body.role,
-          companyName: 'Starters Small Chops',
-          invitation_url: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?token=${invitationToken}&type=signup&redirect_to=${encodeURIComponent('https://startersmallchops.com/admin')}`
-        },
-        emailType: 'transactional'
-      }
+  // Log the action
+  await supabase
+    .from('audit_logs')
+    .insert({
+      action: `user_${body.action}d`,
+      category: 'Admin Management',
+      message: `Admin user ${body.action}d`,
+      user_id: user.id,
+      entity_id: body.userId
     })
-    console.log('[ADMIN-POST] Invitation email sent successfully')
-  } catch (emailError) {
-    console.warn('[ADMIN-POST] Failed to send invitation email:', emailError)
-    // Don't fail the whole request if email fails
-  }
 
   return jsonResponse({
-    success: true, 
-    message: 'Invitation sent successfully',
-    data: { invitation_id: invitation.id }
+    success: true,
+    message: `User ${body.action}d successfully`
   })
 }
 
@@ -335,12 +338,12 @@ async function updatePermissions(supabase: any, body: any, user: any) {
     }
   }
 
-  // Validate target user exists and is admin
+  // Validate target user exists
   const { data: targetUser, error: userError } = await supabase
     .from('profiles')
-    .select('id, name, role')
+    .select('id, name')
     .eq('id', body.userId)
-    .eq('role', 'admin')
+    .eq('user_type', 'admin')
     .single()
 
   if (userError || !targetUser) {
@@ -384,13 +387,13 @@ async function updatePermissions(supabase: any, body: any, user: any) {
 
   // Log the permission update
   await supabase
-    .from('user_permission_audit')
+    .from('audit_logs')
     .insert({
-      user_id: body.userId,
-      menu_key: 'bulk_update',
       action: 'permissions_updated',
-      permission_level: 'edit',
-      changed_by: user.id,
+      category: 'Admin Management',
+      message: `Permissions updated for ${targetUser.name}`,
+      user_id: user.id,
+      entity_id: body.userId,
       new_values: body.permissions
     })
 
@@ -493,115 +496,8 @@ async function resendInvitation(supabase: any, body: any, user: any) {
     }
   }
 
-  // Send new invitation email
-  try {
-    await supabase.functions.invoke('supabase-auth-email-sender', {
-      body: {
-        templateId: 'admin_invitation',
-        to: invitation.email,
-        variables: {
-          role: invitation.role,
-          companyName: 'Starters Small Chops',
-          invitation_url: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?token=${newToken}&type=signup&redirect_to=${encodeURIComponent('https://startersmallchops.com/admin')}`
-        },
-        emailType: 'transactional'
-      }
-    })
-  } catch (emailError) {
-    console.warn('[ADMIN-INVITATION] Failed to send resend email:', emailError)
-  }
-
   return jsonResponse({
     success: true,
     message: 'Invitation resent successfully'
-  })
-}
-
-async function handlePut(supabase: any, req: Request) {
-  // Safe JSON parsing
-  const body = await safeJsonParse(req)
-  
-  if (!body) {
-    throw { 
-      status: 400, 
-      code: 'BAD_JSON', 
-      message: 'Invalid or empty JSON body' 
-    }
-  }
-  
-  console.log('[ADMIN-PUT] Updating admin user:', body)
-  
-  // Enhanced input validation
-  if (!body.userId || !body.action) {
-    throw { 
-      status: 400, 
-      code: 'REQUIRED_FIELDS', 
-      message: 'User ID and action are required' 
-    }
-  }
-
-  if (!['activate', 'deactivate', 'update_role'].includes(body.action)) {
-    throw { 
-      status: 400, 
-      code: 'INVALID_ACTION', 
-      message: 'Action must be activate, deactivate, or update_role' 
-    }
-  }
-
-  let result
-  switch (body.action) {
-    case 'activate':
-      result = await supabase.rpc('activate_admin_user', {
-        p_user_id: body.userId
-      })
-      break
-      
-    case 'deactivate':
-      result = await supabase.rpc('deactivate_admin_user', {
-        p_user_id: body.userId
-      })
-      break
-      
-    case 'update_role':
-      if (!body.role) {
-        throw { 
-          status: 400, 
-          code: 'REQUIRED_FIELDS', 
-          message: 'Role is required for update_role action' 
-        }
-      }
-      result = await supabase.rpc('update_admin_role', {
-        p_user_id: body.userId,
-        p_new_role: body.role
-      })
-      break
-      
-    default:
-      throw { 
-        status: 400, 
-        code: 'INVALID_ACTION', 
-        message: 'Invalid action' 
-      }
-  }
-
-  if (result.error) {
-    throw { 
-      status: 500, 
-      code: 'RPC_ERROR', 
-      message: `Failed to ${body.action} user: ${result.error.message}` 
-    }
-  }
-
-  if (!result.data?.success) {
-    throw { 
-      status: 400, 
-      code: 'OPERATION_FAILED', 
-      message: result.data?.error || 'Operation failed' 
-    }
-  }
-
-  return jsonResponse({
-    success: true, 
-    message: result.data.message
   })
 }

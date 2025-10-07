@@ -25,11 +25,6 @@ export interface AdminInvitation {
   };
 }
 
-interface SendInvitationData {
-  email: string;
-  role: string;
-}
-
 interface UpdateAdminData {
   userId: string;
   action: 'activate' | 'deactivate' | 'update_role';
@@ -45,7 +40,7 @@ export const useAdminManagement = () => {
   const [isUpdatingAdmin, setIsUpdatingAdmin] = useState(false);
   const { toast } = useToast();
 
-  // Fetch admin users
+  // Fetch admin users using the new role-based system
   const fetchAdmins = async () => {
     try {
       setIsLoadingAdmins(true);
@@ -102,87 +97,6 @@ export const useAdminManagement = () => {
       });
     } finally {
       setIsLoadingInvitations(false);
-    }
-  };
-
-  // Send invitation (legacy support)
-  const sendInvitation = async (data: SendInvitationData) => {
-    try {
-      setIsSendingInvitation(true);
-      
-      const { data: response, error } = await supabase.functions.invoke('admin-management', {
-        body: {
-          action: 'create_invitation',
-          email: data.email,
-          role: data.role
-        }
-      });
-
-      if (error) throw error;
-
-      if (response?.success) {
-        toast({
-          title: 'Success',
-          description: 'Admin invitation sent successfully',
-        });
-        
-        // Refresh invitations
-        await fetchInvitations();
-      } else {
-        throw new Error(response?.error || 'Failed to send invitation');
-      }
-    } catch (error: any) {
-      console.error('Error sending invitation:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to send invitation',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsSendingInvitation(false);
-    }
-  };
-
-  // Create admin with immediate access
-  const createAdminUser = async (data: {
-    email: string;
-    role: string;
-    immediate_password?: string;
-    send_email?: boolean;
-    admin_created?: boolean;
-  }) => {
-    try {
-      setIsSendingInvitation(true);
-      
-      const { data: response, error } = await supabase.functions.invoke('admin-user-creator', {
-        body: data
-      });
-
-      if (error) throw error;
-
-      if (response?.success) {
-        toast({
-          title: 'Success',
-          description: response.message || 'Admin user created successfully',
-        });
-        
-        // Refresh both admins and invitations
-        await Promise.all([fetchAdmins(), fetchInvitations()]);
-        
-        return response;
-      } else {
-        throw new Error(response?.error || 'Failed to create admin user');
-      }
-    } catch (error: any) {
-      console.error('Error creating admin user:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to create admin user',
-        variant: 'destructive'
-      });
-      throw error;
-    } finally {
-      setIsSendingInvitation(false);
     }
   };
 
@@ -300,8 +214,6 @@ export const useAdminManagement = () => {
     isLoadingInvitations,
     isSendingInvitation,
     isUpdatingAdmin,
-    sendInvitation, // Legacy method
-    createAdminUser, // New method with immediate access
     updateAdmin,
     deleteInvitation,
     resendInvitation,

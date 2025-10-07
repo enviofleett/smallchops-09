@@ -5,12 +5,14 @@ import { Users, UserPlus, Mail, Activity } from 'lucide-react';
 import { AdminUsersList } from '@/components/admin/AdminUsersList';
 import { AdminInvitations } from '@/components/admin/AdminInvitations';
 import { AdminActivityLog } from '@/components/admin/AdminActivityLog';
-import { CreateAdminDialog } from '@/components/admin/CreateAdminDialog';
+import { CreateAdminUserDialog } from '@/components/admin/CreateAdminUserDialog';
 import { Button } from '@/components/ui/button';
+import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
 
 export default function AdminUsers() {
   const [activeTab, setActiveTab] = useState('users');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const { canCreateUsers } = useRoleBasedPermissions();
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -89,10 +91,15 @@ export default function AdminUsers() {
         </TabsContent>
       </Tabs>
 
-      <CreateAdminDialog 
-        open={createDialogOpen} 
-        onOpenChange={setCreateDialogOpen}
-      />
+      {canCreateUsers() && (
+        <CreateAdminUserDialog 
+          open={createDialogOpen} 
+          onOpenChange={setCreateDialogOpen}
+          onSuccess={() => {
+            setCreateDialogOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

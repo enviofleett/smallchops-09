@@ -7534,38 +7534,53 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          created_with_temp_password: boolean | null
           email: string | null
+          first_login_at: string | null
           id: string
           is_active: boolean
+          must_change_password: boolean | null
           name: string | null
+          password_changed_at: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
+          username: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          created_with_temp_password?: boolean | null
           email?: string | null
+          first_login_at?: string | null
           id: string
           is_active?: boolean
+          must_change_password?: boolean | null
           name?: string | null
+          password_changed_at?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
+          username?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
+          created_with_temp_password?: boolean | null
           email?: string | null
+          first_login_at?: string | null
           id?: string
           is_active?: boolean
+          must_change_password?: boolean | null
           name?: string | null
+          password_changed_at?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
+          username?: string | null
         }
         Relationships: []
       }
@@ -11726,6 +11741,10 @@ export type Database = {
         | "manager"
         | "support_officer"
         | "staff"
+        | "support_staff"
+        | "admin_manager"
+        | "account_manager"
+        | "store_owner"
       assignment_status: "active" | "inactive"
       communication_event_status: "queued" | "processing" | "sent" | "failed"
       communication_log_status:
@@ -11915,7 +11934,17 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super_admin", "admin", "manager", "support_officer", "staff"],
+      app_role: [
+        "super_admin",
+        "admin",
+        "manager",
+        "support_officer",
+        "staff",
+        "support_staff",
+        "admin_manager",
+        "account_manager",
+        "store_owner",
+      ],
       assignment_status: ["active", "inactive"],
       communication_event_status: ["queued", "processing", "sent", "failed"],
       communication_log_status: [

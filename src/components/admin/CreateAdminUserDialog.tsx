@@ -116,7 +116,7 @@ export function CreateAdminUserDialog({ open, onOpenChange, onSuccess }: CreateA
           name: formData.name,
           username: formData.username,
           role: formData.role,
-          password: formData.password,
+          immediate_password: formData.password,
         },
       });
 

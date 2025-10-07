@@ -110,21 +110,27 @@ serve(async (req) => {
       console.warn('[ADMIN-CREATOR] Could not list users, proceeding with creation')
     }
 
-    // Create user
-    const createUserData = {
-      email: body.email,
+    // Create user with proper admin API
+    const createUserData: any = {
+      email: body.email.toLowerCase(),
+      email_confirm: true, // Always confirm email for admin-created users
       user_metadata: {
         role: body.role,
-        created_by_admin: true
+        created_by_admin: true,
+        name: body.name || body.username || body.email.split('@')[0]
       }
     }
 
+    // Only add password if provided
     if (body.immediate_password) {
       createUserData.password = body.immediate_password
-      createUserData.email_confirm = true
-    } else {
-      createUserData.email_confirm = false
     }
+
+    console.log('[ADMIN-CREATOR] Creating user with data:', { 
+      email: createUserData.email, 
+      hasPassword: !!createUserData.password,
+      metadata: createUserData.user_metadata 
+    })
 
     const { data: newUser, error: createError } = await supabase.auth.admin.createUser(createUserData)
 
@@ -150,11 +156,14 @@ serve(async (req) => {
       .from('profiles')
       .upsert({
         id: newUser.user.id,
-        name: body.username || body.email.split('@')[0],
-        email: body.email,
+        name: body.name || body.username || body.email.split('@')[0],
+        email: body.email.toLowerCase(),
+        role: 'admin', // Set role in profiles table
         is_active: true,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        must_change_password: body.immediate_password ? false : true,
+        created_with_temp_password: !body.immediate_password
       }, {
         onConflict: 'id',
         ignoreDuplicates: false
@@ -219,7 +228,9 @@ serve(async (req) => {
 
     const responseData = {
       user_id: newUser.user.id,
-      email: body.email,
+      email: body.email.toLowerCase(),
+      username: body.username || body.email.split('@')[0],
+      name: body.name || body.username || body.email.split('@')[0],
       role: body.role,
       immediate_access: !!body.immediate_password
     }

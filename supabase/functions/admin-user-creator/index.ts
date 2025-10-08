@@ -206,6 +206,42 @@ Deno.serve(async (req) => {
 
     console.log(`[${requestId}] User created successfully:`, newUser.user.id);
 
+    // Wait for profile to be created by trigger (with retry logic)
+    console.log(`[${requestId}] Waiting for profile creation...`);
+    let profileExists = false;
+    let retryCount = 0;
+    const maxRetries = 5;
+    const baseDelay = 100; // ms
+
+    while (!profileExists && retryCount < maxRetries) {
+      const { data: profile, error: profileError } = await admin
+        .from('profiles')
+        .select('id')
+        .eq('id', newUser.user.id)
+        .maybeSingle();
+      
+      if (profile && !profileError) {
+        profileExists = true;
+        console.log(`[${requestId}] Profile found after ${retryCount} retries`);
+      } else {
+        retryCount++;
+        const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+        console.log(`[${requestId}] Profile not found, retry ${retryCount}/${maxRetries} in ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    if (!profileExists) {
+      console.error(`[${requestId}] Profile creation timeout after ${maxRetries} retries`);
+      // Clean up the created user
+      await admin.auth.admin.deleteUser(newUser.user.id);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Profile creation timeout - database trigger may not be working',
+        request_id: requestId
+      }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // Update metadata if needed (optional second step)
     if (role !== 'admin') {
       console.log(`[${requestId}] Updating user metadata with role:`, role);

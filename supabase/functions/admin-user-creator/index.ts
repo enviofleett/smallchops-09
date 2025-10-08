@@ -49,22 +49,8 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     
-    // Set session on anon key client
-    const { error: sessionError } = await client.auth.setSession({
-      access_token: token,
-      refresh_token: ''
-    });
-
-    if (sessionError) {
-      console.error(`[${requestId}] Session error:`, sessionError);
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Invalid session',
-        request_id: requestId
-      }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-    }
-
-    const { data: { user }, error: userError } = await client.auth.getUser();
+    // Verify JWT token directly (no session needed)
+    const { data: { user }, error: userError } = await client.auth.getUser(token);
     
     if (userError || !user) {
       console.error(`[${requestId}] Auth error:`, userError);

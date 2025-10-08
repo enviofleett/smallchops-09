@@ -32,17 +32,8 @@ async function validateAdminUser(client: any, admin: any, authHeader: string) {
 
   const token = authHeader.replace('Bearer ', '');
   
-  // Set session on anon key client
-  const { error: sessionError } = await client.auth.setSession({
-    access_token: token,
-    refresh_token: ''
-  });
-
-  if (sessionError) {
-    throw new Error('Invalid session');
-  }
-
-  const { data: { user }, error: userError } = await client.auth.getUser();
+  // Verify JWT token directly (no session needed)
+  const { data: { user }, error: userError } = await client.auth.getUser(token);
   
   if (userError || !user) {
     throw new Error('Invalid authentication token');

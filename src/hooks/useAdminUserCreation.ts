@@ -60,8 +60,18 @@ export const useAdminUserCreation = () => {
 
       console.log('[ADMIN-USER-CREATION] Creating user:', params.email);
 
-      // Call the edge function
+      // Get the current session token for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No active session. Please log in again.');
+      }
+
+      // Call the edge function with explicit Authorization header
       const { data, error } = await supabase.functions.invoke('admin-user-creator', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: {
           email: params.email.toLowerCase().trim(),
           role: params.role,

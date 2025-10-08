@@ -110,7 +110,17 @@ export function CreateAdminUserDialog({ open, onOpenChange, onSuccess }: CreateA
     setIsLoading(true);
 
     try {
+      // Get the current session token for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No active session. Please log in again.');
+      }
+
       const { data, error } = await supabase.functions.invoke('admin-user-creator', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: {
           email: formData.email,
           name: formData.name,

@@ -5,6 +5,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validate required environment variables
+const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY'];
+const missingVars = requiredEnvVars.filter(name => !Deno.env.get(name));
+
+if (missingVars.length > 0) {
+  throw new Error(
+    `Missing required environment variables: ${missingVars.join(', ')}. ` +
+    `Please configure them in the Supabase Dashboard: Edge Functions → Environment Variables`
+  );
+}
+
 interface RoleUpdateRequest {
   userId: string;
   newRole: 'super_admin' | 'admin' | 'manager' | 'support_officer' | 'staff';

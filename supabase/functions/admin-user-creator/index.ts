@@ -5,6 +5,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Validate required environment variables
+const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY'];
+const missingVars = requiredEnvVars.filter(name => !Deno.env.get(name));
+
+if (missingVars.length > 0) {
+  throw new Error(
+    `Missing required environment variables: ${missingVars.join(', ')}. ` +
+    `Please configure them in the Supabase Dashboard: Edge Functions → Environment Variables`
+  );
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
   

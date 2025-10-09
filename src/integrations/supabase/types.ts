@@ -10042,6 +10042,17 @@ export type Database = {
         }
         Returns: string
       }
+      create_admin_user_with_profile: {
+        Args: {
+          p_assigned_by: string
+          p_email: string
+          p_expires_at?: string
+          p_name: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: Json
+      }
       create_communication_event: {
         Args: {
           p_channel: string

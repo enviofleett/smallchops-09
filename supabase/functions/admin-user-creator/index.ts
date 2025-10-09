@@ -206,82 +206,58 @@ Deno.serve(async (req) => {
 
     console.log(`[${requestId}] User created successfully:`, newUser.user.id);
 
-    // Wait for profile to be created by trigger (with retry logic)
-    console.log(`[${requestId}] Waiting for profile creation...`);
-    let profileExists = false;
-    let retryCount = 0;
-    const maxRetries = 5;
-    const baseDelay = 100; // ms
-
-    while (!profileExists && retryCount < maxRetries) {
-      const { data: profile, error: profileError } = await admin
-        .from('profiles')
-        .select('id')
-        .eq('id', newUser.user.id)
-        .maybeSingle();
-      
-      if (profile && !profileError) {
-        profileExists = true;
-        console.log(`[${requestId}] Profile found after ${retryCount} retries`);
-      } else {
-        retryCount++;
-        const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
-        console.log(`[${requestId}] Profile not found, retry ${retryCount}/${maxRetries} in ${delay}ms`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+    // ✅ PRODUCTION FIX: Use atomic function to create profile + assign role
+    // This prevents FK violations by ensuring profile exists before role assignment
+    console.log(`[${requestId}] Creating profile and assigning role atomically...`);
+    
+    const { data: atomicResult, error: atomicError } = await admin.rpc(
+      'create_admin_user_with_profile',
+      {
+        p_user_id: newUser.user.id,
+        p_email: email,
+        p_name: createUserData.user_metadata?.name || null,
+        p_role: role,
+        p_assigned_by: user.id,
+        p_expires_at: null
       }
-    }
+    );
 
-    if (!profileExists) {
-      console.error(`[${requestId}] Profile creation timeout after ${maxRetries} retries`);
-      // Clean up the created user
+    if (atomicError) {
+      console.error(`[${requestId}] Atomic creation failed:`, atomicError);
+      
+      // Clean up auth user on failure
+      console.log(`[${requestId}] Cleaning up auth user due to atomic creation failure`);
       await admin.auth.admin.deleteUser(newUser.user.id);
+      
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'Profile creation timeout - database trigger may not be working',
+        error: `Failed to create admin user: ${atomicError.message}`,
+        code: 'ATOMIC_CREATION_FAILED',
+        details: atomicError,
         request_id: requestId
       }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Update metadata if needed (optional second step)
-    if (role !== 'admin') {
-      console.log(`[${requestId}] Updating user metadata with role:`, role);
-      const { error: updateError } = await admin.auth.admin.updateUserById(newUser.user.id, {
-        user_metadata: {
-          ...createUserData.user_metadata,
-          role: role
-        }
-      });
-
-      if (updateError) {
-        console.error(`[${requestId}] Error updating metadata:`, updateError);
-        // Don't fail, metadata update is not critical
-      }
-    }
-
-    // Assign role in user_roles table (using admin client)
-    console.log(`[${requestId}] Assigning role in user_roles table...`);
-    const { error: roleError } = await admin
-      .from('user_roles')
-      .insert({
-        user_id: newUser.user.id,
-        role: role,
-        assigned_by: user.id,
-        is_active: true,
-      });
-
-    if (roleError) {
-      console.error(`[${requestId}] Role assignment failed:`, roleError);
+    // Check if atomic operation succeeded
+    if (!atomicResult || atomicResult.success !== true) {
+      console.error(`[${requestId}] Atomic operation returned failure:`, atomicResult);
       
-      // If role assignment fails, clean up the created user
-      console.log(`[${requestId}] Cleaning up created user due to role assignment failure`);
+      // Clean up auth user
       await admin.auth.admin.deleteUser(newUser.user.id);
       
       return new Response(JSON.stringify({ 
         success: false, 
-        error: `Failed to assign role: ${roleError.message}`,
+        error: atomicResult?.error || 'Atomic profile/role creation failed',
+        code: 'ATOMIC_OPERATION_FAILED',
         request_id: requestId
-      }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    console.log(`[${requestId}] ✅ Profile and role assigned atomically:`, {
+      profile_created: atomicResult.profile_created,
+      role_created: atomicResult.role_created,
+      permissions_assigned: atomicResult.permissions_assigned
+    });
 
     // Log the creation (using admin client)
     console.log(`[${requestId}] Logging audit entry...`);

@@ -27,6 +27,23 @@ export function DriverRevenueTable({ data, isLoading }: DriverRevenueTableProps)
     exportToCSV(exportData, `driver-revenue-${format(new Date(), 'yyyy-MM-dd')}.csv`);
   };
 
+  // Calculate totals
+  const totals = React.useMemo(() => {
+    if (!data || data.length === 0) return null;
+    
+    const totalDeliveries = data.reduce((sum, row) => sum + Number(row.total_deliveries), 0);
+    const totalRevenue = data.reduce((sum, row) => sum + Number(row.total_revenue), 0);
+    const totalDeliveryFees = data.reduce((sum, row) => sum + Number(row.total_delivery_fees), 0);
+    const avgFee = totalDeliveries > 0 ? totalDeliveryFees / totalDeliveries : 0;
+    
+    return {
+      totalDeliveries,
+      totalRevenue,
+      totalDeliveryFees,
+      avgFee,
+    };
+  }, [data]);
+
   if (isLoading) {
     return (
       <Card>
@@ -88,6 +105,25 @@ export function DriverRevenueTable({ data, isLoading }: DriverRevenueTableProps)
                     </TableCell>
                   </TableRow>
                 ))}
+                {totals && (
+                  <TableRow className="bg-muted/50 font-bold border-t-2">
+                    <TableCell colSpan={2} className="font-bold">
+                      Total
+                    </TableCell>
+                    <TableCell className="text-right font-bold">
+                      {totals.totalDeliveries}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-green-600">
+                      ₦{totals.totalRevenue.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-blue-600">
+                      ₦{totals.totalDeliveryFees.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-bold">
+                      ₦{totals.avgFee.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

@@ -236,16 +236,23 @@ export const useRoleBasedPermissions = () => {
           .maybeSingle();
 
         if (error) {
-          console.error('Error fetching user role:', error);
+          console.error('❌ Error fetching user role:', error);
           setUserRole(null);
           return;
         }
 
         const fetchedRole = data?.role as UserRole || null;
-        console.log(`✅ User role fetched from user_roles table: ${fetchedRole} for user ${user.id}`);
+        
+        if (fetchedRole === null) {
+          console.warn(`⚠️ User role is NULL for user ${user.id} (${user.email}). This may indicate a data integrity issue.`);
+          console.warn('Please ensure the user has a valid role assigned in the user_roles table.');
+        } else {
+          console.log(`✅ User role fetched from user_roles table: ${fetchedRole} for user ${user.id}`);
+        }
+        
         setUserRole(fetchedRole);
       } catch (err) {
-        console.error('Error fetching user role:', err);
+        console.error('❌ Exception while fetching user role:', err);
         setUserRole(null);
       }
     };

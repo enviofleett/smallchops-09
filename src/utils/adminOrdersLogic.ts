@@ -289,12 +289,11 @@ export const isOrderExpired = (
 };
 
 export const calculateOrderCounts = (orders: OrderWithItems[], totalCount: number) => {
-  // PRODUCTION FIX: Count ALL confirmed orders, not just paid ones
-  const confirmedOrders = orders.filter(o => o.status === 'confirmed');
-  
+  // PRODUCTION: Count orders by status including pending
   return {
     all: totalCount,
-    confirmed: confirmedOrders.length,
+    pending: orders.filter(o => o.status === 'pending').length,
+    confirmed: orders.filter(o => o.status === 'confirmed').length,
     preparing: orders.filter(o => o.status === 'preparing').length,
     ready: orders.filter(o => o.status === 'ready').length,
     out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,

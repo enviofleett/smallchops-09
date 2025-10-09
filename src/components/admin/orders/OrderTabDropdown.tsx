@@ -9,6 +9,7 @@ interface OrderTabDropdownProps {
   onTabChange: (tab: string) => void;
   orderCounts: {
     all: number;
+    pending: number;
     confirmed: number;
     preparing: number;
     ready: number;
@@ -26,6 +27,7 @@ export const OrderTabDropdown = ({
 
   const tabs = [
     { value: 'all', label: 'All Orders', count: orderCounts.all, color: '' },
+    { value: 'pending', label: 'Pending', count: orderCounts.pending, color: '' },
     { value: 'confirmed', label: 'Confirmed', count: orderCounts.confirmed, color: '' },
     { value: 'preparing', label: 'Preparing', count: orderCounts.preparing, color: '' },
     { value: 'ready', label: 'Ready', count: orderCounts.ready, color: '' },

@@ -93,8 +93,8 @@ function AdminOrdersContent() {
   });
 
 
-  // PRODUCTION FIX: Use real-time updates for confirmed tab, fallback to polling for others
-  const useRealTime = state.activeTab === 'confirmed';
+  // PRODUCTION: Use real-time updates for pending and confirmed tabs
+  const useRealTime = state.activeTab === 'pending' || state.activeTab === 'confirmed';
   
   // Real-time hook for confirmed orders
   const {
@@ -259,15 +259,29 @@ function AdminOrdersContent() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Pending</p>
+                  <p className="text-2xl font-bold">{orderCounts.pending}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
-                  <Clock className="w-5 h-5" />
+                  <Package className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Ready Orders</p>
+                  <p className="text-sm text-muted-foreground">Ready</p>
                   <p className="text-2xl font-bold">{orderCounts.ready}</p>
                 </div>
               </div>
@@ -278,7 +292,7 @@ function AdminOrdersContent() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                  <Package className="w-5 h-5" />
+                  <CheckCircle className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">In Progress</p>
@@ -294,7 +308,7 @@ function AdminOrdersContent() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                  <CheckCircle className="w-5 h-5" />
+                  <TrendingUp className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Delivered</p>
@@ -467,9 +481,12 @@ function AdminOrdersContent() {
             
             {/* Desktop: Full grid layout */}
             <div className="hidden md:block">
-              <TabsList className="grid w-full grid-cols-6 gap-1 p-1 bg-muted rounded-lg">
+              <TabsList className="grid w-full grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
                 <TabsTrigger value="all" className="text-sm px-2 py-2 data-[state=active]:bg-background">
-                  All Orders ({orderCounts.all})
+                  All ({orderCounts.all})
+                </TabsTrigger>
+                <TabsTrigger value="pending" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                  Pending ({orderCounts.pending})
                 </TabsTrigger>
                 <TabsTrigger value="confirmed" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   Confirmed ({orderCounts.confirmed})
@@ -481,7 +498,7 @@ function AdminOrdersContent() {
                   Ready ({orderCounts.ready})
                 </TabsTrigger>
                 <TabsTrigger value="out_for_delivery" className="text-sm px-2 py-2 data-[state=active]:bg-background">
-                  Out for Delivery ({orderCounts.out_for_delivery})
+                  Out ({orderCounts.out_for_delivery})
                 </TabsTrigger>
                 <TabsTrigger value="delivered" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   Delivered ({orderCounts.delivered})

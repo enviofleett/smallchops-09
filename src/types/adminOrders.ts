@@ -25,6 +25,7 @@ export interface DeliverySchedule {
 
 export interface OrderCounts {
   all: number;
+  pending: number;
   confirmed: number;
   preparing: number;
   ready: number;

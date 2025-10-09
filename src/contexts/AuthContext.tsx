@@ -173,6 +173,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .maybeSingle();
 
       if (customerAcc) {
+        // Validate that customer has required email field
+        if (!customerAcc.email) {
+          console.error(`❌ Customer account missing email for user ${authUser.id} (${authUser.email})`);
+          console.error('Customer account data:', {
+            customer_id: customerAcc.id,
+            user_id: customerAcc.user_id,
+            name: customerAcc.name,
+            email: customerAcc.email
+          });
+          logger.error('Customer account has NULL email - data integrity issue', {
+            customer_id: customerAcc.id,
+            user_id: customerAcc.user_id,
+            auth_email: authUser.email
+          });
+          
+          // Attempt to fix by updating from auth.users email
+          if (authUser.email) {
+            console.warn(`⚠️ Attempting to fix missing email for customer ${customerAcc.id}`);
+            const { error: updateError } = await supabase
+              .from('customer_accounts')
+              .update({ email: authUser.email })
+              .eq('id', customerAcc.id);
+            
+            if (!updateError) {
+              console.log(`✅ Successfully updated customer email to ${authUser.email}`);
+              customerAcc.email = authUser.email;
+            } else {
+              console.error('❌ Failed to update customer email:', updateError);
+              throw new Error('Customer account is missing email and could not be fixed. Please contact support.');
+            }
+          } else {
+            throw new Error('Customer account is missing email. Please contact support.');
+          }
+        }
+        
+        // Validate email format if present
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (customerAcc.email && !emailRegex.test(customerAcc.email)) {
+          console.error(`❌ Invalid email format for customer ${customerAcc.id}: ${customerAcc.email}`);
+          logger.error('Customer account has invalid email format', {
+            customer_id: customerAcc.id,
+            email: customerAcc.email
+          });
+          throw new Error('Customer account has invalid email format. Please contact support.');
+        }
+        
+        console.log(`✅ Customer account validated: ${customerAcc.email}`);
+        
         // Customer user
         setCustomerAccount(customerAcc);
         setUserType('customer');
@@ -219,13 +267,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.error('Failed to create admin profile:', profileError);
         }
       } else {
+        // Validate that user has email before creating customer account
+        if (!authUser.email) {
+          console.error('❌ Cannot create customer account: user has no email');
+          logger.error('Attempted to create customer account without email', {
+            user_id: authUser.id,
+            metadata: authUser.user_metadata
+          });
+          throw new Error('Cannot create customer account: email is required');
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(authUser.email)) {
+          console.error(`❌ Invalid email format: ${authUser.email}`);
+          logger.error('Attempted to create customer account with invalid email format', {
+            user_id: authUser.id,
+            email: authUser.email
+          });
+          throw new Error('Cannot create customer account: invalid email format');
+        }
+        
         // Create customer account with enhanced Google profile data
         const customerName = authUser.user_metadata?.full_name || 
                            authUser.user_metadata?.name || 
                            `${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() ||
                            authUser.email?.split('@')[0] || 'Customer';
+        
+        console.log(`✅ Creating customer account with email: ${authUser.email}`);
                            
-        const { data: newCustomer } = await supabase
+        const { data: newCustomer, error: createError } = await supabase
           .from('customer_accounts')
           .insert({
             user_id: authUser.id,
@@ -236,7 +307,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .select()
           .single();
 
+        if (createError) {
+          console.error('❌ Failed to create customer account:', createError);
+          logger.error('Failed to create customer account', {
+            user_id: authUser.id,
+            email: authUser.email,
+            error: createError
+          });
+          throw createError;
+        }
+
         if (newCustomer) {
+          console.log(`✅ Customer account created successfully: ${newCustomer.id}`);
           setCustomerAccount(newCustomer);
           setUserType('customer');
         }
@@ -355,6 +437,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async ({ email, password, name, phone }: LoginCredentials & { name: string; phone?: string }) => {
     try {
+      // Validate email format before attempting signup
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email || !emailRegex.test(email)) {
+        const errorMsg = 'Please provide a valid email address';
+        console.error('❌ Sign up failed: Invalid email format', email);
+        toast({
+          title: "Registration failed",
+          description: errorMsg,
+          variant: "destructive",
+        });
+        return { success: false, error: errorMsg };
+      }
+      
       const redirectUrl = `${window.location.origin}/auth-callback`;
       const userData: Record<string, any> = { 
         name, 
@@ -365,6 +460,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (phone && phone.trim()) {
         userData.phone = phone;
       }
+
+      console.log(`✅ Attempting customer signup with email: ${email}`);
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -497,6 +594,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUpAdmin = async (credentials: { email: string; password: string; name: string }) => {
     try {
       const { email, password, name } = credentials;
+      
+      // Validate email format before attempting signup
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email || !emailRegex.test(email)) {
+        const errorMsg = 'Please provide a valid email address';
+        console.error('❌ Admin sign up failed: Invalid email format', email);
+        toast({
+          title: "Admin registration failed",
+          description: errorMsg,
+          variant: "destructive",
+        });
+        return { success: false, error: errorMsg };
+      }
+      
+      console.log(`✅ Attempting admin signup with email: ${email}`);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,

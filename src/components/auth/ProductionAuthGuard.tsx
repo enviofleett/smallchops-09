@@ -75,6 +75,9 @@ const ProductionAuthGuard: React.FC<ProductionAuthGuardProps> = ({
 
   // Not admin user - show access denied
   if (!canAccessAdmin) {
+    // Check if this is due to a null role (data integrity issue)
+    const hasNullRole = isAuthenticated && user && !user.role;
+    
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
@@ -82,15 +85,29 @@ const ProductionAuthGuard: React.FC<ProductionAuthGuardProps> = ({
             <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
               <Shield className="h-8 w-8 text-destructive" />
             </div>
-            <CardTitle className="text-destructive">Access Denied</CardTitle>
+            <CardTitle className="text-destructive">
+              {hasNullRole ? 'Account Configuration Error' : 'Access Denied'}
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                You don't have administrator privileges to access this section.
+                {hasNullRole ? (
+                  <>
+                    Your account is missing a required role assignment. 
+                    This is a data integrity issue that must be resolved by an administrator.
+                  </>
+                ) : (
+                  'You don\'t have administrator privileges to access this section.'
+                )}
               </AlertDescription>
             </Alert>
+            {hasNullRole && (
+              <p className="text-sm text-muted-foreground">
+                Error Code: NULL_ROLE | User ID: {user?.id}
+              </p>
+            )}
             <div className="space-y-2">
               <Button
                 onClick={() => window.location.href = '/'}
@@ -98,13 +115,15 @@ const ProductionAuthGuard: React.FC<ProductionAuthGuardProps> = ({
               >
                 Return to Store
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => window.location.href = '/admin/auth'}
-                className="w-full"
-              >
-                Login as Admin
-              </Button>
+              {!hasNullRole && (
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.href = '/admin/auth'}
+                  className="w-full"
+                >
+                  Login as Admin
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

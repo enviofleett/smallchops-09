@@ -244,8 +244,15 @@ export const useRoleBasedPermissions = () => {
         const fetchedRole = data?.role as UserRole || null;
         
         if (fetchedRole === null) {
-          console.warn(`⚠️ User role is NULL for user ${user.id} (${user.email}). This may indicate a data integrity issue.`);
-          console.warn('Please ensure the user has a valid role assigned in the user_roles table.');
+          console.error(`❌ User role is NULL for user ${user.id} (${user.email}). This is a data integrity issue.`);
+          console.error('User details:', {
+            user_id: user.id,
+            email: user.email,
+            has_user_roles_entry: data !== null,
+            user_roles_data: data
+          });
+          console.warn('⚠️ This user will have restricted access until a valid role is assigned.');
+          console.warn('Action required: Assign a role in the user_roles table for this user.');
         } else {
           console.log(`✅ User role fetched from user_roles table: ${fetchedRole} for user ${user.id}`);
         }
@@ -268,7 +275,8 @@ export const useRoleBasedPermissions = () => {
     }
 
     if (!userRole) {
-      console.log(`❌ Permission denied for ${menuKey}: No user role found`);
+      console.error(`❌ Permission denied for ${menuKey}: No user role found for user ${user?.id} (${user?.email})`);
+      console.error('This indicates a data integrity issue. User must have a valid role assigned in user_roles table.');
       return false;
     }
 

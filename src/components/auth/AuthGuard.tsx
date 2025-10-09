@@ -55,6 +55,30 @@ const AuthGuard = ({
     if (!isCustomerAuth || !customerAccount) {
       return <Navigate to={`${fallbackPath}?mode=customer`} state={{ from: location }} replace />;
     }
+    
+    // Validate customer account has required email field
+    if (!customerAccount.email) {
+      console.error('❌ Customer account is missing email - blocking access');
+      console.error('Customer account details:', {
+        id: customerAccount.id,
+        user_id: customerAccount.user_id,
+        name: customerAccount.name
+      });
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-md text-center">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">Account Configuration Error</h2>
+            <p className="text-gray-700 mb-4">
+              Your customer account is missing required information (email). 
+              Please contact support to resolve this issue.
+            </p>
+            <p className="text-sm text-gray-500">
+              Error Code: MISSING_EMAIL
+            </p>
+          </div>
+        </div>
+      );
+    }
   }
 
   // If no specific role required, check for any authentication

@@ -83,3 +83,11 @@ export const useAnalyticsDashboard = (startDate: Date, endDate: Date) => {
     staleTime: 5 * 60 * 1000,
   });
 };
+
+export const useAllProducts = () => {
+  return useQuery({
+    queryKey: ['all-products'],
+    queryFn: () => import('@/api/advancedReports').then(m => m.getAllProducts()),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+};

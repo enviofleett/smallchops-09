@@ -163,6 +163,16 @@ export async function getAnalyticsDashboard(
   return data;
 }
 
+export async function getAllProducts(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name')
+    .order('name');
+
+  if (error) throw new Error(`Failed to fetch products: ${error.message}`);
+  return data || [];
+}
+
 // CSV Export Utility
 export function exportToCSV(data: any[], filename: string) {
   if (!data || data.length === 0) return;

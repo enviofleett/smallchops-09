@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, parseISO } from 'date-fns';
-import { useTopProducts, useProductTrends } from '@/hooks/useAdvancedReports';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useAllProducts, useProductTrends } from '@/hooks/useAdvancedReports';
 
 interface ProductTrendsChartProps {
   startDate: Date;
@@ -14,14 +18,17 @@ interface ProductTrendsChartProps {
 
 export function ProductTrendsChart({ startDate, endDate, interval }: ProductTrendsChartProps) {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   
-  const { data: topProducts, isLoading: productsLoading } = useTopProducts(startDate, endDate, 10);
+  const { data: allProducts, isLoading: productsLoading } = useAllProducts();
   const { data: trendsData, isLoading: trendsLoading } = useProductTrends(
     selectedProductId,
     startDate,
     endDate,
     interval
   );
+
+  const selectedProduct = allProducts?.find(p => p.id === selectedProductId);
 
   const chartData = trendsData?.map(item => ({
     date: format(parseISO(item.interval_start), 'MMM d'),
@@ -48,18 +55,47 @@ export function ProductTrendsChart({ startDate, endDate, interval }: ProductTren
       <CardHeader>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <CardTitle>Product Sales Trends</CardTitle>
-          <Select value={selectedProductId || ''} onValueChange={setSelectedProductId}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder="Select a product" />
-            </SelectTrigger>
-            <SelectContent>
-              {topProducts?.map(product => (
-                <SelectItem key={product.product_id} value={product.product_id}>
-                  {product.product_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-full sm:w-64 justify-between"
+              >
+                {selectedProduct ? selectedProduct.name : "Select a product..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full sm:w-64 p-0">
+              <Command>
+                <CommandInput placeholder="Search products..." />
+                <CommandList>
+                  <CommandEmpty>No product found.</CommandEmpty>
+                  <CommandGroup>
+                    {allProducts?.map((product) => (
+                      <CommandItem
+                        key={product.id}
+                        value={product.name}
+                        onSelect={() => {
+                          setSelectedProductId(product.id === selectedProductId ? null : product.id);
+                          setOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedProductId === product.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {product.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
       </CardHeader>
       <CardContent>

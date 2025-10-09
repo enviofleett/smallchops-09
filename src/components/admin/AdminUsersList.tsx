@@ -54,28 +54,39 @@ export function AdminUsersList() {
   const { data: users, isLoading } = useQuery<AdminUser[]>({
     queryKey: ['admin-users-list'],
     queryFn: async () => {
-      const profilesResult: any = await (supabase as any)
-        .from('profiles')
-        .select('id, email, name, is_active, created_at')
-        .eq('user_type', 'admin')
-        .order('created_at', { ascending: false });
-
-      if (profilesResult.error) throw profilesResult.error;
-
+      // Fetch all admin users from user_roles table
       const rolesResult: any = await (supabase as any)
         .from('user_roles')
-        .select('user_id, role')
+        .select('user_id, role, is_active')
         .eq('is_active', true)
-        .or('expires_at.is.null,expires_at.gt.now()');
+        .or('expires_at.is.null,expires_at.gt.now()')
+        .order('created_at', { ascending: false });
 
       if (rolesResult.error) throw rolesResult.error;
 
+      // Get unique user IDs with admin roles
+      const adminUserIds = rolesResult.data?.map((r: any) => r.user_id) || [];
+      
+      if (adminUserIds.length === 0) {
+        return [];
+      }
+
+      // Fetch profiles for these users
+      const profilesResult: any = await (supabase as any)
+        .from('profiles')
+        .select('id, email, name, is_active, created_at')
+        .in('id', adminUserIds);
+
+      if (profilesResult.error) throw profilesResult.error;
+
+      // Fetch auth data for last sign in times
       const authResult: any = await (supabase as any).auth.admin.listUsers();
 
-      const roleMap = new Map<string, UserRole>();
+      // Create maps for quick lookup
+      const roleMap = new Map<string, { role: UserRole; is_active: boolean }>();
       if (rolesResult.data) {
         rolesResult.data.forEach((r: any) => {
-          roleMap.set(r.user_id, r.role as UserRole);
+          roleMap.set(r.user_id, { role: r.role as UserRole, is_active: r.is_active });
         });
       }
 
@@ -86,15 +97,17 @@ export function AdminUsersList() {
         });
       }
 
+      // Combine the data
       const result: AdminUser[] = [];
       if (profilesResult.data) {
         profilesResult.data.forEach((p: any) => {
+          const roleData = roleMap.get(p.id);
           result.push({
             id: p.id,
             email: p.email || '',
             name: p.name || p.email || 'Unknown',
-            role: roleMap.get(p.id) || null,
-            is_active: p.is_active || false,
+            role: roleData?.role || null,
+            is_active: p.is_active && (roleData?.is_active ?? false),
             created_at: p.created_at,
             last_sign_in_at: authMap.get(p.id) || null,
           });

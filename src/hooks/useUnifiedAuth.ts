@@ -22,9 +22,10 @@ export const useUnifiedAuth = () => {
     // Special case for toolbuxdev@gmail.com
     if (user.email === 'toolbuxdev@gmail.com') return true;
     
-    // Check if user has any admin role from user_roles table
-    return userType === 'admin' && userRole !== null;
-  }, [isAuthenticated, user, userType, userRole]);
+    // Check if user has any valid role from user_roles table
+    // This allows support_staff and other roles to access admin areas
+    return userRole !== null;
+  }, [isAuthenticated, user, userRole]);
 
   // Unified permission check
   const hasMenuPermission = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view'): boolean => {
@@ -58,9 +59,10 @@ export const useUnifiedAuth = () => {
     // Special case for toolbuxdev@gmail.com
     if (user.email === 'toolbuxdev@gmail.com') return true;
     
-    // Must be admin type with valid role from user_roles table
-    return isAdmin && userRole !== null;
-  }, [isAuthenticated, user, isAdmin, userRole]);
+    // Allow access if user has any valid role from user_roles table
+    // This includes support_staff, account_manager, etc.
+    return userRole !== null;
+  }, [isAuthenticated, user, userRole]);
 
   return {
     // Core auth state

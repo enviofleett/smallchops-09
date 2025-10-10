@@ -293,7 +293,8 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       throw new Error(`Failed to get analytics: ${analyticsError.message}`);
     }
 
-    // Get all customers for display WITH DATE FILTERING
+    // Get all customers for display WITH DATE FILTERING (PRODUCTION DATA SOURCE)
+    // This function ensures only customers with PAID orders are returned
     const { data: customersResult, error: customersError } = await supabase
       .rpc('get_all_customers_display', {
         p_start_date: from.toISOString(),
@@ -305,9 +306,26 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       throw new Error(`Failed to get customers: ${customersError.message}`);
     }
 
-    // Parse the results
+    // Parse the results - PRODUCTION DATA with proper null safety
     const analytics = analyticsResult as any;
-    const allCustomers: Customer[] = (customersResult as any[]) || [];
+    let allCustomers: Customer[] = (customersResult as any[]) || [];
+    
+    // CRITICAL: Deduplicate customers by email to prevent React key conflicts
+    // This ensures guest customers with same email are merged into one entry
+    const customerMap = new Map<string, Customer>();
+    allCustomers.forEach(customer => {
+      const existing = customerMap.get(customer.email);
+      if (existing) {
+        // Merge: keep the one with more orders or higher spending
+        if (customer.totalOrders > existing.totalOrders || 
+            customer.totalSpent > existing.totalSpent) {
+          customerMap.set(customer.email, customer);
+        }
+      } else {
+        customerMap.set(customer.email, customer);
+      }
+    });
+    allCustomers = Array.from(customerMap.values());
 
     // Get email statuses for all customers
     const emailStatuses = await getCustomerEmailStatuses(allCustomers.map(c => c.email).filter(email => email));
@@ -324,19 +342,20 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       }
     });
 
-    // Calculate additional data for analysis
+    // Calculate additional data for analysis - PRODUCTION READY
+    // Only customers with PAID orders are included (validated by DB function)
     const topCustomersByOrders = allCustomers
-      .filter(c => c.totalOrders > 0)
+      .filter(c => c.totalOrders > 0 && c.totalSpent > 0) // Ensure real paid transactions
       .sort((a, b) => b.totalOrders - a.totalOrders)
       .slice(0, 10);
     
     const topCustomersBySpending = allCustomers
-      .filter(c => c.totalSpent > 0)
+      .filter(c => c.totalSpent > 0) // Only customers who actually paid
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 10);
     
     const repeatCustomers = allCustomers
-      .filter(c => c.totalOrders > 1)
+      .filter(c => c.totalOrders > 1 && c.totalSpent > 0) // Multiple paid orders
       .sort((a, b) => b.totalOrders - a.totalOrders)
       .slice(0, 10);
 

@@ -79,9 +79,9 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
 
   const mobileComponent = (
     <div className="space-y-3">
-      {customers.map((customer) => (
+      {customers.map((customer, index) => (
         <MobileCard 
-          key={customer.id}
+          key={`${customer.id}-${customer.email}-${index}`}
           onClick={() => {
             setSelectedCustomer(customer);
             setDetailsOpen(true);
@@ -227,8 +227,8 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
               </tr>
             </thead>
             <tbody>
-              {customers.map((customer) => (
-                <tr key={customer.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+              {customers.map((customer, index) => (
+                <tr key={`${customer.id}-${customer.email}-${index}`} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-4">
                       <button

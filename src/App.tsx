@@ -216,10 +216,10 @@ const App = () => {
           <AuthProvider>
             <NotificationProvider>
               <NotificationIntegration />
-              <FloatingOrderNotifications />
-              <OrderNotificationListener />
               <CartProvider>
             <BrowserRouter>
+              <FloatingOrderNotifications />
+              <OrderNotificationListener />
             <Routes>
               {/* Customer store at root */}
               <Route path="/" element={<PublicHome />} />

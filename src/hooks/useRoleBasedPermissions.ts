@@ -208,12 +208,16 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
 export const useRoleBasedPermissions = () => {
   const { user } = useAuth();
   const [userRole, setUserRole] = React.useState<UserRole | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   // Fetch user role from user_roles table
   React.useEffect(() => {
     const fetchUserRole = async () => {
+      setIsLoading(true);
+      
       if (!user?.id) {
         setUserRole(null);
+        setIsLoading(false);
         return;
       }
 
@@ -221,6 +225,7 @@ export const useRoleBasedPermissions = () => {
       if (user.email === 'toolbuxdev@gmail.com') {
         console.log('🔐 SUPER ADMIN ACCESS: toolbuxdev@gmail.com detected, granting super_admin role');
         setUserRole('super_admin');
+        setIsLoading(false);
         return;
       }
 
@@ -238,6 +243,7 @@ export const useRoleBasedPermissions = () => {
         if (error) {
           console.error('❌ Error fetching user role:', error);
           setUserRole(null);
+          setIsLoading(false);
           return;
         }
 
@@ -251,24 +257,24 @@ export const useRoleBasedPermissions = () => {
         }
         
         setUserRole(fetchedRole);
+        setIsLoading(false);
       } catch (err) {
         console.error('❌ Exception while fetching user role:', err);
         setUserRole(null);
+        setIsLoading(false);
       }
     };
 
     fetchUserRole();
   }, [user?.id, user?.email]);
 
-  const hasPermission = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view'): boolean => {
+  const hasPermission = React.useCallback((menuKey: string, requiredLevel: 'view' | 'edit' = 'view'): boolean => {
     // CRITICAL: Special case for toolbuxdev@gmail.com - always has access
     if (user?.email === 'toolbuxdev@gmail.com') {
-      console.log(`✅ Permission granted for ${menuKey} (super admin: toolbuxdev@gmail.com)`);
       return true;
     }
 
     if (!userRole) {
-      console.log(`❌ Permission denied for ${menuKey}: No user role found`);
       return false;
     }
 
@@ -282,7 +288,7 @@ export const useRoleBasedPermissions = () => {
     if (requiredLevel === 'edit' && permission !== 'edit') return false;
     
     return true;
-  };
+  }, [user?.email, userRole]);
 
   const canCreateUsers = (): boolean => {
     return userRole === 'super_admin' || userRole === 'admin' || user?.email === 'toolbuxdev@gmail.com';
@@ -310,6 +316,7 @@ export const useRoleBasedPermissions = () => {
 
   return {
     userRole,
+    isLoading,
     hasPermission,
     canCreateUsers,
     canAssignRoles,

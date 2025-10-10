@@ -12,7 +12,7 @@ import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
 export default function AdminUsers() {
   const [activeTab, setActiveTab] = useState('users');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const { canCreateUsers } = useRoleBasedPermissions();
+  const { canCreateUsers, isLoading } = useRoleBasedPermissions();
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -26,10 +26,12 @@ export default function AdminUsers() {
             Manage admin users, invitations, and monitor activity
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Invite Admin User
-        </Button>
+        {!isLoading && (
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Invite Admin User
+          </Button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -91,7 +93,7 @@ export default function AdminUsers() {
         </TabsContent>
       </Tabs>
 
-      {canCreateUsers() && (
+      {!isLoading && canCreateUsers() && (
         <CreateAdminUserDialog 
           open={createDialogOpen} 
           onOpenChange={setCreateDialogOpen}

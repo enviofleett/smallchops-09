@@ -9,7 +9,7 @@ import { UserPlus, Shield } from "lucide-react";
 
 export const AdminUserControl = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const { canCreateUsers } = useRoleBasedPermissions();
+  const { canCreateUsers, isLoading } = useRoleBasedPermissions();
 
   const handleCreateSuccess = () => {
     setShowCreateDialog(false);
@@ -29,7 +29,7 @@ export const AdminUserControl = () => {
               Create and manage admin users with role-based permissions
             </p>
           </div>
-          {canCreateUsers() && (
+          {!isLoading && canCreateUsers() && (
             <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
               <UserPlus className="w-4 h-4 mr-2" />
               Create Admin User

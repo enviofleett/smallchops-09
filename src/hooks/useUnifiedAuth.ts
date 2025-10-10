@@ -9,11 +9,11 @@ import { useMemo } from 'react';
  */
 export const useUnifiedAuth = () => {
   const { user, isAuthenticated, isLoading, userType, session } = useAuth();
-  const { userRole, hasPermission: roleBasedPermission, canAssignRoles, canCreateUsers } = useRoleBasedPermissions();
+  const { userRole, hasPermission: roleBasedPermission, canAssignRoles, canCreateUsers, isLoading: roleLoading } = useRoleBasedPermissions();
   const { data: dbPermissions, isLoading: permissionsLoading } = usePermissions();
 
   // Consolidate loading states
-  const isAuthLoading = isLoading || permissionsLoading;
+  const isAuthLoading = isLoading || permissionsLoading || roleLoading;
 
   // Production-safe admin check using role-based permissions
   const isAdmin = useMemo(() => {

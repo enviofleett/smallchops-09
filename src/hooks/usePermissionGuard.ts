@@ -7,10 +7,10 @@ import { useAuth } from '@/contexts/AuthContext';
  */
 export const usePermissionGuard = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view') => {
   const { user, isLoading: authLoading } = useAuth();
-  const { hasPermission } = useRoleBasedPermissions();
+  const { hasPermission, isLoading: roleLoading } = useRoleBasedPermissions();
   
   // PRODUCTION SECURITY: Enhanced safety checks
-  const isLoading = authLoading;
+  const isLoading = authLoading || roleLoading;
   const isAuthenticated = !!user?.id;
   
   // PRODUCTION SECURITY: Role-based permission checking

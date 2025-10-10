@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -14,7 +14,8 @@ import {
   Settings
 } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-import { usePermissionGuard, MENU_PERMISSION_KEYS, type MenuPermissionKey } from '@/hooks/usePermissionGuard';
+import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
+import { MENU_PERMISSION_KEYS, type MenuPermissionKey } from '@/hooks/usePermissionGuard';
 import startersLogo from '@/assets/starters-logo.png';
 import {
   Sidebar,
@@ -28,6 +29,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface MenuItem {
   icon: React.ComponentType<{ className?: string }>;
@@ -115,8 +117,10 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const { data: settings } = useBusinessSettings();
+  const { userRole, hasPermission } = useRoleBasedPermissions();
   
   const collapsed = state === "collapsed";
+  const isLoading = userRole === null;
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
@@ -125,54 +129,76 @@ export function AppSidebar() {
     return location.pathname.startsWith(path);
   };
 
-  const PermissionMenuItem = ({ item }: { item: MenuItem }) => {
-    const { hasPermission, isLoading } = usePermissionGuard(item.permissionKey, 'view');
-    
-    // Don't render while loading permissions
-    if (isLoading) return null;
-    if (!hasPermission) return null;
-    
-    return (
-      <SidebarMenuItem key={item.path}>
-        <SidebarMenuButton 
-          asChild 
-          isActive={isActive(item.path)}
-          tooltip={collapsed ? item.label : undefined}
-          className="w-full justify-start"
-        >
-          <NavLink to={item.path} end={item.path === '/dashboard'}>
-            <item.icon className="w-4 h-4 shrink-0" />
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    );
-  };
+  // Pre-compute visible items to avoid flickering
+  const visibleMenuGroups = useMemo(() => {
+    if (isLoading) return { core: [], management: [], administration: [] };
+
+    const filterItems = (items: MenuItem[]) => 
+      items.filter(item => hasPermission(item.permissionKey, 'view'));
+
+    return {
+      core: filterItems(coreOperations),
+      management: filterItems(management),
+      administration: filterItems(administration),
+    };
+  }, [isLoading, hasPermission]);
+
+  const renderMenuItem = (item: MenuItem) => (
+    <SidebarMenuItem key={item.path}>
+      <SidebarMenuButton 
+        asChild 
+        isActive={isActive(item.path)}
+        tooltip={collapsed ? item.label : undefined}
+        className="w-full justify-start"
+      >
+        <NavLink to={item.path} end={item.path === '/dashboard'}>
+          <item.icon className="w-4 h-4 shrink-0" />
+          {!collapsed && <span className="truncate">{item.label}</span>}
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
 
   const renderMenuGroup = (items: MenuItem[], groupLabel: string) => {
-    // Pre-filter items to avoid rendering empty groups
-    const visibleItems = items.filter(item => {
-      const { hasPermission, isLoading } = usePermissionGuard(item.permissionKey, 'view');
-      return !isLoading && hasPermission;
-    });
-    
-    if (visibleItems.length === 0) return null;
+    if (items.length === 0) return null;
     
     return (
-      <SidebarGroup>
+      <SidebarGroup key={groupLabel}>
         <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70 uppercase tracking-wider">
           {groupLabel}
         </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
-            {items.map((item) => (
-              <PermissionMenuItem key={item.path} item={item} />
-            ))}
+            {items.map(renderMenuItem)}
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
     );
   };
+
+  const renderLoadingSkeleton = () => (
+    <>
+      {[1, 2, 3].map((group) => (
+        <SidebarGroup key={group}>
+          <SidebarGroupLabel>
+            <Skeleton className="h-3 w-20" />
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {[1, 2, 3].map((item) => (
+                <SidebarMenuItem key={item}>
+                  <div className="flex items-center gap-2 px-2 py-1.5">
+                    <Skeleton className="h-4 w-4 shrink-0" />
+                    {!collapsed && <Skeleton className="h-4 flex-1" />}
+                  </div>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      ))}
+    </>
+  );
 
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">
@@ -195,9 +221,15 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-2">
-        {renderMenuGroup(coreOperations, "Core")}
-        {renderMenuGroup(management, "Management")}
-        {renderMenuGroup(administration, "Administration")}
+        {isLoading ? (
+          renderLoadingSkeleton()
+        ) : (
+          <>
+            {renderMenuGroup(visibleMenuGroups.core, "Core")}
+            {renderMenuGroup(visibleMenuGroups.management, "Management")}
+            {renderMenuGroup(visibleMenuGroups.administration, "Administration")}
+          </>
+        )}
       </SidebarContent>
     </Sidebar>
   );

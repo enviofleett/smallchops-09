@@ -204,25 +204,6 @@ export const EnhancedOrderCard: React.FC<EnhancedOrderCardProps> = ({
             </div>
           )}
 
-          {/* Delivery Address */}
-          {order.order_type === 'delivery' && order.delivery_address && (
-            <div className="space-y-2">
-              <h4 className="font-medium flex items-center gap-2 text-sm">
-                <MapPin className="w-4 h-4" />
-                Delivery Address
-              </h4>
-              <div className="bg-muted/30 rounded-lg p-3">
-                <p className="text-sm">
-                  {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
-                    ? `${(order.delivery_address as any).address_line_1 || ''}, ${(order.delivery_address as any).city || ''}`.trim()
-                    : typeof order.delivery_address === 'string' 
-                      ? order.delivery_address
-                      : 'Address available'
-                  }
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Advanced Controls */}
           {showAdvancedControls && (

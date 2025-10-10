@@ -26,11 +26,37 @@ export default function Reports() {
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [interval, setInterval] = useState<'day' | 'week' | 'month'>('day');
 
-  // Fetch data using custom hooks
-  const { data: revenueData, isLoading: revenueLoading } = useDailyRevenue(startDate, endDate);
-  const { data: productsData, isLoading: productsLoading } = useProductsSold(startDate, endDate, interval);
-  const { data: driverData, isLoading: driverLoading } = useDriverRevenue(startDate, endDate, interval);
-  const { data: dashboardData, isLoading: dashboardLoading } = useAnalyticsDashboard(startDate, endDate);
+  // Validate and normalize dates for production
+  const validStartDate = React.useMemo(() => {
+    const date = new Date(startDate);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, [startDate]);
+
+  const validEndDate = React.useMemo(() => {
+    const date = new Date(endDate);
+    date.setHours(23, 59, 59, 999);
+    return date;
+  }, [endDate]);
+
+  // Production validation: Ensure dates are valid
+  React.useEffect(() => {
+    if (validStartDate > validEndDate) {
+      console.error('⚠️ Invalid date range: Start date is after end date');
+      setEndDate(new Date(validStartDate));
+    }
+    
+    const daysDiff = Math.ceil((validEndDate.getTime() - validStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 365) {
+      console.warn('⚠️ Date range exceeds 365 days, performance may be affected');
+    }
+  }, [validStartDate, validEndDate]);
+
+  // Fetch data using custom hooks with validated dates
+  const { data: revenueData, isLoading: revenueLoading } = useDailyRevenue(validStartDate, validEndDate);
+  const { data: productsData, isLoading: productsLoading } = useProductsSold(validStartDate, validEndDate, interval);
+  const { data: driverData, isLoading: driverLoading } = useDriverRevenue(validStartDate, validEndDate, interval);
+  const { data: dashboardData, isLoading: dashboardLoading } = useAnalyticsDashboard(validStartDate, validEndDate);
 
   return (
     <div className="space-y-6 p-6">
@@ -45,7 +71,16 @@ export default function Reports() {
         
         <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
           {/* Interval Selector */}
-          <Select value={interval} onValueChange={(v: any) => setInterval(v)}>
+          <Select 
+            value={interval} 
+            onValueChange={(v: 'day' | 'week' | 'month') => {
+              if (['day', 'week', 'month'].includes(v)) {
+                setInterval(v);
+              } else {
+                console.error('⚠️ Invalid interval value:', v);
+              }
+            }}
+          >
             <SelectTrigger className="w-full sm:w-32">
               <SelectValue />
             </SelectTrigger>
@@ -68,7 +103,20 @@ export default function Reports() {
               <CalendarComponent
                 mode="single"
                 selected={startDate}
-                onSelect={(date) => date && setStartDate(date)}
+                onSelect={(date) => {
+                  if (date) {
+                    const normalizedDate = new Date(date);
+                    normalizedDate.setHours(0, 0, 0, 0);
+                    
+                    if (normalizedDate > endDate) {
+                      setStartDate(normalizedDate);
+                      setEndDate(normalizedDate);
+                    } else {
+                      setStartDate(normalizedDate);
+                    }
+                  }
+                }}
+                disabled={(date) => date > new Date() || date > endDate}
                 initialFocus
                 className="p-3 pointer-events-auto"
               />
@@ -86,8 +134,20 @@ export default function Reports() {
               <CalendarComponent
                 mode="single"
                 selected={endDate}
-                onSelect={(date) => date && setEndDate(date)}
-                disabled={(date) => date < startDate}
+                onSelect={(date) => {
+                  if (date) {
+                    const normalizedDate = new Date(date);
+                    normalizedDate.setHours(23, 59, 59, 999);
+                    
+                    if (normalizedDate < startDate) {
+                      setStartDate(normalizedDate);
+                      setEndDate(normalizedDate);
+                    } else {
+                      setEndDate(normalizedDate);
+                    }
+                  }
+                }}
+                disabled={(date) => date < startDate || date > new Date()}
                 initialFocus
                 className="p-3 pointer-events-auto"
               />
@@ -153,7 +213,7 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="trends" className="space-y-4">
-          <ProductTrendsChart startDate={startDate} endDate={endDate} interval={interval} />
+          <ProductTrendsChart startDate={validStartDate} endDate={validEndDate} interval={interval} />
         </TabsContent>
 
         <TabsContent value="drivers" className="space-y-4">
@@ -161,7 +221,7 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="delivery-fees" className="space-y-4">
-          <DeliveryFeesTable startDate={startDate} endDate={endDate} interval={interval} />
+          <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} />
         </TabsContent>
       </Tabs>
     </div>

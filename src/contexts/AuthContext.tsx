@@ -472,8 +472,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
       
+      // Clear auth state immediately for smooth UX
+      setUser(null);
+      setCustomerAccount(null);
+      setUserType(null);
+      setSession(null);
+      
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
+      // Clear any cached data
+      localStorage.removeItem('supabase.auth.token');
+      
     } catch (error) {
       console.error('Logout error:', error);
       throw error;

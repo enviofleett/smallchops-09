@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut, Home, Package, Users, Settings } from 'lucide-react';
+import { User, LogOut, Home, Package, Users, Settings, KeyRound, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { NotificationPreview } from '@/components/notifications/NotificationPreview';
+import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
+import { useToast } from '@/hooks/use-toast';
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -24,11 +26,32 @@ const TopNav = () => {
     data: settings
   } = useBusinessSettings();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  // Enable inactivity timeout
+  useInactivityTimeout();
+  
   const handleLogout = async () => {
-    await logout();
-    setShowUserMenu(false);
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      setShowUserMenu(false);
+      toast({
+        title: "Logged out successfully",
+        description: "You've been securely logged out",
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Logout failed",
+        description: "Please try again",
+        variant: "destructive",
+      });
+      setIsLoggingOut(false);
+    }
   };
   return <header className="bg-background border-b border-border sticky top-0 z-40 w-full">
       <div className="flex items-center justify-between gap-2 md:gap-4 px-3 py-3 md:px-6 md:py-4 min-h-[60px] md:min-h-[73px]">
@@ -134,13 +157,28 @@ const TopNav = () => {
                   <User className="h-4 w-4" />
                   <span>Profile</span>
                 </button>
+                <button 
+                  onClick={() => {
+                    navigate('/admin/change-password');
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-popover-foreground hover:bg-accent flex items-center gap-2"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  <span>Change Password</span>
+                </button>
                 <hr className="my-2 border-border" />
                 <button 
-                  onClick={handleLogout} 
-                  className="w-full px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="w-full px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 disabled:opacity-50"
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
+                  {isLoggingOut ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="h-4 w-4" />
+                  )}
+                  <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
                 </button>
               </div>
             )}

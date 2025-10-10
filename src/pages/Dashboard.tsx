@@ -136,38 +136,40 @@ const Dashboard = () => {
         </Button>
       </div>
 
-      {/* Calendar Picker + Revenue Per Day Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1 flex items-start">
+      {/* Date Range Selector - Full Width */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex-1 min-w-[280px]">
           <DateRangeSelector
             startDate={dateRange.startDate}
             endDate={dateRange.endDate}
             onRangeChange={handleDateRangeChange}
           />
         </div>
-        <div className="lg:col-span-3">
-          {dailyError ? (
-            <div className="text-center py-12 space-y-4">
-              <div className="text-destructive">
-                <p className="font-medium mb-2">Failed to load analytics</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {dailyError instanceof Error ? dailyError.message : 'Unknown error occurred'}
-                </p>
-                <div className="flex gap-2 justify-center">
-                  <Button onClick={() => refetchDaily()} variant="outline" size="sm">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Retry
-                  </Button>
-                </div>
+      </div>
+
+      {/* Revenue Per Day Chart - Full Width */}
+      <div className="w-full">
+        {dailyError ? (
+          <div className="text-center py-12 space-y-4">
+            <div className="text-destructive">
+              <p className="font-medium mb-2">Failed to load analytics</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {dailyError instanceof Error ? dailyError.message : 'Unknown error occurred'}
+              </p>
+              <div className="flex gap-2 justify-center">
+                <Button onClick={() => refetchDaily()} variant="outline" size="sm">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
               </div>
             </div>
-          ) : (
-            <RevenuePerDayChart
-              dailyData={dailyMetrics?.dailyData || []}
-              isLoading={isDailyLoading}
-            />
-          )}
-        </div>
+          </div>
+        ) : (
+          <RevenuePerDayChart
+            dailyData={dailyMetrics?.dailyData || []}
+            isLoading={isDailyLoading}
+          />
+        )}
       </div>
 
       {/* Customer Segmentation Cards */}

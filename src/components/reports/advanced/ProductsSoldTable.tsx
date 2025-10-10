@@ -122,6 +122,22 @@ export function ProductsSoldTable({ data, isLoading }: ProductsSoldTableProps) {
                     </TableRow>
                   );
                 })}
+                
+                {/* Total Summary Row */}
+                <TableRow className="bg-muted/50 font-bold border-t-2">
+                  <TableCell className="font-bold">Total</TableCell>
+                  <TableCell className="font-bold text-muted-foreground">All Products</TableCell>
+                  <TableCell className="text-right font-bold">
+                    {filteredData.reduce((sum, row) => sum + Number(row.units_sold), 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-green-600">
+                    ₦{filteredData.reduce((sum, row) => sum + Number(row.total_revenue), 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right font-bold">
+                    ₦{(filteredData.reduce((sum, row) => sum + Number(row.total_revenue), 0) / 
+                      filteredData.reduce((sum, row) => sum + Number(row.units_sold), 0)).toFixed(2)}
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>

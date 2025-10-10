@@ -22,6 +22,8 @@ import { NetworkProvider } from "./components/network/NetworkProvider";
 import { OnlineStatusBanner } from "./components/network/OnlineStatusBanner";
 import { DeploymentInfo } from "./components/common/DeploymentInfo";
 import { NotificationIntegration } from "@/components/notifications/NotificationIntegration";
+import { FloatingOrderNotifications } from "@/components/notifications/FloatingOrderNotifications";
+import { OrderNotificationListener } from "@/components/notifications/OrderNotificationListener";
 import AdminLayout from "./components/layout/AdminLayout";
 import { CartProvider } from "@/contexts/CartProvider";
 
@@ -214,6 +216,8 @@ const App = () => {
           <AuthProvider>
             <NotificationProvider>
               <NotificationIntegration />
+              <FloatingOrderNotifications />
+              <OrderNotificationListener />
               <CartProvider>
             <BrowserRouter>
             <Routes>

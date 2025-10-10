@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { useNotificationSoundEffect } from '@/hooks/useNotificationSound';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info' | 'order';
@@ -17,6 +17,14 @@ export interface Notification {
   autoClose?: boolean;
   duration?: number;
   sound?: boolean;
+  data?: {
+    orderId?: string;
+    orderNumber?: string;
+    customerName?: string;
+    totalAmount?: number;
+    itemCount?: number;
+    status?: string;
+  };
 }
 
 interface NotificationState {
@@ -24,6 +32,8 @@ interface NotificationState {
   unreadCount: number;
   isPreviewVisible: boolean;
   currentPreview?: Notification;
+  activeFloatingNotifications: Notification[];
+  maxFloatingNotifications: number;
 }
 
 type NotificationAction =
@@ -33,12 +43,17 @@ type NotificationAction =
   | { type: 'MARK_ALL_AS_READ' }
   | { type: 'SHOW_PREVIEW'; payload: Notification }
   | { type: 'HIDE_PREVIEW' }
-  | { type: 'CLEAR_ALL' };
+  | { type: 'CLEAR_ALL' }
+  | { type: 'ADD_FLOATING_NOTIFICATION'; payload: Notification }
+  | { type: 'REMOVE_FLOATING_NOTIFICATION'; payload: string }
+  | { type: 'CLEAR_FLOATING_NOTIFICATIONS' };
 
 const initialState: NotificationState = {
   notifications: [],
   unreadCount: 0,
   isPreviewVisible: false,
+  activeFloatingNotifications: [],
+  maxFloatingNotifications: 5,
 };
 
 const notificationReducer = (
@@ -102,6 +117,42 @@ const notificationReducer = (
         unreadCount: 0,
       };
 
+    case 'ADD_FLOATING_NOTIFICATION': {
+      const existing = state.activeFloatingNotifications.find(
+        n => n.data?.orderId === action.payload.data?.orderId
+      );
+      
+      // Prevent duplicates within 5 seconds
+      if (existing && 
+          Date.now() - existing.timestamp.getTime() < 5000) {
+        return state;
+      }
+
+      const newNotifications = [action.payload, ...state.activeFloatingNotifications];
+      
+      // Keep only max notifications (FIFO)
+      const limited = newNotifications.slice(0, state.maxFloatingNotifications);
+      
+      return {
+        ...state,
+        activeFloatingNotifications: limited,
+      };
+    }
+
+    case 'REMOVE_FLOATING_NOTIFICATION':
+      return {
+        ...state,
+        activeFloatingNotifications: state.activeFloatingNotifications.filter(
+          n => n.id !== action.payload
+        ),
+      };
+
+    case 'CLEAR_FLOATING_NOTIFICATIONS':
+      return {
+        ...state,
+        activeFloatingNotifications: [],
+      };
+
     default:
       return state;
   }
@@ -116,6 +167,10 @@ interface NotificationContextType {
   clearAll: () => void;
   showPreview: (notification: Notification) => void;
   hidePreview: () => void;
+  activeFloatingNotifications: Notification[];
+  addFloatingNotification: (notification: Notification) => void;
+  removeFloatingNotification: (id: string) => void;
+  clearFloatingNotifications: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -193,6 +248,32 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     dispatch({ type: 'HIDE_PREVIEW' });
   }, []);
 
+  const addFloatingNotification = useCallback((notification: Notification) => {
+    dispatch({ type: 'ADD_FLOATING_NOTIFICATION', payload: notification });
+  }, []);
+
+  const removeFloatingNotification = useCallback((id: string) => {
+    dispatch({ type: 'REMOVE_FLOATING_NOTIFICATION', payload: id });
+  }, []);
+
+  const clearFloatingNotifications = useCallback(() => {
+    dispatch({ type: 'CLEAR_FLOATING_NOTIFICATIONS' });
+  }, []);
+
+  // Auto-clear old floating notifications (30 minutes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      state.activeFloatingNotifications.forEach(notification => {
+        if (now - notification.timestamp.getTime() > 30 * 60 * 1000) {
+          removeFloatingNotification(notification.id);
+        }
+      });
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [state.activeFloatingNotifications, removeFloatingNotification]);
+
   return (
     <NotificationContext.Provider
       value={{
@@ -204,6 +285,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         clearAll,
         showPreview,
         hidePreview,
+        activeFloatingNotifications: state.activeFloatingNotifications,
+        addFloatingNotification,
+        removeFloatingNotification,
+        clearFloatingNotifications,
       }}
     >
       {children}

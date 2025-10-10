@@ -3,12 +3,15 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Package } from 'lucide-react';
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Download, Package, Check, ChevronsUpDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { exportToCSV } from '@/api/advancedReports';
 import { useDriverRevenue, useDriverOrders } from '@/hooks/useAdvancedReports';
 import { Badge } from '@/components/ui/badge';
+import { useDebounce } from '@/hooks/useDebounce';
+import { cn } from '@/lib/utils';
 
 interface DeliveryFeesTableProps {
   startDate: Date;
@@ -18,9 +21,13 @@ interface DeliveryFeesTableProps {
 
 export function DeliveryFeesTable({ startDate, endDate, interval }: DeliveryFeesTableProps) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const { data: driverRevenue, isLoading: driversLoading } = useDriverRevenue(startDate, endDate, interval);
   const { data: driverOrders, isLoading: ordersLoading } = useDriverOrders(selectedDriverId, startDate, endDate);
+
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
   // Get unique drivers from driver revenue data
   const uniqueDrivers = driverRevenue?.reduce((acc, curr) => {
@@ -29,6 +36,13 @@ export function DeliveryFeesTable({ startDate, endDate, interval }: DeliveryFees
     }
     return acc;
   }, [] as Array<{ driver_id: string; driver_name: string }>);
+
+  // Filter drivers based on search query
+  const filteredDrivers = uniqueDrivers?.filter(driver =>
+    driver.driver_name.toLowerCase().includes(debouncedSearch.toLowerCase())
+  );
+
+  const selectedDriver = uniqueDrivers?.find(d => d.driver_id === selectedDriverId);
 
   const handleExport = () => {
     if (!driverOrders || driverOrders.length === 0) return;
@@ -61,18 +75,52 @@ export function DeliveryFeesTable({ startDate, endDate, interval }: DeliveryFees
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <CardTitle>Delivery Fees & Orders</CardTitle>
           <div className="flex gap-2 w-full sm:w-auto">
-            <Select value={selectedDriverId || ''} onValueChange={setSelectedDriverId}>
-              <SelectTrigger className="w-full sm:w-64">
-                <SelectValue placeholder="Select a driver" />
-              </SelectTrigger>
-              <SelectContent>
-                {uniqueDrivers?.map(driver => (
-                  <SelectItem key={driver.driver_id} value={driver.driver_id}>
-                    {driver.driver_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={open}
+                  className="w-full sm:w-64 justify-between"
+                >
+                  {selectedDriver ? selectedDriver.driver_name : "Select a driver"}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full sm:w-64 p-0" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search drivers..." 
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No driver found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredDrivers?.map((driver) => (
+                        <CommandItem
+                          key={driver.driver_id}
+                          value={driver.driver_name}
+                          onSelect={() => {
+                            setSelectedDriverId(driver.driver_id);
+                            setOpen(false);
+                            setSearchQuery('');
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedDriverId === driver.driver_id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {driver.driver_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <Button variant="outline" size="sm" onClick={handleExport} disabled={!driverOrders || driverOrders.length === 0}>
               <Download className="h-4 w-4 mr-2" />
               Export

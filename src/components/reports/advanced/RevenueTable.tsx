@@ -179,6 +179,21 @@ export function RevenueTable({ data, isLoading }: RevenueTableProps) {
                     )}
                   </React.Fragment>
                 ))}
+                
+                {/* Total Summary Row */}
+                <TableRow className="bg-muted/50 font-bold border-t-2">
+                  <TableCell></TableCell>
+                  <TableCell className="font-bold">Total</TableCell>
+                  <TableCell className="text-right font-bold text-green-600">
+                    ₦{data.reduce((sum, row) => sum + row.total_revenue, 0).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right font-bold hidden sm:table-cell">
+                    {data.reduce((sum, row) => sum + row.total_orders, 0)}
+                  </TableCell>
+                  <TableCell className="text-right font-bold hidden md:table-cell">
+                    ₦{(data.reduce((sum, row) => sum + row.total_revenue, 0) / data.reduce((sum, row) => sum + row.total_orders, 0)).toFixed(2)}
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>

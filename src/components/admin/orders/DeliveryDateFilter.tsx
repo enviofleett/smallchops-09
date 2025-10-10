@@ -27,12 +27,6 @@ export const DeliveryDateFilter: React.FC<DeliveryDateFilterProps> = ({
         </div>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">
-          <div className="flex items-center justify-between w-full gap-3">
-            <span>All Deliveries</span>
-            {orderCounts && <Badge variant="secondary">{orderCounts.all}</Badge>}
-          </div>
-        </SelectItem>
         <SelectItem value="today">
           <div className="flex items-center justify-between w-full gap-3">
             <span>Today</span>

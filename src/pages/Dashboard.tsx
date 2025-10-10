@@ -1,48 +1,42 @@
-import React, { useState } from 'react';
-import { Package, ShoppingCart, Users, TrendingUp, RefreshCw } from 'lucide-react';
-import RevenueChart from '@/components/charts/RevenueChart';
-import OrdersChart from '@/components/charts/OrdersChart';
-import { DailyMetricsPanel } from '@/components/dashboard/DailyMetricsPanel';
+import React, { useState, useMemo } from 'react';
+import { RefreshCw } from 'lucide-react';
 import DashboardHeader from '@/components/DashboardHeader';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ProgressiveLoader } from '@/components/ui/progressive-loader';
 import { useQuery } from '@tanstack/react-query';
 import { fetchDailyAnalytics } from '@/api/reports';
 import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
+import { RevenuePerDayChart } from '@/components/dashboard/RevenuePerDayChart';
+import { CustomerSegmentationCards } from '@/components/dashboard/CustomerSegmentationCards';
+import { WeekdaySalesChart } from '@/components/dashboard/WeekdaySalesChart';
 import { toast } from 'sonner';
+
 const Dashboard = () => {
-  const {
-    data,
-    isLoading,
-    error,
-    refresh
-  } = useDashboardData();
-  // Date range in YYYY-MM-DD format (client local dates)
-  // Backend will convert these to Lagos timezone (UTC+1) for querying
+  const { data, isLoading, error, refresh } = useDashboardData();
+
+  // Date range in YYYY-MM-DD format
   const [dateRange, setDateRange] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0]
+    endDate: new Date().toISOString().split('T')[0],
   });
 
-  // Fetch daily analytics data with proper error handling and retry logic
+  // Fetch daily analytics with enhanced metrics
   const {
     data: dailyMetrics,
     isLoading: isDailyLoading,
     error: dailyError,
-    refetch: refetchDaily
+    refetch: refetchDaily,
   } = useQuery({
-    queryKey: ['daily-metrics', dateRange],
+    queryKey: ['daily-analytics', dateRange],
     queryFn: async () => {
       try {
         const result = await fetchDailyAnalytics({
           startDate: dateRange.startDate,
           endDate: dateRange.endDate,
-          retryCount: 3
+          retryCount: 3,
         });
 
-        // Validate response structure
         if (!result || typeof result !== 'object') {
           throw new Error('Invalid response from analytics API');
         }
@@ -53,131 +47,146 @@ const Dashboard = () => {
       }
     },
     staleTime: 5 * 60 * 1000,
-    // 5 minutes
     retry: 2,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
-    enabled: !!data // Only fetch daily metrics after main dashboard data loads
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    enabled: !!data,
   });
-  if (isLoading) {
-    return <div className="space-y-6">
-        <DashboardHeader />
-        
-        {/* Loading Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {[...Array(4)].map((_, i) => <div key={i} className="bg-card rounded-2xl shadow-sm border border-border p-4 md:p-6">
-              <Skeleton className="h-4 w-24 mb-2" />
-              <Skeleton className="h-6 md:h-8 w-16 mb-2" />
-              <Skeleton className="h-3 w-20" />
-            </div>)}
-        </div>
 
-        {/* Loading Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
-            <Skeleton className="h-5 md:h-6 w-32 mb-4" />
-            <Skeleton className="h-48 md:h-64 w-full" />
-          </div>
-          <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
-            <Skeleton className="h-5 md:h-6 w-32 mb-4" />
-            <Skeleton className="h-48 md:h-64 w-full" />
-          </div>
-        </div>
-      </div>;
-  }
-  const formatCurrency = (amount: number) => {
-    if (amount === 0) return "₦0";
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('en-NG').format(num);
-  };
+  // Calculate customer segmentation metrics
+  const customerSegmentation = useMemo(() => {
+    if (!dailyMetrics?.dailyData) {
+      return {
+        guestCount: 0,
+        registeredCount: 0,
+        firstTimeOrdersCount: 0,
+        totalCheckouts: 0,
+      };
+    }
+
+    return {
+      guestCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (d.guestCheckouts || 0), 0),
+      registeredCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (d.registeredCheckouts || 0), 0),
+      firstTimeOrdersCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (d.firstTimeOrders || 0), 0),
+      totalCheckouts: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (d.orders || 0), 0),
+    };
+  }, [dailyMetrics]);
+
   const handleDateRangeChange = (startDate: string, endDate: string) => {
-    console.log('[Dashboard] Date range changed:', {
-      startDate,
-      endDate
-    });
+    console.log('[Dashboard] Date range changed:', { startDate, endDate });
 
-    // Validate date range
     const start = new Date(startDate);
     const end = new Date(endDate);
+
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      console.error('[Dashboard] Invalid date format:', {
-        startDate,
-        endDate
-      });
+      console.error('[Dashboard] Invalid date format:', { startDate, endDate });
       toast.error('Invalid date format. Please select valid dates.');
       return;
     }
+
     if (start > end) {
-      console.error('[Dashboard] Start date after end date:', {
-        startDate,
-        endDate
-      });
+      console.error('[Dashboard] Start date after end date:', { startDate, endDate });
       toast.error('Start date must be before end date.');
       return;
     }
-    setDateRange({
-      startDate,
-      endDate
-    });
+
+    setDateRange({ startDate, endDate });
     toast.success('Date range updated');
   };
-  return <div className="space-y-4 md:space-y-6">
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <DashboardHeader />
+
+        {/* Loading Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1">
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="lg:col-span-3">
+            <Skeleton className="h-[400px] w-full rounded-lg" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-lg" />
+          ))}
+        </div>
+
+        <Skeleton className="h-[400px] w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header with Refresh Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <DashboardHeader />
-        <div className="flex items-center gap-2">
-          <Button onClick={() => refresh(true)} disabled={isLoading} variant="outline" size="sm" className="flex items-center gap-2">
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
+        <Button
+          onClick={() => refresh(true)}
+          disabled={isLoading}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
-      <div className="space-y-4 md:space-y-6">
-
-        {/* Daily Metrics Section */}
-        <div className="space-y-4 md:space-y-6 mt-6">
-          <div className="flex items-center justify-between">
-            
-            <DateRangeSelector startDate={dateRange.startDate} endDate={dateRange.endDate} onRangeChange={handleDateRangeChange} />
-          </div>
-
-          {dailyError ? <div className="text-center py-12 space-y-4">
+      {/* Calendar Picker + Revenue Per Day Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-1 flex items-start">
+          <DateRangeSelector
+            startDate={dateRange.startDate}
+            endDate={dateRange.endDate}
+            onRangeChange={handleDateRangeChange}
+          />
+        </div>
+        <div className="lg:col-span-3">
+          {dailyError ? (
+            <div className="text-center py-12 space-y-4">
               <div className="text-destructive">
-                <p className="font-medium mb-2">Failed to load daily metrics</p>
+                <p className="font-medium mb-2">Failed to load analytics</p>
                 <p className="text-sm text-muted-foreground mb-4">
                   {dailyError instanceof Error ? dailyError.message : 'Unknown error occurred'}
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  {dailyError instanceof Error && (dailyError.message.includes('session') || dailyError.message.includes('Authentication') || dailyError.message.includes('AuthSessionMissingError')) ? 'Your session may have expired. Please refresh the page or log in again.' : dailyError instanceof Error && dailyError.message.includes('403') ? 'You do not have permission to view analytics. Please contact your administrator.' : dailyError instanceof Error && dailyError.message.includes('500') ? 'The server encountered an error. Please try again in a few moments.' : 'Please check your connection and try again.'}
                 </p>
                 <div className="flex gap-2 justify-center">
                   <Button onClick={() => refetchDaily()} variant="outline" size="sm">
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Retry
                   </Button>
-                  {dailyError instanceof Error && (dailyError.message.includes('session') || dailyError.message.includes('Authentication')) && <Button onClick={() => window.location.reload()} variant="default" size="sm">
-                      Refresh Page
-                    </Button>}
                 </div>
               </div>
-            </div> : <DailyMetricsPanel dailyData={dailyMetrics?.dailyData || []} isLoading={isDailyLoading} />}
+            </div>
+          ) : (
+            <RevenuePerDayChart
+              dailyData={dailyMetrics?.dailyData || []}
+              isLoading={isDailyLoading}
+            />
+          )}
         </div>
       </div>
 
-      {(!data || !data.stats?.totalProducts && !data.stats?.totalOrders) && !isLoading && <div className="text-center py-8 space-y-4">
-          <div className="text-muted-foreground">
-            <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />
-            <h3 className="text-lg font-medium">No Data Available</h3>
-            <p className="text-sm">Your dashboard will show data once you start adding products and receiving orders.</p>
-            <p className="text-xs mt-2">Check back after your first sale!</p>
-          </div>
-        </div>}
-    </div>;
+      {/* Customer Segmentation Cards */}
+      {!dailyError && (
+        <CustomerSegmentationCards
+          {...customerSegmentation}
+          isLoading={isDailyLoading}
+        />
+      )}
+
+      {/* Weekday Sales Comparison */}
+      {!dailyError && (
+        <WeekdaySalesChart
+          dailyData={dailyMetrics?.dailyData || []}
+          isLoading={isDailyLoading}
+        />
+      )}
+    </div>
+  );
 };
+
 export default Dashboard;

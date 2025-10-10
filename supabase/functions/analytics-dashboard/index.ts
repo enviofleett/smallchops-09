@@ -916,14 +916,23 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     // Group data by day
     const dailyMap: { [key: string]: any } = {};
     
+    // Get all registered customer IDs for this period for first-time order detection
+    const registeredCustomerIds = new Set((customers || []).map(c => c.id).filter(Boolean));
+    
     // Initialize all days in range
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateKey = d.toISOString().split('T')[0];
+      const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'long' });
+      
       dailyMap[dateKey] = {
         date: dateKey,
+        weekday: dayOfWeek,
         revenue: 0,
         orders: 0,
         cancelledOrders: 0,
+        guestCheckouts: 0,
+        registeredCheckouts: 0,
+        firstTimeOrders: 0,
         customers: new Set(),
         customerDetails: [] as any[],
         products: {} as { [key: string]: { name: string; quantity: number } },
@@ -946,6 +955,18 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
         if (dailyMap[dateKey]) {
           dailyMap[dateKey].revenue += Number(order.total_amount) || 0;
           dailyMap[dateKey].orders += 1;
+          
+          // Track guest vs registered checkouts
+          if (order.customer_id) {
+            dailyMap[dateKey].registeredCheckouts += 1;
+            
+            // Check if this is a first-time order (customer registered in this period)
+            if (registeredCustomerIds.has(order.customer_id)) {
+              dailyMap[dateKey].firstTimeOrders += 1;
+            }
+          } else {
+            dailyMap[dateKey].guestCheckouts += 1;
+          }
           
           if (order.customer_email) {
             dailyMap[dateKey].customers.add(order.customer_email);
@@ -1077,9 +1098,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
 
     return {
       date: dateKey,
+      weekday: day.weekday,
       revenue: day.revenue,
       orders: day.orders,
       cancelledOrders: day.cancelledOrders,
+      guestCheckouts: day.guestCheckouts,
+      registeredCheckouts: day.registeredCheckouts,
+      firstTimeOrders: day.firstTimeOrders,
       customers: day.customers.size,
       newProducts: day.newProducts,
       newCustomerRegistrations: day.newCustomerRegistrations,

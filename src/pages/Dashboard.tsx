@@ -52,9 +52,10 @@ const Dashboard = () => {
     enabled: !!data,
   });
 
-  // Calculate customer segmentation metrics
+  // Calculate customer segmentation metrics with production-grade validation
   const customerSegmentation = useMemo(() => {
-    if (!dailyMetrics?.dailyData) {
+    if (!dailyMetrics?.dailyData || dailyMetrics.dailyData.length === 0) {
+      console.warn('[Dashboard] No daily metrics available for customer segmentation');
       return {
         guestCount: 0,
         registeredCount: 0,
@@ -63,12 +64,28 @@ const Dashboard = () => {
       };
     }
 
-    return {
-      guestCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (d.guestCheckouts || 0), 0),
-      registeredCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (d.registeredCheckouts || 0), 0),
-      firstTimeOrdersCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (d.firstTimeOrders || 0), 0),
-      totalCheckouts: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (d.orders || 0), 0),
+    const metrics = {
+      guestCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (Number(d.guestCheckouts) || 0), 0),
+      registeredCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (Number(d.registeredCheckouts) || 0), 0),
+      firstTimeOrdersCount: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (Number(d.firstTimeOrders) || 0), 0),
+      totalCheckouts: dailyMetrics.dailyData.reduce((sum: number, d: any) => sum + (Number(d.orders) || 0), 0),
     };
+
+    console.log('[Dashboard] Customer Segmentation Metrics:', metrics);
+
+    // Production validation: Ensure totals add up correctly
+    const calculatedTotal = metrics.guestCount + metrics.registeredCount;
+    if (calculatedTotal !== metrics.totalCheckouts) {
+      console.error('[Dashboard] Metric mismatch detected!', {
+        guestCount: metrics.guestCount,
+        registeredCount: metrics.registeredCount,
+        calculatedTotal,
+        reportedTotal: metrics.totalCheckouts,
+        difference: metrics.totalCheckouts - calculatedTotal
+      });
+    }
+
+    return metrics;
   }, [dailyMetrics]);
 
   const handleDateRangeChange = (startDate: string, endDate: string) => {

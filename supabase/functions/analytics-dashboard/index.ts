@@ -902,7 +902,7 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     let customers = [];
     const { data: customersData, error: customersError } = await supabase
       .from('customers')
-      .select('created_at, email, name')
+      .select('id, created_at, email, name')
       .gte('created_at', startUTC)
       .lte('created_at', endUTC)
       .order('created_at', { ascending: true });
@@ -911,13 +911,16 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       console.error('Error fetching customers:', customersError);
     } else {
       customers = customersData || [];
+      console.log(`[Debug] Fetched ${customers.length} customers registered in period`);
     }
 
     // Group data by day
     const dailyMap: { [key: string]: any } = {};
     
-    // Get all registered customer IDs for this period for first-time order detection
-    const registeredCustomerIds = new Set((customers || []).map(c => c.id).filter(Boolean));
+    // CRITICAL: Get all registered customer IDs from this period for accurate first-time order detection
+    const newCustomerIdsInPeriod = new Set((customers || []).map(c => c.id).filter(Boolean));
+    
+    console.log(`[Production Debug] New customers registered in period: ${newCustomerIdsInPeriod.size}`);
     
     // Initialize all days in range
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -945,6 +948,10 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     console.log(`[Debug] Initialized ${Object.keys(dailyMap).length} days in date range`);
 
     // Aggregate orders data with validation (using Lagos timezone for grouping)
+    let guestCheckoutCount = 0;
+    let registeredCheckoutCount = 0;
+    let firstTimeOrderCount = 0;
+    
     (orders || []).forEach(order => {
       try {
         if (!order.order_time) return;
@@ -956,16 +963,21 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
           dailyMap[dateKey].revenue += Number(order.total_amount) || 0;
           dailyMap[dateKey].orders += 1;
           
-          // Track guest vs registered checkouts
+          // CRITICAL PRODUCTION LOGIC: Track guest vs registered checkouts
           if (order.customer_id) {
+            // This is a registered customer checkout
             dailyMap[dateKey].registeredCheckouts += 1;
+            registeredCheckoutCount += 1;
             
-            // Check if this is a first-time order (customer registered in this period)
-            if (registeredCustomerIds.has(order.customer_id)) {
+            // CRITICAL: Check if this customer registered during this period (first-time order)
+            if (newCustomerIdsInPeriod.has(order.customer_id)) {
               dailyMap[dateKey].firstTimeOrders += 1;
+              firstTimeOrderCount += 1;
             }
           } else {
+            // This is a guest checkout (no customer_id)
             dailyMap[dateKey].guestCheckouts += 1;
+            guestCheckoutCount += 1;
           }
           
           if (order.customer_email) {
@@ -973,7 +985,9 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
             dailyMap[dateKey].customerDetails.push({
               email: order.customer_email,
               name: order.customer_name || 'Unknown',
-              orderValue: Number(order.total_amount) || 0
+              orderValue: Number(order.total_amount) || 0,
+              isGuest: !order.customer_id,
+              customerId: order.customer_id
             });
           }
         }
@@ -981,6 +995,8 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
         console.error('[Error] Failed to process order:', err, order.id);
       }
     });
+
+    console.log(`[Production Metrics] Guest Checkouts: ${guestCheckoutCount}, Registered Checkouts: ${registeredCheckoutCount}, First-Time Orders: ${firstTimeOrderCount}`);
 
     console.log(`[Debug] Aggregated ${orders?.length || 0} legitimate orders`);
 

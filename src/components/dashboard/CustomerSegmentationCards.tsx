@@ -21,6 +21,32 @@ export function CustomerSegmentationCards({
   const guestPercentage = totalCheckouts > 0 ? (guestCount / totalCheckouts) * 100 : 0;
   const registeredPercentage = totalCheckouts > 0 ? (registeredCount / totalCheckouts) * 100 : 0;
 
+  // Production validation logging
+  React.useEffect(() => {
+    if (!isLoading && totalCheckouts > 0) {
+      console.log('[CustomerSegmentation] Production Metrics:', {
+        guestCount,
+        registeredCount,
+        firstTimeOrdersCount,
+        totalCheckouts,
+        guestPercentage: guestPercentage.toFixed(1) + '%',
+        registeredPercentage: registeredPercentage.toFixed(1) + '%',
+        totalMatch: (guestCount + registeredCount) === totalCheckouts
+      });
+
+      // Alert if metrics don't add up
+      if ((guestCount + registeredCount) !== totalCheckouts) {
+        console.error('[CustomerSegmentation] PRODUCTION ERROR: Metrics do not add up!', {
+          guestCount,
+          registeredCount,
+          sum: guestCount + registeredCount,
+          totalCheckouts,
+          difference: totalCheckouts - (guestCount + registeredCount)
+        });
+      }
+    }
+  }, [guestCount, registeredCount, firstTimeOrdersCount, totalCheckouts, isLoading, guestPercentage, registeredPercentage]);
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

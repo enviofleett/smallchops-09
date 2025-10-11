@@ -32,6 +32,7 @@ const roleColors: Record<UserRole, string> = {
   manager: 'bg-green-400',
   support_officer: 'bg-yellow-500',
   staff: 'bg-gray-500',
+  fulfilment_support: 'bg-amber-500',
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -44,6 +45,7 @@ const roleLabels: Record<UserRole, string> = {
   manager: 'Manager (Legacy)',
   support_officer: 'Support Officer (Legacy)',
   staff: 'Staff (Legacy)',
+  fulfilment_support: 'Fulfilment Support',
 };
 
 export function AdminUsersList() {

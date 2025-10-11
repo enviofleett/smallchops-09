@@ -18,7 +18,7 @@ if (missingVars.length > 0) {
 
 interface RoleUpdateRequest {
   userId: string;
-  newRole: 'super_admin' | 'admin' | 'manager' | 'support_officer' | 'staff';
+  newRole: 'super_admin' | 'store_owner' | 'admin_manager' | 'account_manager' | 'support_staff' | 'admin' | 'manager' | 'support_officer' | 'staff' | 'fulfilment_support';
   expiresAt?: string;
 }
 
@@ -108,10 +108,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!newRole || !['super_admin', 'admin', 'manager', 'support_officer', 'staff'].includes(newRole)) {
+    if (!newRole || !['super_admin', 'store_owner', 'admin_manager', 'account_manager', 'support_staff', 'admin', 'manager', 'support_officer', 'staff', 'fulfilment_support'].includes(newRole)) {
       console.error(`[${requestId}] Invalid role:`, newRole);
       return new Response(JSON.stringify({ 
-        error: 'Invalid role. Must be one of: super_admin, admin, manager, support_officer, staff',
+        error: 'Invalid role. Must be one of: super_admin, store_owner, admin_manager, account_manager, support_staff, admin, manager, support_officer, staff, fulfilment_support',
         request_id: requestId 
       }), {
         status: 400,

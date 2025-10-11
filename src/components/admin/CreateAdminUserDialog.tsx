@@ -25,10 +25,11 @@ const roleLabels: Record<UserRole, string> = {
   manager: 'Manager (Legacy)',
   support_officer: 'Support Officer (Legacy)',
   staff: 'Staff (Legacy)',
+  fulfilment_support: 'Fulfilment Support',
 };
 
 // Only allow creation of new roles
-const CREATABLE_ROLES: UserRole[] = ['super_admin', 'store_owner', 'admin_manager', 'account_manager', 'support_staff'];
+const CREATABLE_ROLES: UserRole[] = ['super_admin', 'store_owner', 'admin_manager', 'account_manager', 'support_staff', 'fulfilment_support'];
 
 export function CreateAdminUserDialog({ open, onOpenChange, onSuccess }: CreateAdminUserDialogProps) {
   const { toast } = useToast();

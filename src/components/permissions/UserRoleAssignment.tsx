@@ -39,6 +39,7 @@ const roleLabels: Record<UserRole, string> = {
   manager: 'Manager (Legacy)',
   support_officer: 'Support Officer (Legacy)',
   staff: 'Staff (Legacy)',
+  fulfilment_support: 'Fulfilment Support',
 };
 
 const roleColors: Record<UserRole, string> = {
@@ -51,6 +52,7 @@ const roleColors: Record<UserRole, string> = {
   manager: 'bg-green-500',
   support_officer: 'bg-yellow-500',
   staff: 'bg-gray-500',
+  fulfilment_support: 'bg-amber-500',
 };
 
 export function UserRoleAssignment() {

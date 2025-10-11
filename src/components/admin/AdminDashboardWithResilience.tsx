@@ -20,9 +20,10 @@ export const AdminDashboardWithResilience = () => {
     queryKey: ['dashboard-stats'],
     queryFn: async (): Promise<DashboardStats> => {
       // Use safe operations instead of direct supabase calls
+      // CRITICAL: Only fetch paid orders for revenue calculations
       const [ordersResult, customersResult] = await Promise.allSettled([
         supabaseSafe.getMany('orders', 
-          (query) => query.select('*').order('created_at', { ascending: false }).limit(10),
+          (query) => query.select('*').eq('payment_status', 'paid').order('created_at', { ascending: false }).limit(10),
           { fallbackData: [] }
         ),
         supabaseSafe.getMany('customer_accounts',

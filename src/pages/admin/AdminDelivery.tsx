@@ -38,7 +38,6 @@ import {
   BarChartHorizontal
 } from 'lucide-react';
 import { format, isToday, parseISO, isAfter, isBefore, addMinutes, subDays } from 'date-fns';
-import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { formatAddress } from '@/utils/formatAddress';
 import { cn } from '@/lib/utils';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
@@ -224,9 +223,6 @@ export default function AdminDelivery() {
       </Helmet>
 
       <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 md:p-6">
-        {/* System Status Check */}
-        <SystemStatusChecker />
-        
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
           <div>

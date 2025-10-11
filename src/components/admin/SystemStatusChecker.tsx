@@ -79,47 +79,5 @@ export function SystemStatusChecker() {
     }
     return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />OK</Badge>;
   };
-  return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CheckCircle className="w-5 h-5" />
-          System Status
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Orders API</span>
-            {getStatusBadge(ordersLoading, ordersError, ordersData, 'Orders')}
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Routes API</span>
-            {getStatusBadge(routesLoading, routesError, routes, 'Routes')}
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Drivers API</span>
-            {getStatusBadge(driversLoading, driversError, drivers, 'Drivers')}
-          </div>
-        </div>
-        {(ordersError || routesError || driversError) && (
-          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-            <h4 className="text-sm font-medium text-destructive mb-2">System Issues Detected</h4>
-            <ul className="text-xs text-muted-foreground space-y-1">
-              {ordersError && <li>• Orders: {ordersError.message}</li>}
-              {routesError && <li>• Routes: {routesError.message}</li>}
-              {driversError && <li>• Drivers: {driversError.message}</li>}
-            </ul>
-          </div>
-        )}
-        {drivers && drivers.length === 0 && (
-          <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-            <p className="text-sm text-orange-800">
-              <strong>No drivers registered:</strong> Add drivers in the Drivers tab to enable dispatch functionality.
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+  return;
 }

@@ -12,16 +12,19 @@ import {
   Activity
 } from 'lucide-react';
 import { useAdminDashboardData } from '@/hooks/useAdminDashboardData';
+import { useDashboardAccess } from '@/hooks/useDashboardAccess';
+import { RestrictedDashboardView } from '@/components/admin/RestrictedDashboardView';
 import { FulfillmentStatistics } from '@/components/admin/FulfillmentStatistics';
 import { FulfillmentWeeklyStats } from '@/components/admin/FulfillmentWeeklyStats';
 import { FulfillmentChannelStats } from '@/components/admin/FulfillmentChannelStats';
 import { useDashboardData } from '@/hooks/useDashboardData';
 
 const AdminDashboard = () => {
+  const { canViewDashboard, isLoading: isCheckingAccess, userRole } = useDashboardAccess();
   const { data: adminData, isLoading: adminLoading, error: adminError } = useAdminDashboardData();
   const { data: dashboardData, isLoading: dashboardLoading } = useDashboardData();
 
-  if (adminLoading || dashboardLoading) {
+  if (isCheckingAccess || adminLoading || dashboardLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -43,6 +46,11 @@ const AdminDashboard = () => {
         </div>
       </div>
     );
+  }
+
+  // Show restricted view if user doesn't have access
+  if (!canViewDashboard) {
+    return <RestrictedDashboardView userRole={userRole} />;
   }
 
   if (adminError) {

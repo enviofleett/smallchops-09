@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
 import DashboardHeader from '@/components/DashboardHeader';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useDashboardAccess } from '@/hooks/useDashboardAccess';
+import { RestrictedDashboardView } from '@/components/admin/RestrictedDashboardView';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +15,7 @@ import { WeekdaySalesChart } from '@/components/dashboard/WeekdaySalesChart';
 import { toast } from 'sonner';
 
 const Dashboard = () => {
+  const { canViewDashboard, isLoading: isCheckingAccess, userRole } = useDashboardAccess();
   const { data, isLoading, error, refresh } = useDashboardData();
 
   // Date range in YYYY-MM-DD format
@@ -49,7 +52,7 @@ const Dashboard = () => {
     staleTime: 5 * 60 * 1000,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    enabled: !!data,
+    enabled: !!data && canViewDashboard, // Only fetch if user has access
   });
 
   // Calculate customer segmentation metrics with production-grade validation
@@ -110,7 +113,8 @@ const Dashboard = () => {
     toast.success('Date range updated');
   };
 
-  if (isLoading) {
+  // Check access control first
+  if (isCheckingAccess || isLoading) {
     return (
       <div className="space-y-6">
         <DashboardHeader />
@@ -134,6 +138,11 @@ const Dashboard = () => {
         <Skeleton className="h-[400px] w-full rounded-lg" />
       </div>
     );
+  }
+
+  // Show restricted view if user doesn't have access
+  if (!canViewDashboard) {
+    return <RestrictedDashboardView userRole={userRole} />;
   }
 
   return (

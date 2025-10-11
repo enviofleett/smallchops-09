@@ -3,7 +3,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Download, Search, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { exportToCSV } from '@/api/advancedReports';
 import type { DriverRevenueReport } from '@/api/advancedReports';
@@ -14,6 +15,8 @@ interface DriverRevenueTableProps {
 }
 
 export function DriverRevenueTable({ data, isLoading }: DriverRevenueTableProps) {
+  const [searchQuery, setSearchQuery] = React.useState('');
+
   const handleExport = () => {
     if (!data || data.length === 0) return;
     const exportData = data.map(row => ({
@@ -27,13 +30,28 @@ export function DriverRevenueTable({ data, isLoading }: DriverRevenueTableProps)
     exportToCSV(exportData, `driver-revenue-${format(new Date(), 'yyyy-MM-dd')}.csv`);
   };
 
-  // Calculate totals
-  const totals = React.useMemo(() => {
-    if (!data || data.length === 0) return null;
+  // Filter data based on search query (production-safe with trim and case-insensitive)
+  const filteredData = React.useMemo(() => {
+    if (!data) return [];
+    if (!searchQuery.trim()) return data;
     
-    const totalDeliveries = data.reduce((sum, row) => sum + Number(row.total_deliveries), 0);
-    const totalRevenue = data.reduce((sum, row) => sum + Number(row.total_revenue), 0);
-    const totalDeliveryFees = data.reduce((sum, row) => sum + Number(row.total_delivery_fees), 0);
+    const query = searchQuery.trim().toLowerCase();
+    return data.filter(row => 
+      row.driver_name?.toLowerCase().includes(query)
+    );
+  }, [data, searchQuery]);
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+  };
+
+  // Calculate totals based on filtered data
+  const totals = React.useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return null;
+    
+    const totalDeliveries = filteredData.reduce((sum, row) => sum + Number(row.total_deliveries), 0);
+    const totalRevenue = filteredData.reduce((sum, row) => sum + Number(row.total_revenue), 0);
+    const totalDeliveryFees = filteredData.reduce((sum, row) => sum + Number(row.total_delivery_fees), 0);
     const avgFee = totalDeliveries > 0 ? totalDeliveryFees / totalDeliveries : 0;
     
     return {
@@ -42,7 +60,7 @@ export function DriverRevenueTable({ data, isLoading }: DriverRevenueTableProps)
       totalDeliveryFees,
       avgFee,
     };
-  }, [data]);
+  }, [filteredData]);
 
   if (isLoading) {
     return (
@@ -59,17 +77,52 @@ export function DriverRevenueTable({ data, isLoading }: DriverRevenueTableProps)
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Driver Revenue Report</CardTitle>
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
+      <CardHeader>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <CardTitle>Driver Revenue Report</CardTitle>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-initial sm:min-w-[280px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by driver name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value.slice(0, 100))}
+                className="pl-9 pr-9"
+                maxLength={100}
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearSearch}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleExport}
+              disabled={!filteredData || filteredData.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {!data || data.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No driver revenue data available for the selected period
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No drivers found matching "{searchQuery}"
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -85,7 +138,7 @@ export function DriverRevenueTable({ data, isLoading }: DriverRevenueTableProps)
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.map((row, index) => (
+                {filteredData.map((row, index) => (
                   <TableRow key={index}>
                     <TableCell className="font-medium">
                       {format(parseISO(row.interval_start), 'MMM d, yyyy')}

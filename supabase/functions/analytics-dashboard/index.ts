@@ -1165,29 +1165,11 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     totalFirstTimeOrders: summary.totalFirstTimeOrders
   });
 
-  // Return response with caching headers
-  return new Response(
-    JSON.stringify({
+    return {
       dailyData,
       summary,
-      dateRange: { startDate, endDate },
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        isLive: true,
-        dataFreshness: 'realtime',
-        timezone: 'Africa/Lagos (UTC+1)'
-      }
-    }),
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=300', // 5 minutes cache
-        'X-Data-Source': 'live-production',
-        'X-Generated-At': new Date().toISOString(),
-        ...corsHeaders
-      }
-    }
-  );
+      dateRange: { startDate, endDate }
+    };
   } catch (error) {
     console.error('Critical error in generateDailyAnalytics:', error);
     return {

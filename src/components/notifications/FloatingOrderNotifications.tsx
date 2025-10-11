@@ -19,19 +19,19 @@ export const FloatingOrderNotifications = () => {
   // Fetch order details when an order is selected
   const { order: selectedOrder } = useOrderDetails(selectedOrderId || '');
 
-  // Only show to admin users
-  if (authLoading || !isAdmin) return null;
+  // Persist dismissed IDs (max 50 entries) - MUST be before any conditional returns
+  useEffect(() => {
+    const idsArray = Array.from(dismissedIds).slice(-50);
+    sessionStorage.setItem('dismissed-notifications', JSON.stringify(idsArray));
+  }, [dismissedIds]);
 
   // Filter out dismissed notifications
   const visibleNotifications = activeFloatingNotifications.filter(
     notif => !dismissedIds.has(notif.id)
   );
 
-  // Persist dismissed IDs (max 50 entries)
-  useEffect(() => {
-    const idsArray = Array.from(dismissedIds).slice(-50);
-    sessionStorage.setItem('dismissed-notifications', JSON.stringify(idsArray));
-  }, [dismissedIds]);
+  // Only show to admin users or if no notifications
+  if (authLoading || !isAdmin || visibleNotifications.length === 0) return null;
 
   const handleClose = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -48,8 +48,6 @@ export const FloatingOrderNotifications = () => {
     setIsModalOpen(false);
     setSelectedOrderId(null);
   };
-
-  if (visibleNotifications.length === 0) return null;
 
   return (
     <>

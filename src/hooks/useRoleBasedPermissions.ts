@@ -121,7 +121,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
   {
     role: 'fulfilment_support',
     permissions: {
-      dashboard: 'edit',
+      dashboard: 'none', // RESTRICTED: Fulfillment support cannot view dashboard data
       orders_view: 'edit',
       delivery_zones: 'view',
       customers_view: 'view',

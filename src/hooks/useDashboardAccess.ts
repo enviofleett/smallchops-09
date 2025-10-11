@@ -4,12 +4,12 @@ import { useMemo, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 // Roles that can view full dashboard
+// PRODUCTION SECURITY: fulfilment_support removed - they only need Orders and Delivery access
 const DASHBOARD_AUTHORIZED_ROLES = [
   'super_admin',
   'store_owner',
   'admin_manager',
   'account_manager',
-  'fulfilment_support',
 ] as const;
 
 type DashboardAuthorizedRole = typeof DASHBOARD_AUTHORIZED_ROLES[number];

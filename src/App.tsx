@@ -46,6 +46,7 @@ const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"
 const Products = withLazyLoading(() => import("./pages/Products"), undefined, false, 10000);
 const Customers = withLazyLoading(() => import("./pages/Customers"), undefined, false, 10000);
 const Reports = withLazyLoading(() => import("./pages/Reports"), undefined, false, 10000);
+const EmailTemplates = withLazyLoading(() => import("./pages/admin/EmailTemplates").then(m => ({ default: m.EmailTemplates })), undefined, false, 10000);
 const ChangePassword = withLazyLoading(() => import("./pages/admin/ChangePassword"), undefined, false, 10000);
 import { PasswordChangeRequired } from "./components/auth/PasswordChangeRequired";
 const PaymentSettings = withLazyLoading(() => import("./pages/PaymentSettings").then(m => ({ default: m.PaymentSettings })), undefined, false, 10000);
@@ -301,6 +302,7 @@ const App = () => {
                 <Route path="/promotions" element={<Promotions />} />
                 <Route path="/bookings" element={<BookingManagement />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
+                <Route path="/admin/email-templates" element={<EmailTemplates />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/payment-settings" element={<PaymentSettings />} />
               </Route>

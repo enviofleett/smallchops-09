@@ -11,7 +11,8 @@ import {
   Calendar,
   BarChart3, 
   FileSearch, 
-  Settings
+  Settings,
+  Mail
 } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
@@ -104,6 +105,12 @@ const administration: MenuItem[] = [
     label: 'Audit Logs',
     path: '/audit-logs',
     permissionKey: MENU_PERMISSION_KEYS.auditLogs
+  },
+  {
+    icon: Mail,
+    label: 'Email Templates',
+    path: '/admin/email-templates',
+    permissionKey: MENU_PERMISSION_KEYS.settings
   },
   {
     icon: Settings,

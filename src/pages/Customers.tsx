@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, Filter, Plus, Edit, UserPlus, Users, BarChart3, Trophy } from 'lucide-react';
+import { Search, Filter, Plus, Edit, UserPlus, Users, BarChart3 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { CustomerAnalytics } from '@/components/customers/CustomerAnalytics';
 import { CustomerFilters } from '@/components/customers/CustomerFilters';
@@ -173,111 +173,6 @@ const Customers = () => {
         />
       )}
 
-      {/* Repeat Business Analysis - Refined Design */}
-      {analytics && analytics.repeatCustomers.length > 0 && (
-        <div className="bg-gradient-to-br from-white to-muted/30 rounded-2xl shadow-lg border border-border/50 p-5 md:p-7 backdrop-blur-sm">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                  <Trophy className="h-5 w-5 text-purple-600" />
-                </div>
-                <h3 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
-                  Repeat Business Champions
-                </h3>
-              </div>
-              <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
-                Top customers driving recurring revenue • Live data
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full border border-emerald-200">
-                ✓ Verified Payments
-              </span>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {analytics.repeatCustomers.slice(0, 3).map((customer, index) => {
-              const safeCustomer = {
-                id: customer.id || `repeat-${index}`,
-                name: customer.name || 'Unknown Customer',
-                totalOrders: Math.max(0, customer.totalOrders || 0),
-                totalSpent: Math.max(0, customer.totalSpent || 0),
-                isGuest: Boolean(customer.isGuest)
-              };
-
-              const avgOrderValue = safeCustomer.totalOrders > 0 
-                ? Math.round(safeCustomer.totalSpent / safeCustomer.totalOrders)
-                : 0;
-
-              return (
-                <div 
-                  key={safeCustomer.id} 
-                  className="group relative bg-white rounded-xl border border-border p-5 hover:shadow-xl hover:border-primary/50 transition-all duration-300"
-                >
-                  {/* Rank Badge */}
-                  <div className="absolute -top-3 -right-3 w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-sm">#{index + 1}</span>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {/* Customer Name & Type */}
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-base text-foreground leading-tight line-clamp-2 flex-1" title={safeCustomer.name}>
-                        {safeCustomer.name}
-                      </h4>
-                      {safeCustomer.isGuest && (
-                        <span className="text-[10px] font-medium bg-orange-100 text-orange-700 px-2 py-1 rounded-md border border-orange-200 shrink-0">
-                          Guest
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Metrics */}
-                    <div className="space-y-2.5 text-sm">
-                      <div className="flex items-center justify-between p-2.5 bg-muted/50 rounded-lg">
-                        <span className="text-muted-foreground font-medium">Orders</span>
-                        <span className="font-bold text-foreground">{safeCustomer.totalOrders}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2.5 bg-emerald-50 rounded-lg border border-emerald-100">
-                        <span className="text-emerald-700 font-medium">Total Paid</span>
-                        <span className="font-bold text-emerald-700">
-                          ₦{safeCustomer.totalSpent.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-2.5 bg-blue-50 rounded-lg border border-blue-100">
-                        <span className="text-blue-700 font-medium">Avg/Order</span>
-                        <span className="font-bold text-blue-700">
-                          ₦{avgOrderValue.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* No repeat customers state - Mobile Responsive */}
-      {analytics && analytics.repeatCustomers.length === 0 && (
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
-          <div className="text-center py-6 sm:py-8">
-            <div className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-3 sm:mb-4">
-              <Users className="h-full w-full" />
-            </div>
-            <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-2">No Repeat Customers Yet</h3>
-            <p className="text-sm sm:text-base text-gray-600 max-w-md mx-auto px-4">
-              Once customers make multiple paid orders, they'll appear here as your repeat business champions.
-            </p>
-            <div className="mt-4 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 max-w-md mx-auto">
-              <strong>Note:</strong> Only customers with paid orders are counted for accurate business metrics.
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Customer Type Filter - Production Ready */}
       {hasValidAnalytics && (

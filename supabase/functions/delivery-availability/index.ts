@@ -53,40 +53,10 @@ serve(async (req) => {
         end_date = url.searchParams.get('end_date') || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         customer_id = url.searchParams.get('customer_id') || undefined;
       } else {
-        try {
-          const body: DeliverySlotRequest = await req.json();
-          
-          // Validate required fields
-          if (!body.start_date || !body.end_date) {
-            return new Response(
-              JSON.stringify({ 
-                success: false,
-                error: 'Missing required fields: start_date and end_date' 
-              }),
-              { 
-                status: 400, 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-              }
-            );
-          }
-          
-          start_date = body.start_date;
-          end_date = body.end_date;
-          customer_id = body.customer_id;
-        } catch (parseError) {
-          console.error('❌ JSON parse error:', parseError);
-          return new Response(
-            JSON.stringify({ 
-              success: false,
-              error: 'Invalid request format. Please ensure the request is valid JSON.',
-              details: parseError instanceof Error ? parseError.message : 'Unknown parse error'
-            }),
-            { 
-              status: 400, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          );
-        }
+        const body: DeliverySlotRequest = await req.json();
+        start_date = body.start_date;
+        end_date = body.end_date;
+        customer_id = body.customer_id;
       }
       
       console.log('📅 Fetching delivery slots from', start_date, 'to', end_date);
@@ -287,9 +257,8 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        success: false,
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error occurred'
+        message: error instanceof Error ? error.message : 'Unknown error'
       }),
       { 
         status: 500, 

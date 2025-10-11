@@ -92,38 +92,18 @@ export class DeliveryBookingAPI {
 
       if (error) {
         console.error('❌ Delivery availability error:', error);
-        
-        // Detect HTML error responses (function not deployed or server error)
-        const errorStr = typeof error === 'string' ? error : error.message || '';
-        if (errorStr.includes('<!DOCTYPE') || errorStr.includes('<html')) {
-          throw new Error('Delivery scheduling service is temporarily unavailable. Please try again later.');
-        }
-        
         throw new Error(error.message || 'Failed to fetch delivery availability');
-      }
-
-      // Validate response structure
-      if (!data || typeof data !== 'object') {
-        throw new Error('Invalid response from delivery service. Please refresh and try again.');
       }
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to fetch delivery slots');
       }
 
-      console.log('✅ Delivery slots received:', data.slots?.length || 0, 'slots');
+      console.log('✅ Delivery slots received:', data.slots.length, 'slots');
       return data;
 
     } catch (error) {
       console.error('❌ API Error in getAvailableSlots:', error);
-      
-      // Provide user-friendly error messages
-      if (error instanceof Error) {
-        if (error.message.includes('MIME type')) {
-          throw new Error('Service temporarily unavailable. Please refresh the page and try again.');
-        }
-      }
-      
       throw error;
     }
   }

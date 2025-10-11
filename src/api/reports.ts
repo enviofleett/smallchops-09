@@ -176,6 +176,15 @@ export async function fetchReportsData(
         body: { groupBy, startDate, endDate }
       });
       
+      console.log('📊 Reports API response:', {
+        attempt,
+        hasError: !!error,
+        hasData: !!data,
+        totalRevenue: data?.stats?.totalRevenue,
+        totalOrders: data?.stats?.totalOrders,
+        note: 'Now filtering for payment_status IN (paid, completed)'
+      });
+      
       if (error) {
         console.error(`Reports function error (attempt ${attempt}):`, error);
         throw new Error(error.message || 'Reports function failed');

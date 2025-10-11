@@ -54,6 +54,13 @@ export const useDashboardData = () => {
       const maxRetries = retryCount < 2 ? 3 : 1; // Reduce retries after initial failures
       const result = await fetchReportsData({ retryCount: maxRetries });
       
+      console.log('🔍 Dashboard data fetched:', {
+        hasData: !!result,
+        totalRevenue: result?.stats?.totalRevenue,
+        totalOrders: result?.stats?.totalOrders,
+        trendsCount: result?.revenueTrends?.length
+      });
+      
       // Validate the returned data structure
       if (result && typeof result === 'object') {
         console.log('Dashboard: Data received successfully', {

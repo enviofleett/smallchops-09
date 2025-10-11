@@ -91,21 +91,9 @@ export async function fetchDailyAnalytics(
         throw new Error('Invalid response format from analytics API');
       }
       
-      console.log(`[Analytics API] Daily analytics data received (attempt ${attempt}):`, {
+      console.log(`Daily analytics data received successfully (attempt ${attempt}):`, {
         hasDailyData: Array.isArray(data.dailyData),
         dataCount: data.dailyData?.length || 0
-      });
-
-      // Enhanced logging to trace data flow
-      console.log('[Analytics API] Response received:', {
-        hasDailyData: !!data.dailyData,
-        dailyDataLength: data.dailyData?.length || 0,
-        sampleDay: data.dailyData?.[0],
-        summary: data.summary,
-        totalOrdersInData: data.dailyData?.reduce((sum: number, d: any) => sum + (d.orders || 0), 0),
-        totalRevenueInData: data.dailyData?.reduce((sum: number, d: any) => sum + (d.revenue || 0), 0),
-        guestCheckoutsTotal: data.dailyData?.reduce((sum: number, d: any) => sum + (d.guestCheckouts || 0), 0),
-        registeredCheckoutsTotal: data.dailyData?.reduce((sum: number, d: any) => sum + (d.registeredCheckouts || 0), 0)
       });
       
       // Return with proper structure and defaults

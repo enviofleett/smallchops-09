@@ -72,7 +72,6 @@ const Dashboard = () => {
     };
 
     console.log('[Dashboard] Customer Segmentation Metrics:', metrics);
-    console.log('[Dashboard] API Summary Stats:', dailyMetrics.summary);
 
     // Production validation: Ensure totals add up correctly
     const calculatedTotal = metrics.guestCount + metrics.registeredCount;
@@ -84,18 +83,6 @@ const Dashboard = () => {
         reportedTotal: metrics.totalCheckouts,
         difference: metrics.totalCheckouts - calculatedTotal
       });
-    }
-
-    // Validate against API summary
-    if (dailyMetrics.summary) {
-      const summaryOrders = dailyMetrics.summary.totalOrders || 0;
-      if (metrics.totalCheckouts !== summaryOrders) {
-        console.error('[Dashboard] Summary mismatch!', {
-          calculatedFromDaily: metrics.totalCheckouts,
-          summaryTotal: summaryOrders,
-          difference: summaryOrders - metrics.totalCheckouts
-        });
-      }
     }
 
     return metrics;

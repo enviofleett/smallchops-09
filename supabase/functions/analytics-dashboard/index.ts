@@ -1132,7 +1132,7 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     };
   });
 
-  // Calculate summary
+  // Calculate summary with enhanced breakdown
   const summary = {
     totalDays: dailyData.length,
     totalRevenue: dailyData.reduce((sum, day) => sum + day.revenue, 0),
@@ -1146,7 +1146,12 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
       : 0,
     averageDailyOrders: dailyData.length > 0 
       ? dailyData.reduce((sum, day) => sum + day.orders, 0) / dailyData.length 
-      : 0
+      : 0,
+    // Enhanced breakdown for dashboard
+    totalPaidOrders: dailyData.reduce((sum, day) => sum + day.orders, 0),
+    totalGuestCheckouts: dailyData.reduce((sum, day) => sum + day.guestCheckouts, 0),
+    totalRegisteredCheckouts: dailyData.reduce((sum, day) => sum + day.registeredCheckouts, 0),
+    totalFirstTimeOrders: dailyData.reduce((sum, day) => sum + day.firstTimeOrders, 0)
   };
 
   console.log('[Debug] Daily analytics summary:', {
@@ -1154,7 +1159,10 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     totalRevenue: summary.totalRevenue,
     totalOrders: summary.totalOrders,
     totalCancelledOrders: summary.totalCancelledOrders,
-    totalCustomers: summary.totalCustomers
+    totalCustomers: summary.totalCustomers,
+    totalGuestCheckouts: summary.totalGuestCheckouts,
+    totalRegisteredCheckouts: summary.totalRegisteredCheckouts,
+    totalFirstTimeOrders: summary.totalFirstTimeOrders
   });
 
     return {

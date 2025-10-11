@@ -63,11 +63,13 @@ export const useDashboardData = () => {
       
       // Validate the returned data structure
       if (result && typeof result === 'object') {
-        console.log('Dashboard: Data received successfully', {
-          hasStats: !!result.stats,
-          statsKeys: result.stats ? Object.keys(result.stats) : [],
-          customersCount: result.topCustomersByOrders?.length || 0
-        });
+      console.log('[Dashboard Data] Raw API response:', {
+        hasData: !!result,
+        dailyDataCount: result?.dailyData?.length,
+        summary: result?.summary,
+        totalOrdersCalculated: result?.dailyData?.reduce((sum: any, d: any) => sum + (d.orders || 0), 0),
+        totalRevenueCalculated: result?.dailyData?.reduce((sum: any, d: any) => sum + (d.revenue || 0), 0)
+      });
         setData(result);
         setRetryCount(0); // Reset retry count on success
       } else {

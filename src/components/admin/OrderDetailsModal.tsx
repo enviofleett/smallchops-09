@@ -11,7 +11,8 @@ import { OrderDetailsFooter } from '@/components/orders/details/OrderDetailsFoot
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Printer,
-  Package
+  Package,
+  Send
 } from 'lucide-react';
 import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
 import { AdminOrderPrintView } from './AdminOrderPrintView';
@@ -19,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { usePrint } from '@/hooks/usePrint';
 import '@/styles/admin-print.css';
+import { EmailTemplateSelector } from '@/components/email/EmailTemplateSelector';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -35,6 +37,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [assignedRiderId, setAssignedRiderId] = useState<string | null>(order?.assigned_rider_id || null);
   const [isAssigningRider, setIsAssigningRider] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const [showEmailSelector, setShowEmailSelector] = useState(false);
   
   // Fetch live data with real-time updates
   const { data: detailedOrderData, isLoading: isLoadingDetailed, error, lastUpdated, connectionStatus, reconnect } = useRealTimeOrderData(order?.id);
@@ -129,6 +132,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             order={order}
             onPrint={handlePrint}
             isPrinting={isPrinting}
+            onSendEmail={() => setShowEmailSelector(true)}
+            customerEmail={order?.customer_email}
           />
           <OrderDetailsTabs
             order={order}
@@ -159,6 +164,20 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           adminEmail={user?.email}
         />
       </div>
+
+      {/* Email Template Selector Modal */}
+      {showEmailSelector && (
+        <EmailTemplateSelector
+          open={showEmailSelector}
+          onClose={() => setShowEmailSelector(false)}
+          orderId={order.id}
+          customerEmail={order.customer_email}
+          onEmailSent={() => {
+            toast.success('Email queued successfully');
+            setShowEmailSelector(false);
+          }}
+        />
+      )}
     </>
   );
 };

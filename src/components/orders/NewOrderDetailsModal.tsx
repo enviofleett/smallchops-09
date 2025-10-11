@@ -25,7 +25,8 @@ import {
   Clock,
   AlertCircle,
   AlertTriangle,
-  MessageCircle
+  MessageCircle,
+  Send
 } from 'lucide-react';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
@@ -45,6 +46,7 @@ import { useDeliveryZones } from '@/hooks/useDeliveryZones';
 import { toast } from 'sonner';
 import '@/styles/admin-print.css';
 import '@/styles/admin-80mm-print.css';
+import { EmailTemplateSelector } from '@/components/email/EmailTemplateSelector';
 
 interface NewOrderDetailsModalProps {
   open: boolean;
@@ -64,6 +66,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
   const adminPrintRef = useRef<HTMLDivElement>(null);
   const thermalPrintRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showEmailSelector, setShowEmailSelector] = useState(false);
   
   const { data, isLoading, error, lastUpdated, connectionStatus, reconnect } = useRealTimeOrderData(
     order?.id
@@ -246,6 +249,16 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
             
             {isAdmin && (
               <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowEmailSelector(true)}
+                  disabled={!safeOrder.customer_email}
+                  className="flex-1 sm:flex-none"
+                >
+                  <Send className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Send Email</span>
+                </Button>
                 <Button variant="outline" size="sm" onClick={handlePrint} className="flex-1 sm:flex-none">
                   <Printer className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Print</span>
@@ -742,6 +755,20 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
           </div>
         )}
       </div>
+
+      {/* Email Template Selector Modal */}
+      {isAdmin && showEmailSelector && (
+        <EmailTemplateSelector
+          open={showEmailSelector}
+          onClose={() => setShowEmailSelector(false)}
+          orderId={safeOrder.id}
+          customerEmail={safeOrder.customer_email}
+          onEmailSent={() => {
+            toast.success('Email sent successfully');
+            setShowEmailSelector(false);
+          }}
+        />
+      )}
     </>
   );
 }

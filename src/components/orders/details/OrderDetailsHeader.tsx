@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Package, Printer, CreditCard, Truck, Building2 } from 'lucide-react';
+import { Package, Printer, CreditCard, Truck, Building2, Send } from 'lucide-react';
 
 interface OrderDetailsHeaderProps {
   order: {
@@ -14,6 +14,8 @@ interface OrderDetailsHeaderProps {
   };
   onPrint: () => void;
   isPrinting?: boolean;
+  onSendEmail?: () => void;
+  customerEmail?: string;
 }
 
 /**
@@ -39,7 +41,9 @@ interface OrderDetailsHeaderProps {
 export const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({ 
   order, 
   onPrint,
-  isPrinting = false
+  isPrinting = false,
+  onSendEmail,
+  customerEmail
 }) => {
   return (
     <div className="border-b px-6 py-4">
@@ -76,6 +80,18 @@ export const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({
             <p className="text-xs text-muted-foreground">Total</p>
             <p className="text-lg font-semibold">₦{order.total_amount?.toLocaleString()}</p>
           </div>
+          
+          {onSendEmail && customerEmail && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onSendEmail}
+              className="flex items-center gap-2"
+            >
+              <Send className="w-4 h-4" />
+              Send Email
+            </Button>
+          )}
           
           <Button 
             variant="outline" 

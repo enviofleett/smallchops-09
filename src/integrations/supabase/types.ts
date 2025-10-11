@@ -11248,6 +11248,14 @@ export type Database = {
         Args: { end_date: string; start_date: string }
         Returns: undefined
       }
+      preview_order_email: {
+        Args: { p_order_id: string; p_template_key: string }
+        Returns: Json
+      }
+      process_email_queue_batch: {
+        Args: { p_batch_size?: number }
+        Returns: Json
+      }
       process_email_queue_manual: {
         Args: { batch_size?: number }
         Returns: Json
@@ -11436,6 +11444,14 @@ export type Database = {
           p_expected_amount: number
           p_order_id: string
           p_payment_reference: string
+        }
+        Returns: Json
+      }
+      send_order_email_manual: {
+        Args: {
+          p_admin_id?: string
+          p_order_id: string
+          p_template_key: string
         }
         Returns: Json
       }
@@ -11632,7 +11648,7 @@ export type Database = {
         Returns: Json
       }
       validate_email_template: {
-        Args: { template_data: Json }
+        Args: { p_template_key: string } | { template_data: Json }
         Returns: Json
       }
       validate_order_access_token: {
@@ -11764,6 +11780,7 @@ export type Database = {
         | "admin_manager"
         | "account_manager"
         | "store_owner"
+        | "fulfilment_support"
       assignment_status: "active" | "inactive"
       communication_event_status: "queued" | "processing" | "sent" | "failed"
       communication_log_status:
@@ -11963,6 +11980,7 @@ export const Constants = {
         "admin_manager",
         "account_manager",
         "store_owner",
+        "fulfilment_support",
       ],
       assignment_status: ["active", "inactive"],
       communication_event_status: ["queued", "processing", "sent", "failed"],

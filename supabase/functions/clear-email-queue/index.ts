@@ -24,14 +24,17 @@ serve(async (req) => {
 
     if (action === 'clear_queue') {
       let clearedCount = 0
-      const BATCH_SIZE = 1000 // Delete in batches to avoid timeout
+      const BATCH_SIZE = 100 // Delete in smaller batches to avoid timeout
+      const BATCH_DELAY_MS = 100 // Small delay between batches
 
-      // Helper function to delete in batches
+      // Helper function to delete in batches with delay
       const deleteBatch = async (status: string) => {
         let totalDeleted = 0
         let hasMore = true
+        let batchNumber = 0
 
         while (hasMore) {
+          batchNumber++
           // Get batch of IDs to delete
           const { data: idsToDelete, error: fetchError } = await supabase
             .from('communication_events')
@@ -62,11 +65,14 @@ serve(async (req) => {
           }
 
           totalDeleted += ids.length
-          console.log(`✅ Deleted ${ids.length} ${status} emails (${totalDeleted} total)`)
+          console.log(`✅ Batch ${batchNumber}: Deleted ${ids.length} ${status} emails (${totalDeleted} total)`)
 
           // If we got less than batch size, we're done
           if (ids.length < BATCH_SIZE) {
             hasMore = false
+          } else {
+            // Small delay between batches to avoid overwhelming the database
+            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS))
           }
         }
 

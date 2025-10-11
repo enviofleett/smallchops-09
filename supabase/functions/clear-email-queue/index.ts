@@ -27,50 +27,56 @@ serve(async (req) => {
 
       // Clear queued emails
       if (statuses.includes('queued')) {
-        const { count: queuedCount, error: queuedError } = await supabase
+        const { data: queuedData, error: queuedError } = await supabase
           .from('communication_events')
           .delete()
           .eq('status', 'queued')
+          .select('id', { count: 'exact' })
 
         if (queuedError) {
           console.error('❌ Failed to clear queued emails:', queuedError)
           throw queuedError
         }
 
-        clearedCount += queuedCount || 0
-        console.log(`✅ Cleared ${queuedCount || 0} queued emails`)
+        const queuedCount = queuedData?.length || 0
+        clearedCount += queuedCount
+        console.log(`✅ Cleared ${queuedCount} queued emails`)
       }
 
       // Clear failed emails
       if (statuses.includes('failed')) {
-        const { count: failedCount, error: failedError } = await supabase
+        const { data: failedData, error: failedError } = await supabase
           .from('communication_events')
           .delete()
           .eq('status', 'failed')
+          .select('id', { count: 'exact' })
 
         if (failedError) {
           console.error('❌ Failed to clear failed emails:', failedError)
           throw failedError
         }
 
-        clearedCount += failedCount || 0
-        console.log(`✅ Cleared ${failedCount || 0} failed emails`)
+        const failedCount = failedData?.length || 0
+        clearedCount += failedCount
+        console.log(`✅ Cleared ${failedCount} failed emails`)
       }
 
       // Clear processing emails (stuck in processing state)
       if (statuses.includes('processing')) {
-        const { count: processingCount, error: processingError } = await supabase
+        const { data: processingData, error: processingError } = await supabase
           .from('communication_events')
           .delete()
           .eq('status', 'processing')
+          .select('id', { count: 'exact' })
 
         if (processingError) {
           console.error('❌ Failed to clear processing emails:', processingError)
           throw processingError
         }
 
-        clearedCount += processingCount || 0
-        console.log(`✅ Cleared ${processingCount || 0} processing emails`)
+        const processingCount = processingData?.length || 0
+        clearedCount += processingCount
+        console.log(`✅ Cleared ${processingCount} processing emails`)
       }
 
       // Log the cleanup operation
@@ -107,7 +113,7 @@ serve(async (req) => {
 
     // Reset all failed emails to queued for retry
     if (action === 'retry_failed') {
-      const { count: retryCount, error: retryError } = await supabase
+      const { data: retryData, error: retryError } = await supabase
         .from('communication_events')
         .update({ 
           status: 'queued',
@@ -117,19 +123,21 @@ serve(async (req) => {
           scheduled_at: new Date().toISOString()
         })
         .eq('status', 'failed')
+        .select('id', { count: 'exact' })
 
       if (retryError) {
         console.error('❌ Failed to retry failed emails:', retryError)
         throw retryError
       }
 
-      console.log(`✅ Reset ${retryCount || 0} failed emails for retry`)
+      const retryCount = retryData?.length || 0
+      console.log(`✅ Reset ${retryCount} failed emails for retry`)
 
       return new Response(
         JSON.stringify({
           success: true,
-          retry_count: retryCount || 0,
-          message: `Successfully reset ${retryCount || 0} failed emails for retry`
+          retry_count: retryCount,
+          message: `Successfully reset ${retryCount} failed emails for retry`
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

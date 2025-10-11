@@ -24,59 +24,74 @@ serve(async (req) => {
 
     if (action === 'clear_queue') {
       let clearedCount = 0
+      const BATCH_SIZE = 1000 // Delete in batches to avoid timeout
 
-      // Clear queued emails
+      // Helper function to delete in batches
+      const deleteBatch = async (status: string) => {
+        let totalDeleted = 0
+        let hasMore = true
+
+        while (hasMore) {
+          // Get batch of IDs to delete
+          const { data: idsToDelete, error: fetchError } = await supabase
+            .from('communication_events')
+            .select('id')
+            .eq('status', status)
+            .limit(BATCH_SIZE)
+
+          if (fetchError) {
+            console.error(`❌ Failed to fetch ${status} emails:`, fetchError)
+            throw fetchError
+          }
+
+          if (!idsToDelete || idsToDelete.length === 0) {
+            hasMore = false
+            break
+          }
+
+          // Delete this batch
+          const ids = idsToDelete.map(item => item.id)
+          const { error: deleteError } = await supabase
+            .from('communication_events')
+            .delete()
+            .in('id', ids)
+
+          if (deleteError) {
+            console.error(`❌ Failed to delete ${status} emails batch:`, deleteError)
+            throw deleteError
+          }
+
+          totalDeleted += ids.length
+          console.log(`✅ Deleted ${ids.length} ${status} emails (${totalDeleted} total)`)
+
+          // If we got less than batch size, we're done
+          if (ids.length < BATCH_SIZE) {
+            hasMore = false
+          }
+        }
+
+        return totalDeleted
+      }
+
+      // Clear queued emails in batches
       if (statuses.includes('queued')) {
-        const { data: queuedData, error: queuedError } = await supabase
-          .from('communication_events')
-          .delete()
-          .eq('status', 'queued')
-          .select('id', { count: 'exact' })
-
-        if (queuedError) {
-          console.error('❌ Failed to clear queued emails:', queuedError)
-          throw queuedError
-        }
-
-        const queuedCount = queuedData?.length || 0
+        const queuedCount = await deleteBatch('queued')
         clearedCount += queuedCount
-        console.log(`✅ Cleared ${queuedCount} queued emails`)
+        console.log(`✅ Cleared ${queuedCount} queued emails total`)
       }
 
-      // Clear failed emails
+      // Clear failed emails in batches
       if (statuses.includes('failed')) {
-        const { data: failedData, error: failedError } = await supabase
-          .from('communication_events')
-          .delete()
-          .eq('status', 'failed')
-          .select('id', { count: 'exact' })
-
-        if (failedError) {
-          console.error('❌ Failed to clear failed emails:', failedError)
-          throw failedError
-        }
-
-        const failedCount = failedData?.length || 0
+        const failedCount = await deleteBatch('failed')
         clearedCount += failedCount
-        console.log(`✅ Cleared ${failedCount} failed emails`)
+        console.log(`✅ Cleared ${failedCount} failed emails total`)
       }
 
-      // Clear processing emails (stuck in processing state)
+      // Clear processing emails in batches
       if (statuses.includes('processing')) {
-        const { data: processingData, error: processingError } = await supabase
-          .from('communication_events')
-          .delete()
-          .eq('status', 'processing')
-          .select('id', { count: 'exact' })
-
-        if (processingError) {
-          console.error('❌ Failed to clear processing emails:', processingError)
-          throw processingError
-        }
-
-        const processingCount = processingData?.length || 0
+        const processingCount = await deleteBatch('processing')
         clearedCount += processingCount
-        console.log(`✅ Cleared ${processingCount} processing emails`)
+        console.log(`✅ Cleared ${processingCount} processing emails total`)
       }
 
       // Log the cleanup operation

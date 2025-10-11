@@ -17,6 +17,8 @@ export const DeliveryTabDropdown = ({
   const tabs = [
     { value: 'drivers', label: 'Drivers' },
     { value: 'zones', label: 'Delivery Zones' },
+    { value: 'driver-revenue', label: 'Driver Revenue' },
+    { value: 'delivery-fees', label: 'Delivery Fees' },
   ];
 
   const activeTabData = tabs.find(tab => tab.value === activeTab);

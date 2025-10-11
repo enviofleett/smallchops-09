@@ -19,6 +19,9 @@ import { AdminDriversTab } from '@/components/admin/delivery/AdminDriversTab';
 import { DeliveryZonesManager } from '@/components/delivery/DeliveryZonesManager';
 import { SafeUnifiedDeliveryManagement } from '@/components/admin/delivery/SafeUnifiedDeliveryManagement';
 import { DriverPerformanceDashboard } from '@/components/admin/delivery/DriverPerformanceDashboard';
+import { DriverRevenueTable } from '@/components/reports/advanced/DriverRevenueTable';
+import { DeliveryFeesTable } from '@/components/reports/advanced/DeliveryFeesTable';
+import { useDriverRevenue } from '@/hooks/useAdvancedReports';
 import { usePaidOrders } from '@/hooks/usePaidOrders';
 import { useOrderFilters } from '@/hooks/useOrderFilters';
 import { DeliveryRouteManager } from '@/components/delivery/DeliveryRouteManager';
@@ -34,7 +37,7 @@ import {
   RefreshCw,
   BarChartHorizontal
 } from 'lucide-react';
-import { format, isToday, parseISO, isAfter, isBefore, addMinutes } from 'date-fns';
+import { format, isToday, parseISO, isAfter, isBefore, addMinutes, subDays } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { formatAddress } from '@/utils/formatAddress';
 import { cn } from '@/lib/utils';
@@ -58,10 +61,28 @@ export default function AdminDelivery() {
   const [isRegisterDriverOpen, setIsRegisterDriverOpen] = useState(false);
   const [deliveryWindowFilter, setDeliveryWindowFilter] = useState<string>('all');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  
+  // Date range and interval for reports tabs
+  const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 30));
+  const [endDate, setEndDate] = useState<Date>(new Date());
+  const [interval, setInterval] = useState<'day' | 'week' | 'month'>('day');
 
   const isMobile = useIsMobile();
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const isSelectedDateToday = isToday(selectedDate);
+
+  // Validate and normalize dates for reports
+  const validStartDate = React.useMemo(() => {
+    const date = new Date(startDate);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, [startDate]);
+
+  const validEndDate = React.useMemo(() => {
+    const date = new Date(endDate);
+    date.setHours(23, 59, 59, 999);
+    return date;
+  }, [endDate]);
 
   // DATA FETCHING
   const { orders: paidOrders, isLoading: ordersLoading, error: ordersError, refresh: refreshOrders } = usePaidOrders({ 
@@ -76,6 +97,9 @@ export default function AdminDelivery() {
     orderType: 'delivery',
     paymentStatus: 'paid'
   });
+
+  // Fetch driver revenue data for reports tab
+  const { data: driverData, isLoading: driverLoading } = useDriverRevenue(validStartDate, validEndDate, interval);
 
   // Ready Orders and Schedules
   const readyOrdersBasic = useMemo(
@@ -211,44 +235,124 @@ export default function AdminDelivery() {
               Monitor delivery operations, routes, and performance metrics
             </p>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  aria-label="Pick a date"
-                  className={cn(
-                    "w-full sm:w-[200px] md:w-[240px] justify-start text-left font-normal text-sm",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent 
-                className="w-auto p-0 z-50" 
-                align={isMobile ? "center" : "start"}
-                side={isMobile ? "bottom" : "bottom"}
-                sideOffset={4}
+          
+          {/* Show date range filters for report tabs */}
+          {(activeTab === 'driver-revenue' || activeTab === 'delivery-fees') ? (
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <Select 
+                value={interval} 
+                onValueChange={(v: 'day' | 'week' | 'month') => setInterval(v)}
               >
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    if (date) {
-                      setSelectedDate(date);
-                      setIsCalendarOpen(false);
-                    }
-                  }}
-                  initialFocus
-                  className="pointer-events-auto bg-background border rounded-md shadow-lg"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Daily</SelectItem>
+                  <SelectItem value="week">Weekly</SelectItem>
+                  <SelectItem value="month">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn(!startDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, 'MMM d, yyyy') : 'Start date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        const normalizedDate = new Date(date);
+                        normalizedDate.setHours(0, 0, 0, 0);
+                        if (normalizedDate > endDate) {
+                          setStartDate(normalizedDate);
+                          setEndDate(normalizedDate);
+                        } else {
+                          setStartDate(normalizedDate);
+                        }
+                      }
+                    }}
+                    disabled={(date) => date > new Date() || date > endDate}
+                    initialFocus
+                    className="p-3"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn(!endDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate ? format(endDate, 'MMM d, yyyy') : 'End date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        const normalizedDate = new Date(date);
+                        normalizedDate.setHours(23, 59, 59, 999);
+                        if (normalizedDate < startDate) {
+                          setStartDate(normalizedDate);
+                          setEndDate(normalizedDate);
+                        } else {
+                          setEndDate(normalizedDate);
+                        }
+                      }
+                    }}
+                    disabled={(date) => date < startDate || date > new Date()}
+                    initialFocus
+                    className="p-3"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          ) : (
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    aria-label="Pick a date"
+                    className={cn(
+                      "w-full sm:w-[200px] md:w-[240px] justify-start text-left font-normal text-sm",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">
+                      {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  className="w-auto p-0 z-50" 
+                  align={isMobile ? "center" : "start"}
+                  side={isMobile ? "bottom" : "bottom"}
+                  sideOffset={4}
+                >
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setSelectedDate(date);
+                        setIsCalendarOpen(false);
+                      }
+                    }}
+                    initialFocus
+                    className="pointer-events-auto bg-background border rounded-md shadow-lg"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
         </div>
 
         {/* Error Banner */}
@@ -271,33 +375,35 @@ export default function AdminDelivery() {
           />
         )}
 
-        {/* Delivery Metrics */}
-        <div className={`grid ${gridClasses} gap-2 sm:gap-3 md:gap-4 mx-2 sm:mx-0`}>
-          <MetricCard
-            icon={<Package className="w-4 h-4 sm:w-5 sm:h-5" />}
-            label="Total"
-            value={finalDeliveryMetrics.totalOrders}
-            color="primary"
-          />
-          <MetricCard
-            icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />}
-            label="Progress"
-            value={finalDeliveryMetrics.inProgress}
-            color="orange-500"
-          />
-          <MetricCard
-            icon={<Truck className="w-4 h-4 sm:w-5 sm:h-5" />}
-            label="Delivery"
-            value={finalDeliveryMetrics.outForDelivery}
-            color="purple-500"
-          />
-          <MetricCard
-            icon={<Users className="w-4 h-4 sm:w-5 sm:h-5" />}
-            label="Assigned"
-            value={finalDeliveryMetrics.assigned}
-            color="green-500"
-          />
-        </div>
+        {/* Delivery Metrics - Only show for drivers/zones tabs */}
+        {(activeTab === 'drivers' || activeTab === 'zones') && (
+          <div className={`grid ${gridClasses} gap-2 sm:gap-3 md:gap-4 mx-2 sm:mx-0`}>
+            <MetricCard
+              icon={<Package className="w-4 h-4 sm:w-5 sm:h-5" />}
+              label="Total"
+              value={finalDeliveryMetrics.totalOrders}
+              color="primary"
+            />
+            <MetricCard
+              icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />}
+              label="Progress"
+              value={finalDeliveryMetrics.inProgress}
+              color="orange-500"
+            />
+            <MetricCard
+              icon={<Truck className="w-4 h-4 sm:w-5 sm:h-5" />}
+              label="Delivery"
+              value={finalDeliveryMetrics.outForDelivery}
+              color="purple-500"
+            />
+            <MetricCard
+              icon={<Users className="w-4 h-4 sm:w-5 sm:h-5" />}
+              label="Assigned"
+              value={finalDeliveryMetrics.assigned}
+              color="green-500"
+            />
+          </div>
+        )}
 
         {/* Main Tabs - Responsive */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -312,10 +418,12 @@ export default function AdminDelivery() {
             
             {/* Desktop: Grid layout */}
             <div className="hidden lg:block">
-              <TabsList className="grid w-full grid-cols-2 gap-1 p-1 bg-muted rounded-lg">
+              <TabsList className="grid w-full grid-cols-4 gap-1 p-1 bg-muted rounded-lg">
                 {[
                   { value: 'drivers', label: 'Drivers' },
                   { value: 'zones', label: 'Delivery Zones' },
+                  { value: 'driver-revenue', label: 'Driver Revenue' },
+                  { value: 'delivery-fees', label: 'Delivery Fees' },
                 ].map(tab => (
                   <TabsTrigger
                     key={tab.value}
@@ -337,6 +445,16 @@ export default function AdminDelivery() {
           {/* Delivery Zones Tab */}
           <TabsContent value="zones">
             <DeliveryZonesManager />
+          </TabsContent>
+
+          {/* Driver Revenue Tab */}
+          <TabsContent value="driver-revenue" className="space-y-4">
+            <DriverRevenueTable data={driverData} isLoading={driverLoading} />
+          </TabsContent>
+
+          {/* Delivery Fees Tab */}
+          <TabsContent value="delivery-fees" className="space-y-4">
+            <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} />
           </TabsContent>
         </Tabs>
 

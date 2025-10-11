@@ -79,5 +79,27 @@ export function SystemStatusChecker() {
     }
     return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />OK</Badge>;
   };
-  return;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>System Status</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Orders API</span>
+            {getStatusBadge(ordersLoading, ordersError, ordersData, 'Orders')}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Routes API</span>
+            {getStatusBadge(routesLoading, routesError, routes, 'Routes')}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Drivers API</span>
+            {getStatusBadge(driversLoading, driversError, drivers, 'Drivers')}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }

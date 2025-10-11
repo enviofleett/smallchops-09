@@ -31,12 +31,28 @@ export const EmailTemplateTester: React.FC = () => {
 
   const sendTestMutation = useMutation({
     mutationFn: async () => {
+      if (!testEmail || !selectedTemplateKey) {
+        throw new Error('Please select a template and enter a test email address');
+      }
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(testEmail)) {
+        throw new Error('Please enter a valid email address');
+      }
+
       let variables;
       try {
         variables = JSON.parse(testVariables);
       } catch {
-        throw new Error('Invalid JSON format for variables');
+        throw new Error('Invalid JSON format for variables. Please check your syntax.');
       }
+
+      console.log('🔍 Sending test email:', {
+        to: testEmail,
+        templateKey: selectedTemplateKey,
+        hasVariables: Object.keys(variables).length > 0
+      });
 
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
@@ -47,19 +63,45 @@ export const EmailTemplateTester: React.FC = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Test email error:', error);
+        throw new Error(error.message || 'Failed to send test email. Check edge function logs.');
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Email send failed');
+      }
+
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('✅ Test email sent successfully:', data);
       toast({
-        title: 'Test Email Sent',
-        description: `Test email sent successfully to ${testEmail}`
+        title: '✅ Test email sent successfully',
+        description: `Email delivered to ${testEmail}. Check your inbox.`,
       });
+      setTestEmail('');
+      setTestVariables('{}');
     },
     onError: (error: any) => {
+      console.error('❌ Test email mutation error:', error);
+      
+      let errorMessage = error.message;
+      let errorTitle = 'Failed to send test email';
+      
+      // Provide specific error guidance
+      if (error.message.includes('CORS')) {
+        errorMessage = 'CORS error: Edge function may be starting up. Please wait 30 seconds and try again.';
+      } else if (error.message.includes('535') || error.message.includes('authentication')) {
+        errorTitle = 'SMTP Authentication Failed';
+        errorMessage = 'Invalid SMTP credentials. Check your Function Secrets in Supabase Dashboard.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Request timeout. Check your SMTP server settings and network connection.';
+      }
+      
       toast({
-        title: 'Error',
-        description: error.message,
+        title: errorTitle,
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -80,11 +122,17 @@ export const EmailTemplateTester: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          This will send a real email to the specified address using your production email configuration.
-          Make sure to use valid test variables that match your template.
+      <Alert className="border-orange-200 bg-orange-50">
+        <AlertCircle className="h-4 w-4 text-orange-600" />
+        <AlertDescription className="text-orange-800">
+          <strong>⚠️ Production Email Test</strong>
+          <p className="mt-1">This will send a REAL email to the specified address using your production SMTP settings.</p>
+          <ul className="mt-2 ml-4 list-disc space-y-1 text-sm">
+            <li>Email will be delivered to the recipient's inbox</li>
+            <li>Use a test email address you control</li>
+            <li>Check spam folder if email doesn't arrive</li>
+            <li>Verify your SMTP credentials are configured correctly</li>
+          </ul>
         </AlertDescription>
       </Alert>
 
@@ -142,10 +190,17 @@ export const EmailTemplateTester: React.FC = () => {
           <Button
             onClick={handleSendTest}
             disabled={sendTestMutation.isPending || !selectedTemplateKey || !testEmail}
-            className="flex-1"
+            className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
           >
             <Send className="h-4 w-4 mr-2" />
-            {sendTestMutation.isPending ? 'Sending...' : 'Send Test Email'}
+            {sendTestMutation.isPending ? (
+              <>
+                <span>Sending</span>
+                <span className="animate-pulse ml-1">...</span>
+              </>
+            ) : (
+              'Send Test Email'
+            )}
           </Button>
         </div>
 

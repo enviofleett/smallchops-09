@@ -76,6 +76,37 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
 
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // Validation
+      const errors = [];
+      
+      if (!data.template_name?.trim()) {
+        errors.push('Template name is required');
+      }
+      
+      if (!data.template_key?.trim()) {
+        errors.push('Template key is required');
+      }
+      
+      if (!data.subject_template?.trim()) {
+        errors.push('Subject template is required');
+      }
+      
+      if (!data.html_template?.trim()) {
+        errors.push('HTML template is required');
+      }
+      
+      // Validate variable syntax in templates
+      const varRegex = /\{\{(\w+)\}\}/g;
+      const subjectVars = [...(data.subject_template?.matchAll(varRegex) || [])].map(m => m[1]);
+      const htmlVars = [...(data.html_template?.matchAll(varRegex) || [])].map(m => m[1]);
+      const allVars = [...new Set([...subjectVars, ...htmlVars])];
+      
+      console.log('📝 Template variables detected:', allVars);
+      
+      if (errors.length > 0) {
+        throw new Error(errors.join(', '));
+      }
+
       if (templateId) {
         const { error } = await supabase
           .from('enhanced_email_templates')
@@ -91,14 +122,15 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
     },
     onSuccess: () => {
       toast({
-        title: 'Success',
-        description: `Template ${templateId ? 'updated' : 'created'} successfully`
+        title: '✅ Template saved',
+        description: `Template ${templateId ? 'updated' : 'created'} successfully and is ready for use`
       });
       onSaveSuccess();
     },
     onError: (error: any) => {
+      console.error('❌ Template save error:', error);
       toast({
-        title: 'Error',
+        title: 'Failed to save template',
         description: error.message,
         variant: 'destructive'
       });

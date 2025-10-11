@@ -1,3 +1,4 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { validateSMTPUser, isValidSMTPConfig, maskSMTPConfig, getProviderSpecificSettings, type SMTPUserValidation } from '../_shared/smtp-config.ts';

@@ -9,6 +9,7 @@ const DASHBOARD_AUTHORIZED_ROLES = [
   'store_owner',
   'admin_manager',
   'account_manager',
+  'fulfilment_support',
 ] as const;
 
 type DashboardAuthorizedRole = typeof DASHBOARD_AUTHORIZED_ROLES[number];

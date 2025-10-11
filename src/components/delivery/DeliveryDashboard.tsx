@@ -125,10 +125,7 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
   // Calculate metrics (removed ready orders)
   const metrics = useMemo(() => {
     const outForDelivery = deliveryOrders.filter(order => order.status === 'out_for_delivery').length;
-    // CRITICAL: Only count revenue from PAID orders
-    const totalValue = deliveryOrders
-      .filter(order => order.payment_status === 'paid')
-      .reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    const totalValue = deliveryOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
     
     return {
       totalOrders: deliveryOrders.length,

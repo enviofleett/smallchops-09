@@ -19,11 +19,9 @@ import {
   useAnalyticsDashboard,
 } from '@/hooks/useAdvancedReports';
 import { Card, CardContent } from '@/components/ui/card';
-import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
 
 
 export default function Reports() {
-  const { hasPermission } = useRoleBasedPermissions();
   const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 30));
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [interval, setInterval] = useState<'day' | 'week' | 'month'>('day');
@@ -59,18 +57,6 @@ export default function Reports() {
   const { data: productsData, isLoading: productsLoading } = useProductsSold(validStartDate, validEndDate, interval);
   const { data: driverData, isLoading: driverLoading } = useDriverRevenue(validStartDate, validEndDate, interval);
   const { data: dashboardData, isLoading: dashboardLoading } = useAnalyticsDashboard(validStartDate, validEndDate);
-
-  // Check which tabs are accessible based on user permissions
-  const canViewRevenue = hasPermission('reports-sales', 'view');
-  const canViewProducts = hasPermission('reports-sales', 'view');
-  const canViewTrends = hasPermission('reports-sales', 'view');
-  const canViewDriverRevenue = hasPermission('reports_driver_revenue', 'view');
-  const canViewDeliveryFees = hasPermission('reports_delivery_fees', 'view');
-  
-  // Determine default tab based on permissions
-  const defaultTab = canViewRevenue ? 'revenue' : 
-                     canViewDriverRevenue ? 'drivers' : 
-                     canViewDeliveryFees ? 'delivery-fees' : 'revenue';
 
   return (
     <div className="space-y-6 p-6">
@@ -209,44 +195,34 @@ export default function Reports() {
       )}
 
       {/* Report Tabs */}
-        <Tabs defaultValue={defaultTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
-            {canViewRevenue && <TabsTrigger value="revenue">Revenue</TabsTrigger>}
-            {canViewProducts && <TabsTrigger value="products">Products Sold</TabsTrigger>}
-            {canViewTrends && <TabsTrigger value="trends">Product Trends</TabsTrigger>}
-            {canViewDriverRevenue && <TabsTrigger value="drivers">Driver Revenue</TabsTrigger>}
-            {canViewDeliveryFees && <TabsTrigger value="delivery-fees">Delivery Fees</TabsTrigger>}
-          </TabsList>
+      <Tabs defaultValue="revenue" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
+          <TabsTrigger value="revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="products">Products Sold</TabsTrigger>
+          <TabsTrigger value="trends">Product Trends</TabsTrigger>
+          <TabsTrigger value="drivers">Driver Revenue</TabsTrigger>
+          <TabsTrigger value="delivery-fees">Delivery Fees</TabsTrigger>
+        </TabsList>
 
-        {canViewRevenue && (
-          <TabsContent value="revenue" className="space-y-4">
-            <RevenueTable data={revenueData} isLoading={revenueLoading} />
-          </TabsContent>
-        )}
+        <TabsContent value="revenue" className="space-y-4">
+          <RevenueTable data={revenueData} isLoading={revenueLoading} />
+        </TabsContent>
 
-        {canViewProducts && (
-          <TabsContent value="products" className="space-y-4">
-            <ProductsSoldTable data={productsData} isLoading={productsLoading} />
-          </TabsContent>
-        )}
+        <TabsContent value="products" className="space-y-4">
+          <ProductsSoldTable data={productsData} isLoading={productsLoading} />
+        </TabsContent>
 
-        {canViewTrends && (
-          <TabsContent value="trends" className="space-y-4">
-            <ProductTrendsChart startDate={validStartDate} endDate={validEndDate} interval={interval} />
-          </TabsContent>
-        )}
+        <TabsContent value="trends" className="space-y-4">
+          <ProductTrendsChart startDate={validStartDate} endDate={validEndDate} interval={interval} />
+        </TabsContent>
 
-        {canViewDriverRevenue && (
-          <TabsContent value="drivers" className="space-y-4">
-            <DriverRevenueTable data={driverData} isLoading={driverLoading} />
-          </TabsContent>
-        )}
+        <TabsContent value="drivers" className="space-y-4">
+          <DriverRevenueTable data={driverData} isLoading={driverLoading} />
+        </TabsContent>
 
-        {canViewDeliveryFees && (
-          <TabsContent value="delivery-fees" className="space-y-4">
-            <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} />
-          </TabsContent>
-        )}
+        <TabsContent value="delivery-fees" className="space-y-4">
+          <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} />
+        </TabsContent>
       </Tabs>
     </div>
   );

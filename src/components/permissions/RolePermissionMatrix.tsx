@@ -20,8 +20,6 @@ const menuLabels: Record<string, string> = {
   settingsPermissions: 'Permissions',
   settingsPayments: 'Payment Settings',
   settingsCommunications: 'Communications',
-  reports_driver_revenue: 'Reports: Driver Revenue',
-  reports_delivery_fees: 'Reports: Delivery Fees',
 };
 
 const roleColors: Record<UserRole, string> = {
@@ -34,7 +32,6 @@ const roleColors: Record<UserRole, string> = {
   manager: 'bg-green-400',
   support_officer: 'bg-yellow-500',
   staff: 'bg-gray-500',
-  fulfilment_support: 'bg-amber-500',
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -47,7 +44,6 @@ const roleLabels: Record<UserRole, string> = {
   manager: 'Manager (Legacy)',
   support_officer: 'Support Officer (Legacy)',
   staff: 'Staff (Legacy)',
-  fulfilment_support: 'Fulfilment Support',
 };
 
 export function RolePermissionMatrix() {

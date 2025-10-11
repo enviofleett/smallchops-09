@@ -94,7 +94,7 @@ serve(async (req) => {
       // Get total stats with individual error handling - only production data
       const [productsResult, ordersResult, customersResult] = await Promise.allSettled([
         supabase.from('products').select('id', { count: 'exact', head: true }).not('name', 'ilike', '%test%'),
-        supabase.from('orders').select('id, total_amount', { count: 'exact' }).in('payment_status', ['paid', 'completed']),  // ✅ FIXED
+        supabase.from('orders').select('id, total_amount', { count: 'exact' }).eq('payment_status', 'paid'),
         supabase.from('customer_accounts').select('id', { count: 'exact', head: true })
       ]);
 
@@ -123,7 +123,7 @@ serve(async (req) => {
         const { data: guestOrdersData } = await supabase
           .from('orders')
           .select('customer_email')
-          .in('payment_status', ['paid', 'completed'])  // ✅ FIXED: Include both statuses
+          .eq('payment_status', 'paid')
           .is('customer_id', null)
           .not('customer_email', 'is', null)
           .order('created_at', { ascending: false });
@@ -146,7 +146,7 @@ serve(async (req) => {
       const { data: paidOrders, error: ordersError } = await supabase
         .from('orders')
         .select('order_time, total_amount')
-        .in('payment_status', ['paid', 'completed'])  // ✅ FIXED: Include both statuses
+        .eq('payment_status', 'paid')
         .gte('order_time', `${startDate}T00:00:00.000Z`)
         .lte('order_time', `${endDate}T23:59:59.999Z`)
         .order('order_time', { ascending: true });

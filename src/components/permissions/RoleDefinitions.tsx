@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Users, Eye, Edit, Truck } from 'lucide-react';
+import { Shield, Users, Eye, Edit } from 'lucide-react';
 import { ROLE_PERMISSIONS, UserRole } from '@/hooks/useRoleBasedPermissions';
 
 const roleDescriptions: Record<UserRole, { description: string; capabilities: string[] }> = {
@@ -89,16 +89,6 @@ const roleDescriptions: Record<UserRole, { description: string; capabilities: st
       'Legacy role - consider upgrading',
     ],
   },
-  fulfilment_support: {
-    description: 'Restricted access focused on delivery fulfillment reporting only.',
-    capabilities: [
-      'View-only access to Reports menu',
-      'Can view Driver Revenue reports',
-      'Can view Delivery Fees reports',
-      'No access to other menus or report types',
-      'Focused on delivery operations monitoring',
-    ],
-  },
 };
 
 const roleIcons: Record<UserRole, any> = {
@@ -111,7 +101,6 @@ const roleIcons: Record<UserRole, any> = {
   manager: Users,
   support_officer: Eye,
   staff: Eye,
-  fulfilment_support: Truck,
 };
 
 const roleColors: Record<UserRole, string> = {
@@ -124,7 +113,6 @@ const roleColors: Record<UserRole, string> = {
   manager: 'bg-green-400',
   support_officer: 'bg-yellow-500',
   staff: 'bg-gray-500',
-  fulfilment_support: 'bg-amber-500',
 };
 
 export function RoleDefinitions() {

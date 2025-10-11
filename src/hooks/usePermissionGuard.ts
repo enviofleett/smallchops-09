@@ -53,10 +53,7 @@ export const MENU_PERMISSION_KEYS = {
   settingsAdmin: 'settings_admin_users',
   settingsPermissions: 'settings_admin_permissions',
   settingsPayments: 'settings_payments_providers',
-  settingsCommunications: 'settings_communications_branding',
-  // Report sub-pages
-  reportsDriverRevenue: 'reports_driver_revenue',
-  reportsDeliveryFees: 'reports_delivery_fees'
+  settingsCommunications: 'settings_communications_branding'
 } as const;
 
 export type MenuPermissionKey = typeof MENU_PERMISSION_KEYS[keyof typeof MENU_PERMISSION_KEYS];

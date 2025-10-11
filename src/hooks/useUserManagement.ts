@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useRoleBasedPermissions } from './useRoleBasedPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 
-export type CreateUserRole = 'super_admin' | 'store_owner' | 'admin_manager' | 'account_manager' | 'support_staff' | 'admin' | 'manager' | 'support_officer' | 'staff' | 'fulfilment_support';
+export type CreateUserRole = 'super_admin' | 'store_owner' | 'admin_manager' | 'account_manager' | 'support_staff' | 'admin' | 'manager' | 'support_officer' | 'staff';
 
 export interface CreateUserData {
   email: string;

@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-export type UserRole = 'super_admin' | 'store_owner' | 'admin_manager' | 'account_manager' | 'support_staff' | 'admin' | 'manager' | 'support_officer' | 'staff' | 'fulfilment_support';
+export type UserRole = 'super_admin' | 'store_owner' | 'admin_manager' | 'account_manager' | 'support_staff' | 'admin' | 'manager' | 'support_officer' | 'staff';
 
 export interface RolePermission {
   role: UserRole;
@@ -194,29 +194,6 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
       delivery_zones: 'none',
       promotions_view: 'none',
       'reports-sales': 'none',
-      audit_logs: 'none',
-      settings: 'none',
-      settings_admin_users: 'none',
-      settings_admin_permissions: 'none',
-      settings_payments_providers: 'none',
-      settings_communications_branding: 'none',
-      settings_dev: 'none'
-    }
-  },
-  {
-    role: 'fulfilment_support',
-    permissions: {
-      dashboard: 'none',
-      orders_view: 'none',
-      categories_view: 'none',
-      products_view: 'none',
-      customers_view: 'none',
-      catering_bookings: 'none',
-      delivery_zones: 'none',
-      promotions_view: 'none',
-      'reports-sales': 'view',
-      reports_driver_revenue: 'view',
-      reports_delivery_fees: 'view',
       audit_logs: 'none',
       settings: 'none',
       settings_admin_users: 'none',

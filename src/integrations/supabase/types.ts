@@ -11764,7 +11764,6 @@ export type Database = {
         | "admin_manager"
         | "account_manager"
         | "store_owner"
-        | "fulfilment_support"
       assignment_status: "active" | "inactive"
       communication_event_status: "queued" | "processing" | "sent" | "failed"
       communication_log_status:
@@ -11964,7 +11963,6 @@ export const Constants = {
         "admin_manager",
         "account_manager",
         "store_owner",
-        "fulfilment_support",
       ],
       assignment_status: ["active", "inactive"],
       communication_event_status: ["queued", "processing", "sent", "failed"],

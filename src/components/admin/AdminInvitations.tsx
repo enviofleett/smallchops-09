@@ -28,7 +28,6 @@ const roleLabels: Record<UserRole, string> = {
   manager: 'Manager (Legacy)',
   support_officer: 'Support Officer (Legacy)',
   staff: 'Staff (Legacy)',
-  fulfilment_support: 'Fulfilment Support',
 };
 
 export function AdminInvitations() {

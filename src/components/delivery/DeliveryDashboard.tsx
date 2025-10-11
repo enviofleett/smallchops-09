@@ -62,10 +62,8 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
     if (!ordersData?.orders) return [];
     
     let filtered = ordersData.orders.filter(order => {
-      // Only show paid/completed orders with relevant delivery statuses
-      const isPaid = ['paid', 'completed'].includes(order.payment_status);
-      const hasRelevantStatus = ['confirmed', 'preparing', 'out_for_delivery', 'delivered'].includes(order.status);
-      return isPaid && hasRelevantStatus;
+      // Only show relevant delivery statuses (removed 'ready')
+      return ['confirmed', 'preparing', 'out_for_delivery', 'delivered'].includes(order.status);
     });
 
     // Apply status filter

@@ -726,6 +726,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                 assigned_rider_name: assignedAgent?.name,
                 delivery_schedule: deliverySchedule,
                 pickup_point: pickupPoint,
+                delivery_zone: deliveryZone,
               }}
               businessSettings={businessSettings}
               adminName={user?.name}
@@ -734,7 +735,10 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
           </div>
         ) : (
           <div ref={thermalPrintRef}>
-            <ThermalPrintReceipt order={safeOrder as unknown as OrderWithItems} />
+            <ThermalPrintReceipt 
+              order={safeOrder as unknown as OrderWithItems}
+              deliveryZone={deliveryZone}
+            />
           </div>
         )}
       </div>

@@ -7,13 +7,15 @@ interface JobOrderPrintProps {
   items?: any[];
   deliverySchedule?: any;
   pickupPoint?: any;
+  deliveryZone?: { id: string; name: string; base_fee?: number } | null;
 }
 
 export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
   order,
   items = [],
   deliverySchedule,
-  pickupPoint
+  pickupPoint,
+  deliveryZone
 }) => {
   const orderItems = items.length > 0 ? items : order.order_items || [];
   
@@ -268,6 +270,12 @@ export const JobOrderPrint: React.FC<JobOrderPrintProps> = ({
           <span className="info-label">Scheduled:</span>
           <span className="info-value">{deliveryInfo.time}</span>
         </div>
+        {deliveryZone && order.order_type === 'delivery' && (
+          <div className="info-row">
+            <span className="info-label">Delivery Zone:</span>
+            <span className="info-value">{deliveryZone.name}</span>
+          </div>
+        )}
       </div>
 
       {/* Pickup Schedule Fulfillment (for pickup orders) */}

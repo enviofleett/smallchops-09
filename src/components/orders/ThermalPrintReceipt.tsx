@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 interface ThermalPrintReceiptProps {
   order: OrderWithItems;
   deliverySchedule?: any;
+  deliveryZone?: { id: string; name: string; base_fee?: number } | null;
   businessInfo?: {
     name: string;
     admin_notification_email?: string;
@@ -18,6 +19,7 @@ interface ThermalPrintReceiptProps {
 export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
   order,
   deliverySchedule,
+  deliveryZone,
   businessInfo
 }) => {
   const formatCurrency = (amount: number) => {
@@ -126,6 +128,9 @@ export const ThermalPrintReceipt: React.FC<ThermalPrintReceiptProps> = ({
                 </>
               )}
               {deliveryInfo?.address && <div>{deliveryInfo.address}</div>}
+              {deliveryZone && order.order_type === 'delivery' && (
+                <div>Zone: {deliveryZone.name}</div>
+              )}
               {deliveryInfo?.instructions && <div>{deliveryInfo.instructions}</div>}
               {deliverySchedule?.special_instructions && (
                 <div>{deliverySchedule.special_instructions}</div>

@@ -4,11 +4,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
 import { AlertCircle, Play, RefreshCw, Trash2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const EmailQueueManager: React.FC = () => {
   const [processing, setProcessing] = useState(false);
+  const [showClearAllDialog, setShowClearAllDialog] = useState(false);
+  const [clearAllConfirmText, setClearAllConfirmText] = useState('');
   const queryClient = useQueryClient();
 
   // Get queue statistics
@@ -101,6 +106,30 @@ export const EmailQueueManager: React.FC = () => {
     },
     onError: (error: any) => {
       toast.error(`Clear failed: ${error.message}`);
+    }
+  });
+
+  // Clear ALL emails - complete queue reset
+  const clearAllEmailsMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('clear-email-queue', {
+        body: { 
+          action: 'clear_queue', 
+          statuses: ['queued', 'failed', 'processing'] 
+        }
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['email-queue-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['email-delivery-monitor'] });
+      toast.success(`Successfully cleared ${data.cleared_count} emails from queue`);
+      setShowClearAllDialog(false);
+      setClearAllConfirmText('');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to clear all emails: ${error.message}`);
     }
   });
 
@@ -242,6 +271,32 @@ export const EmailQueueManager: React.FC = () => {
         </div>
       </Card>
 
+      {/* Danger Zone - Complete Queue Reset */}
+      <Card className="p-6 border-destructive bg-destructive/5">
+        <h3 className="text-lg font-semibold text-destructive mb-4 flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          Danger Zone - Complete Queue Reset
+        </h3>
+        
+        <Alert className="mb-4 border-destructive/50">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Warning: Irreversible Action</AlertTitle>
+          <AlertDescription>
+            This will permanently delete all {((queueStats?.queued || 0) + (queueStats?.failed || 0))} 
+            emails from the queue (queued, failed, and processing). This action cannot be undone.
+          </AlertDescription>
+        </Alert>
+        
+        <Button
+          variant="destructive"
+          onClick={() => setShowClearAllDialog(true)}
+          disabled={clearAllEmailsMutation.isPending || ((queueStats?.queued || 0) + (queueStats?.failed || 0)) === 0}
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Clear All Emails ({(queueStats?.queued || 0) + (queueStats?.failed || 0)})
+        </Button>
+      </Card>
+
       {/* Setup Instructions */}
       <Card className="p-6 border-blue-200 bg-blue-50">
         <h3 className="font-semibold text-blue-900 mb-3">🔧 Setup Automated Processing</h3>
@@ -254,6 +309,43 @@ export const EmailQueueManager: React.FC = () => {
           </ol>
         </div>
       </Card>
+
+      {/* Clear All Confirmation Dialog */}
+      <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                This will permanently delete <strong>{(queueStats?.queued || 0) + (queueStats?.failed || 0)} emails</strong> from the queue.
+                This action cannot be undone.
+              </p>
+              <p className="font-semibold">Type "CLEAR ALL" to confirm:</p>
+              <Input
+                value={clearAllConfirmText}
+                onChange={(e) => setClearAllConfirmText(e.target.value)}
+                placeholder="CLEAR ALL"
+                className="font-mono"
+              />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowClearAllDialog(false);
+              setClearAllConfirmText('');
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => clearAllEmailsMutation.mutate()}
+              disabled={clearAllConfirmText !== 'CLEAR ALL' || clearAllEmailsMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {clearAllEmailsMutation.isPending ? 'Clearing...' : 'Clear All Emails'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

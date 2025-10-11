@@ -27,6 +27,7 @@ const roleLabels: Record<UserRole, string> = {
   admin_manager: 'Admin Manager',
   account_manager: 'Account Manager',
   support_staff: 'Support Staff',
+  fulfilment_support: 'Fulfilment Support',
   admin: 'Admin (Legacy)',
   manager: 'Manager (Legacy)',
   support_officer: 'Support Officer (Legacy)',

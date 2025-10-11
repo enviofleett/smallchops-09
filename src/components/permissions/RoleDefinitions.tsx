@@ -55,6 +55,16 @@ const roleDescriptions: Record<UserRole, { description: string; capabilities: st
       'Focused on support operations',
     ],
   },
+  fulfilment_support: {
+    description: 'Focused on order fulfillment, delivery coordination, and logistics management.',
+    capabilities: [
+      'Full dashboard access',
+      'Full order management and tracking',
+      'View delivery zones and customer info',
+      'No access to products, settings, or financial reports',
+      'Dedicated to fulfillment operations',
+    ],
+  },
   admin: {
     description: 'Legacy: Comprehensive access to operational features (mapped to admin_manager + more).',
     capabilities: [
@@ -97,6 +107,7 @@ const roleIcons: Record<UserRole, any> = {
   admin_manager: Users,
   account_manager: Edit,
   support_staff: Eye,
+  fulfilment_support: Users,
   admin: Shield,
   manager: Users,
   support_officer: Eye,
@@ -109,6 +120,7 @@ const roleColors: Record<UserRole, string> = {
   admin_manager: 'bg-blue-500',
   account_manager: 'bg-cyan-500',
   support_staff: 'bg-green-500',
+  fulfilment_support: 'bg-orange-500',
   admin: 'bg-blue-400',
   manager: 'bg-green-400',
   support_officer: 'bg-yellow-500',

@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!newRole || !['super_admin', 'admin', 'manager', 'support_officer', 'staff'].includes(newRole)) {
+    if (!newRole || !['super_admin', 'admin', 'manager', 'support_officer', 'staff', 'support_staff', 'admin_manager', 'account_manager', 'store_owner', 'fulfilment_support'].includes(newRole)) {
       console.error(`[${requestId}] Invalid role:`, newRole);
       return new Response(JSON.stringify({ 
         error: 'Invalid role. Must be one of: super_admin, admin, manager, support_officer, staff',

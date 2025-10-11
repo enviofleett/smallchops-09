@@ -50,28 +50,43 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
   } = useQuery({
     queryKey: ['delivery-availability', new Date().toISOString().split('T')[0]],
     queryFn: async () => {
-      const { deliveryBookingAPI } = await import('@/api/deliveryBookingApi');
-      const now = new Date();
-      const maxDate = addDays(now, 60); // 60 days from backend config
-      
-      const response = await deliveryBookingAPI.getAvailableSlots({
-        start_date: deliveryBookingAPI.formatDateForAPI(now),
-        end_date: deliveryBookingAPI.formatDateForAPI(maxDate)
-      });
-      
-      console.log('✅ Delivery API response:', {
-        slots: response.slots.length,
-        config: response.config,
-        businessDays: response.business_days
-      });
-      
-      return response;
+      try {
+        const { deliveryBookingAPI } = await import('@/api/deliveryBookingApi');
+        const now = new Date();
+        const maxDate = addDays(now, 60); // 60 days from backend config
+        
+        const response = await deliveryBookingAPI.getAvailableSlots({
+          start_date: deliveryBookingAPI.formatDateForAPI(now),
+          end_date: deliveryBookingAPI.formatDateForAPI(maxDate)
+        });
+        
+        console.log('✅ Delivery API response:', {
+          slots: response.slots.length,
+          config: response.config,
+          businessDays: response.business_days
+        });
+        
+        return response;
+      } catch (err) {
+        console.error('❌ Failed to fetch delivery slots:', err);
+        
+        // Provide clearer error for deployment issues
+        if (err instanceof Error && 
+            (err.message.includes('MIME type') || 
+             err.message.includes('text/html') ||
+             err.message.includes('temporarily unavailable'))) {
+          throw new Error('Delivery scheduling is temporarily unavailable. Please try again in a few moments.');
+        }
+        
+        throw err;
+      }
     },
     staleTime: 10 * 60 * 1000, // 10 minutes cache
     refetchInterval: false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: 'always',
-    retry: 2
+    retry: 2,
+    retryDelay: 1000
   });
 
   const availableSlots = apiResponse?.slots || [];
@@ -235,10 +250,17 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                {error}
-                <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
-                  Retry
-                </Button>
+                <div className="space-y-2">
+                  <p className="font-semibold">Unable to load delivery schedule</p>
+                  <p className="text-sm">
+                    {error.includes('MIME type') || error.includes('text/html') || error.includes('temporarily unavailable')
+                      ? 'The delivery scheduling service is temporarily unavailable. Please try refreshing the page.' 
+                      : error}
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-2">
+                    Retry
+                  </Button>
+                </div>
               </AlertDescription>
             </Alert>
           )}
@@ -323,10 +345,17 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                {error}
-                <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
-                  Retry
-                </Button>
+                <div className="space-y-2">
+                  <p className="font-semibold">Unable to load delivery schedule</p>
+                  <p className="text-sm">
+                    {error.includes('MIME type') || error.includes('text/html') || error.includes('temporarily unavailable')
+                      ? 'The delivery scheduling service is temporarily unavailable. Please try refreshing the page.' 
+                      : error}
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-2">
+                    Retry
+                  </Button>
+                </div>
               </AlertDescription>
             </Alert>
           )}

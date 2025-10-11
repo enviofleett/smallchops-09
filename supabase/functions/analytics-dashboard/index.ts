@@ -124,12 +124,13 @@ serve(async (req) => {
             break;
         }
 
-        // Get order data
+        // Get order data - CRITICAL: Only include paid orders for revenue calculations
         const { data: orders, error: ordersError } = await supabase
           .from('orders')
           .select('*')
           .gte('created_at', startTime.toISOString())
-          .lte('created_at', endTime.toISOString());
+          .lte('created_at', endTime.toISOString())
+          .eq('payment_status', 'paid');
 
         if (ordersError) throw ordersError;
 
@@ -149,7 +150,8 @@ serve(async (req) => {
             pending: orders?.filter(o => ['pending', 'confirmed', 'preparing'].includes(o.status)).length || 0,
             cancelled: orders?.filter(o => o.status === 'cancelled').length || 0,
             averageValue: orders?.reduce((sum, o) => sum + (o.total_amount || 0), 0) / (orders?.length || 1),
-            revenue: orders?.filter(o => o.status === 'delivered').reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0
+            // CRITICAL: Revenue from paid orders only
+            revenue: orders?.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0
           },
           payments: {
             total: payments?.length || 0,
@@ -455,7 +457,8 @@ function generateOrderTimeline(orders: any[], timeframe: string) {
 
     buckets[bucketTime].totalOrders++;
     
-    if (order.status === 'delivered') {
+    // CRITICAL: Only count revenue from paid orders
+    if (order.status === 'delivered' && order.payment_status === 'paid') {
       buckets[bucketTime].completedOrders++;
       buckets[bucketTime].revenue += order.total_amount || 0;
     } else if (order.status === 'cancelled') {
@@ -560,14 +563,15 @@ async function generateBusinessIntelligence(supabase: any, period: string) {
     { data: payments },
     { data: analytics }
   ] = await Promise.all([
-    supabase.from('orders').select('*').gte('created_at', startTime.toISOString()),
+    // CRITICAL: Only paid orders for revenue calculations
+    supabase.from('orders').select('*').gte('created_at', startTime.toISOString()).eq('payment_status', 'paid'),
     supabase.from('customers').select('*').gte('created_at', startTime.toISOString()),
     supabase.from('payment_transactions').select('*').gte('created_at', startTime.toISOString()),
     supabase.from('customer_purchase_analytics').select('*')
   ]);
 
-  // Revenue analytics
-  const totalRevenue = orders?.filter(o => o.status === 'delivered')
+  // Revenue analytics - CRITICAL: Only paid orders count as revenue
+  const totalRevenue = orders?.filter(o => o.payment_status === 'paid')
     .reduce((sum, o) => sum + (o.total_amount || 0), 0) || 0;
   
   const avgOrderValue = orders?.length > 0 
@@ -831,12 +835,13 @@ async function generateDailyAnalytics(supabase: any, startDate: string, endDate:
     });
   
     // Get all orders in the date range (using UTC boundaries that match Lagos time)
-    // Include all orders except cancelled ones (they're tracked separately)
+    // CRITICAL: Only include PAID orders for revenue calculations
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('*')
       .gte('order_time', startUTC)
       .lte('order_time', endUTC)
+      .eq('payment_status', 'paid')
       .neq('status', 'cancelled')
       .order('order_time', { ascending: true });
 

@@ -15,9 +15,7 @@ export const DeliveryTabDropdown = ({
   const [isOpen, setIsOpen] = useState(false);
 
   const tabs = [
-    { value: 'overview', label: 'Overview' },
     { value: 'drivers', label: 'Drivers' },
-    { value: 'analytics', label: 'Analytics' },
     { value: 'zones', label: 'Delivery Zones' },
   ];
 
@@ -56,7 +54,7 @@ export const DeliveryTabDropdown = ({
         className="w-full justify-between h-12 px-4 bg-background border border-input hover:bg-accent hover:text-accent-foreground"
       >
         <span className="font-medium">
-          {activeTabData?.label || 'Overview'}
+          {activeTabData?.label || 'Drivers'}
         </span>
         {isOpen ? (
           <ChevronUp className="h-4 w-4" />

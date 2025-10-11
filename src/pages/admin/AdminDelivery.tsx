@@ -52,7 +52,7 @@ const GRID_BREAKPOINTS = {
 export default function AdminDelivery() {
   // STATE
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('drivers');
   const [selectedOrders, setSelectedOrders] = useState<OrderWithItems[]>([]);
   const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
   const [isRegisterDriverOpen, setIsRegisterDriverOpen] = useState(false);
@@ -312,11 +312,9 @@ export default function AdminDelivery() {
             
             {/* Desktop: Grid layout */}
             <div className="hidden lg:block">
-              <TabsList className="grid w-full grid-cols-4 gap-1 p-1 bg-muted rounded-lg">
+              <TabsList className="grid w-full grid-cols-2 gap-1 p-1 bg-muted rounded-lg">
                 {[
-                  { value: 'overview', label: 'Overview' },
                   { value: 'drivers', label: 'Drivers' },
-                  { value: 'analytics', label: 'Analytics' },
                   { value: 'zones', label: 'Delivery Zones' },
                 ].map(tab => (
                   <TabsTrigger
@@ -331,55 +329,9 @@ export default function AdminDelivery() {
             </div>
           </div>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* Shipping Fees Report - Full Width */}
-            <Card className="w-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  Shipping Fees Report
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ShippingFeesReport />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Drivers Tab */}
           <TabsContent value="drivers">
             <AdminDriversTab />
-          </TabsContent>
-
-          {/* Analytics Tab - Number of trips by driver */}
-          <TabsContent value="analytics" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChartHorizontal className="w-5 h-5" />
-                  Driver Trip Analytics
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Number of trips covered by each driver (out for delivery)
-                </p>
-              </CardHeader>
-              <CardContent>
-                {Object.keys(driverTripCounts).length === 0 ? (
-                  <p className="text-muted-foreground py-2">No trips found for the selected date.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {Object.entries(driverTripCounts).map(([driverId, count]) => (
-                      <div key={driverId} className="flex items-center gap-3 border-b py-2">
-                        <Users className="w-4 h-4 text-primary" />
-                        <span className="font-medium">{getDriverName(driverId)}</span>
-                        <Badge variant="outline">{count} trips</Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Delivery Zones Tab */}

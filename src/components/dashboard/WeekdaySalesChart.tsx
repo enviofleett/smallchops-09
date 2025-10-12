@@ -36,10 +36,20 @@ export function WeekdaySalesChart({ dailyData, isLoading }: WeekdaySalesChartPro
       aggregated[day] = { sales: 0, orders: 0 };
     });
 
-    // Aggregate data by weekday
+    // Aggregate data by weekday with timezone-safe parsing
     dailyData.forEach(daily => {
-      const weekday = daily.weekday || new Date(daily.date).toLocaleDateString('en-US', { weekday: 'long' });
-      if (aggregated[weekday]) {
+      // Use provided weekday or calculate from date string (timezone-safe)
+      let weekday = daily.weekday;
+      
+      if (!weekday && daily.date) {
+        // Parse date as YYYY-MM-DD in LOCAL timezone (not UTC)
+        // This ensures "2025-10-12" is always Sunday regardless of timezone
+        const [year, month, day] = daily.date.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        weekday = localDate.toLocaleDateString('en-US', { weekday: 'long' });
+      }
+      
+      if (weekday && aggregated[weekday]) {
         aggregated[weekday].sales += daily.revenue;
         aggregated[weekday].orders += daily.orders;
       }

@@ -50,7 +50,7 @@ export const usePaymentConfirmation = () => {
       
       const result = await verifySecurePayment(reference);
       
-      if (!result.success || result.status !== 'success') {
+      if (!result.success || (result.status !== 'success' && result.status !== 'completed')) {
         updateStep('paystack', 'error', `Paystack verification failed: ${result.status || 'Unknown error'}`);
         toast.dismiss(progressToast);
         toast.error('❌ Payment verification failed', {

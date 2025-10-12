@@ -119,9 +119,9 @@ export function formatDeliveryDate(dateString: string | null | undefined): strin
   try {
     const date = parseISO(dateString);
     if (!isValid(date)) return null;
-    // Convert to Lagos time and format
+    // Convert to Lagos time and format with weekday
     const lagosDate = toLagosTime(date);
-    return format(lagosDate, 'MMM dd, yyyy');
+    return format(lagosDate, 'EEEE MMM dd, yyyy');
   } catch {
     return null;
   }

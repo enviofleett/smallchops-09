@@ -3,7 +3,6 @@ import { TrendingUp, Users, DollarSign, Repeat, UserPlus, TrendingDown, Minus, C
 import { CustomerMetrics, Customer, DateRange } from '@/types/customers';
 import { CustomerListModal } from './CustomerListModal';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-
 interface CustomerAnalyticsProps {
   metrics: CustomerMetrics;
   topCustomersByOrders: Customer[];
@@ -13,7 +12,6 @@ interface CustomerAnalyticsProps {
   isLoading?: boolean;
   dateRange?: DateRange;
 }
-
 export const CustomerAnalytics = ({
   metrics,
   topCustomersByOrders,
@@ -30,16 +28,28 @@ export const CustomerAnalytics = ({
     if (!dateRange) return 'All time';
     const start = new Date(dateRange.from);
     const end = new Date(dateRange.to);
-    const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
-    
+    const options: Intl.DateTimeFormatOptions = {
+      month: 'short',
+      day: 'numeric'
+    };
     if (start.getFullYear() !== end.getFullYear()) {
-      return `${start.toLocaleDateString('en-US', { ...options, year: 'numeric' })} - ${end.toLocaleDateString('en-US', { ...options, year: 'numeric' })}`;
+      return `${start.toLocaleDateString('en-US', {
+        ...options,
+        year: 'numeric'
+      })} - ${end.toLocaleDateString('en-US', {
+        ...options,
+        year: 'numeric'
+      })}`;
     }
     return `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}, ${end.getFullYear()}`;
   };
 
   // Calculate new customers and growth metrics (production-ready)
-  const { newCustomers, newCustomersGrowth, repeatCustomersGrowth } = useMemo(() => {
+  const {
+    newCustomers,
+    newCustomersGrowth,
+    repeatCustomersGrowth
+  } = useMemo(() => {
     const now = new Date();
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const last60Days = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
@@ -60,21 +70,17 @@ export const CustomerAnalytics = ({
     });
 
     // Calculate growth percentage with safe division
-    const newGrowth = previousPeriodNew.length > 0
-      ? ((currentPeriodNew.length - previousPeriodNew.length) / previousPeriodNew.length) * 100
-      : currentPeriodNew.length > 0 ? 100 : 0;
+    const newGrowth = previousPeriodNew.length > 0 ? (currentPeriodNew.length - previousPeriodNew.length) / previousPeriodNew.length * 100 : currentPeriodNew.length > 0 ? 100 : 0;
 
     // Repeat customers growth (comparing current rate to estimated previous)
     const currentRepeatRate = metrics.repeatCustomerRate;
     // Estimate previous period rate (conservative approach)
-    const estimatedPreviousRate = Math.max(0, currentRepeatRate - (currentRepeatRate * 0.1)); // 10% baseline
-    const repeatGrowth = estimatedPreviousRate > 0
-      ? ((currentRepeatRate - estimatedPreviousRate) / estimatedPreviousRate) * 100
-      : currentRepeatRate > 0 ? 100 : 0;
-
+    const estimatedPreviousRate = Math.max(0, currentRepeatRate - currentRepeatRate * 0.1); // 10% baseline
+    const repeatGrowth = estimatedPreviousRate > 0 ? (currentRepeatRate - estimatedPreviousRate) / estimatedPreviousRate * 100 : currentRepeatRate > 0 ? 100 : 0;
     return {
       newCustomers: currentPeriodNew,
-      newCustomersGrowth: Math.min(newGrowth, 999), // Cap at 999% for display
+      newCustomersGrowth: Math.min(newGrowth, 999),
+      // Cap at 999% for display
       repeatCustomersGrowth: Math.min(repeatGrowth, 999)
     };
   }, [allCustomers, metrics.repeatCustomerRate]);
@@ -86,94 +92,81 @@ export const CustomerAnalytics = ({
     const Icon = isPositive ? TrendingUp : isNeutral ? Minus : TrendingDown;
     const colorClass = isPositive ? 'text-green-600' : isNeutral ? 'text-gray-600' : 'text-red-600';
     const bgClass = isPositive ? 'bg-green-50' : isNeutral ? 'bg-gray-50' : 'bg-red-50';
-
-    return (
-      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${bgClass}`}>
+    return <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${bgClass}`}>
         <Icon className={`h-3 w-3 ${colorClass}`} />
         <span className={`text-xs font-medium ${colorClass}`}>
           {isNeutral ? '0%' : `${Math.abs(growth).toFixed(1)}%`}
         </span>
-      </div>
-    );
+      </div>;
   };
-
   if (isLoading) {
-    return (
-      <div className="space-y-4">
+    return <div className="space-y-4">
         <div className="flex items-center justify-between text-sm bg-muted/30 px-3 py-2 rounded-lg animate-pulse">
           <div className="h-4 w-48 bg-muted rounded"></div>
           <div className="h-3 w-24 bg-muted rounded"></div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
+          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
               <div className="h-10 bg-gray-200 rounded mb-3"></div>
               <div className="h-6 bg-gray-200 rounded mb-2"></div>
               <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            </div>
-          ))}
+            </div>)}
         </div>
-      </div>
-    );
+      </div>;
   }
 
   // Streamlined stats - production ready with 3 key metrics
-  const stats = [
-    {
-      title: 'Total Customers',
-      value: metrics.totalCustomers.toLocaleString(),
-      subtitle: 'All time',
-      icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
-      key: 'total',
-      customers: allCustomers,
-    },
-    {
-      title: 'New Customers',
-      value: newCustomers.length.toLocaleString(),
-      subtitle: 'Last 30 days',
-      icon: UserPlus,
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-100',
-      key: 'new',
-      customers: newCustomers,
-      growth: newCustomersGrowth,
-    },
-    {
-      title: 'Guest Customers',
-      value: metrics.guestCustomers.toLocaleString(),
-      subtitle: 'Unregistered',
-      icon: Users,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
-      key: 'guest',
-      customers: allCustomers.filter(c => c.isGuest),
-    }
-  ];
+  const stats = [{
+    title: 'Total Customers',
+    value: metrics.totalCustomers.toLocaleString(),
+    subtitle: 'All time',
+    icon: Users,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100',
+    key: 'total',
+    customers: allCustomers
+  }, {
+    title: 'New Customers',
+    value: newCustomers.length.toLocaleString(),
+    subtitle: 'Last 30 days',
+    icon: UserPlus,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-100',
+    key: 'new',
+    customers: newCustomers,
+    growth: newCustomersGrowth
+  }, {
+    title: 'Guest Customers',
+    value: metrics.guestCustomers.toLocaleString(),
+    subtitle: 'Unregistered',
+    icon: Users,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-100',
+    key: 'guest',
+    customers: allCustomers.filter(c => c.isGuest)
+  }];
 
   // Modal mapping for stats
-  const modalMap: Record<
-    string,
-    { title: string; customers: Customer[] }
-  > = {
+  const modalMap: Record<string, {
+    title: string;
+    customers: Customer[];
+  }> = {
     total: {
       title: "All Customers",
-      customers: allCustomers,
+      customers: allCustomers
     },
     new: {
       title: "New Customers (Last 30 Days)",
-      customers: newCustomers,
+      customers: newCustomers
     },
     guest: {
       title: "Guest Customers",
-      customers: allCustomers.filter(c => c.isGuest),
+      customers: allCustomers.filter(c => c.isGuest)
     }
   };
 
   // Production-ready responsive grid
-  return (
-    <div className="space-y-4">
+  return <div className="space-y-4">
       {/* Date Range Context - Shows what data is being displayed */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg border border-border/50">
         <div className="flex items-center gap-2">
@@ -189,18 +182,10 @@ export const CustomerAnalytics = ({
 
       {/* Main Stats Grid - Production Ready Mobile Responsive (3 cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          const hasGrowth = stat.growth !== undefined;
-          
-          return (
-            <button
-              key={stat.title}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 w-full text-left focus:outline-none hover:shadow-xl hover:border-blue-200 active:scale-[0.98] transition-all duration-200 group"
-              onClick={() => setModal(stat.key as any)}
-              type="button"
-              aria-label={`View ${stat.title} details`}
-            >
+        {stats.map(stat => {
+        const Icon = stat.icon;
+        const hasGrowth = stat.growth !== undefined;
+        return <button key={stat.title} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 w-full text-left focus:outline-none hover:shadow-xl hover:border-blue-200 active:scale-[0.98] transition-all duration-200 group" onClick={() => setModal(stat.key as any)} type="button" aria-label={`View ${stat.title} details`}>
               <div className="flex items-start justify-between mb-4">
                 <div className={`p-3 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-200`}>
                   <Icon className={`h-6 w-6 ${stat.color}`} />
@@ -219,96 +204,17 @@ export const CustomerAnalytics = ({
                   {stat.subtitle}
                 </p>
               </div>
-            </button>
-          );
-        })}
+            </button>;
+      })}
       </div>
 
       {/* Additional Insights Card - Mobile Responsive */}
       <Card className="border-blue-100 bg-gradient-to-br from-blue-50 to-white">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base md:text-lg flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-blue-600" />
-            Customer Growth Insights
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            Real-time customer acquisition and retention metrics
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* New Customers Breakdown */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-600">New Customers (30d)</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold text-emerald-600">
-                  {newCustomers.length}
-                </p>
-                {renderGrowthIndicator(newCustomersGrowth)}
-              </div>
-              <div className="space-y-1 text-xs text-gray-600">
-                <div className="flex justify-between">
-                  <span>Guest:</span>
-                  <span className="font-medium">{newCustomers.filter(c => c.isGuest).length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Authenticated:</span>
-                  <span className="font-medium">{newCustomers.filter(c => !c.isGuest).length}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Repeat Customer Growth */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-600">Repeat Customers</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold text-pink-600">
-                  {repeatCustomers.length}
-                </p>
-                {renderGrowthIndicator(repeatCustomersGrowth)}
-              </div>
-              <div className="text-xs text-gray-600">
-                <p>Rate: <span className="font-medium">{metrics.repeatCustomerRate.toFixed(1)}%</span></p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {metrics.repeatCustomerRate > 20 ? '✓ Excellent retention' : 'Focus on retention'}
-                </p>
-              </div>
-            </div>
-
-            {/* Average Order Value */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-600">Avg Order Value</p>
-              <p className="text-2xl font-bold text-purple-600">
-                ₦{Math.round(metrics.avgOrderValue).toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-600">
-                Per customer transaction
-              </p>
-            </div>
-
-            {/* Active Customers */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-600">Active Customers</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {metrics.activeCustomers.toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-600">
-                With recent orders
-              </p>
-            </div>
-          </div>
-        </CardContent>
+        
+        
       </Card>
 
       {/* Modal for detailed view */}
-      {modal && (
-        <CustomerListModal
-          open={!!modal}
-          onOpenChange={() => setModal(null)}
-          title={modalMap[modal].title}
-          customers={modalMap[modal].customers}
-        />
-      )}
-    </div>
-  );
+      {modal && <CustomerListModal open={!!modal} onOpenChange={() => setModal(null)} title={modalMap[modal].title} customers={modalMap[modal].customers} />}
+    </div>;
 };

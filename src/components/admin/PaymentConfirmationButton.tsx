@@ -116,7 +116,7 @@ export const PaymentConfirmationButton: React.FC<PaymentConfirmationButtonProps>
         size="sm"
         onClick={() => setShowConfirmDialog(true)}
         disabled={isConfirming || isRealTimeUpdating}
-        className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+        className="gap-2 bg-red-600 hover:bg-red-700 text-white"
       >
         {isConfirming || isRealTimeUpdating ? (
           <>

@@ -211,6 +211,8 @@ const Dashboard = () => {
         <WeekdaySalesChart
           dailyData={dailyMetrics?.dailyData || []}
           isLoading={isDailyLoading}
+          startDate={dateRange.startDate}
+          endDate={dateRange.endDate}
         />
       )}
     </div>

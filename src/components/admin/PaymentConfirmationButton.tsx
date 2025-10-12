@@ -10,9 +10,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { CheckCircle, Loader2, Zap } from 'lucide-react';
+import { CheckCircle2, Loader2, Zap, AlertCircle } from 'lucide-react';
 import { usePaymentConfirmation } from '@/hooks/usePaymentConfirmation';
 import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 
 interface PaymentConfirmationButtonProps {
   orderId: string;
@@ -81,7 +82,20 @@ export const PaymentConfirmationButton: React.FC<PaymentConfirmationButtonProps>
   }
 
   const handleConfirm = async () => {
+    console.log('🔄 Starting payment confirmation for:', {
+      orderId,
+      orderNumber,
+      paymentReference,
+      timestamp: new Date().toISOString()
+    });
+    
     const result = await confirmPayment(orderId, paymentReference, orderNumber);
+    
+    console.log('✓ Payment confirmation result:', {
+      success: result.success,
+      orderNumber,
+      timestamp: new Date().toISOString()
+    });
     
     if (result.success) {
       // Real-time subscription will handle the UI update
@@ -98,69 +112,87 @@ export const PaymentConfirmationButton: React.FC<PaymentConfirmationButtonProps>
   return (
     <>
       <Button
-        variant="outline"
+        variant="default"
         size="sm"
         onClick={() => setShowConfirmDialog(true)}
         disabled={isConfirming || isRealTimeUpdating}
-        className="gap-2"
+        className="gap-2 bg-green-600 hover:bg-green-700 text-white"
       >
         {isConfirming || isRealTimeUpdating ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            {isRealTimeUpdating ? 'Updating...' : 'Verifying...'}
+            {isRealTimeUpdating ? 'Live Update...' : 'Verifying...'}
           </>
         ) : (
           <>
-            <Zap className="w-4 h-4" />
+            <CheckCircle2 className="w-4 h-4" />
             Confirm Payment
           </>
         )}
       </Button>
 
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-primary" />
-              Instant Payment Verification
+            <AlertDialogTitle className="flex items-center gap-2 text-lg">
+              <div className="p-2 rounded-full bg-green-100 dark:bg-green-900">
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              Live Payment Verification
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              This will verify the payment status directly with Paystack for order #{orderNumber}.
-              <br /><br />
-              <strong>Reference:</strong> {paymentReference}
-              <br /><br />
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <div className="text-sm">
+                This will verify the payment status directly with <strong>Paystack</strong> in real-time for:
+              </div>
+              
+              <div className="bg-muted p-3 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">Order Number:</span>
+                  <Badge variant="outline" className="font-mono">#{orderNumber}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">Reference:</span>
+                  <code className="text-xs bg-background px-2 py-1 rounded">{paymentReference}</code>
+                </div>
+              </div>
+              
               {isConfirming ? (
-                <span className="text-primary font-semibold">
-                  ⚡ Verifying payment in real-time...
-                </span>
+                <div className="flex items-center gap-2 text-primary font-semibold bg-primary/10 p-3 rounded-lg">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">⚡ Verifying payment with Paystack...</span>
+                </div>
               ) : (
-                <span>
-                  If the payment is successful, the order will be <strong>immediately</strong> marked as paid and confirmed.
-                </span>
+                <div className="flex items-start gap-2 text-sm">
+                  <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">
+                    If successful, the order will be <strong>immediately confirmed</strong> and marked as paid. 
+                    You'll see live updates as each step completes.
+                  </span>
+                </div>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2">
             <AlertDialogCancel disabled={isConfirming || isRealTimeUpdating}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction 
+            <Button 
               onClick={handleConfirm}
               disabled={isConfirming || isRealTimeUpdating}
-              className="gap-2"
+              className="gap-2 bg-green-600 hover:bg-green-700 min-w-[140px]"
             >
               {isConfirming || isRealTimeUpdating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {isRealTimeUpdating ? 'Updating...' : 'Verifying...'}
+                  {isRealTimeUpdating ? 'Live Update...' : 'Verifying...'}
                 </>
               ) : (
                 <>
-                  <Zap className="w-4 h-4" />
-                  Verify Now
+                  <CheckCircle2 className="w-4 h-4" />
+                  ✓ Verify Payment
                 </>
               )}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

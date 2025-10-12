@@ -33,6 +33,7 @@ import { parseProductFeatures } from '@/utils/productFeatureParser';
 import { sanitizeText } from '@/utils/htmlSanitizer';
 import { DriverAssignmentSection } from './details/DriverAssignmentSection';
 import { StatusManagementSection } from './details/StatusManagementSection';
+import { StatusUpdateHistory } from './details/StatusUpdateHistory';
 import { useOrderPageHooks } from '@/hooks/orderPageHooks';
 import { UnifiedOrder, OrderStatus } from '@/types/unifiedOrder';
 import { OrderWithItems } from '@/api/orders';
@@ -717,13 +718,18 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
 
           {/* Status Management - ADMIN ONLY */}
           {isAdmin && (
-            <StatusManagementSection
-              currentStatus={safeOrder.status}
-              orderId={safeOrder.id}
-              updatedAt={safeOrder.updated_at}
-              onUpdateStatus={handleStatusUpdateWithClose}
-              isUpdating={false}
-            />
+            <>
+              <StatusManagementSection
+                currentStatus={safeOrder.status}
+                orderId={safeOrder.id}
+                updatedAt={safeOrder.updated_at}
+                onUpdateStatus={handleStatusUpdateWithClose}
+                isUpdating={false}
+              />
+              
+              {/* Status Update History */}
+              <StatusUpdateHistory orderId={safeOrder.id} />
+            </>
           )}
         </div>
       </AdaptiveDialog>

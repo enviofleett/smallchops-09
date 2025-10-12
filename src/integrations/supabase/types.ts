@@ -5426,47 +5426,6 @@ export type Database = {
         }
         Relationships: []
       }
-      order_status_history: {
-        Row: {
-          changed_at: string | null
-          changed_by: string | null
-          created_at: string | null
-          id: string
-          new_status: Database["public"]["Enums"]["order_status"] | null
-          notes: string | null
-          old_status: Database["public"]["Enums"]["order_status"] | null
-          order_id: string | null
-        }
-        Insert: {
-          changed_at?: string | null
-          changed_by?: string | null
-          created_at?: string | null
-          id?: string
-          new_status?: Database["public"]["Enums"]["order_status"] | null
-          notes?: string | null
-          old_status?: Database["public"]["Enums"]["order_status"] | null
-          order_id?: string | null
-        }
-        Update: {
-          changed_at?: string | null
-          changed_by?: string | null
-          created_at?: string | null
-          id?: string
-          new_status?: Database["public"]["Enums"]["order_status"] | null
-          notes?: string | null
-          old_status?: Database["public"]["Enums"]["order_status"] | null
-          order_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_status_history_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       order_update_metrics: {
         Row: {
           admin_user_id: string | null

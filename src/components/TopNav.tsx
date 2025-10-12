@@ -25,7 +25,6 @@ const TopNav = () => {
   const {
     data: settings
   } = useBusinessSettings();
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -34,25 +33,6 @@ const TopNav = () => {
   // Enable inactivity timeout
   useInactivityTimeout();
   
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      await logout();
-      setShowUserMenu(false);
-      toast({
-        title: "Logged out successfully",
-        description: "You've been securely logged out",
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast({
-        title: "Logout failed",
-        description: "Please try again",
-        variant: "destructive",
-      });
-      setIsLoggingOut(false);
-    }
-  };
   return <header className="bg-background border-b border-border sticky top-0 z-40 w-full">
       <div className="flex items-center justify-between gap-2 md:gap-4 px-3 py-3 md:px-6 md:py-4 min-h-[60px] md:min-h-[73px]">
         {/* Left Side: Mobile trigger + Navigation */}
@@ -123,66 +103,9 @@ const TopNav = () => {
           )}
         </div>
 
-        {/* Right Side: Notifications + User */}
+        {/* Right Side: Notifications */}
         <div className="flex items-center gap-1 md:gap-4 shrink-0">
-          {/* Notifications */}
           <NotificationBell />
-
-          {/* User Menu */}
-          <div className="relative">
-            <button 
-              onClick={() => setShowUserMenu(!showUserMenu)} 
-              className="flex items-center gap-2 md:gap-3 p-1.5 md:p-2 rounded-lg hover:bg-accent transition-colors"
-            >
-              <div className="w-7 h-7 md:w-8 md:h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                <User className="h-3 w-3 md:h-4 md:w-4 text-primary" />
-              </div>
-              {!isMobile && (
-                <div className="text-left">
-                  <p className="text-sm font-medium text-foreground truncate max-w-[120px]">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
-                </div>
-              )}
-            </button>
-
-            {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-44 md:w-48 bg-popover rounded-lg shadow-lg border border-border py-2 z-50">
-                <button 
-                  onClick={() => {
-                    navigate('/settings');
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-popover-foreground hover:bg-accent flex items-center gap-2"
-                >
-                  <User className="h-4 w-4" />
-                  <span>Profile</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    navigate('/admin/change-password');
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-popover-foreground hover:bg-accent flex items-center gap-2"
-                >
-                  <KeyRound className="h-4 w-4" />
-                  <span>Change Password</span>
-                </button>
-                <hr className="my-2 border-border" />
-                <button 
-                  onClick={handleLogout}
-                  disabled={isLoggingOut}
-                  className="w-full px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isLoggingOut ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <LogOut className="h-4 w-4" />
-                  )}
-                  <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
       

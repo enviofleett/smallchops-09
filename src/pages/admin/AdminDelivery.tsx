@@ -26,17 +26,7 @@ import { usePaidOrders } from '@/hooks/usePaidOrders';
 import { useOrderFilters } from '@/hooks/useOrderFilters';
 import { DeliveryRouteManager } from '@/components/delivery/DeliveryRouteManager';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { 
-  Truck, 
-  Clock,
-  Users,
-  Package,
-  TrendingUp,
-  CalendarIcon,
-  AlertTriangle,
-  RefreshCw,
-  BarChartHorizontal
-} from 'lucide-react';
+import { Truck, Clock, Users, Package, TrendingUp, CalendarIcon, AlertTriangle, RefreshCw, BarChartHorizontal } from 'lucide-react';
 import { format, isToday, parseISO, isAfter, isBefore, addMinutes, subDays } from 'date-fns';
 import { formatAddress } from '@/utils/formatAddress';
 import { cn } from '@/lib/utils';
@@ -48,9 +38,8 @@ import { isOrderOverdue } from '@/utils/scheduleTime';
 const GRID_BREAKPOINTS = {
   mobile: 'grid-cols-2',
   tablet: 'md:grid-cols-4',
-  desktop: 'lg:grid-cols-4',
+  desktop: 'lg:grid-cols-4'
 };
-
 export default function AdminDelivery() {
   // STATE
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -60,12 +49,11 @@ export default function AdminDelivery() {
   const [isRegisterDriverOpen, setIsRegisterDriverOpen] = useState(false);
   const [deliveryWindowFilter, setDeliveryWindowFilter] = useState<string>('all');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  
+
   // Date range and interval for reports tabs
   const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 30));
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [interval, setInterval] = useState<'day' | 'week' | 'month'>('day');
-
   const isMobile = useIsMobile();
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const isSelectedDateToday = isToday(selectedDate);
@@ -76,7 +64,6 @@ export default function AdminDelivery() {
     date.setHours(0, 0, 0, 0);
     return date;
   }, [startDate]);
-
   const validEndDate = React.useMemo(() => {
     const date = new Date(endDate);
     date.setHours(23, 59, 59, 999);
@@ -84,13 +71,20 @@ export default function AdminDelivery() {
   }, [endDate]);
 
   // DATA FETCHING
-  const { orders: paidOrders, isLoading: ordersLoading, error: ordersError, refresh: refreshOrders } = usePaidOrders({ 
-    selectedDate, 
+  const {
+    orders: paidOrders,
+    isLoading: ordersLoading,
+    error: ordersError,
+    refresh: refreshOrders
+  } = usePaidOrders({
+    selectedDate,
     orderType: 'delivery',
-    autoRefresh: isSelectedDateToday 
+    autoRefresh: isSelectedDateToday
   });
-
-  const { filteredOrders: deliveryOrders, metrics: deliveryMetrics } = useOrderFilters({
+  const {
+    filteredOrders: deliveryOrders,
+    metrics: deliveryMetrics
+  } = useOrderFilters({
     orders: paidOrders,
     selectedDate,
     orderType: 'delivery',
@@ -98,18 +92,21 @@ export default function AdminDelivery() {
   });
 
   // Fetch driver revenue data for reports tab
-  const { data: driverData, isLoading: driverLoading } = useDriverRevenue(validStartDate, validEndDate, interval);
+  const {
+    data: driverData,
+    isLoading: driverLoading
+  } = useDriverRevenue(validStartDate, validEndDate, interval);
 
   // Ready Orders and Schedules
-  const readyOrdersBasic = useMemo(
-    () => deliveryOrders.filter(order => order.status === 'ready'),
-    [deliveryOrders]
-  );
+  const readyOrdersBasic = useMemo(() => deliveryOrders.filter(order => order.status === 'ready'), [deliveryOrders]);
   const readyOrderIds = useMemo(() => readyOrdersBasic.map(order => order.id), [readyOrdersBasic]);
-  const { data: deliverySchedules = {}, error: schedulesError } = useQuery({
+  const {
+    data: deliverySchedules = {},
+    error: schedulesError
+  } = useQuery({
     queryKey: ['delivery-schedules-bulk', readyOrderIds],
     queryFn: () => getSchedulesByOrderIds(readyOrderIds),
-    enabled: readyOrderIds.length > 0,
+    enabled: readyOrderIds.length > 0
   });
 
   // SORTED READY ORDERS (by priority)
@@ -124,12 +121,13 @@ export default function AdminDelivery() {
       }
       if (scheduleA && !scheduleB) return -1;
       if (!scheduleA && scheduleB) return 1;
-      return new Date(a.order_time || a.created_at).getTime() - 
-             new Date(b.order_time || b.created_at).getTime();
+      return new Date(a.order_time || a.created_at).getTime() - new Date(b.order_time || b.created_at).getTime();
     });
   }, [readyOrdersBasic, deliverySchedules]);
-
-  const { zones, loading: zonesLoading } = useDeliveryZones();
+  const {
+    zones,
+    loading: zonesLoading
+  } = useDeliveryZones();
 
   // DELIVERY WINDOWS GENERATION
   const deliveryWindows = useMemo(() => {
@@ -156,7 +154,7 @@ export default function AdminDelivery() {
           const startTime = parseISO(`${today}T${schedule.delivery_time_start}:00`);
           const endTime = parseISO(`${today}T${schedule.delivery_time_end}:00`);
           const bufferStart = addMinutes(startTime, -30);
-          return (isAfter(now, bufferStart) && isBefore(now, endTime)) || isAfter(now, startTime);
+          return isAfter(now, bufferStart) && isBefore(now, endTime) || isAfter(now, startTime);
         } catch {
           return false;
         }
@@ -167,8 +165,7 @@ export default function AdminDelivery() {
         const schedule = deliverySchedules[order.id];
         if (!schedule?.delivery_time_end) return false;
         try {
-          return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
-                 ['confirmed', 'preparing', 'ready'].includes(order.status);
+          return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && ['confirmed', 'preparing', 'ready'].includes(order.status);
         } catch {
           return false;
         }
@@ -184,9 +181,7 @@ export default function AdminDelivery() {
 
   // RESET SELECTION ON WINDOW FILTER CHANGE
   React.useEffect(() => {
-    setSelectedOrders(prev => prev.filter(order => 
-      filteredOrdersByWindow.some(filtered => filtered.id === order.id)
-    ));
+    setSelectedOrders(prev => prev.filter(order => filteredOrdersByWindow.some(filtered => filtered.id === order.id)));
   }, [deliveryWindowFilter]);
 
   // FINAL METRICS
@@ -194,7 +189,7 @@ export default function AdminDelivery() {
     ...deliveryMetrics,
     inProgress: deliveryOrders.filter(o => ['preparing', 'ready'].includes(o.status)).length,
     outForDelivery: deliveryOrders.filter(o => o.status === 'out_for_delivery').length,
-    assigned: deliveryOrders.filter(o => o.assigned_rider_id).length,
+    assigned: deliveryOrders.filter(o => o.assigned_rider_id).length
   }), [deliveryOrders, deliveryMetrics]);
 
   // DRIVER TRIP ANALYTICS
@@ -213,9 +208,7 @@ export default function AdminDelivery() {
 
   // Responsive grid classes
   const gridClasses = isMobile ? 'grid-cols-2' : 'md:grid-cols-4';
-
-  return (
-    <>
+  return <>
       {/* SEO */}
       <Helmet>
         <title>Delivery Management - Admin Dashboard</title>
@@ -233,12 +226,8 @@ export default function AdminDelivery() {
           </div>
           
           {/* Show date range filters for report tabs */}
-          {(activeTab === 'driver-revenue' || activeTab === 'delivery-fees') ? (
-            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-              <Select 
-                value={interval} 
-                onValueChange={(v: 'day' | 'week' | 'month') => setInterval(v)}
-              >
+          {activeTab === 'driver-revenue' || activeTab === 'delivery-fees' ? <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <Select value={interval} onValueChange={(v: 'day' | 'week' | 'month') => setInterval(v)}>
                 <SelectTrigger className="w-full sm:w-32">
                   <SelectValue />
                 </SelectTrigger>
@@ -257,25 +246,18 @@ export default function AdminDelivery() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        const normalizedDate = new Date(date);
-                        normalizedDate.setHours(0, 0, 0, 0);
-                        if (normalizedDate > endDate) {
-                          setStartDate(normalizedDate);
-                          setEndDate(normalizedDate);
-                        } else {
-                          setStartDate(normalizedDate);
-                        }
-                      }
-                    }}
-                    disabled={(date) => date > new Date() || date > endDate}
-                    initialFocus
-                    className="p-3"
-                  />
+                  <Calendar mode="single" selected={startDate} onSelect={date => {
+                if (date) {
+                  const normalizedDate = new Date(date);
+                  normalizedDate.setHours(0, 0, 0, 0);
+                  if (normalizedDate > endDate) {
+                    setStartDate(normalizedDate);
+                    setEndDate(normalizedDate);
+                  } else {
+                    setStartDate(normalizedDate);
+                  }
+                }
+              }} disabled={date => date > new Date() || date > endDate} initialFocus className="p-3" />
                 </PopoverContent>
               </Popover>
 
@@ -287,148 +269,82 @@ export default function AdminDelivery() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        const normalizedDate = new Date(date);
-                        normalizedDate.setHours(23, 59, 59, 999);
-                        if (normalizedDate < startDate) {
-                          setStartDate(normalizedDate);
-                          setEndDate(normalizedDate);
-                        } else {
-                          setEndDate(normalizedDate);
-                        }
-                      }
-                    }}
-                    disabled={(date) => date < startDate || date > new Date()}
-                    initialFocus
-                    className="p-3"
-                  />
+                  <Calendar mode="single" selected={endDate} onSelect={date => {
+                if (date) {
+                  const normalizedDate = new Date(date);
+                  normalizedDate.setHours(23, 59, 59, 999);
+                  if (normalizedDate < startDate) {
+                    setStartDate(normalizedDate);
+                    setEndDate(normalizedDate);
+                  } else {
+                    setEndDate(normalizedDate);
+                  }
+                }
+              }} disabled={date => date < startDate || date > new Date()} initialFocus className="p-3" />
                 </PopoverContent>
               </Popover>
-            </div>
-          ) : (
-            <div className="flex gap-2 w-full sm:w-auto">
+            </div> : <div className="flex gap-2 w-full sm:w-auto">
               <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    aria-label="Pick a date"
-                    className={cn(
-                      "w-full sm:w-[200px] md:w-[240px] justify-start text-left font-normal text-sm",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
+                  <Button variant="outline" aria-label="Pick a date" className={cn("w-full sm:w-[200px] md:w-[240px] justify-start text-left font-normal text-sm", !selectedDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                     <span className="truncate">
                       {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
                     </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent 
-                  className="w-auto p-0 z-50" 
-                  align={isMobile ? "center" : "start"}
-                  side={isMobile ? "bottom" : "bottom"}
-                  sideOffset={4}
-                >
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        setSelectedDate(date);
-                        setIsCalendarOpen(false);
-                      }
-                    }}
-                    initialFocus
-                    className="pointer-events-auto bg-background border rounded-md shadow-lg"
-                  />
+                <PopoverContent className="w-auto p-0 z-50" align={isMobile ? "center" : "start"} side={isMobile ? "bottom" : "bottom"} sideOffset={4}>
+                  <Calendar mode="single" selected={selectedDate} onSelect={date => {
+                if (date) {
+                  setSelectedDate(date);
+                  setIsCalendarOpen(false);
+                }
+              }} initialFocus className="pointer-events-auto bg-background border rounded-md shadow-lg" />
                 </PopoverContent>
               </Popover>
-            </div>
-          )}
+            </div>}
         </div>
 
         {/* Error Banner */}
-        {ordersError && (
-          <ErrorBanner
-            icon={<AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />}
-            title="Failed to load orders data"
-            description={ordersError instanceof Error ? ordersError.message : 'Unknown error occurred'}
-            color="destructive"
-          />
-        )}
+        {ordersError && <ErrorBanner icon={<AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />} title="Failed to load orders data" description={ordersError instanceof Error ? ordersError.message : 'Unknown error occurred'} color="destructive" />}
 
         {/* Server Cap Warning */}
-        {(deliveryOrders.length >= 1000) && (
-          <ErrorBanner
-            icon={<AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />}
-            title={`Maximum data limit reached (${deliveryOrders.length} orders)`}
-            description="Some orders may not be displayed. Consider narrowing your date range."
-            color="orange-500"
-          />
-        )}
+        {deliveryOrders.length >= 1000 && <ErrorBanner icon={<AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />} title={`Maximum data limit reached (${deliveryOrders.length} orders)`} description="Some orders may not be displayed. Consider narrowing your date range." color="orange-500" />}
 
         {/* Delivery Metrics - Only show for drivers/zones tabs */}
-        {(activeTab === 'drivers' || activeTab === 'zones') && (
-          <div className={`grid ${gridClasses} gap-2 sm:gap-3 md:gap-4 mx-2 sm:mx-0`}>
-            <MetricCard
-              icon={<Package className="w-4 h-4 sm:w-5 sm:h-5" />}
-              label="Total"
-              value={finalDeliveryMetrics.totalOrders}
-              color="primary"
-            />
-            <MetricCard
-              icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />}
-              label="Progress"
-              value={finalDeliveryMetrics.inProgress}
-              color="orange-500"
-            />
-            <MetricCard
-              icon={<Truck className="w-4 h-4 sm:w-5 sm:h-5" />}
-              label="Delivery"
-              value={finalDeliveryMetrics.outForDelivery}
-              color="purple-500"
-            />
-            <MetricCard
-              icon={<Users className="w-4 h-4 sm:w-5 sm:h-5" />}
-              label="Assigned"
-              value={finalDeliveryMetrics.assigned}
-              color="green-500"
-            />
-          </div>
-        )}
+        {(activeTab === 'drivers' || activeTab === 'zones') && <div className={`grid ${gridClasses} gap-2 sm:gap-3 md:gap-4 mx-2 sm:mx-0`}>
+            <MetricCard icon={<Package className="w-4 h-4 sm:w-5 sm:h-5" />} label="Total" value={finalDeliveryMetrics.totalOrders} color="primary" />
+            <MetricCard icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />} label="Progress" value={finalDeliveryMetrics.inProgress} color="orange-500" />
+            <MetricCard icon={<Truck className="w-4 h-4 sm:w-5 sm:h-5" />} label="Delivery" value={finalDeliveryMetrics.outForDelivery} color="purple-500" />
+            <MetricCard icon={<Users className="w-4 h-4 sm:w-5 sm:h-5" />} label="Assigned" value={finalDeliveryMetrics.assigned} color="green-500" />
+          </div>}
 
         {/* Main Tabs - Responsive */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="relative">
             {/* Mobile & Tablet: Dropdown */}
             <div className="block lg:hidden mb-4">
-              <DeliveryTabDropdown
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              />
+              <DeliveryTabDropdown activeTab={activeTab} onTabChange={setActiveTab} />
             </div>
             
             {/* Desktop: Grid layout */}
             <div className="hidden lg:block">
               <TabsList className="grid w-full grid-cols-4 gap-1 p-1 bg-muted rounded-lg">
-                {[
-                  { value: 'drivers', label: 'Drivers' },
-                  { value: 'zones', label: 'Delivery Zones' },
-                  { value: 'driver-revenue', label: 'Driver Revenue' },
-                  { value: 'delivery-fees', label: 'Delivery Fees' },
-                ].map(tab => (
-                  <TabsTrigger
-                    key={tab.value}
-                    value={tab.value}
-                    className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                  >
+                {[{
+                value: 'drivers',
+                label: 'Drivers'
+              }, {
+                value: 'zones',
+                label: 'Delivery Zones'
+              }, {
+                value: 'driver-revenue',
+                label: 'Driver Revenue'
+              }, {
+                value: 'delivery-fees',
+                label: 'Delivery Fees'
+              }].map(tab => <TabsTrigger key={tab.value} value={tab.value} className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     {tab.label}
-                  </TabsTrigger>
-                ))}
+                  </TabsTrigger>)}
               </TabsList>
             </div>
           </div>
@@ -455,29 +371,19 @@ export default function AdminDelivery() {
         </Tabs>
 
         {/* Driver Registration Dialog */}
-        <DriverDialog 
-          open={isRegisterDriverOpen}
-          onOpenChange={setIsRegisterDriverOpen}
-          onSave={async (data) => {
-            console.log('Driver registration:', data);
-            setIsRegisterDriverOpen(false);
-          }}
-        />
+        <DriverDialog open={isRegisterDriverOpen} onOpenChange={setIsRegisterDriverOpen} onSave={async data => {
+        console.log('Driver registration:', data);
+        setIsRegisterDriverOpen(false);
+      }} />
 
         {/* Driver Assignment Dialog */}
-        <DriverAssignDialog
-          isOpen={isDriverDialogOpen}
-          onClose={() => setIsDriverDialogOpen(false)}
-          selectedOrders={selectedOrders}
-          onSuccess={() => {
-            setSelectedOrders([]);
-            setIsDriverDialogOpen(false);
-            refreshOrders();
-          }}
-        />
+        <DriverAssignDialog isOpen={isDriverDialogOpen} onClose={() => setIsDriverDialogOpen(false)} selectedOrders={selectedOrders} onSuccess={() => {
+        setSelectedOrders([]);
+        setIsDriverDialogOpen(false);
+        refreshOrders();
+      }} />
       </div>
-    </>
-  );
+    </>;
 }
 
 // Helper: MetricCard
@@ -485,7 +391,7 @@ function MetricCard({
   icon,
   label,
   value,
-  color = 'primary',
+  color = 'primary'
 }: {
   icon: React.ReactNode;
   label: string;
@@ -496,37 +402,25 @@ function MetricCard({
     'primary': 'bg-primary/10 text-primary',
     'orange-500': 'bg-orange-500/10 text-orange-600',
     'purple-500': 'bg-purple-500/10 text-purple-600',
-    'green-500': 'bg-green-500/10 text-green-600',
+    'green-500': 'bg-green-500/10 text-green-600'
   }[color] || color;
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`p-1.5 sm:p-2 ${colorClass} rounded-lg flex-shrink-0`}>
-            {icon}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">{label}</p>
-            <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{value}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <Card className="overflow-hidden">
+      
+    </Card>;
 }
 
 // Helper: LoadingSkeleton
-function LoadingSkeleton({ rows = 3 }: { rows?: number }) {
-  return (
-    <div className="space-y-3">
-      {[...Array(rows)].map((_, i) => (
-        <div key={i} className="animate-pulse space-y-2">
+function LoadingSkeleton({
+  rows = 3
+}: {
+  rows?: number;
+}) {
+  return <div className="space-y-3">
+      {[...Array(rows)].map((_, i) => <div key={i} className="animate-pulse space-y-2">
           <div className="h-4 bg-muted rounded w-3/4"></div>
           <div className="h-3 bg-muted rounded w-1/2"></div>
-        </div>
-      ))}
-    </div>
-  );
+        </div>)}
+    </div>;
 }
 
 // Helper: ErrorBanner
@@ -543,11 +437,10 @@ function ErrorBanner({
 }) {
   const colorClass = {
     destructive: 'bg-destructive/10 border border-destructive/20',
-    'orange-500': 'bg-orange-500/10 border border-orange-500/20',
+    'orange-500': 'bg-orange-500/10 border border-orange-500/20'
   }[color] || color;
   const textColor = color === 'orange-500' ? 'text-orange-600' : 'text-destructive';
-  return (
-    <div className={`${colorClass} rounded-lg p-3 sm:p-4 mx-2 sm:mx-0`}>
+  return <div className={`${colorClass} rounded-lg p-3 sm:p-4 mx-2 sm:mx-0`}>
       <div className="flex items-start gap-2">
         {icon}
         <div className="flex-1 min-w-0">
@@ -559,26 +452,22 @@ function ErrorBanner({
           </p>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 }
 
 // Helper: DeliveryOrderItem
-function DeliveryOrderItem({ order }: { order: OrderWithItems }) {
-  return (
-    <div className="flex items-center justify-between p-3 border rounded-lg">
+function DeliveryOrderItem({
+  order
+}: {
+  order: OrderWithItems;
+}) {
+  return <div className="flex items-center justify-between p-3 border rounded-lg">
       <div>
         <p className="font-medium truncate">{order.order_number}</p>
         <p className="text-sm text-muted-foreground truncate">{order.customer_name}</p>
       </div>
-      <Badge variant={
-        order.status === 'confirmed' ? 'default' :
-        order.status === 'preparing' ? 'secondary' :
-        order.status === 'ready' ? 'outline' :
-        order.status === 'out_for_delivery' ? 'destructive' : 'outline'
-      }>
+      <Badge variant={order.status === 'confirmed' ? 'default' : order.status === 'preparing' ? 'secondary' : order.status === 'ready' ? 'outline' : order.status === 'out_for_delivery' ? 'destructive' : 'outline'}>
         {order.status?.replace(/_/g, ' ') || 'Unknown'}
       </Badge>
-    </div>
-  );
+    </div>;
 }

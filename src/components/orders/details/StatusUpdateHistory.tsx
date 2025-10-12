@@ -5,6 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow } from "@/components/ui/responsive-table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface StatusUpdateHistoryProps {
   orderId: string;
@@ -88,6 +91,8 @@ export function StatusUpdateHistory({ orderId }: StatusUpdateHistoryProps) {
     staleTime: 30000, // 30 seconds
   });
 
+  const isMobile = useIsMobile();
+
   if (isLoading) {
     return (
       <Card>
@@ -100,11 +105,7 @@ export function StatusUpdateHistory({ orderId }: StatusUpdateHistoryProps) {
         <CardContent className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex items-center gap-3 p-3 rounded-lg border">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </div>
+              <Skeleton className="h-10 w-full" />
             </div>
           ))}
         </CardContent>
@@ -139,46 +140,97 @@ export function StatusUpdateHistory({ orderId }: StatusUpdateHistoryProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-          {history.map((record, index) => (
-            <div
-              key={record.id}
-              className="relative flex items-start gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-            >
-              {/* Timeline connector */}
-              {index < history.length - 1 && (
-                <div className="absolute left-[23px] top-[52px] w-0.5 h-[calc(100%+4px)] bg-border" />
-              )}
-
-              {/* Status change indicator */}
-              <div className="flex items-center gap-2 mt-1">
-                <Badge className={`${getStatusColor(record.old_status)} text-white text-xs px-2 py-0.5`}>
-                  {getStatusLabel(record.old_status)}
-                </Badge>
-                <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <Badge className={`${getStatusColor(record.new_status)} text-white text-xs px-2 py-0.5`}>
-                  {getStatusLabel(record.new_status)}
-                </Badge>
-              </div>
-
-              {/* Details */}
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                  <span className="font-medium truncate">
-                    {record.admin_name || record.admin_email || 'System'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3 flex-shrink-0" />
-                  <span>
-                    {format(new Date(record.changed_at), 'MMM dd, yyyy - hh:mm a')}
-                  </span>
-                </div>
-              </div>
+        <ResponsiveTable
+          mobileComponent={
+            <div className="space-y-3">
+              {history.map((record) => (
+                <MobileCard key={record.id}>
+                  <MobileCardHeader>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge className={`${getStatusColor(record.old_status)} text-white text-xs`}>
+                        {getStatusLabel(record.old_status)}
+                      </Badge>
+                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                      <Badge className={`${getStatusColor(record.new_status)} text-white text-xs`}>
+                        {getStatusLabel(record.new_status)}
+                      </Badge>
+                    </div>
+                  </MobileCardHeader>
+                  <MobileCardContent>
+                    <MobileCardRow
+                      label="Changed By"
+                      value={
+                        <div className="flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm">
+                            {record.admin_name || record.admin_email || 'System'}
+                          </span>
+                        </div>
+                      }
+                    />
+                    <MobileCardRow
+                      label="Date & Time"
+                      value={
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm">
+                            {format(new Date(record.changed_at), 'MMM dd, yyyy - hh:mm a')}
+                          </span>
+                        </div>
+                      }
+                    />
+                  </MobileCardContent>
+                </MobileCard>
+              ))}
             </div>
-          ))}
-        </div>
+          }
+        >
+          <div className="rounded-md border max-h-[400px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[180px]">Previous Status</TableHead>
+                  <TableHead className="w-[180px]">New Status</TableHead>
+                  <TableHead>Changed By</TableHead>
+                  <TableHead className="w-[200px]">Date & Time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>
+                      <Badge className={`${getStatusColor(record.old_status)} text-white`}>
+                        {getStatusLabel(record.old_status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                        <Badge className={`${getStatusColor(record.new_status)} text-white`}>
+                          {getStatusLabel(record.new_status)}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">
+                          {record.admin_name || record.admin_email || 'System'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{format(new Date(record.changed_at), 'MMM dd, yyyy - hh:mm a')}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </ResponsiveTable>
       </CardContent>
     </Card>
   );

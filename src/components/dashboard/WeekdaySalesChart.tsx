@@ -17,14 +17,10 @@ interface WeekdaySalesChartProps {
 }
 
 const WEEKDAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const WEEKDAY_COLORS: { [key: string]: string } = {
-  Monday: 'hsl(var(--primary))',
-  Tuesday: 'hsl(var(--primary))',
-  Wednesday: 'hsl(var(--primary))',
-  Thursday: 'hsl(var(--primary))',
-  Friday: 'hsl(var(--primary))',
-  Saturday: 'hsl(var(--accent))',
-  Sunday: 'hsl(var(--accent))',
+
+// Get today's weekday for highlighting
+const getTodayWeekday = () => {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long' });
 };
 
 export function WeekdaySalesChart({ dailyData, isLoading }: WeekdaySalesChartProps) {
@@ -75,6 +71,7 @@ export function WeekdaySalesChart({ dailyData, isLoading }: WeekdaySalesChartPro
 
   const totalSales = weekdayData.reduce((sum, day) => sum + day.sales, 0);
   const avgSales = weekdayData.length > 0 ? totalSales / weekdayData.length : 0;
+  const todayWeekday = getTodayWeekday();
 
   if (isLoading) {
     return (
@@ -141,13 +138,18 @@ export function WeekdaySalesChart({ dailyData, isLoading }: WeekdaySalesChartPro
               radius={[8, 8, 0, 0]}
               animationDuration={1000}
             >
-              {weekdayData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={WEEKDAY_COLORS[entry.fullDay]}
-                  opacity={entry.sales > avgSales ? 1 : 0.7}
-                />
-              ))}
+              {weekdayData.map((entry, index) => {
+                const isToday = entry.fullDay === todayWeekday;
+                const baseColor = isToday ? '#84cc16' : 'hsl(var(--primary))'; // Lemon green for today
+                
+                return (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={baseColor}
+                    opacity={isToday ? 1 : (entry.sales > avgSales ? 1 : 0.7)}
+                  />
+                );
+              })}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

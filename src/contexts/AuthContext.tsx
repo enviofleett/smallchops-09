@@ -472,6 +472,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const redirectUrl = `${window.location.origin}/auth/callback`;
       console.log('Initiating Google OAuth with redirect:', redirectUrl);
       
+      // PRODUCTION SECURITY: Force all Google OAuth users to be customers only
+      // Admin users MUST use email/password authentication
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -488,8 +490,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Google OAuth error:', error);
         throw error;
       }
-      
-      console.log('Google OAuth initiated successfully');
+
+      // Note: User metadata (user_type: 'customer') will be set in AuthCallback.tsx
+      // after successful OAuth to ensure all Google users are treated as customers
+      console.log('Google OAuth initiated successfully, redirecting...', data);
     } catch (error: any) {
       console.error('Google sign up error:', error);
       toast({

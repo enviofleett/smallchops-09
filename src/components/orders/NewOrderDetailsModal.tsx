@@ -9,8 +9,9 @@ import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { ThermalPrintReceipt } from './ThermalPrintReceipt';
 import { AdminOrderPrintView } from '@/components/admin/AdminOrderPrintView';
+import { CustomerOrderPDF } from './CustomerOrderPDF';
 import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
-import { Package, User, MapPin, Phone, Mail, Printer, RefreshCw, CreditCard, FileText, DollarSign, Calendar, Clock, AlertCircle, AlertTriangle, MessageCircle, Send } from 'lucide-react';
+import { Package, User, MapPin, Phone, Mail, Printer, RefreshCw, CreditCard, FileText, DollarSign, Calendar, Clock, AlertCircle, AlertTriangle, MessageCircle, Send, Download } from 'lucide-react';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
 import { sanitizeText } from '@/utils/htmlSanitizer';
@@ -52,6 +53,7 @@ export function NewOrderDetailsModal({
   const isAdmin = userType === 'admin';
   const adminPrintRef = useRef<HTMLDivElement>(null);
   const thermalPrintRef = useRef<HTMLDivElement>(null);
+  const customerPdfRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showEmailSelector, setShowEmailSelector] = useState(false);
   const {
@@ -181,6 +183,24 @@ export function NewOrderDetailsModal({
         </div>
       </AdaptiveDialog>;
   }
+
+  // Customer PDF download handler
+  const handleCustomerPdfDownload = useReactToPrint({
+    contentRef: customerPdfRef,
+    documentTitle: `Starters-Order-${safeOrder.order_number}`,
+    onAfterPrint: () => {
+      toast.success('Order receipt downloaded', {
+        description: 'Your order details have been saved as PDF'
+      });
+    },
+    onPrintError: error => {
+      console.error('PDF download error:', error);
+      toast.error('Failed to download receipt', {
+        description: 'Please try again or contact support'
+      });
+    }
+  });
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-500',
@@ -222,7 +242,21 @@ export function NewOrderDetailsModal({
               </div>
             </div>
             
-            {isAdmin}
+            <div className="flex gap-2">
+              {!isAdmin && (
+                <Button
+                  onClick={() => handleCustomerPdfDownload()}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Download Receipt</span>
+                  <span className="sm:hidden">Download</span>
+                </Button>
+              )}
+              {isAdmin}
+            </div>
           </div>
 
           {isAdmin && <RealTimeConnectionStatus connectionStatus={connectionStatus} lastUpdated={lastUpdated} onReconnect={reconnect} compact={true} />}
@@ -587,6 +621,18 @@ export function NewOrderDetailsModal({
           </div> : <div ref={thermalPrintRef}>
             <ThermalPrintReceipt order={safeOrder as unknown as OrderWithItems} deliveryZone={deliveryZone} />
           </div>}
+        
+        {/* Customer PDF component */}
+        {!isAdmin && (
+          <div ref={customerPdfRef}>
+            <CustomerOrderPDF 
+              order={safeOrder}
+              businessSettings={businessSettings}
+              deliveryZone={deliveryZone}
+              pickupPoint={pickupPoint}
+            />
+          </div>
+        )}
       </div>
 
       {/* Email Template Selector Modal */}

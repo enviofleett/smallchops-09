@@ -207,6 +207,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .single();
 
         if (newProfile && !profileError) {
+          // Also create user_roles entry
+          const role = authUser.email === 'toolbuxdev@gmail.com' ? 'super_admin' : 'admin';
+          
+          await supabase
+            .from('user_roles')
+            .upsert({
+              user_id: authUser.id,
+              role: role,
+              is_active: true,
+              assigned_by: authUser.id
+            }, {
+              onConflict: 'user_id',
+              ignoreDuplicates: false
+            });
+          
+          console.log(`✅ Admin profile and role ${role} created for ${authUser.email}`);
+          
           setUser({
             id: newProfile.id,
             name: newProfile.name,

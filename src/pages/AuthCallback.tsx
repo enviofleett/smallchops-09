@@ -81,6 +81,40 @@ const AuthCallback: React.FC = () => {
             .single();
           
           if (adminProfile) {
+            // Admin user - ensure role assignment
+            console.log('Admin profile found, checking role assignment...');
+            
+            // Check if user has a role in user_roles table
+            const { data: existingRole } = await supabase
+              .from('user_roles')
+              .select('*')
+              .eq('user_id', user.id)
+              .maybeSingle();
+            
+            if (!existingRole) {
+              console.log('No role found, assigning admin role for:', user.email);
+              // Determine role based on email
+              const role = user.email === 'toolbuxdev@gmail.com' ? 'super_admin' : 'admin';
+              
+              const { error: roleError } = await supabase
+                .from('user_roles')
+                .insert({
+                  user_id: user.id,
+                  role: role,
+                  is_active: true,
+                  assigned_by: user.id // Self-assigned for Google OAuth
+                });
+              
+              if (roleError) {
+                console.error('Failed to assign role:', roleError);
+                // Don't block auth flow, but log for admin review
+              } else {
+                console.log(`✅ Role ${role} assigned successfully to ${user.email}`);
+              }
+            } else {
+              console.log('Existing role found:', existingRole.role);
+            }
+            
             // Admin user - redirect to dashboard
             setStatus('success');
             toast({
@@ -135,6 +169,9 @@ const AuthCallback: React.FC = () => {
             if (!createError && newAccount) {
               customerAccount = newAccount;
               console.log('Customer account created successfully:', customerAccount.id);
+              
+              // Note: Customers don't need user_roles entries unless they need admin access
+              // The customer_accounts table is sufficient for customer authentication
             }
           }
           

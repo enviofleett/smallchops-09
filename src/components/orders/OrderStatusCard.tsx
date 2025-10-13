@@ -16,67 +16,67 @@ const statusConfig: Record<OrderStatus, {
   icon: React.ReactNode;
   label: string;
   description: string;
-  color: string;
+  colorClass: string;
 }> = {
   pending: {
     icon: <Clock className="w-5 h-5" />,
     label: 'Pending',
     description: 'Order received and awaiting confirmation',
-    color: 'text-yellow-600 dark:text-yellow-400'
+    colorClass: 'text-warning'
   },
   confirmed: {
     icon: <CheckCircle className="w-5 h-5" />,
     label: 'Confirmed',
     description: 'Order confirmed and being prepared',
-    color: 'text-blue-600 dark:text-blue-400'
+    colorClass: 'text-primary'
   },
   preparing: {
     icon: <Package className="w-5 h-5" />,
     label: 'Preparing',
     description: 'Your order is being prepared',
-    color: 'text-orange-600 dark:text-orange-400'
+    colorClass: 'text-accent'
   },
   ready: {
     icon: <CheckCircle className="w-5 h-5" />,
     label: 'Ready',
     description: 'Order ready for pickup or delivery',
-    color: 'text-green-600 dark:text-green-400'
+    colorClass: 'text-success'
   },
   out_for_delivery: {
     icon: <Truck className="w-5 h-5" />,
     label: 'Out for Delivery',
     description: 'Order is on the way to you',
-    color: 'text-purple-600 dark:text-purple-400'
+    colorClass: 'text-secondary'
   },
   delivered: {
     icon: <CheckCircle className="w-5 h-5" />,
     label: 'Delivered',
     description: 'Order successfully delivered',
-    color: 'text-emerald-600 dark:text-emerald-400'
+    colorClass: 'text-success'
   },
   completed: {
     icon: <CheckCircle className="w-5 h-5" />,
     label: 'Completed',
     description: 'Order completed successfully',
-    color: 'text-emerald-600 dark:text-emerald-400'
+    colorClass: 'text-success'
   },
   cancelled: {
     icon: <XCircle className="w-5 h-5" />,
     label: 'Cancelled',
     description: 'Order has been cancelled',
-    color: 'text-red-600 dark:text-red-400'
+    colorClass: 'text-destructive'
   },
   refunded: {
     icon: <RotateCcw className="w-5 h-5" />,
     label: 'Refunded',
     description: 'Order refunded successfully',
-    color: 'text-gray-600 dark:text-gray-400'
+    colorClass: 'text-muted-foreground'
   },
   returned: {
     icon: <RotateCcw className="w-5 h-5" />,
     label: 'Returned',
     description: 'Order has been returned',
-    color: 'text-amber-600 dark:text-amber-400'
+    colorClass: 'text-warning'
   }
 };
 
@@ -98,7 +98,7 @@ export const OrderStatusCard: React.FC<OrderStatusCardProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-start gap-4">
-          <div className={cn('flex-shrink-0 p-3 rounded-full bg-muted', config.color)}>
+          <div className={cn('flex-shrink-0 p-3 rounded-full bg-muted', config.colorClass)}>
             {config.icon}
           </div>
           <div className="flex-1 space-y-1">

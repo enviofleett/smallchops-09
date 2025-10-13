@@ -230,13 +230,6 @@ export function NewOrderDetailsModal({
           {/* Customer Order Status Tracker - CUSTOMERS ONLY */}
           {!isAdmin && <CustomerOrderStatusTracker currentStatus={safeOrder.status} orderTime={safeOrder.order_time} estimatedDeliveryTime={deliverySchedule?.delivery_time_end} />}
 
-          {/* Order Status Card */}
-          <OrderStatusCard 
-            status={safeOrder.status} 
-            orderNumber={safeOrder.order_number}
-            timestamp={safeOrder.updated_at || safeOrder.created_at}
-          />
-
           {/* Customer Information */}
           <Card>
             <CardHeader>
@@ -435,6 +428,13 @@ export function NewOrderDetailsModal({
                 </>}
             </CardContent>
           </Card>
+
+          {/* Order Status Card */}
+          <OrderStatusCard 
+            status={safeOrder.status} 
+            orderNumber={safeOrder.order_number}
+            timestamp={safeOrder.updated_at || safeOrder.created_at}
+          />
 
           {/* Order Items */}
           <Card>

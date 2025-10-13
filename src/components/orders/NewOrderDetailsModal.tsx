@@ -21,6 +21,7 @@ import { UnifiedOrder, OrderStatus } from '@/types/unifiedOrder';
 import { OrderWithItems } from '@/api/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
+import { OrderStatusCard } from './OrderStatusCard';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { formatAddress } from '@/utils/formatAddress';
 import { getOrderTimeWindow, hasValidTimeField, formatDeliveryDate } from '@/utils/timeWindowUtils';
@@ -228,6 +229,13 @@ export function NewOrderDetailsModal({
 
           {/* Customer Order Status Tracker - CUSTOMERS ONLY */}
           {!isAdmin && <CustomerOrderStatusTracker currentStatus={safeOrder.status} orderTime={safeOrder.order_time} estimatedDeliveryTime={deliverySchedule?.delivery_time_end} />}
+
+          {/* Order Status Card */}
+          <OrderStatusCard 
+            status={safeOrder.status} 
+            orderNumber={safeOrder.order_number}
+            timestamp={safeOrder.updated_at || safeOrder.created_at}
+          />
 
           {/* Customer Information */}
           <Card>

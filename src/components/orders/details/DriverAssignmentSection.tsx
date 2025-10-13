@@ -63,16 +63,10 @@ export function DriverAssignmentSection({
   // Filter drivers based on search query
   const filteredDrivers = useMemo(() => {
     if (!searchQuery.trim()) return drivers;
-    
     const query = searchQuery.toLowerCase().trim();
-    return drivers.filter(driver => 
-      driver.name.toLowerCase().includes(query) ||
-      driver.phone?.toLowerCase().includes(query) ||
-      driver.email?.toLowerCase().includes(query)
-    );
+    return drivers.filter(driver => driver.name.toLowerCase().includes(query) || driver.phone?.toLowerCase().includes(query) || driver.email?.toLowerCase().includes(query));
   }, [drivers, searchQuery]);
-  return (
-    <Card>
+  return <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Truck className="h-5 w-5" />
@@ -81,8 +75,7 @@ export function DriverAssignmentSection({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Current Driver Display */}
-        {currentDriver && (
-          <div className="p-3 bg-muted/50 rounded-lg border border-border">
+        {currentDriver && <div className="p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -90,17 +83,14 @@ export function DriverAssignmentSection({
                 </div>
                 <div>
                   <p className="font-medium">{currentDriver.name}</p>
-                  {currentDriver.phone && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  {currentDriver.phone && <p className="text-sm text-muted-foreground flex items-center gap-1">
                       <Phone className="h-3 w-3" />
                       {currentDriver.phone}
-                    </p>
-                  )}
+                    </p>}
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          </div>}
 
         {/* Driver Selection with Search */}
         <div className="space-y-2">
@@ -109,88 +99,48 @@ export function DriverAssignmentSection({
           {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search drivers by name, phone, or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-9"
-              disabled={isLoadingDrivers}
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-              >
+            
+            {searchQuery && <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")} className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0">
                 <X className="h-4 w-4" />
-              </Button>
-            )}
+              </Button>}
           </div>
 
           {/* Driver Select with Filtered Results */}
           <div className="flex gap-2">
-            <Select
-              value={selectedDriverId}
-              onValueChange={setSelectedDriverId}
-              disabled={isLoadingDrivers || isAssigning}
-            >
+            <Select value={selectedDriverId} onValueChange={setSelectedDriverId} disabled={isLoadingDrivers || isAssigning}>
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder={isLoadingDrivers ? "Loading drivers..." : "Select a driver"} />
               </SelectTrigger>
               <SelectContent>
-                {filteredDrivers.length === 0 ? (
-                  <div className="p-3 text-sm text-muted-foreground text-center">
+                {filteredDrivers.length === 0 ? <div className="p-3 text-sm text-muted-foreground text-center">
                     {searchQuery ? 'No drivers found matching your search' : 'No drivers available'}
-                  </div>
-                ) : (
-                  filteredDrivers.map((driver) => (
-                    <SelectItem key={driver.id} value={driver.id}>
+                  </div> : filteredDrivers.map(driver => <SelectItem key={driver.id} value={driver.id}>
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4" />
                         <span>{driver.name}</span>
-                        {driver.phone && (
-                          <span className="text-xs text-muted-foreground">
+                        {driver.phone && <span className="text-xs text-muted-foreground">
                             ({driver.phone})
-                          </span>
-                        )}
+                          </span>}
                       </div>
-                    </SelectItem>
-                  ))
-                )}
+                    </SelectItem>)}
               </SelectContent>
             </Select>
             
-            <Button
-              onClick={handleAssign}
-              disabled={!selectedDriverId || isAssigning || selectedDriverId === currentDriverId}
-              size="default"
-            >
+            <Button onClick={handleAssign} disabled={!selectedDriverId || isAssigning || selectedDriverId === currentDriverId} size="default">
               {isAssigning ? 'Assigning...' : 'Assign'}
             </Button>
           </div>
 
           {/* Search Results Count */}
-          {searchQuery && filteredDrivers.length > 0 && (
-            <p className="text-xs text-muted-foreground">
+          {searchQuery && filteredDrivers.length > 0 && <p className="text-xs text-muted-foreground">
               Found {filteredDrivers.length} driver{filteredDrivers.length !== 1 ? 's' : ''}
-            </p>
-          )}
+            </p>}
         </div>
 
         {/* Unassign Button */}
-        {currentDriverId && (
-          <Button
-            variant="outline"
-            onClick={() => onAssignDriver('')}
-            disabled={isAssigning}
-            className="w-full"
-          >
+        {currentDriverId && <Button variant="outline" onClick={() => onAssignDriver('')} disabled={isAssigning} className="w-full">
             Unassign Driver
-          </Button>
-        )}
+          </Button>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }

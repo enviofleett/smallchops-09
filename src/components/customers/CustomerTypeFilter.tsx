@@ -49,5 +49,31 @@ export const CustomerTypeFilter = ({
     variant: 'outline' as const,
     activeClass: 'bg-accent text-accent-foreground border-accent'
   }];
-  return;
+  
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {filters.map((filter) => {
+        const Icon = filter.icon;
+        const isActive = currentFilter === filter.key;
+        
+        return (
+          <Button
+            key={filter.key}
+            variant={isActive ? filter.variant : 'outline'}
+            size="sm"
+            onClick={() => onFilterChange(filter.key)}
+            disabled={isLoading}
+            className={`transition-all ${isActive ? filter.activeClass : ''}`}
+            title={filter.description}
+          >
+            <Icon className="h-4 w-4 mr-2" />
+            <span className="font-medium">{filter.label}</span>
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-background/50 text-xs font-bold">
+              {isLoading ? '...' : filter.count}
+            </span>
+          </Button>
+        );
+      })}
+    </div>
+  );
 };

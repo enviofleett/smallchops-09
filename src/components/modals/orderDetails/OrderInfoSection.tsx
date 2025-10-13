@@ -9,6 +9,7 @@ import { StatusBadge } from './StatusBadge';
 import { toast } from 'sonner';
 // Import defensive validation utilities
 import { safeOrder, statusOptions, getSafeStatus } from '@/utils/orderDefensiveValidation';
+import { useUserContext } from '@/hooks/useUserContext';
 
 interface OrderInfoSectionProps {
   order: Order;
@@ -21,6 +22,9 @@ export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({
   isUpdatingStatus,
   onStatusUpdate 
 }) => {
+  const userContext = useUserContext();
+  const isAdmin = userContext === 'admin';
+  
   // Apply defensive validation to ensure safe rendering
   const safeOrderData = safeOrder(order);
   
@@ -148,27 +152,31 @@ export const OrderInfoSection: React.FC<OrderInfoSectionProps> = ({
               Current Status
             </label>
             <div className="flex items-center gap-2">
-              <Select
-                value={getSafeStatus(safeOrderData.status)}
-                onValueChange={handleStatusChange}
-                disabled={isUpdating || isUpdatingStatus}
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue>
-                    <StatusBadge status={getSafeStatus(safeOrderData.status)} />
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={status.value as OrderStatus} />
-                        <span>{status.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isAdmin ? (
+                <Select
+                  value={getSafeStatus(safeOrderData.status)}
+                  onValueChange={handleStatusChange}
+                  disabled={isUpdating || isUpdatingStatus}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue>
+                      <StatusBadge status={getSafeStatus(safeOrderData.status)} />
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status.value} value={status.value}>
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={status.value as OrderStatus} />
+                          <span>{status.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <StatusBadge status={getSafeStatus(safeOrderData.status)} />
+              )}
             </div>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { usePrint } from '@/hooks/usePrint';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useUpdateOrderStatus } from '@/hooks/useUpdateOrderStatus';
 import { StatusBadge } from './StatusBadge';
+import { useUserContext } from '@/hooks/useUserContext';
 
 interface ActionsSectionProps {
   order: Order;
@@ -33,6 +34,9 @@ export const ActionsSection: React.FC<ActionsSectionProps> = ({
   onStatusUpdate,
   isUpdatingStatus,
 }) => {
+  const userContext = useUserContext();
+  const isAdmin = userContext === 'admin';
+  
   const { handlePrint } = usePrint(printRef, `Order-${order.order_number}`);
   const { copyToClipboard, isCopying } = useCopyToClipboard();
   const { updateStatus, isUpdating } = useUpdateOrderStatus(order.id);
@@ -55,51 +59,55 @@ export const ActionsSection: React.FC<ActionsSectionProps> = ({
 
   return (
     <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-      {/* Status Update */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-foreground whitespace-nowrap">
-          Change Status:
-        </span>
-        <Select
-          value={order.status}
-          onValueChange={handleStatusChange}
-          disabled={isUpdating || isUpdatingStatus}
-        >
-          <SelectTrigger className="w-48">
-            <SelectValue>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={order.status} />
-              </div>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map((status) => (
-              <SelectItem key={status.value} value={status.value}>
+      {/* Status Update - Admin Only */}
+      {isAdmin && (
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-foreground whitespace-nowrap">
+            Change Status:
+          </span>
+          <Select
+            value={order.status}
+            onValueChange={handleStatusChange}
+            disabled={isUpdating || isUpdatingStatus}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue>
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={status.value} />
-                  <span>{status.label}</span>
+                  <StatusBadge status={order.status} />
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {(isUpdating || isUpdatingStatus) && (
-          <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
-        )}
-      </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((status) => (
+                <SelectItem key={status.value} value={status.value}>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={status.value} />
+                    <span>{status.label}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {(isUpdating || isUpdatingStatus) && (
+            <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
+      )}
 
       {/* Action Buttons */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handlePrint}
-          className="flex items-center gap-2"
-        >
-          <Printer className="h-4 w-4" />
-          Print
-        </Button>
+      <div className="flex items-center gap-2 ml-auto">
+        {isAdmin && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrint}
+            className="flex items-center gap-2"
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </Button>
+        )}
 
         <Button
           variant="outline"

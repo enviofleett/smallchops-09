@@ -21,6 +21,7 @@ import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { usePrint } from '@/hooks/usePrint';
 import '@/styles/admin-print.css';
 import { EmailTemplateSelector } from '@/components/email/EmailTemplateSelector';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -33,6 +34,9 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   isOpen, 
   onClose 
 }) => {
+  // Production-ready admin authentication check
+  const { canAccessAdmin } = useUnifiedAuth();
+  
   const [selectedTab, setSelectedTab] = useState('summary');
   const [assignedRiderId, setAssignedRiderId] = useState<string | null>(order?.assigned_rider_id || null);
   const [isAssigningRider, setIsAssigningRider] = useState(false);
@@ -47,6 +51,13 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   // Get admin user info for print footer
   const { user } = useAuth();
   const { data: businessSettings } = useBusinessSettings();
+  
+  // Security: Only admins can access this modal
+  if (!canAccessAdmin) {
+    toast.error('Unauthorized access');
+    onClose();
+    return null;
+  }
   
   if (!order) {
     return null;

@@ -207,22 +207,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .single();
 
         if (newProfile && !profileError) {
-          // Also create user_roles entry
+          // Create user_roles entry with proper conflict handling
           const role = authUser.email === 'toolbuxdev@gmail.com' ? 'super_admin' : 'admin';
           
-          await supabase
+          // Check if role already exists
+          const { data: existingRoleCheck } = await supabase
             .from('user_roles')
-            .upsert({
-              user_id: authUser.id,
-              role: role,
-              is_active: true,
-              assigned_by: authUser.id
-            }, {
-              onConflict: 'user_id',
-              ignoreDuplicates: false
-            });
-          
-          console.log(`✅ Admin profile and role ${role} created for ${authUser.email}`);
+            .select('id, role, is_active')
+            .eq('user_id', authUser.id)
+            .eq('role', role)
+            .maybeSingle();
+
+          if (!existingRoleCheck) {
+            // Insert new role
+            const { error: roleError } = await supabase
+              .from('user_roles')
+              .insert({
+                user_id: authUser.id,
+                role: role,
+                is_active: true,
+                assigned_by: authUser.id
+              });
+            
+            if (roleError) {
+              console.error('❌ Failed to assign role in AuthContext:', roleError);
+            } else {
+              console.log(`✅ Admin profile and role ${role} created for ${authUser.email}`);
+            }
+          } else if (!existingRoleCheck.is_active) {
+            // Reactivate existing inactive role
+            await supabase
+              .from('user_roles')
+              .update({ is_active: true, updated_at: new Date().toISOString() })
+              .eq('user_id', authUser.id)
+              .eq('role', role);
+            
+            console.log(`✅ Admin profile created and role ${role} reactivated for ${authUser.email}`);
+          } else {
+            console.log(`✅ Admin profile created, role ${role} already active for ${authUser.email}`);
+          }
           
           setUser({
             id: newProfile.id,

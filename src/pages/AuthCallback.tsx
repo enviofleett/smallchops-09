@@ -81,20 +81,23 @@ const AuthCallback: React.FC = () => {
             .single();
           
           if (adminProfile) {
-            // Admin user - ensure role assignment
+            // Admin user - ensure role assignment with proper conflict handling
             console.log('Admin profile found, checking role assignment...');
             
-            // Check if user has a role in user_roles table
-            const { data: existingRole } = await supabase
-              .from('user_roles')
-              .select('*')
-              .eq('user_id', user.id)
-              .maybeSingle();
+            // Determine role based on email
+            const role = user.email === 'toolbuxdev@gmail.com' ? 'super_admin' : 'admin';
             
-            if (!existingRole) {
-              console.log('No role found, assigning admin role for:', user.email);
-              // Determine role based on email
-              const role = user.email === 'toolbuxdev@gmail.com' ? 'super_admin' : 'admin';
+            // Check if role already exists
+            const { data: existingRole, error: checkError } = await supabase
+              .from('user_roles')
+              .select('id, role, is_active')
+              .eq('user_id', user.id)
+              .eq('role', role)
+              .maybeSingle();
+
+            if (!existingRole && !checkError) {
+              // Role doesn't exist, create it
+              console.log('No role found, assigning role for:', user.email);
               
               const { error: roleError } = await supabase
                 .from('user_roles')
@@ -102,17 +105,43 @@ const AuthCallback: React.FC = () => {
                   user_id: user.id,
                   role: role,
                   is_active: true,
-                  assigned_by: user.id // Self-assigned for Google OAuth
+                  assigned_by: user.id
                 });
               
               if (roleError) {
-                console.error('Failed to assign role:', roleError);
-                // Don't block auth flow, but log for admin review
+                console.error('❌ CRITICAL: Failed to assign role during Google OAuth:', roleError);
+                
+                // Log to audit_logs for admin review
+                await supabase.from('audit_logs').insert({
+                  action: 'google_oauth_role_assignment_failed',
+                  category: 'Authentication',
+                  message: `Failed to assign ${role} role to ${user.email}`,
+                  user_id: user.id,
+                  new_values: { error: roleError.message, email: user.email }
+                });
+                
+                // Don't block auth flow
+                toast({
+                  title: 'Setup Incomplete',
+                  description: 'Your account was created but requires admin approval. Please contact support.',
+                  variant: 'default'
+                });
               } else {
-                console.log(`✅ Role ${role} assigned successfully to ${user.email}`);
+                console.log(`✅ Role ${role} assigned successfully to ${user.email} via Google OAuth`);
               }
-            } else {
-              console.log('Existing role found:', existingRole.role);
+            } else if (existingRole) {
+              console.log(`✅ Role ${existingRole.role} already exists for ${user.email}`);
+              
+              // Reactivate if inactive
+              if (!existingRole.is_active) {
+                await supabase
+                  .from('user_roles')
+                  .update({ is_active: true, updated_at: new Date().toISOString() })
+                  .eq('id', existingRole.id);
+                console.log(`✅ Reactivated role ${role} for ${user.email}`);
+              }
+            } else if (checkError) {
+              console.error('Error checking existing role:', checkError);
             }
             
             // Admin user - redirect to dashboard

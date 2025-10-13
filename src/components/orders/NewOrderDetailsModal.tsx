@@ -114,6 +114,24 @@ export function NewOrderDetailsModal({
       });
     }
   });
+
+  // Customer PDF download handler - MUST be before any conditional returns
+  const handleCustomerPdfDownload = useReactToPrint({
+    contentRef: customerPdfRef,
+    documentTitle: `Starters-Order-${order?.order_number || 'Receipt'}`,
+    onAfterPrint: () => {
+      toast.success('Order receipt downloaded', {
+        description: 'Your order details have been saved as PDF'
+      });
+    },
+    onPrintError: error => {
+      console.error('PDF download error:', error);
+      toast.error('Failed to download receipt', {
+        description: 'Please try again or contact support'
+      });
+    }
+  });
+
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
     reconnect();
@@ -183,23 +201,6 @@ export function NewOrderDetailsModal({
         </div>
       </AdaptiveDialog>;
   }
-
-  // Customer PDF download handler
-  const handleCustomerPdfDownload = useReactToPrint({
-    contentRef: customerPdfRef,
-    documentTitle: `Starters-Order-${safeOrder.order_number}`,
-    onAfterPrint: () => {
-      toast.success('Order receipt downloaded', {
-        description: 'Your order details have been saved as PDF'
-      });
-    },
-    onPrintError: error => {
-      console.error('PDF download error:', error);
-      toast.error('Failed to download receipt', {
-        description: 'Please try again or contact support'
-      });
-    }
-  });
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {

@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Truck, User, Phone } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Truck, User, Phone, Search, X } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { getDispatchRiders } from "@/api/orders";
 import { toast } from "sonner";
 interface Driver {
@@ -29,6 +30,7 @@ export function DriverAssignmentSection({
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [selectedDriverId, setSelectedDriverId] = useState<string>(currentDriverId || "");
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   useEffect(() => {
     loadDrivers();
   }, []);
@@ -57,6 +59,18 @@ export function DriverAssignmentSection({
     await onAssignDriver(selectedDriverId);
   };
   const currentDriver = drivers.find(d => d.id === currentDriverId);
+
+  // Filter drivers based on search query
+  const filteredDrivers = useMemo(() => {
+    if (!searchQuery.trim()) return drivers;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return drivers.filter(driver => 
+      driver.name.toLowerCase().includes(query) ||
+      driver.phone?.toLowerCase().includes(query) ||
+      driver.email?.toLowerCase().includes(query)
+    );
+  }, [drivers, searchQuery]);
   return (
     <Card>
       <CardHeader>
@@ -88,9 +102,34 @@ export function DriverAssignmentSection({
           </div>
         )}
 
-        {/* Driver Selection */}
+        {/* Driver Selection with Search */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Assign Delivery Agent</label>
+          
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search drivers by name, phone, or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9"
+              disabled={isLoadingDrivers}
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          {/* Driver Select with Filtered Results */}
           <div className="flex gap-2">
             <Select
               value={selectedDriverId}
@@ -101,19 +140,25 @@ export function DriverAssignmentSection({
                 <SelectValue placeholder={isLoadingDrivers ? "Loading drivers..." : "Select a driver"} />
               </SelectTrigger>
               <SelectContent>
-                {drivers.map((driver) => (
-                  <SelectItem key={driver.id} value={driver.id}>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      <span>{driver.name}</span>
-                      {driver.phone && (
-                        <span className="text-xs text-muted-foreground">
-                          ({driver.phone})
-                        </span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
+                {filteredDrivers.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    {searchQuery ? 'No drivers found matching your search' : 'No drivers available'}
+                  </div>
+                ) : (
+                  filteredDrivers.map((driver) => (
+                    <SelectItem key={driver.id} value={driver.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span>{driver.name}</span>
+                        {driver.phone && (
+                          <span className="text-xs text-muted-foreground">
+                            ({driver.phone})
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             
@@ -125,6 +170,13 @@ export function DriverAssignmentSection({
               {isAssigning ? 'Assigning...' : 'Assign'}
             </Button>
           </div>
+
+          {/* Search Results Count */}
+          {searchQuery && filteredDrivers.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Found {filteredDrivers.length} driver{filteredDrivers.length !== 1 ? 's' : ''}
+            </p>
+          )}
         </div>
 
         {/* Unassign Button */}

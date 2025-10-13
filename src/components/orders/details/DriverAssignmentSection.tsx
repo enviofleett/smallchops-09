@@ -6,6 +6,7 @@ import { Truck, User, Phone, Search, X } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { getDispatchRiders } from "@/api/orders";
 import { toast } from "sonner";
+import { useUserContext } from "@/hooks/useUserContext";
 interface Driver {
   id: string;
   name: string;
@@ -27,6 +28,14 @@ export function DriverAssignmentSection({
   onAssignDriver,
   isAssigning
 }: DriverAssignmentSectionProps) {
+  const userContext = useUserContext();
+  const isAdmin = userContext === 'admin';
+  
+  // Security: Only admins can see driver assignment
+  if (!isAdmin) {
+    return null;
+  }
+  
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [selectedDriverId, setSelectedDriverId] = useState<string>(currentDriverId || "");
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);

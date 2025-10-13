@@ -6,6 +6,7 @@ import { Clock, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { OrderStatus } from "@/types/unifiedOrder";
 import { format } from "date-fns";
+import { useUserContext } from "@/hooks/useUserContext";
 interface StatusManagementSectionProps {
   currentStatus: OrderStatus;
   orderId: string;
@@ -59,6 +60,14 @@ export function StatusManagementSection({
   onUpdateStatus,
   isUpdating
 }: StatusManagementSectionProps) {
+  const userContext = useUserContext();
+  const isAdmin = userContext === 'admin';
+  
+  // Security: Only admins can see status management
+  if (!isAdmin) {
+    return null;
+  }
+  
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(currentStatus);
   const handleUpdate = async () => {
     if (selectedStatus === currentStatus) return;

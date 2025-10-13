@@ -247,12 +247,12 @@ export function NewOrderDetailsModal({
               <Button
                 onClick={() => handleCustomerPdfDownload()}
                 variant="default"
-                size="sm"
-                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                size="default"
+                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg font-semibold px-6"
               >
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline font-medium">Download Receipt</span>
-                <span className="sm:hidden font-medium">Download</span>
+                <Download className="h-5 w-5" />
+                <span className="hidden sm:inline">Download PDF Receipt</span>
+                <span className="sm:hidden">Download PDF</span>
               </Button>
             </div>
           </div>

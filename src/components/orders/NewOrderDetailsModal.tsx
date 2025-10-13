@@ -244,6 +244,32 @@ export function NewOrderDetailsModal({
             </div>
             
             <div className="flex gap-2">
+              {/* Admin-only action buttons */}
+              {isAdmin && (
+                <>
+                  <Button
+                    onClick={() => setShowEmailSelector(true)}
+                    variant="outline"
+                    size="default"
+                    className="gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    <span className="hidden sm:inline">Send Email</span>
+                  </Button>
+                  
+                  <Button
+                    onClick={handlePrint}
+                    variant="outline"
+                    size="default"
+                    className="gap-2"
+                  >
+                    <Printer className="h-4 w-4" />
+                    <span className="hidden sm:inline">Print</span>
+                  </Button>
+                </>
+              )}
+              
+              {/* PDF Download for all users */}
               <Button
                 onClick={() => handleCustomerPdfDownload()}
                 variant="default"
@@ -620,17 +646,15 @@ export function NewOrderDetailsModal({
             <ThermalPrintReceipt order={safeOrder as unknown as OrderWithItems} deliveryZone={deliveryZone} />
           </div>}
         
-        {/* Customer PDF component */}
-        {!isAdmin && (
-          <div ref={customerPdfRef}>
-            <CustomerOrderPDF 
-              order={safeOrder}
-              businessSettings={businessSettings}
-              deliveryZone={deliveryZone}
-              pickupPoint={pickupPoint}
-            />
-          </div>
-        )}
+        {/* Customer PDF component - Available for all users */}
+        <div ref={customerPdfRef}>
+          <CustomerOrderPDF 
+            order={safeOrder}
+            businessSettings={businessSettings}
+            deliveryZone={deliveryZone}
+            pickupPoint={pickupPoint}
+          />
+        </div>
       </div>
 
       {/* Email Template Selector Modal */}

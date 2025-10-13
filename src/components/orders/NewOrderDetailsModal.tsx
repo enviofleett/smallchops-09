@@ -10,24 +10,7 @@ import { useReactToPrint } from 'react-to-print';
 import { ThermalPrintReceipt } from './ThermalPrintReceipt';
 import { AdminOrderPrintView } from '@/components/admin/AdminOrderPrintView';
 import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
-import { 
-  Package, 
-  User, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Printer,
-  RefreshCw,
-  CreditCard,
-  FileText,
-  DollarSign,
-  Calendar,
-  Clock,
-  AlertCircle,
-  AlertTriangle,
-  MessageCircle,
-  Send
-} from 'lucide-react';
+import { Package, User, MapPin, Phone, Mail, Printer, RefreshCw, CreditCard, FileText, DollarSign, Calendar, Clock, AlertCircle, AlertTriangle, MessageCircle, Send } from 'lucide-react';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
 import { sanitizeText } from '@/utils/htmlSanitizer';
@@ -47,32 +30,41 @@ import { toast } from 'sonner';
 import '@/styles/admin-print.css';
 import '@/styles/admin-80mm-print.css';
 import { EmailTemplateSelector } from '@/components/email/EmailTemplateSelector';
-
 interface NewOrderDetailsModalProps {
   open: boolean;
   onClose: () => void;
   order: any | null;
 }
-
-export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsModalProps) {
+export function NewOrderDetailsModal({
+  open,
+  onClose,
+  order
+}: NewOrderDetailsModalProps) {
   // CRITICAL: Early null guard to prevent errors during modal transitions
   if (!order) {
     return null;
   }
-
-  const { userType, user } = useAuth();
+  const {
+    userType,
+    user
+  } = useAuth();
   const isAdmin = userType === 'admin';
-  
   const adminPrintRef = useRef<HTMLDivElement>(null);
   const thermalPrintRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showEmailSelector, setShowEmailSelector] = useState(false);
-  
-  const { data, isLoading, error, lastUpdated, connectionStatus, reconnect } = useRealTimeOrderData(
-    order?.id
-  );
-
-  const { assignRiderMutation, handleStatusUpdate } = useOrderPageHooks(order.id);
+  const {
+    data,
+    isLoading,
+    error,
+    lastUpdated,
+    connectionStatus,
+    reconnect
+  } = useRealTimeOrderData(order?.id);
+  const {
+    assignRiderMutation,
+    handleStatusUpdate
+  } = useOrderPageHooks(order.id);
 
   // Enhanced status update that closes modal immediately for confirmed tab
   const handleStatusUpdateWithClose = async (newStatus: OrderStatus) => {
@@ -87,15 +79,20 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
   };
 
   // Fetch pickup point data if order is pickup type
-  const { data: pickupPoint, isLoading: isLoadingPickupPoint } = usePickupPoint(
-    order?.pickup_point_id
-  );
+  const {
+    data: pickupPoint,
+    isLoading: isLoadingPickupPoint
+  } = usePickupPoint(order?.pickup_point_id);
 
   // Fetch business settings for print header
-  const { data: businessSettings } = useBusinessSettings();
-  
+  const {
+    data: businessSettings
+  } = useBusinessSettings();
+
   // Fetch delivery zones to display zone name
-  const { zones } = useDeliveryZones();
+  const {
+    zones
+  } = useDeliveryZones();
   const deliveryZone = zones.find(zone => zone.id === order?.delivery_zone_id);
 
   // Enhanced print handler for admin with success/error notifications
@@ -104,43 +101,36 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
     documentTitle: `Order-${order?.order_number || 'Receipt'}`,
     onAfterPrint: () => {
       toast.success('Order printed successfully', {
-        description: `Order #${order?.order_number} has been sent to printer`,
+        description: `Order #${order?.order_number} has been sent to printer`
       });
     },
-    onPrintError: (error) => {
+    onPrintError: error => {
       console.error('Print error:', error);
       toast.error('Failed to print order', {
-        description: 'Please check your printer connection and try again',
+        description: 'Please check your printer connection and try again'
       });
-    },
+    }
   });
-
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
     reconnect();
   };
-
   const handleAssignDriver = async (driverId: string) => {
     await assignRiderMutation.mutateAsync({
       orderId: order.id,
       riderId: driverId
     });
   };
-
   if (isLoading && !data) {
-    return (
-      <AdaptiveDialog open={open} onOpenChange={onClose} title="Loading Order" description="Please wait">
+    return <AdaptiveDialog open={open} onOpenChange={onClose} title="Loading Order" description="Please wait">
         <div className="p-8 text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">Loading order details...</p>
         </div>
-      </AdaptiveDialog>
-    );
+      </AdaptiveDialog>;
   }
-
   if (error) {
-    return (
-      <AdaptiveDialog open={open} onOpenChange={onClose} title="Error" description="Failed to load order">
+    return <AdaptiveDialog open={open} onOpenChange={onClose} title="Error" description="Failed to load order">
         <div className="p-8 text-center">
           <p className="text-destructive mb-4">Failed to load order details</p>
           <Button onClick={handleRefresh} variant="outline">
@@ -148,15 +138,12 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
             Retry
           </Button>
         </div>
-      </AdaptiveDialog>
-    );
+      </AdaptiveDialog>;
   }
-
   const orderData = data?.order || order;
   const items = data?.items || [];
   const assignedAgent = data?.assigned_agent;
   const deliverySchedule = data?.delivery_schedule;
-
   const safeOrder: UnifiedOrder = {
     id: orderData.id || '',
     order_number: orderData.order_number || 'N/A',
@@ -184,19 +171,15 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
     payment_method: orderData.payment_method,
     payment_reference: orderData.payment_reference || orderData.paystack_reference,
     assigned_rider_id: orderData.assigned_rider_id || assignedAgent?.id,
-    assigned_rider_name: assignedAgent?.name,
+    assigned_rider_name: assignedAgent?.name
   };
-
   if (!safeOrder.id) {
-    return (
-      <AdaptiveDialog open={open} onOpenChange={onClose} title="Invalid Order" description="Order data is missing">
+    return <AdaptiveDialog open={open} onOpenChange={onClose} title="Invalid Order" description="Order data is missing">
         <div className="p-8 text-center text-destructive">
           Invalid order data
         </div>
-      </AdaptiveDialog>
-    );
+      </AdaptiveDialog>;
   }
-
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-500',
@@ -205,30 +188,21 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
       ready: 'bg-purple-500',
       out_for_delivery: 'bg-orange-500',
       delivered: 'bg-green-500',
-      cancelled: 'bg-red-500',
+      cancelled: 'bg-red-500'
     };
     return colors[status] || 'bg-gray-500';
   };
-
   const getPaymentStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-500',
       paid: 'bg-green-500',
       failed: 'bg-red-500',
-      refunded: 'bg-gray-500',
+      refunded: 'bg-gray-500'
     };
     return colors[status] || 'bg-gray-500';
   };
-
-  return (
-    <>
-      <AdaptiveDialog 
-        open={open} 
-        onOpenChange={onClose}
-        title={`Order #${safeOrder.order_number}`}
-        description={`${safeOrder.order_type} order for ${safeOrder.customer_name}`}
-        size="xl"
-      >
+  return <>
+      <AdaptiveDialog open={open} onOpenChange={onClose} title={`Order #${safeOrder.order_number}`} description={`${safeOrder.order_type} order for ${safeOrder.customer_name}`} size="xl">
         <div className="space-y-6 max-h-[80vh] overflow-y-auto p-4 sm:p-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b">
@@ -247,46 +221,13 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
               </div>
             </div>
             
-            {isAdmin && (
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setShowEmailSelector(true)}
-                  disabled={!safeOrder.customer_email}
-                  className="flex-1 sm:flex-none"
-                >
-                  <Send className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Send Email</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={handlePrint} className="flex-1 sm:flex-none">
-                  <Printer className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Print</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleRefresh}>
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            {isAdmin}
           </div>
 
-          {isAdmin && (
-            <RealTimeConnectionStatus 
-              connectionStatus={connectionStatus}
-              lastUpdated={lastUpdated}
-              onReconnect={reconnect}
-              compact={true}
-            />
-          )}
+          {isAdmin && <RealTimeConnectionStatus connectionStatus={connectionStatus} lastUpdated={lastUpdated} onReconnect={reconnect} compact={true} />}
 
           {/* Customer Order Status Tracker - CUSTOMERS ONLY */}
-          {!isAdmin && (
-            <CustomerOrderStatusTracker
-              currentStatus={safeOrder.status}
-              orderTime={safeOrder.order_time}
-              estimatedDeliveryTime={deliverySchedule?.delivery_time_end}
-            />
-          )}
+          {!isAdmin && <CustomerOrderStatusTracker currentStatus={safeOrder.status} orderTime={safeOrder.order_time} estimatedDeliveryTime={deliverySchedule?.delivery_time_end} />}
 
           {/* Customer Information */}
           <Card>
@@ -305,39 +246,25 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <span className="text-base">{safeOrder.customer_email}</span>
               </div>
-              {safeOrder.customer_phone && (
-                <div className="flex items-center gap-2">
+              {safeOrder.customer_phone && <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <span className="text-base">{safeOrder.customer_phone}</span>
                   {isAdmin && (() => {
-                    // Clean and format Nigerian phone number
-                    const cleanNumber = safeOrder.customer_phone.replace(/[^0-9]/g, '');
-                    const formattedNumber = cleanNumber.startsWith('234') 
-                      ? cleanNumber 
-                      : `234${cleanNumber.replace(/^0/, '')}`;
-                    
-                    // Create dynamic message
-                    const message = `Hello ${safeOrder.customer_name}, this is regarding your order #${safeOrder.order_number}. How can I assist you?`;
-                    const encodedMessage = encodeURIComponent(message);
-                    
-                    // Use wa.me universal link (most reliable, rarely blocked)
-                    const whatsappUrl = `https://wa.me/${formattedNumber}?text=${encodedMessage}`;
-                    
-                    return (
-                      <a
-                        href={whatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-[#25D366] hover:bg-[#20BA5A] transition-all duration-200 hover:scale-110 cursor-pointer shadow-sm hover:shadow-md"
-                        title="Chat on WhatsApp"
-                        aria-label="Chat with customer on WhatsApp"
-                      >
+                // Clean and format Nigerian phone number
+                const cleanNumber = safeOrder.customer_phone.replace(/[^0-9]/g, '');
+                const formattedNumber = cleanNumber.startsWith('234') ? cleanNumber : `234${cleanNumber.replace(/^0/, '')}`;
+
+                // Create dynamic message
+                const message = `Hello ${safeOrder.customer_name}, this is regarding your order #${safeOrder.order_number}. How can I assist you?`;
+                const encodedMessage = encodeURIComponent(message);
+
+                // Use wa.me universal link (most reliable, rarely blocked)
+                const whatsappUrl = `https://wa.me/${formattedNumber}?text=${encodedMessage}`;
+                return <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center justify-center h-7 w-7 rounded-full bg-[#25D366] hover:bg-[#20BA5A] transition-all duration-200 hover:scale-110 cursor-pointer shadow-sm hover:shadow-md" title="Chat on WhatsApp" aria-label="Chat with customer on WhatsApp">
                         <MessageCircle className="h-4 w-4 text-white" />
-                      </a>
-                    );
-                  })()}
-                </div>
-              )}
+                      </a>;
+              })()}
+                </div>}
             </CardContent>
           </Card>
 
@@ -363,11 +290,9 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
               </div>
 
               {/* Delivery/Pickup Details */}
-              {safeOrder.order_type === 'delivery' ? (
-                <>
+              {safeOrder.order_type === 'delivery' ? <>
                   {/* Delivery Address */}
-                  {safeOrder.delivery_address && (
-                    <>
+                  {safeOrder.delivery_address && <>
                       <Separator />
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
@@ -378,8 +303,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                           {formatAddress(safeOrder.delivery_address)}
                         </p>
                       </div>
-                    </>
-                  )}
+                    </>}
 
                   {/* Delivery Time Window (1-hour window from delivery_time) */}
                   <Separator />
@@ -389,26 +313,21 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                       Delivery Window
                     </div>
                     
-                    {!hasValidTimeField(safeOrder) ? (
-                      <div className="pl-6">
+                    {!hasValidTimeField(safeOrder) ? <div className="pl-6">
                         <Alert variant="destructive">
                           <AlertTriangle className="h-4 w-4" />
                           <AlertDescription>
                             <strong>Data Error:</strong> Missing delivery time for this order. Please contact support.
                           </AlertDescription>
                         </Alert>
-                      </div>
-                    ) : (
-                      <div className="pl-6 space-y-1">
-                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && (
-                          <div className="flex items-center gap-2 text-sm">
+                      </div> : <div className="pl-6 space-y-1">
+                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="text-muted-foreground">Date:</span>
                             <span className="font-medium">
                               {formatDeliveryDate(safeOrder.delivery_date)}
                             </span>
-                          </div>
-                        )}
+                          </div>}
                         <div className="flex items-center gap-2 text-sm">
                           <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="text-muted-foreground">Time:</span>
@@ -419,15 +338,11 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                             1-hour window
                           </Badge>
                         </div>
-                      </div>
-                    )}
+                      </div>}
                   </div>
-                </>
-              ) : safeOrder.order_type === 'pickup' ? (
-                <>
+                </> : safeOrder.order_type === 'pickup' ? <>
                   {/* Pickup Location */}
-                  {isLoadingPickupPoint ? (
-                    <>
+                  {isLoadingPickupPoint ? <>
                       <Separator />
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
@@ -438,9 +353,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                           Loading pickup location...
                         </div>
                       </div>
-                    </>
-                  ) : pickupPoint ? (
-                    <>
+                    </> : pickupPoint ? <>
                       <Separator />
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
@@ -450,16 +363,11 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                         <div className="pl-6 space-y-1">
                           <p className="text-sm font-medium">{pickupPoint.name}</p>
                           <p className="text-sm text-muted-foreground">{pickupPoint.address}</p>
-                          {pickupPoint.contact_phone && (
-                            <p className="text-xs text-muted-foreground">📞 {pickupPoint.contact_phone}</p>
-                          )}
-                          {pickupPoint.instructions && (
-                            <p className="text-xs text-muted-foreground italic mt-1">ℹ️ {pickupPoint.instructions}</p>
-                          )}
+                          {pickupPoint.contact_phone && <p className="text-xs text-muted-foreground">📞 {pickupPoint.contact_phone}</p>}
+                          {pickupPoint.instructions && <p className="text-xs text-muted-foreground italic mt-1">ℹ️ {pickupPoint.instructions}</p>}
                         </div>
                       </div>
-                    </>
-                  ) : null}
+                    </> : null}
 
                   {/* Pickup Time Window (1-hour window from pickup_time) */}
                   <Separator />
@@ -469,26 +377,21 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                       Pickup Time
                     </div>
                     
-                    {!hasValidTimeField(safeOrder) ? (
-                      <div className="pl-6">
+                    {!hasValidTimeField(safeOrder) ? <div className="pl-6">
                         <Alert variant="destructive">
                           <AlertTriangle className="h-4 w-4" />
                           <AlertDescription>
                             <strong>Data Error:</strong> Missing pickup time for this order. Please contact support.
                           </AlertDescription>
                         </Alert>
-                      </div>
-                    ) : (
-                      <div className="pl-6 space-y-1">
-                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && (
-                          <div className="flex items-center gap-2 text-sm">
+                      </div> : <div className="pl-6 space-y-1">
+                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="text-muted-foreground">Date:</span>
                             <span className="font-medium">
                               {formatDeliveryDate(safeOrder.delivery_date)}
                             </span>
-                          </div>
-                        )}
+                          </div>}
                         <div className="flex items-center gap-2 text-sm">
                           <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="text-muted-foreground">Time Window:</span>
@@ -499,15 +402,12 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                             1-hour window
                           </Badge>
                         </div>
-                      </div>
-                    )}
+                      </div>}
                   </div>
-                </>
-              ) : null}
+                </> : null}
 
               {/* Special Instructions */}
-              {(safeOrder.special_instructions || deliverySchedule?.special_instructions) && (
-                <>
+              {(safeOrder.special_instructions || deliverySchedule?.special_instructions) && <>
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
@@ -515,22 +415,16 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                       Special Instructions
                     </div>
                     <div className="pl-6 space-y-1">
-                      {safeOrder.special_instructions && (
-                        <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded">
+                      {safeOrder.special_instructions && <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded">
                           {safeOrder.special_instructions}
-                        </div>
-                      )}
-                      {deliverySchedule?.special_instructions && 
-                       deliverySchedule.special_instructions !== safeOrder.special_instructions && (
-                        <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded">
+                        </div>}
+                      {deliverySchedule?.special_instructions && deliverySchedule.special_instructions !== safeOrder.special_instructions && <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded">
                           <span className="text-xs font-medium">Delivery: </span>
                           {deliverySchedule.special_instructions}
-                        </div>
-                      )}
+                        </div>}
                     </div>
                   </div>
-                </>
-              )}
+                </>}
             </CardContent>
           </Card>
 
@@ -543,33 +437,18 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {items.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+              {items.length === 0 ? <div className="text-center py-8 text-muted-foreground">
                   No items found
-                </div>
-              ) : (
-                <div className="space-y-4">
+                </div> : <div className="space-y-4">
                   {items.map((item: any) => {
-                    const features = item.product?.features 
-                      ? parseProductFeatures(item.product.features)
-                      : [];
-                    
-                    const productImage = item.product?.image_url || 
-                      (item.product?.images && item.product.images[0]) || 
-                      '/placeholder.svg';
-                    
-                    return (
-                      <div key={item.id} className="flex gap-4 p-4 bg-muted/50 rounded-lg border border-border/50 hover:shadow-sm transition-shadow">
+                const features = item.product?.features ? parseProductFeatures(item.product.features) : [];
+                const productImage = item.product?.image_url || item.product?.images && item.product.images[0] || '/placeholder.svg';
+                return <div key={item.id} className="flex gap-4 p-4 bg-muted/50 rounded-lg border border-border/50 hover:shadow-sm transition-shadow">
                         {/* Product Image */}
                         <div className="flex-shrink-0">
-                          <img 
-                            src={productImage} 
-                            alt={item.product?.name || item.product_name || 'Product'}
-                            className="w-20 h-20 rounded-lg object-cover border border-border"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/placeholder.svg';
-                            }}
-                          />
+                          <img src={productImage} alt={item.product?.name || item.product_name || 'Product'} className="w-20 h-20 rounded-lg object-cover border border-border" onError={e => {
+                      (e.target as HTMLImageElement).src = '/placeholder.svg';
+                    }} />
                         </div>
 
                         {/* Product Details */}
@@ -578,27 +457,19 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                             {item.product?.name || item.product_name || 'Unknown Product'}
                           </div>
                           
-                          {item.product?.description && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          {item.product?.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                               {sanitizeText(item.product.description)}
-                            </p>
-                          )}
+                            </p>}
 
-                          {features.length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-2 flex flex-wrap gap-1">
-                              {features.map((feature, idx) => (
-                                <span key={idx} className="px-2 py-0.5 bg-background/80 rounded-md border">
+                          {features.length > 0 && <div className="text-xs text-muted-foreground mt-2 flex flex-wrap gap-1">
+                              {features.map((feature, idx) => <span key={idx} className="px-2 py-0.5 bg-background/80 rounded-md border">
                                   {feature}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                                </span>)}
+                            </div>}
 
-                          {item.special_instructions && (
-                            <div className="text-sm italic text-muted-foreground mt-2 p-2 bg-muted/50 rounded">
+                          {item.special_instructions && <div className="text-sm italic text-muted-foreground mt-2 p-2 bg-muted/50 rounded">
                               📝 {item.special_instructions}
-                            </div>
-                          )}
+                            </div>}
 
                           <div className="flex items-center gap-4 mt-2 text-sm">
                             <span className="text-muted-foreground">
@@ -619,11 +490,9 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                             Total
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      </div>;
+              })}
+                </div>}
             </CardContent>
           </Card>
 
@@ -637,38 +506,28 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {safeOrder.subtotal !== undefined && (
-                  <div className="flex justify-between text-base">
+                {safeOrder.subtotal !== undefined && <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Subtotal:</span>
                     <span>₦{safeOrder.subtotal.toLocaleString()}</span>
-                  </div>
-                )}
-                {safeOrder.tax_amount !== undefined && safeOrder.tax_amount > 0 && (
-                  <div className="flex justify-between text-base">
+                  </div>}
+                {safeOrder.tax_amount !== undefined && safeOrder.tax_amount > 0 && <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Tax/VAT:</span>
                     <span>₦{safeOrder.tax_amount.toLocaleString()}</span>
-                  </div>
-                )}
-                {safeOrder.delivery_fee !== undefined && safeOrder.delivery_fee > 0 && (
-                  <div className="space-y-1">
+                  </div>}
+                {safeOrder.delivery_fee !== undefined && safeOrder.delivery_fee > 0 && <div className="space-y-1">
                     <div className="flex justify-between text-base">
                       <span className="text-muted-foreground">Delivery Fee:</span>
                       <span>₦{safeOrder.delivery_fee.toLocaleString()}</span>
                     </div>
-                    {deliveryZone && (
-                      <div className="flex justify-between text-xs">
+                    {deliveryZone && <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground/70">Delivery Zone:</span>
                         <span className="text-muted-foreground">{deliveryZone.name}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {safeOrder.discount_amount !== undefined && safeOrder.discount_amount > 0 && (
-                  <div className="flex justify-between text-base text-green-600">
+                      </div>}
+                  </div>}
+                {safeOrder.discount_amount !== undefined && safeOrder.discount_amount > 0 && <div className="flex justify-between text-base text-green-600">
                     <span>Discount:</span>
                     <span>-₦{safeOrder.discount_amount.toLocaleString()}</span>
-                  </div>
-                )}
+                  </div>}
                 <Separator />
                 <div className="flex justify-between font-bold text-xl">
                   <span>Total:</span>
@@ -679,8 +538,7 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
           </Card>
 
           {/* Payment Information */}
-          {(safeOrder.payment_method || safeOrder.payment_reference) && (
-            <Card>
+          {(safeOrder.payment_method || safeOrder.payment_reference) && <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <CreditCard className="h-5 w-5" />
@@ -688,87 +546,45 @@ export function NewOrderDetailsModal({ open, onClose, order }: NewOrderDetailsMo
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {safeOrder.payment_method && (
-                  <div className="flex justify-between text-base">
+                {safeOrder.payment_method && <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Method:</span>
                     <span className="font-medium capitalize">{safeOrder.payment_method}</span>
-                  </div>
-                )}
-                {safeOrder.payment_reference && (
-                  <div className="flex justify-between text-base">
+                  </div>}
+                {safeOrder.payment_reference && <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Reference:</span>
                     <span className="font-mono text-sm">{safeOrder.payment_reference}</span>
-                  </div>
-                )}
+                  </div>}
               </CardContent>
-            </Card>
-          )}
+            </Card>}
 
           {/* Driver Assignment - ADMIN ONLY */}
-          {isAdmin && (
-            <DriverAssignmentSection
-              orderId={safeOrder.id}
-              currentDriverId={safeOrder.assigned_rider_id}
-              currentDriverName={safeOrder.assigned_rider_name}
-              onAssignDriver={handleAssignDriver}
-              isAssigning={assignRiderMutation.isPending}
-            />
-          )}
+          {isAdmin && <DriverAssignmentSection orderId={safeOrder.id} currentDriverId={safeOrder.assigned_rider_id} currentDriverName={safeOrder.assigned_rider_name} onAssignDriver={handleAssignDriver} isAssigning={assignRiderMutation.isPending} />}
 
           {/* Status Management - ADMIN ONLY */}
-          {isAdmin && (
-            <StatusManagementSection
-              currentStatus={safeOrder.status}
-              orderId={safeOrder.id}
-              updatedAt={safeOrder.updated_at}
-              onUpdateStatus={handleStatusUpdateWithClose}
-              isUpdating={false}
-            />
-          )}
+          {isAdmin && <StatusManagementSection currentStatus={safeOrder.status} orderId={safeOrder.id} updatedAt={safeOrder.updated_at} onUpdateStatus={handleStatusUpdateWithClose} isUpdating={false} />}
         </div>
       </AdaptiveDialog>
 
       {/* Hidden print components */}
       <div className="hidden">
-        {isAdmin ? (
-          <div ref={adminPrintRef}>
-            <AdminOrderPrintView
-              order={{
-                ...safeOrder,
-                items: items,
-                assigned_rider_name: assignedAgent?.name,
-                delivery_schedule: deliverySchedule,
-                pickup_point: pickupPoint,
-                delivery_zone: deliveryZone,
-              }}
-              businessSettings={businessSettings}
-              adminName={user?.name}
-              adminEmail={user?.email}
-            />
-          </div>
-        ) : (
-          <div ref={thermalPrintRef}>
-            <ThermalPrintReceipt 
-              order={safeOrder as unknown as OrderWithItems}
-              deliveryZone={deliveryZone}
-            />
-          </div>
-        )}
+        {isAdmin ? <div ref={adminPrintRef}>
+            <AdminOrderPrintView order={{
+          ...safeOrder,
+          items: items,
+          assigned_rider_name: assignedAgent?.name,
+          delivery_schedule: deliverySchedule,
+          pickup_point: pickupPoint,
+          delivery_zone: deliveryZone
+        }} businessSettings={businessSettings} adminName={user?.name} adminEmail={user?.email} />
+          </div> : <div ref={thermalPrintRef}>
+            <ThermalPrintReceipt order={safeOrder as unknown as OrderWithItems} deliveryZone={deliveryZone} />
+          </div>}
       </div>
 
       {/* Email Template Selector Modal */}
-      {isAdmin && showEmailSelector && (
-        <EmailTemplateSelector
-          open={showEmailSelector}
-          onClose={() => setShowEmailSelector(false)}
-          orderId={safeOrder.id}
-          customerEmail={safeOrder.customer_email}
-          onEmailSent={() => {
-            toast.success('Email sent successfully');
-            setShowEmailSelector(false);
-          }}
-        />
-      )}
-    </>
-  );
+      {isAdmin && showEmailSelector && <EmailTemplateSelector open={showEmailSelector} onClose={() => setShowEmailSelector(false)} orderId={safeOrder.id} customerEmail={safeOrder.customer_email} onEmailSent={() => {
+      toast.success('Email sent successfully');
+      setShowEmailSelector(false);
+    }} />}
+    </>;
 }

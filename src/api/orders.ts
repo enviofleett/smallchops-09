@@ -208,6 +208,11 @@ export async function bulkUpdateOrders(orderIds: string[], updates: Record<strin
 }
 
 export async function assignRiderToOrder(orderId: string, riderId: string) {
+  // 🔒 SECURITY: Verify user is authenticated
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  
+  // Use the now-secured edge function with proper auth headers
   return updateOrder({ orderId, updates: { assigned_rider_id: riderId }});
 }
 

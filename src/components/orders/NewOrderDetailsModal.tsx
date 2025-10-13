@@ -247,16 +247,37 @@ export function NewOrderDetailsModal({
               {!isAdmin && (
                 <Button
                   onClick={() => handleCustomerPdfDownload()}
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                 >
                   <Download className="h-4 w-4" />
-                  <span className="hidden sm:inline">Download Receipt</span>
-                  <span className="sm:hidden">Download</span>
+                  <span className="hidden sm:inline font-medium">Download Receipt</span>
+                  <span className="sm:hidden font-medium">Download</span>
                 </Button>
               )}
-              {isAdmin}
+              {isAdmin && (
+                <>
+                  <Button
+                    onClick={() => setShowEmailSelector(true)}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    <span className="hidden sm:inline">Send Email</span>
+                  </Button>
+                  <Button
+                    onClick={() => handlePrint()}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Printer className="h-4 w-4" />
+                    <span className="hidden sm:inline">Print</span>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 

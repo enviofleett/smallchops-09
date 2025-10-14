@@ -131,36 +131,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // 🔒 SECURITY: Field-level permission check for admin-only fields
-    const restrictedFieldsAttempted = attemptedFields.filter(field => 
-      ADMIN_ONLY_FIELDS.includes(field)
-    );
-    
-    if (restrictedFieldsAttempted.length > 0) {
-      // Log security violation attempt
-      await supabaseService.from('audit_logs').insert({
-        action: 'unauthorized_field_update_attempt',
-        category: 'Security Violation',
-        message: `Admin-only fields update attempted: ${restrictedFieldsAttempted.join(', ')}`,
-        user_id: user.id,
-        entity_id: orderId,
-        new_values: { 
-          attempted_fields: restrictedFieldsAttempted,
-          email: user.email,
-          timestamp: new Date().toISOString()
-        }
-      });
-
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Forbidden - Cannot update restricted fields',
-          restricted_fields: restrictedFieldsAttempted,
-          message: 'Only administrators can modify status, payment information, and driver assignments'
-        }),
-        { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
-      );
-    }
+    // ✅ Admin verified - all fields allowed for admin users
 
     if (action === 'update') {
       // Log the admin action

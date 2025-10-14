@@ -211,8 +211,14 @@ export async function updateOrder({ orderId, updates }: OrderUpdatePayload) {
         body: { action: 'update', orderId, updates }
       });
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Failed to update order');
+      if (error) {
+        console.error('❌ Edge function invocation error:', error);
+        throw new Error(`Edge Function error: ${error.message || JSON.stringify(error)}`);
+      }
+      if (!data?.success) {
+        console.error('❌ Edge function returned error:', data);
+        throw new Error(data?.error || data?.message || 'Failed to update order');
+      }
       
       return data;
     }

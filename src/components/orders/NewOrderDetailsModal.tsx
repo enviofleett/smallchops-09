@@ -630,10 +630,10 @@ export function NewOrderDetailsModal({
             </Card>}
 
           {/* Driver Assignment - ADMIN ONLY */}
-          {isAdmin && <DriverAssignmentSection orderId={safeOrder.id} currentDriverId={safeOrder.assigned_rider_id} currentDriverName={safeOrder.assigned_rider_name} onAssignDriver={handleAssignDriver} isAssigning={assignRiderMutation.isPending} />}
+          {!authLoading && isAdmin && <DriverAssignmentSection orderId={safeOrder.id} currentDriverId={safeOrder.assigned_rider_id} currentDriverName={safeOrder.assigned_rider_name} onAssignDriver={handleAssignDriver} isAssigning={assignRiderMutation.isPending} />}
 
           {/* Status Management - ADMIN ONLY */}
-          {isAdmin && <StatusManagementSection currentStatus={safeOrder.status} orderId={safeOrder.id} updatedAt={safeOrder.updated_at} onUpdateStatus={handleStatusUpdateWithClose} isUpdating={false} />}
+          {!authLoading && isAdmin && <StatusManagementSection currentStatus={safeOrder.status} orderId={safeOrder.id} updatedAt={safeOrder.updated_at} onUpdateStatus={handleStatusUpdateWithClose} isUpdating={false} />}
         </div>
       </AdaptiveDialog>
 

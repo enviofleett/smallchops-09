@@ -62,26 +62,8 @@ export function StatusManagementSection({
   onUpdateStatus,
   isUpdating
 }: StatusManagementSectionProps) {
-  // 🔒 CRITICAL: All hooks MUST be called before any conditional returns
-  const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
+  // Note: Parent component ensures this only renders for admins
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(currentStatus);
-  
-  // 🔒 SECURITY: Don't render admin features for non-admins (after all hooks)
-  if (authLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <div className="animate-pulse">Checking permissions...</div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  if (!isAdmin) {
-    return null;
-  }
   const handleUpdate = async () => {
     if (selectedStatus === currentStatus) return;
     await onUpdateStatus(selectedStatus);

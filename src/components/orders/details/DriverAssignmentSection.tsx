@@ -7,7 +7,6 @@ import { Truck, User, Phone, Search, X, Shield } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { getDispatchRiders } from "@/api/orders";
 import { toast } from "sonner";
-import { useUnifiedAuth } from "@/hooks/useUnifiedAuth";
 
 interface Driver {
   id: string;
@@ -30,8 +29,7 @@ export function DriverAssignmentSection({
   onAssignDriver,
   isAssigning
 }: DriverAssignmentSectionProps) {
-  // ✅ CRITICAL: ALL HOOKS FIRST - Called unconditionally before any returns
-  const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
+  // Note: Parent component ensures this only renders for admins
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [selectedDriverId, setSelectedDriverId] = useState<string>(currentDriverId || "");
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
@@ -73,24 +71,7 @@ export function DriverAssignmentSection({
     );
   }, [drivers, searchQuery]);
   
-  // ✅ CONDITIONAL RETURNS AFTER ALL HOOKS
-  if (authLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <div className="animate-pulse">Checking permissions...</div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  if (!isAdmin) {
-    return null;
-  }
-  
-  // ✅ DERIVED STATE & FUNCTIONS AFTER HOOKS
+  // Derived state
   const currentDriver = drivers.find(d => d.id === currentDriverId);
   
   const handleAssign = async () => {

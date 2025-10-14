@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.process-communication-events-enhanced]
 verify_jwt = false
+
+[functions.unified-smtp-sender]
+verify_jwt = false

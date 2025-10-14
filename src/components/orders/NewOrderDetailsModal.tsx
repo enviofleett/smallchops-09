@@ -9,8 +9,8 @@ import { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { ThermalPrintReceipt } from './ThermalPrintReceipt';
 import { AdminOrderPrintView } from '@/components/admin/AdminOrderPrintView';
-import { CustomerOrderPDF } from './CustomerOrderPDF';
 import { RealTimeConnectionStatus } from '@/components/common/RealTimeConnectionStatus';
+import { useCustomerReceiptPDF } from '@/hooks/useCustomerReceiptPDF';
 import { Package, User, MapPin, Phone, Mail, Printer, RefreshCw, CreditCard, FileText, DollarSign, Calendar, Clock, AlertCircle, AlertTriangle, MessageCircle, Send, Download } from 'lucide-react';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { parseProductFeatures } from '@/utils/productFeatureParser';
@@ -47,9 +47,9 @@ export function NewOrderDetailsModal({
   const { isAdmin, isLoading: authLoading, user } = useUnifiedAuth();
   const adminPrintRef = useRef<HTMLDivElement>(null);
   const thermalPrintRef = useRef<HTMLDivElement>(null);
-  const customerPdfRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showEmailSelector, setShowEmailSelector] = useState(false);
+  const { downloadReceipt, isGenerating } = useCustomerReceiptPDF();
   
   // Real-time data hook - use optional chaining for null safety
   const {
@@ -100,22 +100,13 @@ export function NewOrderDetailsModal({
     }
   });
 
-  // Customer PDF download handler
-  const handleCustomerPdfDownload = useReactToPrint({
-    contentRef: customerPdfRef,
-    documentTitle: `Starters-Order-${order?.order_number || 'Receipt'}`,
-    onAfterPrint: () => {
-      toast.success('Order receipt downloaded', {
-        description: 'Your order details have been saved as PDF'
-      });
-    },
-    onPrintError: error => {
-      console.error('PDF download error:', error);
-      toast.error('Failed to download receipt', {
-        description: 'Please try again or contact support'
-      });
-    }
-  });
+  // Business info for PDF generation
+  const businessInfo = {
+    name: businessSettings?.name || 'Starters',
+    address: '2B Close Off 11Crescent Kado Estate, Kado',
+    phone: businessSettings?.whatsapp_support_number || '0807 301 1100',
+    email: 'store@startersmallchops.com',
+  };
 
   // ✅ CONDITIONAL RETURNS AFTER ALL HOOKS
   // Early null guard to prevent errors during modal transitions
@@ -277,14 +268,19 @@ export function NewOrderDetailsModal({
               
               {/* PDF Download for all users */}
               <Button
-                onClick={() => handleCustomerPdfDownload()}
+                onClick={() => downloadReceipt(safeOrder, businessInfo)}
+                disabled={isGenerating}
                 variant="default"
                 size="default"
                 className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg font-semibold px-6"
               >
-                <Download className="h-5 w-5" />
-                <span className="hidden sm:inline">Download PDF Receipt</span>
-                <span className="sm:hidden">Download PDF</span>
+                <Download className={`h-5 w-5 ${isGenerating ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">
+                  {isGenerating ? 'Generating PDF...' : 'Download PDF Receipt'}
+                </span>
+                <span className="sm:hidden">
+                  {isGenerating ? 'Generating...' : 'Download PDF'}
+                </span>
               </Button>
             </div>
           </div>
@@ -651,16 +647,6 @@ export function NewOrderDetailsModal({
           </div> : <div ref={thermalPrintRef}>
             <ThermalPrintReceipt order={safeOrder as unknown as OrderWithItems} deliveryZone={deliveryZone} />
           </div>}
-        
-        {/* Customer PDF component - Available for all users */}
-        <div ref={customerPdfRef}>
-          <CustomerOrderPDF 
-            order={safeOrder}
-            businessSettings={businessSettings}
-            deliveryZone={deliveryZone}
-            pickupPoint={pickupPoint}
-          />
-        </div>
       </div>
 
       {/* Email Template Selector Modal */}

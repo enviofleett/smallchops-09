@@ -44,12 +44,29 @@ serve(async (req) => {
     // Process in batches to avoid timeouts
     const batchSize = queuedCount > 100 ? 50 : 20;
     
-    const { data, error } = await supabase.functions.invoke('process-communication-events-enhanced', {
-      body: {
+    // Call the processor function directly via HTTP (JWT verification disabled)
+    const functionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-communication-events-enhanced`;
+    
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
+      },
+      body: JSON.stringify({
         batchSize,
         immediate_processing: false
-      }
+      })
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Processor invocation failed:', response.status, errorText);
+      throw new Error(`Processor returned ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const error = null;
 
     if (error) {
       console.error('❌ Processor invocation failed:', error);

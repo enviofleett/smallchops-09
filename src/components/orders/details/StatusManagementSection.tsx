@@ -7,7 +7,6 @@ import { Clock, RefreshCw, Shield } from "lucide-react";
 import { useState } from "react";
 import { OrderStatus } from "@/types/unifiedOrder";
 import { format } from "date-fns";
-import { useUnifiedAuth } from "@/hooks/useUnifiedAuth";
 
 interface StatusManagementSectionProps {
   currentStatus: OrderStatus;

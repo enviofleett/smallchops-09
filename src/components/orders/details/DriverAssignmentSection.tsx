@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Truck, User, Phone, Search, X, Shield } from "lucide-react";
+import { Truck, User, Phone, Shield } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { getDispatchRiders } from "@/api/orders";
 import { toast } from "sonner";

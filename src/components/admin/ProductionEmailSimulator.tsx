@@ -225,7 +225,7 @@ export const ProductionEmailSimulator: React.FC = () => {
             order_number: `PROD-${Date.now()}`,
             order_total: '₦15,000',
             order_date: new Date().toLocaleDateString(),
-            store_name: 'Starters Small Chops'
+            store_name: 'Starters'
           }
         }
       });
@@ -253,7 +253,7 @@ export const ProductionEmailSimulator: React.FC = () => {
           templateKey: 'customer_welcome',
           variables: {
             customer_name: 'New Customer',
-            store_name: 'Starters Small Chops',
+            store_name: 'Starters',
             support_email: 'support@startersmallchops.com'
           }
         }

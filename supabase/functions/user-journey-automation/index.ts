@@ -179,7 +179,7 @@ async function handleRegistrationJourney(
       template_key: 'customer_welcome',
       template_variables: {
         customer_name: userData.name || 'New Customer',
-        business_name: 'Starters Small Chops',
+        business_name: 'Starters',
         signup_date: new Date().toLocaleDateString('en-US', { 
           weekday: 'long', 
           year: 'numeric', 
@@ -426,7 +426,7 @@ async function handleOrderStatusChangeJourney(
           month: 'long', 
           day: 'numeric' 
         }),
-        business_name: 'Starters Small Chops',
+        business_name: 'Starters',
         support_email: 'support@starterssmallchops.com',
         order_id: orderData.order_id,
         old_status: metadata?.old_status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '',

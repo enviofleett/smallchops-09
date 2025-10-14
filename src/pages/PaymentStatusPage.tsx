@@ -6,7 +6,7 @@ export default function PaymentStatusPage() {
   return (
     <>
       <Helmet>
-        <title>Payment Status Checker | Starters Small Chops</title>
+        <title>Payment Status Checker | Starters</title>
         <meta name="description" content="Check the status of your payment and recover payment information" />
         <link rel="canonical" href={`${window.location.origin}/payment/status`} />
       </Helmet>

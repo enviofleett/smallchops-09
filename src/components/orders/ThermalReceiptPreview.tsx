@@ -257,7 +257,7 @@ export const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = ({
               {/* Footer */}
               <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold' }}>
                 <div><strong>Thank you for your order!</strong></div>
-                <div><strong>🍽️ Starters Small Chops 🍽️</strong></div>
+                <div><strong>🍽️ Starters 🍽️</strong></div>
                 {receiptContent.adminEmail && (
                   <div>📧 {receiptContent.adminEmail}</div>
                 )}

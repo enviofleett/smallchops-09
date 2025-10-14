@@ -216,7 +216,7 @@ export const useThermalPrint = () => {
           
           <div class="footer text-center">
             <div>Thank you for your order!</div>
-            <div>Starters Small Chops</div>
+            <div>Starters</div>
             ${receiptContent.adminEmail ? 
               `<div>${receiptContent.adminEmail}</div>` : ''}
             

@@ -32,7 +32,7 @@ serve(async (req) => {
     // Prepare enhanced variables for welcome email template (snake_case)
     const welcomeVariables = {
       customer_name: customer_name || customer_email.split('@')[0],
-      business_name: businessSettings?.name || 'Starters Small Chops',
+      business_name: businessSettings?.name || 'Starters',
       signup_date: new Date().toLocaleDateString('en-US', { 
         weekday: 'long', 
         year: 'numeric', 

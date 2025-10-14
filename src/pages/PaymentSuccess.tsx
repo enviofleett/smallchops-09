@@ -256,7 +256,7 @@ export default function PaymentSuccess() {
   return (
     <>
       <Helmet>
-        <title>Payment Successful | Starters Small Chops</title>
+        <title>Payment Successful | Starters</title>
         <meta name="description" content="Your payment has been processed successfully." />
         <link rel="canonical" href={`${window.location.origin}/payment/success`} />
       </Helmet>

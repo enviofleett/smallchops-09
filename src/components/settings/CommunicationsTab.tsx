@@ -170,7 +170,7 @@ export const CommunicationsTab = () => {
           variables: {
             test_timestamp: new Date().toISOString(),
             environment: 'production',
-            business_name: 'Starters Small Chops'
+            business_name: 'Starters'
           },
           email_type: 'system_test'
         }
@@ -300,7 +300,7 @@ export const CommunicationsTab = () => {
           variables: {
             timestamp: new Date().toLocaleString(),
             test_environment: window.location.hostname.includes('lovable') ? 'preview' : 'production',
-            business_name: 'Starters Small Chops',
+            business_name: 'Starters',
             test_id: `test_${now}`
           },
           email_type: 'system_test'

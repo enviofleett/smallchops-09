@@ -67,7 +67,7 @@ export const generateReceiptContent = (data: ReceiptData) => {
     getDeliveryInfo,
     getItemDetails,
     deliveryInfo,
-    businessName: businessInfo?.name || 'STARTERS SMALL CHOPS',
+    businessName: businessInfo?.name || 'STARTERS',
     contactNumber: businessInfo?.whatsapp_support_number,
     adminEmail: businessInfo?.admin_notification_email,
     formattedDate: new Date(order.created_at).toLocaleString('en-GB', {

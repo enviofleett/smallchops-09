@@ -72,11 +72,11 @@ export const resendWelcomeEmail = async (customerEmail: string): Promise<boolean
       body: {
         action: 'send_email',
         recipient: customerEmail,
-        subject: 'Welcome to Starters Small Chops!',
+        subject: 'Welcome to Starters!',
         template_key: 'customer_welcome',
         variables: {
           customerName: customerEmail.split('@')[0], // Fallback name
-          companyName: 'Starters Small Chops',
+          companyName: 'Starters',
           supportEmail: 'support@startersmallchops.com',
           websiteUrl: window.location.origin,
           siteUrl: window.location.origin

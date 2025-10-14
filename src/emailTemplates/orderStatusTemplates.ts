@@ -75,7 +75,7 @@ export function getOrderStatusTemplate(status: OrderStatus, data: EmailTemplateD
     </head>
     <body>
       <div class="header">
-        <h1>Starters Small Chops</h1>
+        <h1>Starters</h1>
         <p>Your order status has been updated</p>
       </div>
       
@@ -105,11 +105,11 @@ export function getOrderStatusTemplate(status: OrderStatus, data: EmailTemplateD
         
         <p>If you have any questions about your order, please don't hesitate to contact us.</p>
         
-        <p>Thank you for choosing Starters Small Chops!</p>
+        <p>Thank you for choosing Starters!</p>
       </div>
       
       <div class="footer">
-        <p>© 2024 Starters Small Chops. All rights reserved.</p>
+        <p>© 2024 Starters. All rights reserved.</p>
         <p>Questions? Contact us at <a href="mailto:${adminEmail}">${adminEmail}</a></p>
       </div>
     </body>
@@ -193,11 +193,11 @@ function getStatusSpecificContent(status: OrderStatus, orderData: OrderData, tra
     
     case 'ready':
       if (orderData.order_type === 'pickup') {
-        return `
-          <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin: 20px 0;">
-            <h4 style="margin-top: 0; color: #155724;">Ready for Pickup</h4>
-            <p>Your order is ready! Please come collect it at:</p>
-            <p><strong>Starters Small Chops - Main Location</strong><br>
+      return `
+        <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin: 20px 0;">
+          <h4 style="margin-top: 0; color: #155724;">Ready for Pickup</h4>
+          <p>Your order is ready! Please come collect it at:</p>
+          <p><strong>Starters - Main Location</strong><br>
             Business Hours: 9:00 AM - 9:00 PM</p>
             ${orderData.pickup_time ? `<p><strong>Pickup Time:</strong> ${orderData.pickup_time}</p>` : ''}
           </div>
@@ -238,7 +238,7 @@ export function getOrderStatusPlainText(status: OrderStatus, data: EmailTemplate
   const { orderData, adminEmail } = data;
   
   return `
-STARTERS SMALL CHOPS - ORDER UPDATE
+STARTERS - ORDER UPDATE
 
 Hello ${orderData.customer_name},
 
@@ -262,8 +262,8 @@ ${orderData.special_instructions}
 
 If you have any questions about your order, please contact us at ${adminEmail}.
 
-Thank you for choosing Starters Small Chops!
+Thank you for choosing Starters!
 
-© 2024 Starters Small Chops. All rights reserved.
+© 2024 Starters. All rights reserved.
   `.trim();
 }

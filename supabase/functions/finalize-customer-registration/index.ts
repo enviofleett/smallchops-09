@@ -159,7 +159,7 @@ serve(async (req) => {
         priority: 'high',
         variables: {
           customer_name: name,
-          business_name: 'Starters Small Chops',
+          business_name: 'Starters',
           signup_date: new Date().toLocaleDateString('en-US', { 
             weekday: 'long', 
             year: 'numeric', 

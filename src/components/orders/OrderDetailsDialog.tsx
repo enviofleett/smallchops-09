@@ -330,7 +330,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     
     // Enhanced business info with admin details for 80mm thermal printing
     const businessInfo = {
-      name: 'STARTERS SMALL CHOPS',
+      name: 'STARTERS',
       admin_notification_email: 'store@startersmallchops.com',
       whatsapp_support_number: '0807 301 1100',
       printed_by: adminName,
@@ -369,7 +369,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     
     // Enhanced business info with admin details for 80mm thermal printing
     const businessInfo = {
-      name: 'STARTERS SMALL CHOPS',
+      name: 'STARTERS',
       admin_notification_email: 'store@startersmallchops.com',
       whatsapp_support_number: '0807 301 1100',
       printed_by: adminName,

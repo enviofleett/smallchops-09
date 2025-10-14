@@ -92,7 +92,7 @@ export const EmailTemplateManager: React.FC = () => {
       const currentDate = new Date();
       const productionVariables = {
         // Business information
-        business_name: businessSettings?.name || 'Starters Small Chops',
+        business_name: businessSettings?.name || 'Starters',
         business_tagline: businessSettings?.tagline || 'Quality products delivered',
         website_url: businessSettings?.website_url || 'https://startersmallchops.com',
         support_email: 'support@startersmallchops.com',

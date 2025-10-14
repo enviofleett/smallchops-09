@@ -188,7 +188,7 @@ export const UnifiedEmailControls = () => {
           templateKey: 'smtp_test',
           variables: {
             test_time: new Date().toLocaleString(),
-            business_name: 'Starters Small Chops'
+            business_name: 'Starters'
           }
         }
       });

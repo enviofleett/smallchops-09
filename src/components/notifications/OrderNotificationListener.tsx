@@ -3,14 +3,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { toast } from "@/hooks/use-toast";
+import { useUnifiedAuth } from "@/hooks/useUnifiedAuth";
 
 export const OrderNotificationListener = () => {
   const { addFloatingNotification } = useNotifications();
+  const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const processingRef = useRef<Set<string>>(new Set());
   const lastEventTimeRef = useRef<number>(0);
 
   useEffect(() => {
+    // ✅ Only admins should receive real-time order notifications
+    if (authLoading || !isAdmin) {
+      return;
+    }
     let retryCount = 0;
     const maxRetries = 3;
 
@@ -135,7 +141,7 @@ export const OrderNotificationListener = () => {
       }
       processingRef.current.clear();
     };
-  }, [addFloatingNotification]);
+  }, [addFloatingNotification, isAdmin, authLoading]);
 
   return null; // This is a logic-only component
 };

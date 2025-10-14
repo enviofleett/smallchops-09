@@ -30,10 +30,14 @@ export function DriverAssignmentSection({
   onAssignDriver,
   isAssigning
 }: DriverAssignmentSectionProps) {
-  // 🔒 SECURITY: Use server-backed admin verification
+  // 🔒 CRITICAL: All hooks MUST be called before any conditional returns
   const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>(currentDriverId || "");
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   
-  // 🔒 SECURITY: Don't render admin features for non-admins
+  // 🔒 SECURITY: Don't render admin features for non-admins (after all hooks)
   if (authLoading) {
     return (
       <Card>
@@ -49,11 +53,6 @@ export function DriverAssignmentSection({
   if (!isAdmin) {
     return null;
   }
-  
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [selectedDriverId, setSelectedDriverId] = useState<string>(currentDriverId || "");
-  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   useEffect(() => {
     loadDrivers();
   }, []);

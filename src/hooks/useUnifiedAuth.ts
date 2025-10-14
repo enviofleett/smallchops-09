@@ -1,7 +1,9 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRoleBasedPermissions, UserRole } from './useRoleBasedPermissions';
 import { usePermissions } from './usePermissions';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * Unified authentication hook that consolidates all auth-related checks
@@ -11,6 +13,45 @@ export const useUnifiedAuth = () => {
   const { user, isAuthenticated, isLoading, userType, session } = useAuth();
   const { userRole, hasPermission: roleBasedPermission, canAssignRoles, canCreateUsers, isLoading: roleLoading } = useRoleBasedPermissions();
   const { data: dbPermissions, isLoading: permissionsLoading } = usePermissions();
+  const { toast } = useToast();
+  
+  // ✅ SECURITY: Runtime validation against privilege escalation
+  useEffect(() => {
+    const validateUserType = async () => {
+      if (!isAuthenticated || !session) return;
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('validate-user-type');
+        
+        if (error) {
+          console.error('⚠️ User type validation failed:', error);
+          return;
+        }
+        
+        if (!data.isValid) {
+          console.error('🚨 Security violation detected:', data);
+          toast({
+            title: '🔒 Security Alert',
+            description: data.message,
+            variant: 'destructive'
+          });
+          
+          // Force logout and re-login
+          setTimeout(async () => {
+            await supabase.auth.signOut();
+            window.location.href = '/auth?mode=customer';
+          }, 3000);
+        }
+      } catch (error) {
+        console.error('❌ Validation error:', error);
+      }
+    };
+    
+    // Run validation after auth is loaded
+    if (isAuthenticated && !isLoading) {
+      validateUserType();
+    }
+  }, [isAuthenticated, session, isLoading]);
 
   // Consolidate loading states
   const isAuthLoading = isLoading || permissionsLoading || roleLoading;

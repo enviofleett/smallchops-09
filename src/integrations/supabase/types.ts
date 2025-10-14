@@ -8123,6 +8123,33 @@ export type Database = {
         }
         Relationships: []
       }
+      security_violations: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          id: string
+          resolved_at: string | null
+          user_id: string | null
+          violation_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          resolved_at?: string | null
+          user_id?: string | null
+          violation_type: string
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          resolved_at?: string | null
+          user_id?: string | null
+          violation_type?: string
+        }
+        Relationships: []
+      }
       sms_configuration: {
         Row: {
           balance_threshold: number | null
@@ -11043,6 +11070,15 @@ export type Database = {
           p_reference: string
           p_success?: boolean
           p_user_id?: string
+        }
+        Returns: undefined
+      }
+      log_privilege_escalation_attempt: {
+        Args: {
+          p_details: Json
+          p_email: string
+          p_user_id: string
+          p_violation_type: string
         }
         Returns: undefined
       }

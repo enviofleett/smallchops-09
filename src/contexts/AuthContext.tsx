@@ -185,15 +185,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                                authUser.user_metadata?.role === 'admin' ||
                                authUser.user_metadata?.user_type === 'admin';
       
-      // New user - determine type based on metadata or email
-      // Special case: toolbuxdev@gmail.com always gets admin privileges
-      const isAdminEmail = authUser.email === 'toolbuxdev@gmail.com' ||
-                          authUser.email === 'store@startersmallchops.com' || 
-                          authUser.email === 'chudesyl@gmail.com' ||
-                          authUser.email?.includes('admin') || 
-                          isCreatedByAdmin;
+      // ✅ SECURITY: Strict whitelist of guaranteed admin emails
+      const GUARANTEED_ADMIN_EMAILS = [
+        'toolbuxdev@gmail.com',
+        'store@startersmallchops.com'
+      ];
+      
+      const isAdminEmail = GUARANTEED_ADMIN_EMAILS.includes(authUser.email || '') || isCreatedByAdmin;
       
       if (isAdminEmail || isCreatedByAdmin) {
+        // ✅ CRITICAL: Check if user already has a customer account
+        const { data: existingCustomer } = await supabase
+          .from('customer_accounts')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .maybeSingle();
+        
+        if (existingCustomer) {
+          console.warn(`⚠️ SECURITY: User ${authUser.email} has customer account, preventing admin profile creation`);
+          
+          // Log security violation
+          await supabase.rpc('log_privilege_escalation_attempt', {
+            p_user_id: authUser.id,
+            p_email: authUser.email || '',
+            p_violation_type: 'attempted_admin_profile_on_customer',
+            p_details: {
+              reason: 'User with customer account attempted admin access',
+              timestamp: new Date().toISOString()
+            }
+          });
+          
+          // Fetch full customer account data
+          const { data: fullCustomer } = await supabase
+            .from('customer_accounts')
+            .select('*')
+            .eq('user_id', authUser.id)
+            .single();
+          
+          // Treat as customer
+          if (fullCustomer) {
+            setCustomerAccount(fullCustomer);
+            setUserType('customer');
+            setUser(null);
+          }
+          return;
+        }
         // Create admin profile for users who should be admins
         const { data: newProfile, error: profileError } = await supabase
           .from('profiles')
@@ -259,6 +295,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.error('Failed to create admin profile:', profileError);
         }
       } else {
+        // ✅ CRITICAL: Check if user already has an admin profile
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, role')
+          .eq('id', authUser.id)
+          .maybeSingle();
+        
+        if (existingProfile) {
+          console.warn(`⚠️ SECURITY: User ${authUser.email} has admin profile, preventing customer account creation`);
+          
+          // Log security violation
+          await supabase.rpc('log_privilege_escalation_attempt', {
+            p_user_id: authUser.id,
+            p_email: authUser.email || '',
+            p_violation_type: 'attempted_customer_account_on_admin',
+            p_details: {
+              existing_role: existingProfile.role,
+              reason: 'User with admin profile attempted customer account creation',
+              timestamp: new Date().toISOString()
+            }
+          });
+          
+          // Treat as admin
+          setUser({
+            id: existingProfile.id,
+            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Admin',
+            role: existingProfile.role as UserRole,
+            email: authUser.email || ''
+          });
+          setUserType('admin');
+          setCustomerAccount(null);
+          return;
+        }
+        
         // Create customer account with enhanced Google profile data
         const customerName = authUser.user_metadata?.full_name || 
                            authUser.user_metadata?.name || 

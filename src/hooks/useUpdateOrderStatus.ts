@@ -25,12 +25,23 @@ export const useUpdateOrderStatus = (orderId: string): UseUpdateOrderStatusRetur
     setError(null);
 
     try {
-      // First try the bulletproof admin function
+      // 🔒 SECURITY: Verify admin access before updating
+      const { requireAdminAccess, checkClientRateLimit } = await import('@/lib/api-security');
+      
+      // Client-side rate limit
+      if (!checkClientRateLimit('update-order-status', 10, 30000)) {
+        throw new Error('Too many status updates. Please wait.');
+      }
+
+      // Verify admin access
+      const auth = await requireAdminAccess();
+
+      // Call bulletproof admin function with verified auth
       const { data: result, error: rpcError } = await supabase
         .rpc('admin_update_order_status_bulletproof', {
           p_order_id: orderId,
           p_new_status: newStatus,
-          p_admin_id: (await supabase.auth.getUser()).data.user?.id || null,
+          p_admin_id: auth.userId,
         });
 
       if (rpcError) {

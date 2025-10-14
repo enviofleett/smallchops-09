@@ -182,13 +182,41 @@ export async function getOrders(params?: GetOrdersParams) {
   return { orders: normalizedOrders, count: count || 0 };
 }
 
+/**
+ * 🔒 SECURE: Update order with authentication and validation
+ * Uses admin-orders-manager edge function with built-in security
+ */
 export async function updateOrder({ orderId, updates }: OrderUpdatePayload) {
-  const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
-    body: { action: 'update', orderId, updates }
+  const { 
+    requireAdminAccess, 
+    validateOrderUpdate, 
+    secureAPICall,
+    checkClientRateLimit
+  } = await import('@/lib/api-security');
+
+  // Client-side rate limit check
+  if (!checkClientRateLimit('update-order', 5, 30000)) {
+    throw new Error('Rate limit exceeded');
+  }
+
+  return secureAPICall({
+    operation: 'updateOrder',
+    requiresAdmin: true,
+    execute: async (auth) => {
+      // Validate input
+      validateOrderUpdate({ orderId, updates });
+
+      // Call secured edge function with auth headers
+      const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
+        body: { action: 'update', orderId, updates }
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Failed to update order');
+      
+      return data;
+    }
   });
-  if (error) throw error;
-  if (!data?.success) throw new Error(data?.error || 'Failed to update order');
-  return data;
 }
 
 export async function deleteOrder(orderId: string) {
@@ -201,19 +229,59 @@ export async function bulkDeleteOrders(orderIds: string[]) {
   if (error) throw error;
 }
 
+/**
+ * 🔒 SECURE: Bulk update orders with admin verification
+ * NOTE: This directly updates the database - ensure RLS policies are in place
+ */
 export async function bulkUpdateOrders(orderIds: string[], updates: Record<string, any>) {
-  const { data, error } = await supabase.from('orders').update(updates).in('id', orderIds);
-  if (error) throw error;
-  return { updated_count: (data as any[])?.length || 0 };
+  const { 
+    requireAdminAccess, 
+    validateBulkUpdate,
+    secureAPICall,
+    checkClientRateLimit
+  } = await import('@/lib/api-security');
+
+  // Client-side rate limit check
+  if (!checkClientRateLimit('bulk-update-orders', 3, 60000)) {
+    throw new Error('Rate limit exceeded');
+  }
+
+  return secureAPICall({
+    operation: 'bulkUpdateOrders',
+    requiresAdmin: true,
+    execute: async (auth) => {
+      // Validate input
+      validateBulkUpdate({ orderIds, updates });
+
+      // Perform bulk update
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updates)
+        .in('id', orderIds);
+
+      if (error) throw error;
+      return { updated_count: (data as any[])?.length || 0 };
+    }
+  });
 }
 
+/**
+ * 🔒 SECURE: Assign rider to order with admin verification
+ */
 export async function assignRiderToOrder(orderId: string, riderId: string) {
-  // 🔒 SECURITY: Verify user is authenticated
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-  
-  // Use the now-secured edge function with proper auth headers
-  return updateOrder({ orderId, updates: { assigned_rider_id: riderId }});
+  const { secureAPICall, requireAdminAccess } = await import('@/lib/api-security');
+
+  return secureAPICall({
+    operation: 'assignRiderToOrder',
+    requiresAdmin: true,
+    execute: async () => {
+      // Use secured updateOrder function
+      return updateOrder({ 
+        orderId, 
+        updates: { assigned_rider_id: riderId }
+      });
+    }
+  });
 }
 
 // Function overloads for manuallyQueueCommunicationEvent

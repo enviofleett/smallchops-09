@@ -2,10 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { useRealTimeOrderData } from "@/hooks/useRealTimeOrderData";
 import { useDriverManagement } from "@/hooks/useDriverManagement";
 import { useProductionStatusUpdate } from "@/hooks/useProductionStatusUpdate";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
+import { useUnifiedAuth } from "@/hooks/useUnifiedAuth";
 import { EmailOperations } from "@/utils/emailOperations";
 import { errorReporting } from "@/lib/errorReporting";
 import { EnhancedFinancialBreakdown } from "./details/EnhancedFinancialBreakdown";
@@ -13,9 +15,12 @@ import { CompleteFulfillmentSection } from "./details/CompleteFulfillmentSection
 import { EnhancedDriverSection } from "./details/EnhancedDriverSection";
 import { CompleteOrderItemsSection } from "./details/CompleteOrderItemsSection";
 import { OrderDetailsSectionErrorBoundary } from "./details/ErrorBoundary";
-import { RefreshCw, AlertTriangle, Wifi, WifiOff, Clock } from "lucide-react";
+import { RefreshCw, AlertTriangle, Shield, Info } from "lucide-react";
 
-export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin }) {
+// 🔒 SECURITY: Remove isAdmin prop - use server-backed auth only
+export default function LiveOrderDetailsModal({ orderId, open, onClose }) {
+  // 🔒 SECURITY: Server-backed admin verification (never trust props)
+  const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
   // Fetch comprehensive real-time order data
   const {
     data: orderData,
@@ -352,7 +357,6 @@ export default function LiveOrderDetailsModal({ orderId, open, onClose, isAdmin 
               order={order}
               assignedAgent={assignedAgent}
               drivers={drivers}
-              isAdmin={isAdmin}
               onAssignDriver={handleAssignDriver}
               assigningDriver={assigningDriver}
               isLoading={isLoading}

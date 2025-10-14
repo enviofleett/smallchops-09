@@ -20,7 +20,7 @@ import { StatusManagementSection } from './details/StatusManagementSection';
 import { useOrderPageHooks } from '@/hooks/orderPageHooks';
 import { UnifiedOrder, OrderStatus } from '@/types/unifiedOrder';
 import { OrderWithItems } from '@/api/orders';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { CustomerOrderStatusTracker } from './CustomerOrderStatusTracker';
 import { OrderStatusCard } from './OrderStatusCard';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import '@/styles/admin-print.css';
 import '@/styles/admin-80mm-print.css';
 import { EmailTemplateSelector } from '@/components/email/EmailTemplateSelector';
+import { Shield, Info } from 'lucide-react';
 interface NewOrderDetailsModalProps {
   open: boolean;
   onClose: () => void;
@@ -46,11 +47,9 @@ export function NewOrderDetailsModal({
   if (!order) {
     return null;
   }
-  const {
-    userType,
-    user
-  } = useAuth();
-  const isAdmin = userType === 'admin';
+  
+  // 🔒 SECURITY: Use server-backed admin verification
+  const { isAdmin, isLoading: authLoading, user } = useUnifiedAuth();
   const adminPrintRef = useRef<HTMLDivElement>(null);
   const thermalPrintRef = useRef<HTMLDivElement>(null);
   const customerPdfRef = useRef<HTMLDivElement>(null);

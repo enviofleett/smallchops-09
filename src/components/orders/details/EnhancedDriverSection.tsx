@@ -4,35 +4,38 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, Phone, Car, MapPin, Clock, AlertCircle, MessageCircle, Navigation } from 'lucide-react';
+import { User, Phone, Car, MapPin, Clock, AlertCircle, MessageCircle, Shield } from 'lucide-react';
 import { OrderDetailsSectionErrorBoundary } from './ErrorBoundary';
 import { DriverSectionSkeleton } from './LoadingSkeleton';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 
 interface EnhancedDriverSectionProps {
   order: any;
   assignedAgent?: any;
   drivers?: any[];
-  isAdmin?: boolean;
   onAssignDriver?: (driverId: string) => void;
   assigningDriver?: boolean;
   isLoading?: boolean;
 }
 
 /**
- * Enhanced driver section with avatar, contact info, vehicle details, and status
- * Shows assignment dropdown for admins with comprehensive error handling
+ * 🔒 SECURITY ENHANCED: Driver section with server-backed admin verification
+ * Shows assignment dropdown ONLY for verified admins
+ * Never trusts props for security decisions
  */
 export const EnhancedDriverSection: React.FC<EnhancedDriverSectionProps> = ({
   order,
   assignedAgent,
   drivers = [],
-  isAdmin = false,
   onAssignDriver,
   assigningDriver = false,
   isLoading = false
 }) => {
-  // Show loading skeleton if loading
-  if (isLoading) {
+  // 🔒 SECURITY: Server-backed admin verification
+  const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
+  
+  // Show loading skeleton if auth or data loading
+  if (isLoading || authLoading) {
     return <DriverSectionSkeleton />;
   }
 
@@ -128,6 +131,12 @@ export const EnhancedDriverSection: React.FC<EnhancedDriverSectionProps> = ({
         <h3 className="font-semibold text-base text-foreground flex items-center gap-2">
           <User className="h-4 w-4" />
           Assigned Driver
+          {isAdmin && (
+            <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs ml-auto">
+              <Shield className="h-3 w-3 mr-1" />
+              Admin Mode
+            </Badge>
+          )}
         </h3>
 
         {hasAssignedDriver ? (

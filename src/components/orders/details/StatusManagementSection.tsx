@@ -2,11 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Clock, RefreshCw, Shield } from "lucide-react";
 import { useState } from "react";
 import { OrderStatus } from "@/types/unifiedOrder";
 import { format } from "date-fns";
-import { useUserContext } from "@/hooks/useUserContext";
+import { useUnifiedAuth } from "@/hooks/useUnifiedAuth";
+
 interface StatusManagementSectionProps {
   currentStatus: OrderStatus;
   orderId: string;
@@ -60,10 +62,22 @@ export function StatusManagementSection({
   onUpdateStatus,
   isUpdating
 }: StatusManagementSectionProps) {
-  const userContext = useUserContext();
-  const isAdmin = userContext === 'admin';
+  // 🔒 SECURITY: Use server-backed admin verification
+  const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
   
-  // Security: Only admins can see status management
+  // 🔒 SECURITY: Don't render admin features for non-admins
+  if (authLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center">
+            <div className="animate-pulse">Checking permissions...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   if (!isAdmin) {
     return null;
   }
@@ -77,8 +91,12 @@ export function StatusManagementSection({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
+          <Shield className="h-4 w-4 text-green-600" />
           <RefreshCw className="h-5 w-5" />
           Order Status Management
+          <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs ml-auto">
+            Admin Only
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

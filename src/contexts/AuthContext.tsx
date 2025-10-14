@@ -230,7 +230,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
           return;
         }
+        
+        // ✅ Check if profile already exists before creating
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, role, name')
+          .eq('id', authUser.id)
+          .maybeSingle();
+        
+        if (existingProfile) {
+          console.log(`✅ Existing admin profile found for ${authUser.email}`);
+          setUser({
+            id: existingProfile.id,
+            name: existingProfile.name || authUser.email?.split('@')[0] || 'Admin',
+            role: existingProfile.role as UserRole,
+            email: authUser.email || ''
+          });
+          setUserType('admin');
+          setCustomerAccount(null);
+          return;
+        }
+        
         // Create admin profile for users who should be admins
+        console.log(`🔨 Creating admin profile for ${authUser.email} (created_by_admin: ${isCreatedByAdmin})`);
+        
         const { data: newProfile, error: profileError } = await supabase
           .from('profiles')
           .insert([{
@@ -243,15 +266,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .single();
 
         if (newProfile && !profileError) {
-          // Create user_roles entry with proper conflict handling
-          const role = authUser.email === 'toolbuxdev@gmail.com' ? 'super_admin' : 'admin';
+          // ✅ Use role from user metadata or default to admin
+          const roleToAssign = (authUser.user_metadata?.role || 'admin') as UserRole;
+          
+          console.log(`🔨 Assigning role ${roleToAssign} to ${authUser.email}`);
           
           // Check if role already exists
           const { data: existingRoleCheck } = await supabase
             .from('user_roles')
             .select('id, role, is_active')
             .eq('user_id', authUser.id)
-            .eq('role', role)
             .maybeSingle();
 
           if (!existingRoleCheck) {
@@ -260,7 +284,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .from('user_roles')
               .insert({
                 user_id: authUser.id,
-                role: role,
+                role: roleToAssign,
                 is_active: true,
                 assigned_by: authUser.id
               });
@@ -268,7 +292,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (roleError) {
               console.error('❌ Failed to assign role in AuthContext:', roleError);
             } else {
-              console.log(`✅ Admin profile and role ${role} created for ${authUser.email}`);
+              console.log(`✅ Admin profile and role ${roleToAssign} created for ${authUser.email}`);
             }
           } else if (!existingRoleCheck.is_active) {
             // Reactivate existing inactive role
@@ -276,11 +300,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .from('user_roles')
               .update({ is_active: true, updated_at: new Date().toISOString() })
               .eq('user_id', authUser.id)
-              .eq('role', role);
+              .eq('role', roleToAssign);
             
-            console.log(`✅ Admin profile created and role ${role} reactivated for ${authUser.email}`);
+            console.log(`✅ Admin profile created and role ${roleToAssign} reactivated for ${authUser.email}`);
           } else {
-            console.log(`✅ Admin profile created, role ${role} already active for ${authUser.email}`);
+            console.log(`✅ Admin profile created, role ${roleToAssign} already active for ${authUser.email}`);
           }
           
           setUser({

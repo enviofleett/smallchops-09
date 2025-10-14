@@ -194,6 +194,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const isAdminEmail = GUARANTEED_ADMIN_EMAILS.includes(authUser.email || '') || isCreatedByAdmin;
       
       if (isAdminEmail || isCreatedByAdmin) {
+        console.log(`🔍 Processing admin user: ${authUser.email} (created_by_admin: ${isCreatedByAdmin})`);
+        
         // ✅ CRITICAL: Check if user already has a customer account
         const { data: existingCustomer } = await supabase
           .from('customer_accounts')
@@ -202,27 +204,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .maybeSingle();
         
         if (existingCustomer) {
-          console.warn(`⚠️ SECURITY: User ${authUser.email} has customer account, preventing admin profile creation`);
+          console.warn(`⚠️ User ${authUser.email} has customer account, treating as customer`);
           
-          // Log security violation
-          await supabase.rpc('log_privilege_escalation_attempt', {
-            p_user_id: authUser.id,
-            p_email: authUser.email || '',
-            p_violation_type: 'attempted_admin_profile_on_customer',
-            p_details: {
-              reason: 'User with customer account attempted admin access',
-              timestamp: new Date().toISOString()
-            }
-          });
-          
-          // Fetch full customer account data
+          // Fetch full customer data
           const { data: fullCustomer } = await supabase
             .from('customer_accounts')
             .select('*')
             .eq('user_id', authUser.id)
             .single();
           
-          // Treat as customer
           if (fullCustomer) {
             setCustomerAccount(fullCustomer);
             setUserType('customer');
@@ -231,18 +221,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
         
-        // ✅ Check if profile already exists before creating
+        // ✅ Check if profile already exists
         const { data: existingProfile } = await supabase
           .from('profiles')
-          .select('id, role, name')
+          .select('id, role, is_active')
           .eq('id', authUser.id)
           .maybeSingle();
         
         if (existingProfile) {
           console.log(`✅ Existing admin profile found for ${authUser.email}`);
+          
+          // ✅ FIX #2: Ensure user_role exists for admin users with profiles
+          const { data: existingRole } = await supabase
+            .from('user_roles')
+            .select('role, is_active')
+            .eq('user_id', authUser.id)
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (!existingRole) {
+            console.log(`🔨 Creating missing user_role for ${authUser.email}`);
+            
+            const roleToAssign = (authUser.user_metadata?.role || 'admin') as UserRole;
+            
+            await supabase
+              .from('user_roles')
+              .upsert({
+                user_id: authUser.id,
+                role: roleToAssign,
+                is_active: true,
+                assigned_by: authUser.id
+              }, { onConflict: 'user_id,role' });
+          }
+          
           setUser({
             id: existingProfile.id,
-            name: existingProfile.name || authUser.email?.split('@')[0] || 'Admin',
+            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Admin',
             role: existingProfile.role as UserRole,
             email: authUser.email || ''
           });
@@ -251,8 +265,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
         
-        // Create admin profile for users who should be admins
-        console.log(`🔨 Creating admin profile for ${authUser.email} (created_by_admin: ${isCreatedByAdmin})`);
+        // ✅ FIX #2: PRODUCTION - Auto-create admin profile for new admin users
+        console.log(`🔨 Creating admin profile for ${authUser.email}`);
         
         const { data: newProfile, error: profileError } = await supabase
           .from('profiles')
@@ -260,63 +274,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             id: authUser.id,
             name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Admin',
             role: 'admin',
-            status: 'active'
+            status: 'active',
+            is_active: true
           }])
           .select()
           .single();
 
-        if (newProfile && !profileError) {
-          // ✅ Use role from user metadata or default to admin
+        if (profileError) {
+          console.error('❌ Failed to create admin profile:', profileError);
+          throw profileError;
+        }
+
+        if (newProfile) {
+          // ✅ Create user_roles entry
           const roleToAssign = (authUser.user_metadata?.role || 'admin') as UserRole;
           
           console.log(`🔨 Assigning role ${roleToAssign} to ${authUser.email}`);
           
-          // Check if role already exists
-          const { data: existingRoleCheck } = await supabase
+          const { error: roleError } = await supabase
             .from('user_roles')
-            .select('id, role, is_active')
-            .eq('user_id', authUser.id)
-            .maybeSingle();
-
-          if (!existingRoleCheck) {
-            // Insert new role
-            const { error: roleError } = await supabase
-              .from('user_roles')
-              .insert({
-                user_id: authUser.id,
-                role: roleToAssign,
-                is_active: true,
-                assigned_by: authUser.id
-              });
-            
-            if (roleError) {
-              console.error('❌ Failed to assign role in AuthContext:', roleError);
-            } else {
-              console.log(`✅ Admin profile and role ${roleToAssign} created for ${authUser.email}`);
-            }
-          } else if (!existingRoleCheck.is_active) {
-            // Reactivate existing inactive role
-            await supabase
-              .from('user_roles')
-              .update({ is_active: true, updated_at: new Date().toISOString() })
-              .eq('user_id', authUser.id)
-              .eq('role', roleToAssign);
-            
-            console.log(`✅ Admin profile created and role ${roleToAssign} reactivated for ${authUser.email}`);
-          } else {
-            console.log(`✅ Admin profile created, role ${roleToAssign} already active for ${authUser.email}`);
-          }
+            .insert({
+              user_id: authUser.id,
+              role: roleToAssign,
+              is_active: true,
+              assigned_by: authUser.id
+            });
           
+          if (roleError) {
+            console.error('❌ Failed to assign role:', roleError);
+          } else {
+            console.log(`✅ Admin profile and role ${roleToAssign} created for ${authUser.email}`);
+          }
+
           setUser({
             id: newProfile.id,
             name: newProfile.name,
             role: newProfile.role as UserRole,
-            avatar_url: newProfile.avatar_url,
-            email: authUser.email || '',
+            email: authUser.email || ''
           });
           setUserType('admin');
-        } else {
-          console.error('Failed to create admin profile:', profileError);
+          setCustomerAccount(null);
         }
       } else {
         // ✅ CRITICAL: Check if user already has an admin profile

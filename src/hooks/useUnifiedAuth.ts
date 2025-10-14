@@ -15,52 +15,51 @@ export const useUnifiedAuth = () => {
   const { data: dbPermissions, isLoading: permissionsLoading } = usePermissions();
   const { toast } = useToast();
   
-  // ✅ SECURITY: Runtime validation against privilege escalation
-  // Made NON-BLOCKING to prevent auth failures from breaking login
+  // ✅ FIX #1: PRODUCTION - Non-blocking user type validation
+  // CORS errors from Edge Function won't block admin login
   useEffect(() => {
     const validateUserType = async () => {
-      if (!isAuthenticated || !session) return;
+      if (!user?.id || !session) return;
       
       try {
-        const { data, error } = await supabase.functions.invoke('validate-user-type');
+        console.log('🔍 Running non-blocking user type validation...');
+        
+        const { data, error } = await supabase.functions.invoke('validate-user-type', {
+          body: { userId: user.id }
+        });
         
         if (error) {
-          // Log but don't block - edge function might not be deployed yet
-          console.warn('⚠️ User type validation skipped (non-blocking):', error.message);
+          // ✅ Just log, don't block
+          console.warn('⚠️ User type validation failed (non-blocking):', error.message);
           return;
         }
         
-        if (data && !data.isValid) {
-          // CRITICAL: Only log violation, don't break user session
-          console.error('🚨 Security violation detected:', data);
+        if (data?.violation) {
+          // ✅ Log security violation but don't block login
+          console.warn('⚠️ User type violation detected:', data);
           
-          // Log to backend for admin review
-          await supabase.from('audit_logs').insert({
-            action: 'dual_user_type_detected',
-            category: 'Security',
-            message: `User ${session.user.email} has conflicting account types`,
-            user_id: session.user.id,
-            new_values: data
-          });
-          
-          // Show warning toast only
-          toast({
-            title: '⚠️ Account Notice',
-            description: 'Please contact support if you experience any issues.',
-            variant: 'default'
-          });
+          try {
+            await supabase.rpc('log_privilege_escalation_attempt', {
+              p_user_id: user.id,
+              p_email: user.email || '',
+              p_violation_type: 'dual_type_detected',
+              p_details: data
+            });
+          } catch (logError) {
+            console.warn('Failed to log violation:', logError);
+          }
         }
-      } catch (error) {
-        // Completely non-blocking - just log
-        console.warn('⚠️ User validation skipped:', error instanceof Error ? error.message : 'Unknown error');
+      } catch (err) {
+        // ✅ Catch all errors, never block login
+        console.warn('⚠️ User type validation error (non-blocking):', err);
       }
     };
-    
-    // Run validation after auth is loaded
-    if (isAuthenticated && !isLoading) {
+
+    // Run validation but don't await it (fire and forget)
+    if (isAuthenticated && !isLoading && user?.id) {
       validateUserType();
     }
-  }, [isAuthenticated, session, isLoading, toast]);
+  }, [user?.id, session, isAuthenticated, isLoading]);
 
   // Consolidate loading states
   const isAuthLoading = isLoading || permissionsLoading || roleLoading;

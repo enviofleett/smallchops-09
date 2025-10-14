@@ -62,10 +62,11 @@ export function StatusManagementSection({
   onUpdateStatus,
   isUpdating
 }: StatusManagementSectionProps) {
-  // 🔒 SECURITY: Use server-backed admin verification
+  // 🔒 CRITICAL: All hooks MUST be called before any conditional returns
   const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(currentStatus);
   
-  // 🔒 SECURITY: Don't render admin features for non-admins
+  // 🔒 SECURITY: Don't render admin features for non-admins (after all hooks)
   if (authLoading) {
     return (
       <Card>
@@ -81,8 +82,6 @@ export function StatusManagementSection({
   if (!isAdmin) {
     return null;
   }
-  
-  const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(currentStatus);
   const handleUpdate = async () => {
     if (selectedStatus === currentStatus) return;
     await onUpdateStatus(selectedStatus);

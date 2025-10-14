@@ -6,7 +6,7 @@ const INACTIVITY_TIMEOUT = 20 * 60 * 1000; // 20 minutes
 const WARNING_TIME = 2 * 60 * 1000; // 2 minutes before logout
 
 export const useInactivityTimeout = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, userType } = useAuth();
   const { toast } = useToast();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,7 +46,7 @@ export const useInactivityTimeout = () => {
   }, [toast]);
 
   const resetTimer = useCallback(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || userType !== 'admin') return;
 
     lastActivityRef.current = Date.now();
     clearTimers();
@@ -63,7 +63,8 @@ export const useInactivityTimeout = () => {
   }, [isAuthenticated, clearTimers, handleLogout, showWarning]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Only enable inactivity timeout for admin users
+    if (!isAuthenticated || userType !== 'admin') {
       clearTimers();
       return;
     }
@@ -105,7 +106,7 @@ export const useInactivityTimeout = () => {
       clearTimers();
       if (throttleTimeout) clearTimeout(throttleTimeout);
     };
-  }, [isAuthenticated, resetTimer, clearTimers]);
+  }, [isAuthenticated, userType, resetTimer, clearTimers]);
 
   return { resetTimer };
 };

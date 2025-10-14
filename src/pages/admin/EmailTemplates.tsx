@@ -11,6 +11,7 @@ import { EmailTemplateEditor } from '@/components/email/EmailTemplateEditor';
 import { EmailTemplateTester } from '@/components/email/EmailTemplateTester';
 import { EmailDeliveryMonitor } from '@/components/email/EmailDeliveryMonitor';
 import { EmailQueueManager } from '@/components/email/EmailQueueManager';
+import { EmailProductionValidator } from '@/components/email/EmailProductionValidator';
 
 export const EmailTemplates: React.FC = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -77,6 +78,7 @@ export const EmailTemplates: React.FC = () => {
       <Tabs defaultValue="templates" className="space-y-6">
         <TabsList>
           <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="validation">Production Check</TabsTrigger>
           <TabsTrigger value="tester">Test Emails</TabsTrigger>
           <TabsTrigger value="monitor">Delivery Monitor</TabsTrigger>
           <TabsTrigger value="queue">Queue Manager</TabsTrigger>
@@ -143,6 +145,10 @@ export const EmailTemplates: React.FC = () => {
               )}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="validation">
+          <EmailProductionValidator />
         </TabsContent>
 
         <TabsContent value="tester">

@@ -560,6 +560,40 @@ async function processTemplate(
     
     console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from Email Template Manager`);
   }
+  
+  // CRITICAL FIX 3: Pre-send Variable Validation (Production Only)
+  // Extract all required variables from template BEFORE processing
+  if (isProductionMode && templateFound && template) {
+    const templateContent = [
+      template.subject || template.subject_template || '',
+      template.html_content || template.html_template || '',
+      template.text_content || template.text_template || ''
+    ].join(' ');
+    
+    const variableRegex = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+    const requiredVariables = new Set<string>();
+    let match;
+    while ((match = variableRegex.exec(templateContent)) !== null) {
+      requiredVariables.add(match[1]);
+    }
+    
+    // Check for missing critical variables
+    const missingVariables: string[] = [];
+    requiredVariables.forEach(varName => {
+      if (!(varName in variables) || variables[varName] === null || variables[varName] === undefined || variables[varName] === '') {
+        missingVariables.push(varName);
+      }
+    });
+    
+    if (missingVariables.length > 0) {
+      throw new Error(
+        `PRODUCTION_MODE: Missing required template variables for '${templateKey}': ${missingVariables.join(', ')}. ` +
+        `All template variables must be provided with non-empty values in production.`
+      );
+    }
+    
+    console.log(`✅ PRODUCTION_MODE: All ${requiredVariables.size} required variables validated for template '${templateKey}'`);
+  }
 
   // DEVELOPMENT MODE: Log when fallback templates are used
   if (!isProductionMode && !templateFound && templateKey) {
@@ -618,7 +652,7 @@ async function processTemplate(
     enhancedVariables.unsubscribe_url = enhancedVariables.unsubscribe_url || '#';
   }
 
-  // Variable substitution with safe replacement
+  // Variable substitution with safe replacement and strict validation
   const missingVariables: string[] = [];
   if (templateVariables.size > 0) {
     [subject, html, text].forEach((content, index) => {
@@ -627,15 +661,17 @@ async function processTemplate(
         
         // Track which variables are actually used vs provided
         templateVariables.forEach(varName => {
-          if (!(varName in enhancedVariables) || enhancedVariables[varName] === null || enhancedVariables[varName] === undefined) {
+          const value = enhancedVariables[varName];
+          if (value === null || value === undefined || value === '') {
             if (!missingVariables.includes(varName)) {
               missingVariables.push(varName);
             }
           }
         });
         
+        // Replace all variables with their values
         Object.entries(enhancedVariables).forEach(([key, value]) => {
-          if (value !== null && value !== undefined) {
+          if (value !== null && value !== undefined && value !== '') {
             const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
             processed = processed.replace(regex, String(value));
           }
@@ -646,6 +682,11 @@ async function processTemplate(
         else text = processed;
       }
     });
+  }
+  
+  // Log warning for missing variables (already blocked in production by pre-send validation)
+  if (missingVariables.length > 0) {
+    console.warn(`⚠️ Template '${templateKey}' has missing variables: ${missingVariables.join(', ')}`);
   }
 
   // Apply base layout wrapping for non-full_html templates

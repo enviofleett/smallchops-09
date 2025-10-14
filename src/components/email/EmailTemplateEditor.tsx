@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EmailTemplateValidator } from './EmailTemplateValidator';
 
 interface EmailTemplateEditorProps {
   templateId: string | null;
@@ -287,7 +288,17 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
               })}
               placeholder="customer_name, order_number, total_amount"
             />
+            <p className="text-xs text-muted-foreground">
+              Declare all variables used in your templates. Used in templates with {`{{variable_name}}`} syntax.
+            </p>
           </div>
+
+          <EmailTemplateValidator
+            htmlTemplate={formData.html_template}
+            subjectTemplate={formData.subject_template}
+            variables={formData.variables}
+            className="mt-4"
+          />
 
           <div className="flex items-center space-x-2">
             <Switch

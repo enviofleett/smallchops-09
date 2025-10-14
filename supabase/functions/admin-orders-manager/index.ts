@@ -103,13 +103,50 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Whitelist allowed fields
-    const allowedFields = ['assigned_rider_id', 'admin_notes', 'delivery_fee', 'special_instructions'];
-    const invalidFields = Object.keys(updates).filter(key => !allowedFields.includes(key));
+    // 🔒 SECURITY: Define admin-only fields with strict validation
+    const ADMIN_ONLY_FIELDS = ['status', 'assigned_rider_id', 'payment_status', 'admin_notes', 'delivery_fee'];
+    const ALLOWED_CUSTOMER_FIELDS = ['special_instructions']; // Only customers can update this
+    const ALL_ALLOWED_FIELDS = [...ADMIN_ONLY_FIELDS, ...ALLOWED_CUSTOMER_FIELDS];
+    
+    // Validate all fields are in allowed list
+    const attemptedFields = Object.keys(updates);
+    const invalidFields = attemptedFields.filter(key => !ALL_ALLOWED_FIELDS.includes(key));
+    
     if (invalidFields.length > 0) {
       return new Response(
         JSON.stringify({ success: false, error: `Invalid fields: ${invalidFields.join(', ')}` }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
+      );
+    }
+
+    // 🔒 SECURITY: Field-level permission check for admin-only fields
+    const restrictedFieldsAttempted = attemptedFields.filter(field => 
+      ADMIN_ONLY_FIELDS.includes(field)
+    );
+    
+    if (restrictedFieldsAttempted.length > 0) {
+      // Log security violation attempt
+      await supabaseService.from('audit_logs').insert({
+        action: 'unauthorized_field_update_attempt',
+        category: 'Security Violation',
+        message: `Admin-only fields update attempted: ${restrictedFieldsAttempted.join(', ')}`,
+        user_id: user.id,
+        entity_id: orderId,
+        new_values: { 
+          attempted_fields: restrictedFieldsAttempted,
+          email: user.email,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Forbidden - Cannot update restricted fields',
+          restricted_fields: restrictedFieldsAttempted,
+          message: 'Only administrators can modify status, payment information, and driver assignments'
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
       );
     }
 

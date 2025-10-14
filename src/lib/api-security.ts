@@ -130,9 +130,11 @@ export async function secureAPICall<T = any>({
   validate,
   execute
 }: SecureAPICallOptions<T>): Promise<any> {
+  let auth: { userId: string; email: string } | undefined;
+  
   try {
     // 1. Verify authentication
-    const auth = requiresAdmin 
+    auth = requiresAdmin 
       ? await requireAdminAccess()
       : await requireAuthentication();
 
@@ -151,10 +153,31 @@ export async function secureAPICall<T = any>({
     // 4. Log failure for security monitoring
     console.error(`❌ Secure API call failed: ${operation}`, {
       error: error.message,
-      timestamp: new Date().toISOString()
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+      userId: auth?.userId
     });
 
-    // 5. Re-throw with context
+    // 5. Log to audit trail for tracking
+    try {
+      await supabase.from('audit_logs').insert({
+        action: `${operation}_failed`,
+        category: 'API Error',
+        message: `Secure API call failed: ${error.message}`,
+        user_id: auth?.userId || null,
+        new_values: {
+          error: error.message,
+          stack: error.stack?.substring(0, 500), // Limit stack trace size
+          operation,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (logError) {
+      // Don't fail the original error if logging fails
+      console.error('Failed to log error to audit_logs:', logError);
+    }
+
+    // 6. Re-throw with context
     throw new Error(`${operation} failed: ${error.message}`);
   }
 }

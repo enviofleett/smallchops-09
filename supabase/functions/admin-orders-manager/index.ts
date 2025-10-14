@@ -36,24 +36,34 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user }, error: authError } = await supabaseAnon.auth.getUser();
     
     if (authError || !user) {
-      console.error('Authentication failed:', authError);
+      console.error('❌ Authentication failed:', {
+        error: authError?.message,
+        hasAuthHeader: !!authHeader
+      });
       return new Response(
         JSON.stringify({ success: false, error: 'Unauthorized - Invalid token' }),
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
       );
     }
 
+    console.log('✅ User authenticated:', user.email);
+
     // 🔒 SECURITY: Verify admin privileges using is_admin() function
     const { data: isAdminCheck, error: adminCheckError } = await supabaseAnon
       .rpc('is_admin');
 
     if (adminCheckError) {
-      console.error('Admin check failed:', adminCheckError);
+      console.error('❌ Admin check failed:', {
+        error: adminCheckError.message,
+        user: user.email
+      });
       return new Response(
         JSON.stringify({ success: false, error: 'Authorization check failed' }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
       );
     }
+
+    console.log('🔍 Admin check result:', { isAdmin: isAdminCheck, user: user.email });
 
     if (!isAdminCheck) {
       // 🚨 SECURITY: Log unauthorized access attempt
@@ -86,6 +96,8 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     const { action, orderId, updates } = await req.json();
+    
+    console.log('📥 Request:', { action, orderId, updates });
 
     // Validate orderId is a valid UUID
     if (!orderId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
@@ -172,7 +184,16 @@ const handler = async (req: Request): Promise<Response> => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database update failed:', {
+          error: error.message,
+          orderId,
+          updates
+        });
+        throw error;
+      }
+
+      console.log('✅ Order updated successfully:', { orderId, updatedFields: Object.keys(updates) });
 
       return new Response(
         JSON.stringify({ success: true, order: data }),
@@ -185,9 +206,17 @@ const handler = async (req: Request): Promise<Response> => {
       { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
     );
   } catch (error: any) {
-    console.error('Edge function error:', error);
+    console.error('❌ Edge function error:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        error: error.message,
+        details: 'Check edge function logs for more information'
+      }),
       { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
     );
   }

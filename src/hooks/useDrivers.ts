@@ -25,18 +25,18 @@ export const useRiderAssignment = () => {
 
   return useMutation({
     mutationFn: async ({ orderId, riderId }: { orderId: string; riderId: string | null }) => {
-      const { data, error } = await supabase
-        .from('orders')
-        .update({ 
-          assigned_rider_id: riderId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // Use secure API function instead of direct database update
+      const { assignRiderToOrder, updateOrder } = await import('@/api/orders');
+      
+      if (riderId) {
+        return await assignRiderToOrder(orderId, riderId);
+      } else {
+        // For unassigning rider
+        return await updateOrder({
+          orderId,
+          updates: { assigned_rider_id: null }
+        });
+      }
     },
     onSuccess: (data, variables) => {
       toast.success(variables.riderId ? 'Rider assigned successfully' : 'Rider unassigned successfully');
@@ -46,8 +46,8 @@ export const useRiderAssignment = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
     },
     onError: (error: any) => {
-      console.error('Rider assignment failed:', error);
-      toast.error('Failed to update rider assignment');
+      console.error('Rider assignment error:', error);
+      toast.error(error.message || 'Failed to update rider assignment');
     }
   });
 };

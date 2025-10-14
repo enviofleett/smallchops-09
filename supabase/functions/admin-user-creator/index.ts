@@ -1,9 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders, handleCorsPreflightResponse } from '../_shared/cors.ts';
 
 // Validate required environment variables
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY'];
@@ -18,10 +14,13 @@ if (missingVars.length > 0) {
 
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
+  const origin = req.headers.get('origin');
   
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return handleCorsPreflightResponse(origin);
   }
+  
+  const corsHeaders = getCorsHeaders(origin);
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

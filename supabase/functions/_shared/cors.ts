@@ -126,9 +126,11 @@ export function validateOrigin(origin?: string | null): boolean {
          (shouldCheckDevPatterns && DEV_PATTERNS.some(pattern => pattern.test(origin)));
 }
 
-// Backward compatibility: Basic CORS headers for simple cases
+// DEPRECATED: Backward compatibility export - DO NOT USE IN NEW CODE
+// This will be removed in a future version
+// Use getCorsHeaders() instead for proper origin validation
 export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://startersmallchops.com',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };

@@ -1,21 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { getPaystackConfig, logPaystackConfigStatus } from "../_shared/paystack-config.ts"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-}
+import { getCorsHeaders, handleCorsPreflightResponse } from '../_shared/cors.ts';
 
 serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 200, 
-      headers: corsHeaders 
-    })
+    return handleCorsPreflightResponse(origin);
   }
+  
+  const corsHeaders = getCorsHeaders(origin);
 
   try {
     console.log('🔍 Payment verification started')

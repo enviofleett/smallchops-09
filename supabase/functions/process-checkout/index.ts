@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { toZonedTime, fromZonedTime } from "https://esm.sh/date-fns-tz@3.2.0"
+import { getCorsHeaders, handleCorsPreflightResponse } from '../_shared/cors.ts';
 
 // Lagos timezone constant
 const LAGOS_TIMEZONE = 'Africa/Lagos';
@@ -23,32 +24,14 @@ function lagosToUTC(lagosDate: string, lagosTime: string): string {
   return utcDate.toISOString();
 }
 
-// Enhanced CORS configuration with origin validation
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigins = [
-    'https://startersmallchops.com',
-    'https://preview--smallchops-09.lovable.app'
-  ]
-  
-  const isAllowed = origin && allowedOrigins.some(allowed => 
-    origin === allowed || origin.includes('lovable.app')
-  )
-  
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://startersmallchops.com',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-    'Access-Control-Max-Age': '86400',
-  }
-}
-
 serve(async (req: Request) => {
   const origin = req.headers.get('origin')
-  const corsHeaders = getCorsHeaders(origin)
-
+  
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders })
+    return handleCorsPreflightResponse(origin);
   }
+  
+  const corsHeaders = getCorsHeaders(origin);
 
   try {
     console.log('🚀 Starting checkout process...')

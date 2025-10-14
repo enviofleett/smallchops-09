@@ -53,20 +53,27 @@ const PROVIDER_CONFIGS: Record<string, EmailProviderConfig> = {
     },
     validation: {
       hostPatterns: ['gmail.com', 'smtp.gmail.com'],
-      usernameValidation: (username) => ({
-        valid: username.includes('@gmail.com'),
-        error: username.includes('@gmail.com') ? undefined : 'Must use Gmail address'
-      }),
+      usernameValidation: (username) => {
+        // Accept any valid email format for Gmail SMTP (supports Google Workspace)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const isValidEmail = emailRegex.test(username);
+        
+        return {
+          valid: isValidEmail,
+          error: isValidEmail ? undefined : 'Must use valid email address'
+        };
+      },
       passwordValidation: (password) => ({
         valid: password.length === 16 && /^[a-zA-Z0-9]+$/.test(password),
         error: password.length === 16 ? undefined : 'App Password must be 16 characters'
       })
     },
     setupInstructions: [
-      '1. Enable 2-Factor Authentication on your account',
-      '2. Generate App Password in account security settings',
-      '3. Use your complete Gmail address as username',
-      '4. Use the 16-character App Password (remove spaces)'
+      '1. Enable 2-Factor Authentication on your Google account',
+      '2. Generate App Password in Google Account settings',
+      '3. Use your complete email address (@gmail.com or Google Workspace domain)',
+      '4. Use the 16-character App Password (remove all spaces)',
+      '5. For Google Workspace: Ensure SMTP relay is enabled in Admin Console'
     ]
   },
 

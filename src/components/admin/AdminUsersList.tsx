@@ -56,66 +56,65 @@ export function AdminUsersList() {
   const { data: users, isLoading } = useQuery<AdminUser[]>({
     queryKey: ['admin-users-list'],
     queryFn: async () => {
-      // Fetch all admin users from user_roles table
-      const rolesResult: any = await (supabase as any)
+      console.log('🔍 Fetching admin users list...');
+      
+      // Fetch all active admin users from user_roles table
+      const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, role, is_active')
+        .select('user_id, role, is_active, created_at')
         .eq('is_active', true)
         .or('expires_at.is.null,expires_at.gt.now()')
         .order('created_at', { ascending: false });
 
-      if (rolesResult.error) throw rolesResult.error;
+      if (rolesError) {
+        console.error('❌ Error fetching user roles:', rolesError);
+        throw rolesError;
+      }
+
+      console.log(`✅ Found ${rolesData?.length || 0} active user roles`);
 
       // Get unique user IDs with admin roles
-      const adminUserIds = rolesResult.data?.map((r: any) => r.user_id) || [];
+      const adminUserIds = rolesData?.map(r => r.user_id) || [];
       
       if (adminUserIds.length === 0) {
+        console.log('⚠️ No admin users found in user_roles table');
         return [];
       }
 
       // Fetch profiles for these users
-      const profilesResult: any = await (supabase as any)
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, name, is_active, created_at')
+        .select('id, email, name, is_active, created_at, first_login_at')
         .in('id', adminUserIds);
 
-      if (profilesResult.error) throw profilesResult.error;
+      if (profilesError) {
+        console.error('❌ Error fetching profiles:', profilesError);
+        throw profilesError;
+      }
 
-      // Fetch auth data for last sign in times
-      const authResult: any = await (supabase as any).auth.admin.listUsers();
+      console.log(`✅ Found ${profilesData?.length || 0} admin profiles`);
 
-      // Create maps for quick lookup
+      // Create role map for quick lookup
       const roleMap = new Map<string, { role: UserRole; is_active: boolean }>();
-      if (rolesResult.data) {
-        rolesResult.data.forEach((r: any) => {
-          roleMap.set(r.user_id, { role: r.role as UserRole, is_active: r.is_active });
-        });
-      }
-
-      const authMap = new Map();
-      if (authResult.data?.users) {
-        authResult.data.users.forEach((u: any) => {
-          authMap.set(u.id, u.last_sign_in_at);
-        });
-      }
+      rolesData.forEach(r => {
+        roleMap.set(r.user_id, { role: r.role as UserRole, is_active: r.is_active });
+      });
 
       // Combine the data
-      const result: AdminUser[] = [];
-      if (profilesResult.data) {
-        profilesResult.data.forEach((p: any) => {
-          const roleData = roleMap.get(p.id);
-          result.push({
-            id: p.id,
-            email: p.email || '',
-            name: p.name || p.email || 'Unknown',
-            role: roleData?.role || null,
-            is_active: p.is_active && (roleData?.is_active ?? false),
-            created_at: p.created_at,
-            last_sign_in_at: authMap.get(p.id) || null,
-          });
-        });
-      }
+      const result: AdminUser[] = profilesData.map(p => {
+        const roleData = roleMap.get(p.id);
+        return {
+          id: p.id,
+          email: p.email || '',
+          name: p.name || p.email || 'Unknown',
+          role: roleData?.role || null,
+          is_active: p.is_active && (roleData?.is_active ?? false),
+          created_at: p.created_at,
+          last_sign_in_at: p.first_login_at || null,
+        };
+      });
 
+      console.log(`✅ Returning ${result.length} admin users`);
       return result;
     },
   });

@@ -307,6 +307,15 @@ SECURITY: Never use placeholder, test, or hashed values in production.
   if (secretHost && secretUser && secretPass) {
     console.log('✅ Using production SMTP configuration from Function Secrets');
     
+    // 🔐 DIAGNOSTIC LOGGING - Credential Source Verification
+    console.log('🔐 SMTP Credential Source Verification:');
+    console.log(`   - Host: ${secretHost}`);
+    console.log(`   - User: ${secretUser}`);
+    console.log(`   - Password Length (Raw): ${secretPass?.length || 0} chars`);
+    console.log(`   - Password After Normalization: ${secretPass?.replace(/\s+/g, '').trim().length || 0} chars`);
+    console.log(`   - Source: Function Secrets (Production Mode)`);
+    console.log(`   - Database Credentials: IGNORED (security best practice)`);
+    
     // Parse port FIRST before using in validation
     let port = 587; // Default port
     if (secretPort) {

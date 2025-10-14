@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.unified-smtp-sender]
 verify_jwt = false
+
+[functions.email-queue-cleanup-stale]
+verify_jwt = false

@@ -9587,6 +9587,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      archive_stale_communication_events: {
+        Args: { p_age_hours?: number }
+        Returns: Json
+      }
       assess_production_readiness: {
         Args: Record<PropertyKey, never>
         Returns: Json

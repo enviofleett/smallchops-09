@@ -92,15 +92,16 @@ export const EmailTemplateManager: React.FC = () => {
       const currentDate = new Date();
       const productionVariables = {
         // Business information
-        business_name: businessSettings?.name || 'Your Business',
+        business_name: businessSettings?.name || 'Starters Small Chops',
         business_tagline: businessSettings?.tagline || 'Quality products delivered',
-        website_url: businessSettings?.website_url || 'https://yourbusiness.com',
+        website_url: businessSettings?.website_url || 'https://startersmallchops.com',
         support_email: 'support@startersmallchops.com',
         working_hours: businessSettings?.working_hours || '9 AM - 6 PM',
         whatsapp_number: '+234123456789',
         
         // Customer information (use real recent customer or fallback)
-        customer_name: recentCustomer?.name || 'John Doe',
+        customerName: recentCustomer?.name || 'John Doe', // ✅ Correct camelCase for templates
+        customer_name: recentCustomer?.name || 'John Doe', // Keep for backward compatibility
         customer_email: recentCustomer?.email || 'customer@example.com',
         
         // Order information (use real recent order or fallback)
@@ -116,6 +117,12 @@ export const EmailTemplateManager: React.FC = () => {
         // Time-based variables
         current_year: currentDate.getFullYear().toString(),
         current_date: currentDate.toLocaleDateString(),
+        signupDate: currentDate.toLocaleDateString('en-US', { // ✅ Formatted date for templates
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
         current_time: currentDate.toLocaleTimeString(),
         
         // Common email elements

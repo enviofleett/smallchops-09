@@ -30,14 +30,50 @@ export function DriverAssignmentSection({
   onAssignDriver,
   isAssigning
 }: DriverAssignmentSectionProps) {
-  // 🔒 CRITICAL: All hooks MUST be called before any conditional returns
+  // ✅ CRITICAL: ALL HOOKS FIRST - Called unconditionally before any returns
   const { isAdmin, isLoading: authLoading } = useUnifiedAuth();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [selectedDriverId, setSelectedDriverId] = useState<string>(currentDriverId || "");
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // 🔒 SECURITY: Don't render admin features for non-admins (after all hooks)
+  // Hook: Load drivers on mount
+  useEffect(() => {
+    const loadDrivers = async () => {
+      try {
+        setIsLoadingDrivers(true);
+        const data = await getDispatchRiders();
+        setDrivers(data || []);
+      } catch (error) {
+        console.error('Failed to load drivers:', error);
+        toast.error('Failed to load drivers');
+      } finally {
+        setIsLoadingDrivers(false);
+      }
+    };
+    
+    loadDrivers();
+  }, []);
+  
+  // Hook: Update selected driver when prop changes
+  useEffect(() => {
+    if (currentDriverId) {
+      setSelectedDriverId(currentDriverId);
+    }
+  }, [currentDriverId]);
+  
+  // Hook: Filter drivers based on search query
+  const filteredDrivers = useMemo(() => {
+    if (!searchQuery.trim()) return drivers;
+    const query = searchQuery.toLowerCase().trim();
+    return drivers.filter(driver => 
+      driver.name.toLowerCase().includes(query) || 
+      driver.phone?.toLowerCase().includes(query) || 
+      driver.email?.toLowerCase().includes(query)
+    );
+  }, [drivers, searchQuery]);
+  
+  // ✅ CONDITIONAL RETURNS AFTER ALL HOOKS
   if (authLoading) {
     return (
       <Card>
@@ -53,26 +89,10 @@ export function DriverAssignmentSection({
   if (!isAdmin) {
     return null;
   }
-  useEffect(() => {
-    loadDrivers();
-  }, []);
-  useEffect(() => {
-    if (currentDriverId) {
-      setSelectedDriverId(currentDriverId);
-    }
-  }, [currentDriverId]);
-  const loadDrivers = async () => {
-    try {
-      setIsLoadingDrivers(true);
-      const data = await getDispatchRiders();
-      setDrivers(data || []);
-    } catch (error) {
-      console.error('Failed to load drivers:', error);
-      toast.error('Failed to load drivers');
-    } finally {
-      setIsLoadingDrivers(false);
-    }
-  };
+  
+  // ✅ DERIVED STATE & FUNCTIONS AFTER HOOKS
+  const currentDriver = drivers.find(d => d.id === currentDriverId);
+  
   const handleAssign = async () => {
     if (!selectedDriverId) {
       toast.error('Please select a driver');
@@ -80,14 +100,6 @@ export function DriverAssignmentSection({
     }
     await onAssignDriver(selectedDriverId);
   };
-  const currentDriver = drivers.find(d => d.id === currentDriverId);
-
-  // Filter drivers based on search query
-  const filteredDrivers = useMemo(() => {
-    if (!searchQuery.trim()) return drivers;
-    const query = searchQuery.toLowerCase().trim();
-    return drivers.filter(driver => driver.name.toLowerCase().includes(query) || driver.phone?.toLowerCase().includes(query) || driver.email?.toLowerCase().includes(query));
-  }, [drivers, searchQuery]);
   return (
     <Card>
       <CardHeader>

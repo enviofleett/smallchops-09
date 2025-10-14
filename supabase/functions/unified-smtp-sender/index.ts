@@ -307,6 +307,17 @@ SECURITY: Never use placeholder, test, or hashed values in production.
   if (secretHost && secretUser && secretPass) {
     console.log('✅ Using production SMTP configuration from Function Secrets');
     
+    // Parse port FIRST before using in validation
+    let port = 587; // Default port
+    if (secretPort) {
+      const parsedPort = parseInt(secretPort.trim(), 10);
+      if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+        port = parsedPort;
+      } else {
+        console.warn(`⚠️ Invalid SMTP_PORT value: "${secretPort}", using default 587`);
+      }
+    }
+    
     // Provider-agnostic validation using new configuration system
     const { validateSMTPConfig } = await import('../_shared/email-provider-configs.ts');
     const validation = validateSMTPConfig(secretHost, port, secretUser, secretPass);
@@ -330,17 +341,6 @@ Never use placeholder, test, or hashed values in production.
       `.trim();
       
       throw new Error(detailedError);
-    }
-    
-    // Parse port with robust fallback
-    let port = 587; // Default port
-    if (secretPort) {
-      const parsedPort = parseInt(secretPort.trim(), 10);
-      if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
-        port = parsedPort;
-      } else {
-        console.warn(`⚠️ Invalid SMTP_PORT value: "${secretPort}", using default 587`);
-      }
     }
     
     

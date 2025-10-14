@@ -43,18 +43,15 @@ export function NewOrderDetailsModal({
   onClose,
   order
 }: NewOrderDetailsModalProps) {
-  // CRITICAL: Early null guard to prevent errors during modal transitions
-  if (!order) {
-    return null;
-  }
-  
-  // 🔒 SECURITY: Use server-backed admin verification
+  // ✅ CRITICAL: ALL HOOKS FIRST - Called unconditionally before any returns
   const { isAdmin, isLoading: authLoading, user } = useUnifiedAuth();
   const adminPrintRef = useRef<HTMLDivElement>(null);
   const thermalPrintRef = useRef<HTMLDivElement>(null);
   const customerPdfRef = useRef<HTMLDivElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showEmailSelector, setShowEmailSelector] = useState(false);
+  
+  // Real-time data hook - use optional chaining for null safety
   const {
     data,
     isLoading,
@@ -63,24 +60,14 @@ export function NewOrderDetailsModal({
     connectionStatus,
     reconnect
   } = useRealTimeOrderData(order?.id);
+  
+  // Order operations hook - provide fallback for null order
   const {
     assignRiderMutation,
     handleStatusUpdate
-  } = useOrderPageHooks(order.id);
+  } = useOrderPageHooks(order?.id || '');
 
-  // Enhanced status update that closes modal immediately for confirmed tab
-  const handleStatusUpdateWithClose = async (newStatus: OrderStatus) => {
-    const success = await handleStatusUpdate(newStatus);
-    if (success && order.status === 'confirmed' && newStatus !== 'confirmed') {
-      // Close modal immediately when moving from confirmed to another status
-      setTimeout(() => {
-        onClose();
-      }, 500); // Small delay to show success toast
-    }
-    return success;
-  };
-
-  // Fetch pickup point data if order is pickup type
+  // Fetch pickup point data if order is pickup type - use optional chaining
   const {
     data: pickupPoint,
     isLoading: isLoadingPickupPoint
@@ -95,7 +82,6 @@ export function NewOrderDetailsModal({
   const {
     zones
   } = useDeliveryZones();
-  const deliveryZone = zones.find(zone => zone.id === order?.delivery_zone_id);
 
   // Enhanced print handler for admin with success/error notifications
   const handlePrint = useReactToPrint({
@@ -114,7 +100,7 @@ export function NewOrderDetailsModal({
     }
   });
 
-  // Customer PDF download handler - MUST be before any conditional returns
+  // Customer PDF download handler
   const handleCustomerPdfDownload = useReactToPrint({
     contentRef: customerPdfRef,
     documentTitle: `Starters-Order-${order?.order_number || 'Receipt'}`,
@@ -130,6 +116,27 @@ export function NewOrderDetailsModal({
       });
     }
   });
+
+  // ✅ CONDITIONAL RETURNS AFTER ALL HOOKS
+  // Early null guard to prevent errors during modal transitions
+  if (!order) {
+    return null;
+  }
+
+  // Derived state - safe to use after null check
+  const deliveryZone = zones.find(zone => zone.id === order.delivery_zone_id);
+
+  // Enhanced status update that closes modal immediately for confirmed tab
+  const handleStatusUpdateWithClose = async (newStatus: OrderStatus) => {
+    const success = await handleStatusUpdate(newStatus);
+    if (success && order.status === 'confirmed' && newStatus !== 'confirmed') {
+      // Close modal immediately when moving from confirmed to another status
+      setTimeout(() => {
+        onClose();
+      }, 500); // Small delay to show success toast
+    }
+    return success;
+  };
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);

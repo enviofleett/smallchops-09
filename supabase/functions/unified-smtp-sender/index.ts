@@ -501,6 +501,7 @@ async function processTemplate(
   templateFound: boolean;
   missingVariables: string[];
   templateType?: string;
+  isFullHtml?: boolean;
 }> {
   
   let template = null;
@@ -512,7 +513,7 @@ async function processTemplate(
       // CRITICAL FIX 1: Prioritize enhanced_email_templates from Settings Page
       const { data: enhancedTemplate } = await supabase
         .from('enhanced_email_templates')
-        .select('template_type, subject_template, html_template, text_template')
+        .select('template_type, subject_template, html_template, text_template, full_html')
         .eq('template_key', templateKey)
         .eq('is_active', true)
         .maybeSingle();
@@ -522,7 +523,8 @@ async function processTemplate(
           subject: enhancedTemplate.subject_template,
           html_content: enhancedTemplate.html_template,
           text_content: enhancedTemplate.text_template,
-          template_type: enhancedTemplate.template_type || 'standard'
+          template_type: enhancedTemplate.template_type || 'standard',
+          full_html: enhancedTemplate.full_html === true
         };
         templateType = template.template_type;
         templateFound = true;
@@ -646,7 +648,8 @@ async function processTemplate(
 
   // Add base layout variables for non-full_html templates
   const enhancedVariables = { ...variables };
-  if (templateType !== 'full_html') {
+  const isFullHtml = template?.full_html === true;
+  if (!isFullHtml) {
     enhancedVariables.business_name = enhancedVariables.business_name || businessName;
     enhancedVariables.website_url = enhancedVariables.website_url || '#';  
     enhancedVariables.unsubscribe_url = enhancedVariables.unsubscribe_url || '#';
@@ -690,7 +693,7 @@ async function processTemplate(
   }
 
   // Apply base layout wrapping for non-full_html templates
-  if (templateType !== 'full_html' && html && !html.includes('<!DOCTYPE html>')) {
+  if (!isFullHtml && html && !html.includes('<!DOCTYPE html>')) {
     const layoutVariables = {
       ...enhancedVariables,
       content: html,
@@ -708,7 +711,7 @@ async function processTemplate(
     html = wrappedHtml;
   }
 
-  return { subject, html, text, templateFound, missingVariables, templateType };
+  return { subject, html, text, templateFound, missingVariables, templateType, isFullHtml };
 }
 
 // Production-ready SMTP client with robust error handling

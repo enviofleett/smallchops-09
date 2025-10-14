@@ -2,3 +2,9 @@ project_id = "oknnklksdiqaifhxaccs"
 
 [functions.validate-moq-requirements]
 verify_jwt = false
+
+[functions.email-queue-processor-cron]
+verify_jwt = false
+
+[functions.process-communication-events-enhanced]
+verify_jwt = false

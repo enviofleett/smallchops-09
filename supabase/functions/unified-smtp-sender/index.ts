@@ -422,11 +422,11 @@ Never use placeholder, test, or hashed values in production.
     console.warn('⚠️ Database SMTP configuration issues:', dbValidation.errors.join(', '));
   }
   
-  // Log user type detection for debugging
-  console.log(`📧 Database SMTP User Type: ${dbUserValidation.userType} (Provider: ${dbUserValidation.provider || 'unknown'})`);
+  // Log provider detection for debugging
+  console.log(`📧 Database SMTP Provider: ${dbValidation.provider.name}`);
   
-  if (!dbUserValidation.isValid) {
-    console.warn('⚠️ Database SMTP user validation warnings:', dbUserValidation.errors);
+  if (!dbValidation.valid) {
+    console.warn('⚠️ Database SMTP validation warnings:', dbValidation.errors);
   }
 
   return {

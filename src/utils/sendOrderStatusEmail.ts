@@ -21,6 +21,17 @@ export async function sendOrderStatusEmail(params: SendOrderEmailParams): Promis
       orderNumber: params.orderData.order_number
     });
 
+    // Map order status to template key
+    const templateKeyMap: Record<string, string> = {
+      'confirmed': 'order_confirmed',
+      'preparing': 'order_preparing',
+      'ready': 'order_ready',
+      'out_for_delivery': 'order_out_for_delivery',
+      'delivered': 'order_delivered',
+      'cancelled': 'order_cancelled'
+    };
+    const templateKey = templateKeyMap[params.status] || 'order_confirmed';
+
     // Prepare email content
     const subject = getOrderStatusSubject(params.status, params.orderData.order_number);
     const htmlContent = getOrderStatusTemplate(params.status, {
@@ -42,6 +53,7 @@ export async function sendOrderStatusEmail(params: SendOrderEmailParams): Promis
         html: htmlContent,
         text: textContent,
         emailType: 'transactional',
+        templateKey: templateKey,
         orderData: {
           orderId: params.orderData.id,
           orderNumber: params.orderData.order_number,

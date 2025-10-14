@@ -1,8 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-const INACTIVITY_TIMEOUT = 20 * 60 * 1000; // 20 minutes
+const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes (updated from 20)
 const WARNING_TIME = 2 * 60 * 1000; // 2 minutes before logout
 
 export const useInactivityTimeout = () => {
@@ -107,6 +108,30 @@ export const useInactivityTimeout = () => {
       if (throttleTimeout) clearTimeout(throttleTimeout);
     };
   }, [isAuthenticated, userType, resetTimer, clearTimers]);
+
+  // 🔄 AUTO SESSION REFRESH: Prevent session expiry for active admins
+  useEffect(() => {
+    if (!isAuthenticated || userType !== 'admin') return;
+
+    console.log('🔄 Admin session auto-refresh enabled (every 50 minutes)');
+
+    // Refresh session every 50 minutes to prevent 1-hour expiry
+    const refreshInterval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (error) {
+          console.error('❌ Session refresh failed:', error);
+          // Don't log out - just log the error for monitoring
+        } else {
+          console.log('✅ Admin session refreshed successfully');
+        }
+      } catch (err) {
+        console.error('❌ Session refresh error:', err);
+      }
+    }, 50 * 60 * 1000); // 50 minutes
+
+    return () => clearInterval(refreshInterval);
+  }, [isAuthenticated, userType]);
 
   return { resetTimer };
 };

@@ -13,7 +13,7 @@ export function PasswordChangeRequired({ children }: PasswordChangeRequiredProps
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Query to check if password change is required
+  // Query to check if password change is required with aggressive caching
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['password-change-status', user?.id],
     queryFn: async () => {
@@ -33,6 +33,10 @@ export function PasswordChangeRequired({ children }: PasswordChangeRequiredProps
       return data;
     },
     enabled: !!user?.id && isAuthenticated,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes - don't refetch
+    gcTime: 10 * 60 * 1000,   // Keep in cache for 10 minutes
+    refetchOnMount: false,     // Don't refetch on every route change
+    refetchOnWindowFocus: false, // Don't refetch when window gains focus
   });
 
   useEffect(() => {

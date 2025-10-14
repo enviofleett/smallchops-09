@@ -35,6 +35,16 @@ export const useCustomerAuth = () => {
     let mounted = true;
     let subscription: any;
 
+    // 🚫 CRITICAL: Don't run customer auth on admin routes to prevent session conflicts
+    const isAdminRoute = window.location.pathname.startsWith('/admin') || 
+                         window.location.pathname === '/dashboard';
+    
+    if (isAdminRoute) {
+      console.log('⏭️ Skipping customer auth on admin route:', window.location.pathname);
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+
     const loadCustomerAccount = async (userId: string) => {
       try {
         console.log('🔍 useCustomerAuth: Loading customer account for userId:', userId);

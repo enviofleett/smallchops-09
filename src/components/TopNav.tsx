@@ -8,6 +8,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { NotificationPreview } from '@/components/notifications/NotificationPreview';
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
+import { useSessionHealthMonitor } from '@/hooks/useSessionHealthMonitor';
 import { useToast } from '@/hooks/use-toast';
 import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from "@/components/ui/navigation-menu";
 const TopNav = () => {
@@ -26,8 +27,9 @@ const TopNav = () => {
     toast
   } = useToast();
 
-  // Enable inactivity timeout
+  // Enable inactivity timeout (10 minutes) and session health monitoring
   useInactivityTimeout();
+  useSessionHealthMonitor();
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {

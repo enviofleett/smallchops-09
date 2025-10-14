@@ -161,7 +161,7 @@ export const generateCustomerReceiptPDF = (
     `₦${((item.total_price || (item.quantity * (item.unit_price || item.price || 0))).toLocaleString())}`
   ]);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['Item', 'Qty', 'Unit Price', 'Total']],
     body: tableData,

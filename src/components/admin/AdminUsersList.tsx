@@ -56,14 +56,12 @@ export function AdminUsersList() {
   const { data: users, isLoading } = useQuery<AdminUser[]>({
     queryKey: ['admin-users-list'],
     queryFn: async () => {
-      console.log('🔍 Fetching admin users list...');
+      console.log('🔍 Fetching ALL admin users...');
       
-      // Fetch all active admin users from user_roles table
+      // Fetch ALL admin users from user_roles table (including inactive)
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, role, is_active, created_at')
-        .eq('is_active', true)
-        .or('expires_at.is.null,expires_at.gt.now()')
+        .select('user_id, role, is_active, created_at, expires_at')
         .order('created_at', { ascending: false });
 
       if (rolesError) {
@@ -71,20 +69,22 @@ export function AdminUsersList() {
         throw rolesError;
       }
 
-      console.log(`✅ Found ${rolesData?.length || 0} active user roles`);
+      console.log(`✅ Found ${rolesData?.length || 0} total user roles`);
 
-      // Get unique user IDs with admin roles
-      const adminUserIds = rolesData?.map(r => r.user_id) || [];
+      // Get unique user IDs
+      const adminUserIds = [...new Set(rolesData?.map(r => r.user_id) || [])];
       
       if (adminUserIds.length === 0) {
         console.log('⚠️ No admin users found in user_roles table');
         return [];
       }
 
+      console.log(`👥 Processing ${adminUserIds.length} unique admin users`);
+
       // Fetch profiles for these users
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, name, is_active, created_at, first_login_at')
+        .select('id, email, name, is_active, created_at, first_login_at, updated_at')
         .in('id', adminUserIds);
 
       if (profilesError) {
@@ -93,28 +93,52 @@ export function AdminUsersList() {
       }
 
       console.log(`✅ Found ${profilesData?.length || 0} admin profiles`);
+      
+      // Log missing profiles
+      const profileIds = new Set(profilesData?.map(p => p.id) || []);
+      const missingProfiles = adminUserIds.filter(id => !profileIds.has(id));
+      if (missingProfiles.length > 0) {
+        console.warn(`⚠️ Missing profiles for ${missingProfiles.length} users:`, missingProfiles);
+      }
 
-      // Create role map for quick lookup
-      const roleMap = new Map<string, { role: UserRole; is_active: boolean }>();
+      // Create role map for quick lookup (get most recent active role per user)
+      const roleMap = new Map<string, { role: UserRole; is_active: boolean; expires_at: string | null }>();
       rolesData.forEach(r => {
-        roleMap.set(r.user_id, { role: r.role as UserRole, is_active: r.is_active });
+        const existing = roleMap.get(r.user_id);
+        // Prefer active roles, then most recent
+        if (!existing || (r.is_active && !existing.is_active) || 
+            (!existing.is_active && r.created_at > (existing as any).created_at)) {
+          roleMap.set(r.user_id, { 
+            role: r.role as UserRole, 
+            is_active: r.is_active,
+            expires_at: r.expires_at
+          });
+        }
       });
 
       // Combine the data
       const result: AdminUser[] = profilesData.map(p => {
         const roleData = roleMap.get(p.id);
+        const isExpired = roleData?.expires_at ? new Date(roleData.expires_at) < new Date() : false;
+        
         return {
           id: p.id,
-          email: p.email || '',
-          name: p.name || p.email || 'Unknown',
+          email: p.email || 'No email',
+          name: p.name || p.email || 'Unknown User',
           role: roleData?.role || null,
-          is_active: p.is_active && (roleData?.is_active ?? false),
+          is_active: p.is_active && (roleData?.is_active ?? false) && !isExpired,
           created_at: p.created_at,
           last_sign_in_at: p.first_login_at || null,
         };
       });
 
-      console.log(`✅ Returning ${result.length} admin users`);
+      console.log(`✅ Returning ${result.length} admin users with complete data`);
+      console.table(result.map(u => ({ 
+        email: u.email, 
+        role: u.role, 
+        active: u.is_active 
+      })));
+      
       return result;
     },
   });

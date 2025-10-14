@@ -76,6 +76,45 @@ serve(async (req: Request) => {
     if (!customer?.name) throw new Error('Customer name is required')
     if (!customer?.phone) throw new Error('Customer phone is required')
     
+    // 🔒 STEP 1: Email validation and domain checking
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(customer.email)) {
+      throw new Error('Invalid email format')
+    }
+    
+    // Block temp/local email domains for Paystack
+    const emailLower = customer.email.toLowerCase()
+    if (emailLower.includes('@temp.') || emailLower.includes('@local.') || emailLower.includes('.local')) {
+      console.error('❌ Invalid email domain detected:', customer.email)
+      throw new Error('Invalid email address. Please use a valid email address.')
+    }
+    
+    // 🔒 Additional validation: Use authenticated user's email if available
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        {
+          global: { headers: { Authorization: authHeader } }
+        }
+      )
+      
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+      
+      if (user && user.email) {
+        // Override with authenticated user's email
+        console.log('✅ Using authenticated user email:', user.email)
+        customer.email = user.email
+      }
+    }
+    
+    console.log('📧 Email validation passed:', {
+      email: customer.email,
+      is_authenticated: !!authHeader,
+      domain: customer.email.split('@')[1]
+    })
+    
     // Validate delivery/pickup time fields (CRITICAL for 1-hour window logic)
     if (fulfillment.type === 'delivery' && !delivery_schedule?.delivery_time_start) {
       throw new Error('Delivery time is required for delivery orders')

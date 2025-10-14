@@ -342,41 +342,47 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     }
   }, [isAuthenticated, isLoading]);
 
-  // Enhanced customer profile loading with error handling - PRODUCTION READY
+  // 🔒 STEP 2: Enhanced customer profile loading - ALWAYS prioritize auth.user.email
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
+      // CRITICAL FIX: Always prioritize auth.user.email over profile email
+      const authEmail = user?.email
+      
+      if (!authEmail) {
+        console.error('❌ Authenticated user missing email - this should not happen')
+        toast({
+          title: "Authentication Error",
+          description: "Your account is missing an email address. Please contact support.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      console.log('✅ Using authenticated user email:', authEmail)
+      
       if (profile) {
         console.log('✅ Successfully loaded authenticated customer profile:', { 
           profileId: (profile as any).id,
           name: (profile as any).name, 
-          email: (profile as any).email,
           phone: (profile as any).phone,
-          hasCompleteProfile: !!(profile as any).name && !!(profile as any).email 
+          hasCompleteProfile: !!(profile as any).name && !!authEmail 
         });
         
         setFormData(prev => ({
           ...prev,
-          customer_email: (profile as any).email || user?.email || '',
+          customer_email: authEmail, // Always use auth email
           customer_name: (profile as any).name || '',
           customer_phone: (profile as any).phone || ''
         }));
-      } else if (user) {
-        // Profile hasn't loaded yet, but we have user data - show fallback
-        console.log('⚠️ Profile not loaded yet, using fallback user data');
+      } else {
+        // Profile not loaded - use auth email as fallback
+        console.log('⚠️ Profile not loaded yet, using auth email with fallback data')
         setFormData(prev => ({
           ...prev,
-          customer_email: user.email || '',
-          customer_name: prev.customer_name || '', 
+          customer_email: authEmail,
+          customer_name: prev.customer_name || '',
           customer_phone: prev.customer_phone || ''
         }));
-        
-        // Retry profile loading after a short delay
-        const retryTimeout = setTimeout(() => {
-          console.log('🔄 Retrying profile load...');
-          // The useCustomerProfile hook should handle this automatically
-        }, 2000);
-        
-        return () => clearTimeout(retryTimeout);
       }
     } else if (!isAuthenticated && !isLoading) {
       // Clear form data for unauthenticated users
@@ -484,6 +490,31 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     try {
       setIsSubmitting(true);
       setLastPaymentError(null);
+
+      // 🔒 STEP 3: Pre-submit email validation
+      const email = formData.customer_email.toLowerCase()
+      
+      // Block invalid email domains
+      if (email.includes('@temp.') || email.includes('@local.') || email.includes('.local')) {
+        toast({
+          title: "Invalid Email Address",
+          description: "Please use a valid email address to complete your order.",
+          variant: "destructive"
+        })
+        setIsSubmitting(false)
+        return
+      }
+      
+      // Ensure authenticated users use their account email
+      if (isAuthenticated && user?.email) {
+        if (email !== user.email.toLowerCase()) {
+          console.warn('⚠️ Email mismatch detected, using authenticated email')
+          setFormData(prev => ({
+            ...prev,
+            customer_email: user.email!
+          }))
+        }
+      }
 
       // Validate MOQ requirements before processing
       console.log('🔍 Validating MOQ requirements for cart:', items);

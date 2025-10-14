@@ -9652,7 +9652,7 @@ export type Database = {
       }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
-        Returns: Json
+        Returns: undefined
       }
       calculate_delivery_metrics: {
         Args: { p_date: string }
@@ -10097,6 +10097,10 @@ export type Database = {
       current_user_email: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      customer_can_view_order: {
+        Args: { order_row: Database["public"]["Tables"]["orders"]["Row"] }
+        Returns: boolean
       }
       customer_purchased_product: {
         Args: { customer_uuid: string; product_uuid: string }
@@ -10878,7 +10882,7 @@ export type Database = {
               p_entity_type?: string
             }
           | { p_action_type: string; p_details?: Json; p_order_id: string }
-        Returns: undefined
+        Returns: string
       }
       log_admin_management_action: {
         Args: {
@@ -11030,7 +11034,7 @@ export type Database = {
               user_agent?: string
             }
           | { p_details?: Json; p_event_type: string; p_severity?: string }
-        Returns: undefined
+        Returns: string
       }
       log_payment_verification_attempt: {
         Args: {

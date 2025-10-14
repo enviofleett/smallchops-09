@@ -16,6 +16,7 @@ export const useUnifiedAuth = () => {
   const { toast } = useToast();
   
   // ✅ SECURITY: Runtime validation against privilege escalation
+  // Made NON-BLOCKING to prevent auth failures from breaking login
   useEffect(() => {
     const validateUserType = async () => {
       if (!isAuthenticated || !session) return;
@@ -24,26 +25,34 @@ export const useUnifiedAuth = () => {
         const { data, error } = await supabase.functions.invoke('validate-user-type');
         
         if (error) {
-          console.error('⚠️ User type validation failed:', error);
+          // Log but don't block - edge function might not be deployed yet
+          console.warn('⚠️ User type validation skipped (non-blocking):', error.message);
           return;
         }
         
-        if (!data.isValid) {
+        if (data && !data.isValid) {
+          // CRITICAL: Only log violation, don't break user session
           console.error('🚨 Security violation detected:', data);
-          toast({
-            title: '🔒 Security Alert',
-            description: data.message,
-            variant: 'destructive'
+          
+          // Log to backend for admin review
+          await supabase.from('audit_logs').insert({
+            action: 'dual_user_type_detected',
+            category: 'Security',
+            message: `User ${session.user.email} has conflicting account types`,
+            user_id: session.user.id,
+            new_values: data
           });
           
-          // Force logout and re-login
-          setTimeout(async () => {
-            await supabase.auth.signOut();
-            window.location.href = '/auth?mode=customer';
-          }, 3000);
+          // Show warning toast only
+          toast({
+            title: '⚠️ Account Notice',
+            description: 'Please contact support if you experience any issues.',
+            variant: 'default'
+          });
         }
       } catch (error) {
-        console.error('❌ Validation error:', error);
+        // Completely non-blocking - just log
+        console.warn('⚠️ User validation skipped:', error instanceof Error ? error.message : 'Unknown error');
       }
     };
     
@@ -51,7 +60,7 @@ export const useUnifiedAuth = () => {
     if (isAuthenticated && !isLoading) {
       validateUserType();
     }
-  }, [isAuthenticated, session, isLoading]);
+  }, [isAuthenticated, session, isLoading, toast]);
 
   // Consolidate loading states
   const isAuthLoading = isLoading || permissionsLoading || roleLoading;

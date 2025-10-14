@@ -146,16 +146,17 @@ async function createOrderConfirmationEmails(supabase: any, customerEmail: strin
       status: 'queued',
       template_key: 'order_confirmation_clean',
       template_variables: {
-        customerName: customerName || 'Valued Customer',
-        orderId: orderData?.order_number || orderData?.order_id,
-        orderDate: new Date().toLocaleDateString(),
-        orderTotal: `₦${orderData?.total_amount?.toLocaleString() || '0'}`,
-        orderItems: orderData?.items ? 
+        customer_name: customerName || 'Valued Customer',
+        order_number: orderData?.order_number || orderData?.order_id,
+        order_date: new Date().toLocaleDateString(),
+        total_amount: `₦${orderData?.total_amount?.toLocaleString() || '0'}`,
+        order_items: orderData?.items ? 
           orderData.items.map(item => `${item.product_name} - Qty: ${item.quantity}`).join('<br>') :
           'Order items will be confirmed shortly',
-        deliveryAddress: orderData?.delivery_address || 'As specified in your order',
-        companyName: businessName,
-        supportEmail: businessSettings?.email || 'support@starters.com'
+        delivery_address: orderData?.delivery_address || 'As specified in your order',
+        business_name: businessName,
+        support_email: businessSettings?.email || 'support@starters.com',
+        current_year: new Date().getFullYear().toString()
       },
       priority: 'high'
     },
@@ -167,12 +168,12 @@ async function createOrderConfirmationEmails(supabase: any, customerEmail: strin
       status: 'queued',
       template_key: 'admin_new_order',
       template_variables: {
-        orderNumber: orderData?.order_number || orderData?.order_id,
-        customerName: customerName || 'Customer',
-        customerEmail: customerEmail,
-        orderTotal: `₦${orderData?.total_amount?.toLocaleString() || '0'}`,
-        orderDate: new Date().toLocaleDateString(),
-        itemsCount: orderData?.items?.length || 1,
+        order_number: orderData?.order_number || orderData?.order_id,
+        customer_name: customerName || 'Customer',
+        customer_email: customerEmail,
+        total_amount: `₦${orderData?.total_amount?.toLocaleString() || '0'}`,
+        order_date: new Date().toLocaleDateString(),
+        items_count: orderData?.items?.length || 1,
         orderId: orderData?.order_id,
         adminDashboardLink: `https://yourdomain.com/admin/orders/${orderData?.order_id}`,
         companyName: businessName
@@ -197,7 +198,7 @@ async function createWelcomeEmail(supabase: any, customerEmail: string, customer
       status: 'queued',
       template_key: 'customer_welcome',
       template_variables: {
-        customerName: customerName || 'Valued Customer',
+        customer_name: customerName || 'Valued Customer',
         companyName: businessSettings?.name || 'Starters',
         websiteUrl: businessSettings?.website_url || 'https://starters.com',
         supportEmail: businessSettings?.email || 'support@starters.com'

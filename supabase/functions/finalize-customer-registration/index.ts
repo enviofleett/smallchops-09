@@ -158,15 +158,16 @@ serve(async (req) => {
         status: 'queued',
         priority: 'high',
         variables: {
-          customerName: name,
+          customer_name: name,
           business_name: 'Starters Small Chops',
-          signupDate: new Date().toLocaleDateString('en-US', { 
+          signup_date: new Date().toLocaleDateString('en-US', { 
             weekday: 'long', 
             year: 'numeric', 
             month: 'long', 
             day: 'numeric' 
           }),
-          website_url: 'https://startersmallchops.com'
+          website_url: 'https://startersmallchops.com',
+          current_year: new Date().getFullYear().toString()
         },
         metadata: {
           customer_id: customerId,

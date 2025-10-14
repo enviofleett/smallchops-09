@@ -29,17 +29,18 @@ serve(async (req) => {
       .limit(1)
       .single();
 
-    // Prepare enhanced variables for welcome email template
+    // Prepare enhanced variables for welcome email template (snake_case)
     const welcomeVariables = {
-      customerName: customer_name || customer_email.split('@')[0],
+      customer_name: customer_name || customer_email.split('@')[0],
       business_name: businessSettings?.name || 'Starters Small Chops',
-      signupDate: new Date().toLocaleDateString('en-US', { 
+      signup_date: new Date().toLocaleDateString('en-US', { 
         weekday: 'long', 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric' 
       }),
-      website_url: businessSettings?.site_url || 'https://startersmallchops.com'
+      website_url: businessSettings?.site_url || 'https://startersmallchops.com',
+      current_year: new Date().getFullYear().toString()
     };
 
     console.log('📧 Sending welcome email with variables:', JSON.stringify(welcomeVariables, null, 2));

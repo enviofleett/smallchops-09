@@ -99,9 +99,8 @@ export const EmailTemplateManager: React.FC = () => {
         working_hours: businessSettings?.working_hours || '9 AM - 6 PM',
         whatsapp_number: '+234123456789',
         
-        // Customer information (use real recent customer or fallback)
-        customerName: recentCustomer?.name || 'John Doe', // ✅ Correct camelCase for templates
-        customer_name: recentCustomer?.name || 'John Doe', // Keep for backward compatibility
+        // Customer information (snake_case to match templates)
+        customer_name: recentCustomer?.name || 'John Doe',
         customer_email: recentCustomer?.email || 'customer@example.com',
         
         // Order information (use real recent order or fallback)
@@ -117,7 +116,7 @@ export const EmailTemplateManager: React.FC = () => {
         // Time-based variables
         current_year: currentDate.getFullYear().toString(),
         current_date: currentDate.toLocaleDateString(),
-        signupDate: currentDate.toLocaleDateString('en-US', { // ✅ Formatted date for templates
+        signup_date: currentDate.toLocaleDateString('en-US', { // ✅ snake_case
           weekday: 'long',
           year: 'numeric',
           month: 'long',

@@ -1,8 +1,8 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { OrderReceiptCard } from './OrderReceiptCard';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-import { usePrint } from '@/hooks/usePrint';
+import { useCustomerReceiptPDF } from '@/hooks/useCustomerReceiptPDF';
 
 interface OrderReceiptModalProps {
   isOpen: boolean;
@@ -12,13 +12,11 @@ interface OrderReceiptModalProps {
 
 export function OrderReceiptModal({ isOpen, onClose, order }: OrderReceiptModalProps) {
   const { data: businessSettings } = useBusinessSettings();
-  const printRef = useRef<HTMLDivElement>(null);
-  
-  // Use production-ready print hook
-  const { handlePrint: handleDownload, isPrinting } = usePrint(
-    printRef,
-    `Receipt-${order.order_number}`
-  );
+  const { downloadReceipt, isGenerating } = useCustomerReceiptPDF();
+
+  const handleDownload = () => {
+    downloadReceipt(order, businessInfo);
+  };
 
   const handleEmailReceipt = () => {
     // TODO: Implement email receipt functionality
@@ -33,22 +31,19 @@ export function OrderReceiptModal({ isOpen, onClose, order }: OrderReceiptModalP
   } : undefined;
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Order Receipt</DialogTitle>
-          </DialogHeader>
-          <div ref={printRef}>
-            <OrderReceiptCard
-              order={order}
-              businessInfo={businessInfo}
-              onDownload={handleDownload}
-              onEmailReceipt={handleEmailReceipt}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Order Receipt</DialogTitle>
+        </DialogHeader>
+        <OrderReceiptCard
+          order={order}
+          businessInfo={businessInfo}
+          onDownload={handleDownload}
+          onEmailReceipt={handleEmailReceipt}
+          isDownloading={isGenerating}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

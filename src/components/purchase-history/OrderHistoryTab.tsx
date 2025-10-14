@@ -6,9 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Search, Calendar, Download, Package, Eye } from 'lucide-react';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
-import { getCustomerOrderHistory, PurchaseHistoryFilters, downloadOrderReceipt } from '@/api/purchaseHistory';
+import { getCustomerOrderHistory, PurchaseHistoryFilters } from '@/api/purchaseHistory';
 import { OrderWithItems } from '@/api/orders';
 import { useToast } from '@/hooks/use-toast';
+import { useCustomerReceiptPDF } from '@/hooks/useCustomerReceiptPDF';
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 
 interface OrderHistoryTabProps {
   customerEmail: string;
@@ -26,6 +28,9 @@ export function OrderHistoryTab({ customerEmail }: OrderHistoryTabProps) {
     status: 'all',
     search: ''
   });
+
+  const { downloadReceipt, isGenerating } = useCustomerReceiptPDF();
+  const { data: businessSettings } = useBusinessSettings();
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -49,29 +54,15 @@ export function OrderHistoryTab({ customerEmail }: OrderHistoryTabProps) {
     fetchOrders();
   }, [customerEmail, filters, toast]);
 
-  const handleDownloadReceipt = async (orderId: string) => {
-    try {
-      const receipt = await downloadOrderReceipt(orderId);
-      const url = URL.createObjectURL(receipt);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `receipt-${orderId}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Success",
-        description: "Receipt downloaded successfully",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to download receipt",
-        variant: "destructive",
-      });
-    }
+  const handleDownloadReceipt = (order: OrderWithItems) => {
+    const businessInfo = businessSettings ? {
+      name: businessSettings.name || 'Starters',
+      address: '2B Close Off 11Crescent Kado Estate, Kado',
+      phone: '0807 301 1100',
+      email: 'store@startersmallchops.com',
+    } : undefined;
+
+    downloadReceipt(order, businessInfo);
   };
 
   const getStatusColor = (status: string) => {
@@ -202,11 +193,12 @@ export function OrderHistoryTab({ customerEmail }: OrderHistoryTabProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDownloadReceipt(order.id)}
+                      onClick={() => handleDownloadReceipt(order)}
+                      disabled={isGenerating}
                       className="flex items-center gap-2"
                     >
                       <Download className="h-4 w-4" />
-                      Receipt
+                      {isGenerating ? 'Generating...' : 'Receipt'}
                     </Button>
                   </div>
                 </div>

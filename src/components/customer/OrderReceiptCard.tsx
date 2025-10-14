@@ -51,13 +51,15 @@ interface OrderReceiptProps {
   };
   onDownload?: () => void;
   onEmailReceipt?: () => void;
+  isDownloading?: boolean;
 }
 
 export function OrderReceiptCard({ 
   order, 
   businessInfo, 
   onDownload, 
-  onEmailReceipt 
+  onEmailReceipt,
+  isDownloading = false
 }: OrderReceiptProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -303,9 +305,9 @@ export function OrderReceiptCard({
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 mt-6">
           {onDownload && (
-            <Button variant="outline" onClick={onDownload} className="flex-1">
+            <Button variant="outline" onClick={onDownload} className="flex-1" disabled={isDownloading}>
               <Download className="w-4 h-4 mr-2" />
-              Download Receipt
+              {isDownloading ? 'Generating PDF...' : 'Download Receipt'}
             </Button>
           )}
           

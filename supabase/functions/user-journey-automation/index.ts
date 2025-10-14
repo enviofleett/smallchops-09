@@ -178,10 +178,15 @@ async function handleRegistrationJourney(
       status: 'queued',
       template_key: 'customer_welcome',
       template_variables: {
-        customer_name: userData.name || 'New Customer',
-        store_name: 'Starters',
-        support_email: 'support@starters.com',
-        onboarding_link: 'https://yourdomain.com/onboarding',
+        customerName: userData.name || 'New Customer',
+        business_name: 'Starters Small Chops',
+        signupDate: new Date().toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        website_url: 'https://startersmallchops.com',
         ...metadata
       },
       priority: 'normal'

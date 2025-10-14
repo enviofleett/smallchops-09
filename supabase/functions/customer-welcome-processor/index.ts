@@ -32,19 +32,14 @@ serve(async (req) => {
     // Prepare enhanced variables for welcome email template
     const welcomeVariables = {
       customerName: customer_name || customer_email.split('@')[0],
-      customerEmail: customer_email,
-      business_name: businessSettings?.name || 'Starters',
-      companyName: businessSettings?.name || 'Starters',
-      loginUrl: businessSettings?.site_url || `${Deno.env.get("SUPABASE_URL") || "https://oknnklksdiqaifhxaccs.supabase.co"}`,
-      welcomeDate: new Date().toLocaleDateString('en-US', { 
+      business_name: businessSettings?.name || 'Starters Small Chops',
+      signupDate: new Date().toLocaleDateString('en-US', { 
         weekday: 'long', 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric' 
       }),
-      logoUrl: businessSettings?.logo_url || '',
-      primaryColor: businessSettings?.primary_color || '#667eea',
-      tagline: businessSettings?.tagline || 'Welcome to our community!'
+      website_url: businessSettings?.site_url || 'https://startersmallchops.com'
     };
 
     console.log('📧 Sending welcome email with variables:', JSON.stringify(welcomeVariables, null, 2));

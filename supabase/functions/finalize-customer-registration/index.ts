@@ -159,9 +159,14 @@ serve(async (req) => {
         priority: 'high',
         variables: {
           customerName: name,
-          customerEmail: email.toLowerCase(),
-          companyName: 'Starters',
-          loginUrl: `${Deno.env.get("SUPABASE_URL") || "https://oknnklksdiqaifhxaccs.supabase.co"}`
+          business_name: 'Starters Small Chops',
+          signupDate: new Date().toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          }),
+          website_url: 'https://startersmallchops.com'
         },
         metadata: {
           customer_id: customerId,

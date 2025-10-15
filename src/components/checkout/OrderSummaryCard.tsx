@@ -2,8 +2,10 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ShoppingCart, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { calculatePaystackFee } from '@/lib/paystackFees';
 
 interface CartItem {
   id: string;
@@ -39,6 +41,10 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
   collapsibleOnMobile = false,
   className
 }) => {
+  // Calculate transaction fee
+  const transactionFee = calculatePaystackFee(subtotal + deliveryFee);
+  const finalTotal = subtotal + deliveryFee + transactionFee;
+
   const orderContent = (
     <div className="space-y-4">
       {/* Items List */}
@@ -64,24 +70,42 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
 
       {/* Totals */}
       <div className="space-y-2">
-        {/* VAT-aware breakdown */}
-
-
-        <div className="flex items-center justify-between text-sm font-medium">
-          <span>Sub Total (incl. VAT)</span>
+        <div className="flex items-center justify-between text-sm">
+          <span>Subtotal (incl. VAT)</span>
           <span>₦{(subTotalInclVat ?? subtotal).toLocaleString()}</span>
         </div>
         
         <div className="flex items-center justify-between text-sm">
           <span>Delivery Fee</span>
-          <span>{deliveryFee > 0 ? `₦${deliveryFee.toLocaleString()}` : '₦0'}</span>
+          <span>{deliveryFee > 0 ? `₦${deliveryFee.toLocaleString()}` : 'Free'}</span>
         </div>
+        
+        {transactionFee > 0 && (
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <span>Payment Processing Fee</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Paystack charges 1.5% + ₦100 to securely process your payment (capped at ₦2,000)
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <span>₦{transactionFee.toLocaleString()}</span>
+          </div>
+        )}
         
         <Separator />
         
         <div className="flex items-center justify-between font-semibold">
-          <span>Total</span>
-          <span className="text-lg">₦{total.toLocaleString()}</span>
+          <span>Total to Pay</span>
+          <span className="text-lg text-primary">₦{finalTotal.toLocaleString()}</span>
         </div>
       </div>
     </div>
@@ -103,7 +127,7 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
                   </span>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-primary">₦{total.toLocaleString()}</p>
+                  <p className="font-semibold text-primary">₦{finalTotal.toLocaleString()}</p>
                 </div>
               </div>
             </AccordionTrigger>

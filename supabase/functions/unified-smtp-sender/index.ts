@@ -597,30 +597,45 @@ async function processTemplate(
     console.log(`✅ PRODUCTION_MODE: All ${requiredVariables.size} required variables validated for template '${templateKey}'`);
   }
 
-  // ✅ CRITICAL FIX: Block ALL emails without valid templates (NO FALLBACK EVER)
-  if (!templateFound || !template) {
-    const errorMsg = `❌ BLOCKED: Email rejected - template '${templateKey}' not found. Create this template in Email Template Manager.`;
-    console.error(errorMsg);
-    
-    // Log to audit_logs for tracking
-    await supabase.from('audit_logs').insert({
-      action: 'email_blocked_missing_template',
-      category: 'Email System',
-      message: errorMsg,
-      new_values: {
-        template_key: templateKey,
-        recipient: to,
-        blocked_at: new Date().toISOString()
-      }
-    });
-    
-    throw new Error(errorMsg);
+  // DEVELOPMENT MODE: Log when fallback templates are used
+  if (!isProductionMode && !templateFound && templateKey) {
+    console.warn(`⚠️ DEVELOPMENT_MODE: Template '${templateKey}' not found in database - using fallback. Add this template to Email Template Manager to ensure it works in production.`);
   }
 
-  // Template processing - use database template ONLY
-  const subject = template.subject || template.subject_template || `${businessName} - Notification`;
-  const html = template.html_content || template.html_template || '';
-  const text = template.text_content || template.text_template || '';
+  // Template processing - use template if found, fallback only in non-production
+  let subject: string;
+  let html: string;
+  let text: string;
+  
+  if (templateFound && template) {
+    // Use database template
+    subject = template.subject || template.subject_template || `${businessName} - Notification`;
+    html = template.html_content || template.html_template || '';
+    text = template.text_content || template.text_template || '';
+  } else if (!isProductionMode) {
+    // Fallback template (only allowed in development)
+    console.warn(`⚠️ DEVELOPMENT_MODE: Using fallback template for '${templateKey}'`);
+    subject = `${businessName} - Important Notification`;
+    html = `
+      <html>
+        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #f59e0b; margin-bottom: 20px;">${businessName}</h2>
+            <p>Thank you for your business with us.</p>
+            <p>This is an automated notification regarding your recent activity.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="font-size: 12px; color: #666;">
+              This email was sent from our automated system. Please do not reply directly.
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+    text = `${businessName} - Important Notification\n\nThank you for your business with us.\n\nThis is an automated notification regarding your recent activity.\n\nThis email was sent from our automated system. Please do not reply directly.`;
+  } else {
+    // This should never happen in production mode due to earlier checks
+    throw new Error('PRODUCTION_MODE: Template processing failed - no fallback allowed');
+  }
 
   // Extract all template variables to track missing ones
   const allContent = [subject, html, text].join(' ');

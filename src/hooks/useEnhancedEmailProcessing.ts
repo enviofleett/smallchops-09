@@ -109,19 +109,11 @@ export const useEnhancedEmailProcessing = () => {
 
   const triggerEnhancedProcessing = useCallback(async (email: string, eventType: string = 'customer_welcome'): Promise<boolean> => {
     try {
-      // Map event type to template key
-      const templateKeyMap: Record<string, string> = {
-        'customer_welcome': 'customer_welcome',
-        'order_confirmation': 'order_confirmation',
-        'order_status_update': 'order_status_update'
-      };
-      
       // Create communication event with high priority
       const { error } = await supabase
         .from('communication_events')
         .insert({
           event_type: eventType,
-          template_key: templateKeyMap[eventType] || eventType,
           recipient_email: email,
           status: 'queued',
           priority: 'high',

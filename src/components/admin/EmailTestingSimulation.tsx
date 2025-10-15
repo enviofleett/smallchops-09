@@ -176,19 +176,11 @@ export const EmailTestingSimulation = () => {
   };
 
   const testEmailSending = async (scenarioId: string, variables: any) => {
-    // Map scenario to template key
-    const templateKeyMap: Record<string, string> = {
-      'order_confirmation': 'order_confirmation',
-      'customer_welcome': 'customer_welcome',
-      'order_status_update': 'order_status_update'
-    };
-    
     // Create communication event
     const { data: event, error: eventError } = await supabase
       .from('communication_events')
       .insert({
         event_type: scenarioId,
-        template_key: templateKeyMap[scenarioId] || 'order_status_update',
         status: 'queued',
         order_id: variables.order_id || crypto.randomUUID(), // Generate random UUID if not provided
         payload: variables,

@@ -615,23 +615,31 @@ async function processTemplate(
   } else if (!isProductionMode) {
     // Fallback template (only allowed in development)
     console.warn(`⚠️ DEVELOPMENT_MODE: Using fallback template for '${templateKey}'`);
-    subject = `${businessName} - Important Notification`;
+    subject = `${businessName} - Order Status Update`;
     html = `
-      <html>
-        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #f59e0b; margin-bottom: 20px;">${businessName}</h2>
-            <p>Thank you for your business with us.</p>
-            <p>This is an automated notification regarding your recent activity.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-            <p style="font-size: 12px; color: #666;">
-              This email was sent from our automated system. Please do not reply directly.
-            </p>
-          </div>
-        </body>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Order Status Update</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; padding: 20px;">
+          <h2>Notification from ${businessName}</h2>
+          <p>Hi {{customer_name}},</p>
+          
+          <p>Thank you for your business with us. This is an automated notification regarding your recent order <strong>{{order_number}}</strong>.</p>
+          
+          <p>Follow us on all our social media handles to keep track of our new offers: <a href="https://www.instagram.com/startersmallchops/" style="color: #f59e0b;">https://www.instagram.com/startersmallchops/</a></p>
+          
+          <p>
+              Thank you,<br>
+              <strong>The ${businessName} Team</strong>
+          </p>
+      </body>
       </html>
     `;
-    text = `${businessName} - Important Notification\n\nThank you for your business with us.\n\nThis is an automated notification regarding your recent activity.\n\nThis email was sent from our automated system. Please do not reply directly.`;
+    text = `Notification from ${businessName}\n\nHi {{customer_name}},\n\nThank you for your business with us. This is an automated notification regarding your recent order {{order_number}}.\n\nFollow us on Instagram: https://www.instagram.com/startersmallchops/\n\nThank you,\nThe ${businessName} Team`;
   } else {
     // This should never happen in production mode due to earlier checks
     throw new Error('PRODUCTION_MODE: Template processing failed - no fallback allowed');

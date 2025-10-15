@@ -21,7 +21,17 @@ export async function sendOrderStatusEmail(params: SendOrderEmailParams): Promis
       orderNumber: params.orderData.order_number
     });
 
-    // Map order status to template key
+    // Fetch business settings for support email and business name
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('admin_notification_email, name, site_url')
+      .single();
+
+    const supportEmail = businessSettings?.admin_notification_email || params.adminEmail || 'support@startersmallchops.com';
+    const businessName = businessSettings?.name || 'Starters';
+    const websiteUrl = businessSettings?.site_url || window.location.origin;
+
+    // Map order status to template key and human-readable display
     const templateKeyMap: Record<string, string> = {
       'confirmed': 'order_confirmed',
       'preparing': 'order_preparing',
@@ -30,30 +40,59 @@ export async function sendOrderStatusEmail(params: SendOrderEmailParams): Promis
       'delivered': 'order_delivered',
       'cancelled': 'order_cancelled'
     };
+    
+    const statusDisplayMap: Record<string, string> = {
+      'confirmed': 'Confirmed',
+      'preparing': 'Being Prepared',
+      'ready': 'Ready for Pickup',
+      'out_for_delivery': 'Out for Delivery',
+      'delivered': 'Delivered',
+      'cancelled': 'Cancelled'
+    };
+
     const templateKey = templateKeyMap[params.status] || 'order_confirmed';
 
-    // Prepare email content
-    const subject = getOrderStatusSubject(params.status, params.orderData.order_number);
-    const htmlContent = getOrderStatusTemplate(params.status, {
-      orderData: params.orderData,
-      adminEmail: params.adminEmail,
-      trackingUrl: params.trackingUrl
-    });
-    const textContent = getOrderStatusPlainText(params.status, {
-      orderData: params.orderData,
-      adminEmail: params.adminEmail,
-      trackingUrl: params.trackingUrl
+    // Build comprehensive variables object for template replacement
+    const variables = {
+      customer_name: params.orderData.customer_name || 'Customer',
+      order_number: params.orderData.order_number,
+      status_display: statusDisplayMap[params.status] || params.status,
+      new_status: params.status,
+      status_date: new Date().toLocaleString('en-US', { 
+        dateStyle: 'full', 
+        timeStyle: 'short' 
+      }),
+      support_email: supportEmail,
+      order_total: `₦${params.orderData.total_amount.toLocaleString()}`,
+      total_amount: params.orderData.total_amount.toLocaleString(),
+      business_name: businessName,
+      website_url: websiteUrl,
+      order_type: params.orderData.order_type,
+      delivery_address: params.orderData.order_type === 'delivery' && params.orderData.delivery_address
+        ? (typeof params.orderData.delivery_address === 'string'
+            ? params.orderData.delivery_address
+            : params.orderData.delivery_address.address_line_1 || '')
+        : '',
+      pickup_point: params.orderData.order_type === 'pickup' ? 'Main Location' : '',
+      special_instructions: params.orderData.special_instructions || '',
+      tracking_url: params.trackingUrl || '',
+      current_year: new Date().getFullYear().toString()
+    };
+
+    console.log('📋 Email variables prepared:', {
+      templateKey,
+      variableCount: Object.keys(variables).length,
+      hasCustomerName: !!variables.customer_name,
+      hasOrderNumber: !!variables.order_number
     });
 
-    // Send email via unified SMTP sender
+    // Send email via unified SMTP sender with templateKey and variables only
     const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         to: params.to,
-        subject,
-        html: htmlContent,
-        text: textContent,
-        emailType: 'transactional',
         templateKey: templateKey,
+        variables: variables,
+        emailType: 'transactional',
         orderData: {
           orderId: params.orderData.id,
           orderNumber: params.orderData.order_number,
@@ -96,22 +135,53 @@ export async function sendOrderStatusEmailFallback(params: SendOrderEmailParams)
       orderNumber: params.orderData.order_number
     });
 
+    // Fetch business settings for comprehensive variables
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('admin_notification_email, name, site_url')
+      .single();
+
+    const supportEmail = businessSettings?.admin_notification_email || params.adminEmail || 'support@startersmallchops.com';
+    const businessName = businessSettings?.name || 'Starters';
+    const websiteUrl = businessSettings?.site_url || window.location.origin;
+
+    const statusDisplayMap: Record<string, string> = {
+      'confirmed': 'Confirmed',
+      'preparing': 'Being Prepared',
+      'ready': 'Ready for Pickup',
+      'out_for_delivery': 'Out for Delivery',
+      'delivered': 'Delivered',
+      'cancelled': 'Cancelled'
+    };
+
     // Use existing email template service
     const templateKey = `order_${params.status}`;
     const variables = {
-      customer_name: params.orderData.customer_name,
+      customer_name: params.orderData.customer_name || 'Customer',
       order_number: params.orderData.order_number,
-      order_total: params.orderData.total_amount.toLocaleString(),
-      status: params.status,
+      status_display: statusDisplayMap[params.status] || params.status,
+      new_status: params.status,
+      status_date: new Date().toLocaleString('en-US', { 
+        dateStyle: 'full', 
+        timeStyle: 'short' 
+      }),
+      support_email: supportEmail,
+      order_total: `₦${params.orderData.total_amount.toLocaleString()}`,
+      total_amount: params.orderData.total_amount.toLocaleString(),
+      business_name: businessName,
+      website_url: websiteUrl,
       order_type: params.orderData.order_type,
       delivery_address: params.orderData.delivery_address 
         ? (typeof params.orderData.delivery_address === 'string' 
            ? params.orderData.delivery_address 
            : params.orderData.delivery_address.address_line_1)
-        : null,
+        : '',
+      pickup_point: params.orderData.order_type === 'pickup' ? 'Main Location' : '',
       pickup_time: params.orderData.pickup_time,
-      special_instructions: params.orderData.special_instructions,
-      admin_email: params.adminEmail
+      special_instructions: params.orderData.special_instructions || '',
+      tracking_url: params.trackingUrl || '',
+      current_year: new Date().getFullYear().toString(),
+      admin_email: supportEmail
     };
 
     // Queue email via communication events

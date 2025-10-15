@@ -2,10 +2,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ShoppingCart, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { calculatePaystackFee } from '@/lib/paystackFees';
 
 interface CartItem {
   id: string;
@@ -41,9 +39,8 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
   collapsibleOnMobile = false,
   className
 }) => {
-  // Calculate transaction fee
-  const transactionFee = calculatePaystackFee(subtotal + deliveryFee);
-  const finalTotal = subtotal + deliveryFee + transactionFee;
+  // Paystack will add their own fees at checkout
+  const finalTotal = subtotal + deliveryFee;
 
   const orderContent = (
     <div className="space-y-4">
@@ -80,32 +77,18 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
           <span>{deliveryFee > 0 ? `₦${deliveryFee.toLocaleString()}` : 'Free'}</span>
         </div>
         
-        {transactionFee > 0 && (
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <span>Payment Processing Fee</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-xs">
-                      Paystack charges 1.5% + ₦100 to securely process your payment (capped at ₦2,000)
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <span>₦{transactionFee.toLocaleString()}</span>
-          </div>
-        )}
-        
         <Separator />
         
         <div className="flex items-center justify-between font-semibold">
-          <span>Total to Pay</span>
+          <span>Total</span>
           <span className="text-lg text-primary">₦{finalTotal.toLocaleString()}</span>
+        </div>
+
+        <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md mt-2">
+          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-blue-800 dark:text-blue-300">
+            Payment processing fees will be calculated and added by Paystack at checkout
+          </p>
         </div>
       </div>
     </div>

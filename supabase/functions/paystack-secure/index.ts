@@ -150,9 +150,10 @@ serve(async (req: Request): Promise<Response> => {
       
       const paystackPayload = {
         email: email,
-        amount: Math.round(amount * 100), // Convert to kobo
+        amount: Math.round(amount * 100), // Convert to kobo (just order total)
         currency: 'NGN',
         reference: reference,
+        bearer: "subaccount", // Customer pays all Paystack fees
         callback_url: requestData.callback_url || `${Deno.env.get('SITE_URL')}/payment/callback`,
         metadata: metadata || {}
       };

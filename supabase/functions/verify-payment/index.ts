@@ -180,20 +180,29 @@ serve(async (req: Request) => {
     let orderStatus: string
     let paymentStatus: string
 
-    // Validate payment amounts match (security check)
-    // Total amount already includes transaction fee stored in database
-    const expectedAmount = Math.round(order.total_amount * 100) // Convert to kobo
+    // Validate payment amounts (Paystack adds their own fees on top)
+    const orderTotalInKobo = Math.round(order.total_amount * 100) // Convert to kobo
     const receivedAmount = paymentData.amount
     
-    if (Math.abs(expectedAmount - receivedAmount) > 1) { // Allow 1 kobo tolerance
-      console.error('❌ Amount mismatch:', {
-        expected: expectedAmount,
+    // Allow Paystack to add their own transaction fees
+    // Verify received amount is at least the order total (can be higher due to Paystack fees)
+    if (receivedAmount < orderTotalInKobo) {
+      console.error('❌ Amount too low:', {
+        orderTotal: orderTotalInKobo,
         received: receivedAmount,
-        order_total: order.total_amount,
-        difference: Math.abs(expectedAmount - receivedAmount)
+        difference: orderTotalInKobo - receivedAmount
       })
-      throw new Error('Payment amount mismatch - possible fraud attempt')
+      throw new Error('Payment amount is less than order total')
     }
+    
+    // Log the actual fee charged by Paystack
+    const paystackFeeCharged = receivedAmount - orderTotalInKobo
+    console.log('💰 Paystack fee charged:', {
+      orderTotal: orderTotalInKobo,
+      receivedAmount: receivedAmount,
+      paystackFee: paystackFeeCharged,
+      feeInNaira: (paystackFeeCharged / 100).toFixed(2)
+    })
 
     switch (paymentData.status) {
       case 'success':

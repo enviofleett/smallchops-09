@@ -1275,7 +1275,7 @@ export type Database = {
           source: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
-          template_key: string | null
+          template_key: string
           template_variables: Json | null
           updated_at: string
           variables: Json | null
@@ -1312,7 +1312,7 @@ export type Database = {
           source?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
-          template_key?: string | null
+          template_key: string
           template_variables?: Json | null
           updated_at?: string
           variables?: Json | null
@@ -1349,7 +1349,7 @@ export type Database = {
           source?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
-          template_key?: string | null
+          template_key?: string
           template_variables?: Json | null
           updated_at?: string
           variables?: Json | null
@@ -9558,7 +9558,7 @@ export type Database = {
         Returns: Json
       }
       admin_update_order_status_bulletproof: {
-        Args: { p_admin_id: string; p_new_status: string; p_order_id: string }
+        Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
         Returns: Json
       }
       admin_update_order_status_lock_first: {
@@ -10711,7 +10711,7 @@ export type Database = {
           source: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
-          template_key: string | null
+          template_key: string
           template_variables: Json | null
           updated_at: string
           variables: Json | null

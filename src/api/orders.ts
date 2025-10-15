@@ -295,9 +295,22 @@ export async function manuallyQueueCommunicationEvent(orderId: string, eventType
 export async function manuallyQueueCommunicationEvent(order: OrderWithItems, eventType: string): Promise<any>;
 export async function manuallyQueueCommunicationEvent(orderOrId: string | OrderWithItems, eventType: string) {
   const orderId = typeof orderOrId === 'string' ? orderOrId : orderOrId.id;
+  
+  // Map event type to template key
+  const templateKeyMap: Record<string, string> = {
+    'order_confirmation': 'order_confirmation',
+    'order_status_update': 'order_status_update',
+    'order_preparing': 'order_preparing',
+    'order_ready': 'order_ready',
+    'order_out_for_delivery': 'order_out_for_delivery',
+    'order_delivered': 'order_delivered',
+    'order_cancelled': 'order_cancelled'
+  };
+  
   const { data, error } = await supabase.from('communication_events').insert({
     event_type: eventType,
     order_id: orderId,
+    template_key: templateKeyMap[eventType] || 'order_status_update',
     status: 'queued'
   });
   if (error) throw error;

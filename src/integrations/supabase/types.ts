@@ -11298,13 +11298,22 @@ export type Database = {
         Returns: Json
       }
       queue_communication_event_nonblocking: {
-        Args: {
-          p_event_type: string
-          p_order_id: string
-          p_recipient_email: string
-          p_template_key: string
-          p_template_variables?: Json
-        }
+        Args:
+          | {
+              p_event_type: string
+              p_order_id: string
+              p_priority?: string
+              p_recipient_email: string
+              p_template_key: string
+              p_template_variables: Json
+            }
+          | {
+              p_event_type: string
+              p_order_id: string
+              p_recipient_email: string
+              p_template_key: string
+              p_template_variables?: Json
+            }
         Returns: Json
       }
       reassign_order_rider: {

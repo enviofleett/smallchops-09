@@ -53,11 +53,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('🔄 Processing communication events enhanced...');
     
-    // Build query for queued events
+    // Build query for queued events - filter out NULL template_key to prevent spam
     let query = supabase
       .from('communication_events')
       .select('*')
       .eq('status', 'queued')
+      .not('template_key', 'is', null)
       .order('created_at', { ascending: true })
       .limit(batchSize);
 

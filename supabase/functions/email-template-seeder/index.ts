@@ -118,6 +118,8 @@ const PRODUCTION_TEMPLATES: ProductionTemplate[] = [
             <p style="margin: 5px 0; color: #856404;"><strong>Delivery Address:</strong> {{delivery_address}}</p>
             {{#driver_name}}<p style="margin: 5px 0; color: #856404;"><strong>Driver:</strong> {{driver_name}}</p>{{/driver_name}}
             {{#driver_phone}}<p style="margin: 5px 0; color: #856404;"><strong>Driver Phone:</strong> {{driver_phone}}</p>{{/driver_phone}}
+            {{#driver_vehicle_full}}<p style="margin: 5px 0; color: #856404;"><strong>Vehicle:</strong> {{driver_vehicle_full}}</p>{{/driver_vehicle_full}}
+            {{#driver_license_plate}}<p style="margin: 5px 0; color: #856404;"><strong>License Plate:</strong> {{driver_license_plate}}</p>{{/driver_license_plate}}
           </div>
           <p style="color: #666; line-height: 1.6;">
             Please ensure someone is available to receive the delivery.
@@ -129,8 +131,8 @@ const PRODUCTION_TEMPLATES: ProductionTemplate[] = [
         </div>
       </div>
     `,
-    text_template: `📦 Out for Delivery\nOrder #{{order_number}}\n\nHi {{customer_name}},\n\nGreat news! Your order is now out for delivery and should arrive soon.\n\n🚚 Delivery Information:\nExpected Delivery: {{estimated_delivery_time}}\nDelivery Address: {{delivery_address}}\nDriver: {{driver_name}}\nDriver Phone: {{driver_phone}}\n\nPlease ensure someone is available to receive the delivery.\n\nQuestions? Contact us at {{support_email}}\n© {{current_year}} {{business_name}}. All rights reserved.`,
-    variables: ['business_name', 'customer_name', 'order_number', 'estimated_delivery_time', 'delivery_address', 'driver_name', 'driver_phone', 'support_email', 'current_year'],
+    text_template: `📦 Out for Delivery\nOrder #{{order_number}}\n\nHi {{customer_name}},\n\nGreat news! Your order is now out for delivery and should arrive soon.\n\n🚚 Delivery Information:\nExpected Delivery: {{estimated_delivery_time}}\nDelivery Address: {{delivery_address}}\nDriver: {{driver_name}}\nDriver Phone: {{driver_phone}}\nVehicle: {{driver_vehicle_full}}\nLicense Plate: {{driver_license_plate}}\n\nPlease ensure someone is available to receive the delivery.\n\nQuestions? Contact us at {{support_email}}\n© {{current_year}} {{business_name}}. All rights reserved.`,
+    variables: ['business_name', 'customer_name', 'order_number', 'estimated_delivery_time', 'delivery_address', 'driver_name', 'driver_phone', 'driver_email', 'driver_vehicle_type', 'driver_vehicle_brand', 'driver_vehicle_model', 'driver_vehicle_full', 'driver_license_plate', 'has_driver_assigned', 'support_email', 'current_year'],
     template_type: 'transactional',
     category: 'orders', 
     style: 'modern',

@@ -64,7 +64,7 @@ serve(async (req) => {
       throw new Error(`Failed to fetch order: ${orderError?.message || 'Order not found'}`);
     }
 
-    // Fetch driver details if assigned
+    // Fetch complete driver details if assigned (production-ready)
     const { data: assignment } = await supabase
       .from('order_assignments')
       .select(`
@@ -73,7 +73,11 @@ serve(async (req) => {
           id,
           name,
           phone,
-          vehicle_type
+          email,
+          vehicle_type,
+          vehicle_brand,
+          vehicle_model,
+          license_plate
         )
       `)
       .eq('order_id', order_id)
@@ -81,6 +85,13 @@ serve(async (req) => {
       .single();
 
     const driver = assignment?.drivers;
+
+    console.log('Driver info fetched:', driver ? {
+      name: driver.name,
+      phone: driver.phone,
+      vehicle: `${driver.vehicle_brand || ''} ${driver.vehicle_model || ''}`.trim(),
+      license: driver.license_plate
+    } : 'No driver assigned');
 
     // Build email content using the utility function
     const orderData = {
@@ -95,7 +106,7 @@ serve(async (req) => {
       total_amount: order.total_amount
     };
 
-    // Prepare template variables for the out_for_delivery template
+    // Prepare comprehensive template variables for delivery emails (production-ready)
     const templateVariables = {
       customer_name: orderData.customer_name,
       order_number: orderData.order_number,
@@ -104,14 +115,30 @@ serve(async (req) => {
       delivery_instructions: orderData.delivery_instructions || '',
       estimated_delivery_time: orderData.estimated_delivery_time ? 
         new Date(orderData.estimated_delivery_time).toLocaleString() : '',
-      driver_name: driver?.name || '',
+      // Complete driver information
+      driver_name: driver?.name || 'Our delivery team',
       driver_phone: driver?.phone || '',
+      driver_email: driver?.email || '',
       driver_vehicle_type: driver?.vehicle_type || '',
+      driver_vehicle_brand: driver?.vehicle_brand || '',
+      driver_vehicle_model: driver?.vehicle_model || '',
+      driver_license_plate: driver?.license_plate || '',
+      driver_vehicle_full: driver ? 
+        `${driver.vehicle_brand || ''} ${driver.vehicle_model || ''}`.trim() || driver.vehicle_type || '' : '',
+      has_driver_assigned: driver ? 'true' : 'false',
       order_items_html: buildOrderItemsHtml(orderData.order_items || []),
       order_items_text: buildOrderItemsText(orderData.order_items || []),
       total_amount: orderData.total_amount?.toLocaleString() || '0',
-      business_name: 'Starters' // Get from business settings if needed
+      business_name: 'Starters',
+      support_email: 'support@startersmallchops.com',
+      current_year: new Date().getFullYear().toString()
     };
+
+    console.log('Template variables prepared with driver info:', {
+      has_driver: !!driver,
+      driver_name: templateVariables.driver_name,
+      driver_vehicle: templateVariables.driver_vehicle_full
+    });
 
     // Send email using the template from Email Template Manager
     const { data: emailResponse, error: emailError } = await supabase.functions.invoke('unified-smtp-sender', {

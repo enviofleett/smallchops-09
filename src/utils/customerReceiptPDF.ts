@@ -39,6 +39,22 @@ interface BusinessInfo {
   email?: string;
 }
 
+// Custom currency formatter for PDF - avoids locale string issues
+const formatCurrency = (amount: number): string => {
+  // Ensure we have a valid number
+  const num = Number(amount) || 0;
+  
+  // Format with 2 decimal places
+  const formatted = num.toFixed(2);
+  
+  // Add thousand separators manually
+  const parts = formatted.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  
+  // Return with Naira symbol
+  return `₦${parts.join('.')}`;
+};
+
 export const generateCustomerReceiptPDF = (
   order: Order,
   businessInfo?: BusinessInfo
@@ -235,8 +251,8 @@ export const generateCustomerReceiptPDF = (
     return [
       productName,
       item.quantity.toString(),
-      `\u20A6${unitPrice.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      `\u20A6${totalPrice.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      formatCurrency(unitPrice),
+      formatCurrency(totalPrice)
     ];
   });
 
@@ -254,7 +270,7 @@ export const generateCustomerReceiptPDF = (
       cellPadding: 5
     },
     bodyStyles: {
-      fontSize: 10,
+      fontSize: 11,
       cellPadding: 5,
       textColor: darkGray
     },
@@ -263,9 +279,9 @@ export const generateCustomerReceiptPDF = (
     },
     columnStyles: {
       0: { cellWidth: 'auto', fontStyle: 'normal' },
-      1: { cellWidth: 20, halign: 'center' },
-      2: { cellWidth: 40, halign: 'right' },
-      3: { cellWidth: 40, halign: 'right', fontStyle: 'bold' }
+      1: { cellWidth: 20, halign: 'center', fontSize: 11 },
+      2: { cellWidth: 45, halign: 'right', fontSize: 11 },
+      3: { cellWidth: 45, halign: 'right', fontStyle: 'bold', fontSize: 11 }
     },
     margin: { left: 15, right: 15 }
   });
@@ -288,26 +304,26 @@ export const generateCustomerReceiptPDF = (
 
   if (order.subtotal !== undefined && order.subtotal !== null) {
     doc.text('Subtotal:', summaryX, yPos);
-    doc.text(`\u20A6${order.subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+    doc.text(formatCurrency(order.subtotal), pageWidth - 20, yPos, { align: 'right' });
     yPos += 6;
   }
 
   if (order.tax_amount || order.vat_amount) {
     doc.text('VAT (7.5%):', summaryX, yPos);
-    doc.text(`\u20A6${(order.tax_amount || order.vat_amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+    doc.text(formatCurrency(order.tax_amount || order.vat_amount || 0), pageWidth - 20, yPos, { align: 'right' });
     yPos += 6;
   }
 
   if (order.delivery_fee) {
     doc.text('Delivery Fee:', summaryX, yPos);
-    doc.text(`\u20A6${order.delivery_fee.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+    doc.text(formatCurrency(order.delivery_fee), pageWidth - 20, yPos, { align: 'right' });
     yPos += 6;
   }
 
   if (order.discount_amount) {
     doc.setTextColor(34, 197, 94);
     doc.text('Discount:', summaryX, yPos);
-    doc.text(`-\u20A6${order.discount_amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+    doc.text(`-${formatCurrency(order.discount_amount)}`, pageWidth - 20, yPos, { align: 'right' });
     doc.setTextColor(...darkGray);
     yPos += 6;
   }
@@ -319,10 +335,10 @@ export const generateCustomerReceiptPDF = (
   yPos += 7;
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(13);
   doc.setTextColor(...primaryColor);
   doc.text('TOTAL:', summaryX, yPos);
-  doc.text(`\u20A6${order.total_amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+  doc.text(formatCurrency(order.total_amount), pageWidth - 20, yPos, { align: 'right' });
 
   if (order.payment_method) {
     yPos = summaryStartY + 58;

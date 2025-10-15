@@ -65,12 +65,8 @@ export const generateCustomerReceiptPDF = (
     yPos += 5;
   }
 
-  // Business Name
-  doc.setFontSize(24);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...primaryColor);
-  doc.text(businessInfo?.name || 'Starters', pageWidth / 2, yPos, { align: 'center' });
-  yPos += 8;
+  // Remove duplicate business name text - logo is enough
+  yPos += 3;
 
   // Business Info
   doc.setFontSize(9);
@@ -118,23 +114,30 @@ export const generateCustomerReceiptPDF = (
   
   // Two column layout for order info
   const leftCol = boxX + boxPadding + 2;
-  const midCol = pageWidth / 2;
+  const rightCol = pageWidth - boxX - boxPadding - 2;
 
   doc.setFont('helvetica', 'bold');
   doc.text('Order Number:', leftCol, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(order.order_number, leftCol + 32, yPos);
+  // Ensure full order number is displayed with proper wrapping if needed
+  const orderNumText = order.order_number || 'N/A';
+  const orderNumX = leftCol + 32;
+  const maxOrderNumWidth = (pageWidth / 2) - orderNumX - 5;
+  const orderNumLines = doc.splitTextToSize(orderNumText, maxOrderNumWidth);
+  doc.text(orderNumLines, orderNumX, yPos);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Date:', midCol, yPos);
+  doc.text('Date:', pageWidth / 2 + 5, yPos);
   doc.setFont('helvetica', 'normal');
   const formattedDate = new Date(order.created_at).toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   });
-  doc.text(formattedDate, midCol + 15, yPos);
-  yPos += 7;
+  doc.text(formattedDate, pageWidth / 2 + 20, yPos);
+  yPos += Math.max(7, orderNumLines.length * 5);
 
   if (order.payment_status) {
     doc.setFont('helvetica', 'bold');
@@ -148,11 +151,11 @@ export const generateCustomerReceiptPDF = (
 
   if (order.status) {
     doc.setFont('helvetica', 'bold');
-    doc.text('Status:', midCol, yPos);
+    doc.text('Status:', pageWidth / 2 + 5, yPos);
     doc.setFont('helvetica', 'normal');
-    doc.text(order.status.toUpperCase(), midCol + 15, yPos);
+    doc.text(order.status.replace(/_/g, ' ').toUpperCase(), pageWidth / 2 + 20, yPos);
   }
-  yPos += 7;
+  yPos += 8;
 
   yPos = boxStartY + 33;
 
@@ -213,17 +216,29 @@ export const generateCustomerReceiptPDF = (
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...primaryColor);
-  doc.text('ORDER ITEMS', 15, yPos);
+  doc.text('PURCHASED PRODUCTS', 15, yPos);
   yPos += 8;
 
   // Items Table
   const items = order.items || order.order_items || [];
-  const tableData = items.map((item) => [
-    item.product_name || item.name || 'Unknown Item',
-    item.quantity.toString(),
-    `₦${((item.unit_price || item.price || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`,
-    `₦${((item.total_price || (item.quantity * (item.unit_price || item.price || 0))).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`
-  ]);
+  const tableData = items.map((item) => {
+    // Extract product name with proper fallback chain
+    const productName = item.product_name 
+      || item.name 
+      || ((item as any).product?.name) 
+      || ((item as any).products?.name)
+      || 'Item';
+    
+    const unitPrice = item.unit_price || item.price || 0;
+    const totalPrice = item.total_price || (item.quantity * unitPrice);
+    
+    return [
+      productName,
+      item.quantity.toString(),
+      `\u20A6${unitPrice.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `\u20A6${totalPrice.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ];
+  });
 
   autoTable(doc, {
     startY: yPos,
@@ -273,26 +288,26 @@ export const generateCustomerReceiptPDF = (
 
   if (order.subtotal !== undefined && order.subtotal !== null) {
     doc.text('Subtotal:', summaryX, yPos);
-    doc.text(`₦${order.subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+    doc.text(`\u20A6${order.subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
     yPos += 6;
   }
 
   if (order.tax_amount || order.vat_amount) {
     doc.text('VAT (7.5%):', summaryX, yPos);
-    doc.text(`₦${((order.tax_amount || order.vat_amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 }))}`, pageWidth - 20, yPos, { align: 'right' });
+    doc.text(`\u20A6${(order.tax_amount || order.vat_amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
     yPos += 6;
   }
 
   if (order.delivery_fee) {
     doc.text('Delivery Fee:', summaryX, yPos);
-    doc.text(`₦${order.delivery_fee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+    doc.text(`\u20A6${order.delivery_fee.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
     yPos += 6;
   }
 
   if (order.discount_amount) {
     doc.setTextColor(34, 197, 94);
     doc.text('Discount:', summaryX, yPos);
-    doc.text(`-₦${order.discount_amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+    doc.text(`-\u20A6${order.discount_amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
     doc.setTextColor(...darkGray);
     yPos += 6;
   }
@@ -304,10 +319,10 @@ export const generateCustomerReceiptPDF = (
   yPos += 7;
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.setTextColor(...primaryColor);
   doc.text('TOTAL:', summaryX, yPos);
-  doc.text(`₦${order.total_amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
+  doc.text(`\u20A6${order.total_amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - 20, yPos, { align: 'right' });
 
   if (order.payment_method) {
     yPos = summaryStartY + 58;

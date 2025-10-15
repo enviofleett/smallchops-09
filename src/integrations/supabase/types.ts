@@ -1248,7 +1248,7 @@ export type Database = {
           channel: string | null
           collision_detected_at: string | null
           created_at: string
-          dedupe_key: string | null
+          dedupe_key: string
           delivery_status: string | null
           email_provider: string | null
           email_type: string | null
@@ -1285,7 +1285,7 @@ export type Database = {
           channel?: string | null
           collision_detected_at?: string | null
           created_at?: string
-          dedupe_key?: string | null
+          dedupe_key?: string
           delivery_status?: string | null
           email_provider?: string | null
           email_type?: string | null
@@ -1322,7 +1322,7 @@ export type Database = {
           channel?: string | null
           collision_detected_at?: string | null
           created_at?: string
-          dedupe_key?: string | null
+          dedupe_key?: string
           delivery_status?: string | null
           email_provider?: string | null
           email_type?: string | null
@@ -10684,7 +10684,7 @@ export type Database = {
           channel: string | null
           collision_detected_at: string | null
           created_at: string
-          dedupe_key: string | null
+          dedupe_key: string
           delivery_status: string | null
           email_provider: string | null
           email_type: string | null

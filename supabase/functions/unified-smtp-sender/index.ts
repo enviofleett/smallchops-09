@@ -377,7 +377,7 @@ Never use placeholder, test, or hashed values in production.
       // Normalize password: remove spaces that are sometimes copied from UI (e.g., Gmail App Passwords)
       password: secretPass.replace(/\s+/g, '').trim(),
       senderEmail: secretUser.trim(),
-      senderName: 'System',
+      senderName: 'Starters',
       encryption: 'TLS',
       source: 'function_secrets'
     };
@@ -444,7 +444,7 @@ Never use placeholder, test, or hashed values in production.
     username: normalizedUsername,
     password: normalizedPassword,
     senderEmail: (config.sender_email || normalizedUsername).trim(),
-    senderName: (config.sender_name || 'System').trim(),
+    senderName: (config.sender_name || 'Starters').trim(),
     encryption: 'TLS',
     source: 'database'
   };
@@ -1484,8 +1484,8 @@ serve(async (req: Request) => {
           from: `${smtpConfig.senderName} <${smtpConfig.senderEmail}>`,
           to: requestBody.to,
           subject: finalSubject,
-          text,
-          html
+          // Prioritize HTML - only send text if no HTML available
+          ...(html ? { html, text } : { text })
         });
         
         return { client, connectionInfo };

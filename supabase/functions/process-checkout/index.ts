@@ -109,14 +109,28 @@ serve(async (req: Request) => {
       throw new Error('Delivery/pickup date is required')
     }
 
+    // Calculate Paystack transaction fee (1.5% + ₦100 for amounts > ₦2,500)
+    const calculatePaystackFee = (amount: number): number => {
+      if (amount <= 2500) return 0;  // Free for small amounts
+      const percentageFee = amount * 0.015;  // 1.5%
+      const flatFee = 100;  // ₦100
+      const totalFee = percentageFee + flatFee;
+      const cappedFee = Math.min(totalFee, 2000);  // Cap at ₦2,000
+      return Math.round(cappedFee * 100) / 100;  // Round to 2 decimals
+    };
+
     // Calculate amounts
     const subtotal = items.reduce((sum: number, item: any) => 
       sum + ((item.unit_price || item.price) * item.quantity), 0)
     const deliveryFee = fulfillment?.type === 'delivery' ? (fulfillment.delivery_fee || 0) : 0
     const taxAmount = 0 // Add tax calculation if needed
-    const totalAmount = subtotal + deliveryFee + taxAmount
+    const subtotalWithDelivery = subtotal + deliveryFee + taxAmount
     
-    console.log('💰 Calculated totals:', { subtotal, deliveryFee, taxAmount, totalAmount })
+    // Calculate transaction fee BEFORE finalizing order
+    const transactionFee = calculatePaystackFee(subtotalWithDelivery)
+    const totalAmount = subtotalWithDelivery + transactionFee
+    
+    console.log('💰 Calculated totals:', { subtotal, deliveryFee, taxAmount, transactionFee, totalAmount })
 
     // Generate order number and payment reference
     const timestamp = Date.now()
@@ -144,6 +158,7 @@ serve(async (req: Request) => {
       subtotal: subtotal,
       tax_amount: taxAmount,
       delivery_fee: deliveryFee,
+      transaction_fee: transactionFee,
       total_amount: totalAmount,
       payment_method: payment.method || 'paystack',
       payment_reference: paymentReference,

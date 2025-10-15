@@ -5576,6 +5576,7 @@ export type Database = {
           tax_amount: number
           total_amount: number
           total_vat: number | null
+          transaction_fee: number | null
           updated_at: string
           updated_by: string | null
           user_id: string | null
@@ -5630,6 +5631,7 @@ export type Database = {
           tax_amount?: number
           total_amount?: number
           total_vat?: number | null
+          transaction_fee?: number | null
           updated_at?: string
           updated_by?: string | null
           user_id?: string | null
@@ -5684,6 +5686,7 @@ export type Database = {
           tax_amount?: number
           total_amount?: number
           total_vat?: number | null
+          transaction_fee?: number | null
           updated_at?: string
           updated_by?: string | null
           user_id?: string | null

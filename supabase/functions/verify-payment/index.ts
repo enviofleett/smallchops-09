@@ -181,6 +181,7 @@ serve(async (req: Request) => {
     let paymentStatus: string
 
     // Validate payment amounts match (security check)
+    // Total amount already includes transaction fee stored in database
     const expectedAmount = Math.round(order.total_amount * 100) // Convert to kobo
     const receivedAmount = paymentData.amount
     
@@ -188,7 +189,8 @@ serve(async (req: Request) => {
       console.error('❌ Amount mismatch:', {
         expected: expectedAmount,
         received: receivedAmount,
-        order_total: order.total_amount
+        order_total: order.total_amount,
+        difference: Math.abs(expectedAmount - receivedAmount)
       })
       throw new Error('Payment amount mismatch - possible fraud attempt')
     }

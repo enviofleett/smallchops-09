@@ -52,6 +52,27 @@ export const useUpdateOrderStatus = (orderId: string): UseUpdateOrderStatusRetur
         throw new Error((result as any)?.error || 'Failed to update order status');
       }
 
+      // 🚚 Send specialized out-for-delivery email with driver info
+      if (newStatus === 'out_for_delivery') {
+        try {
+          console.log('📧 Triggering out-for-delivery email with driver details...');
+          const { error: emailError } = await supabase.functions.invoke('send-out-for-delivery-email', {
+            body: { order_id: orderId }
+          });
+          
+          if (emailError) {
+            console.error('⚠️ Failed to send out-for-delivery email:', emailError);
+            // Don't fail the entire update if email fails
+            toast.warning('Order updated, but email notification may be delayed');
+          } else {
+            console.log('✅ Out-for-delivery email sent with driver details');
+          }
+        } catch (emailError) {
+          console.error('⚠️ Error sending out-for-delivery email:', emailError);
+          // Don't block status update if email fails
+        }
+      }
+
       // Invalidate ALL relevant query keys to ensure UI updates across all tabs
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admin-orders'] }),

@@ -222,14 +222,14 @@ export function NewOrderDetailsModal({
   };
   return <>
       <AdaptiveDialog open={open} onOpenChange={onClose} title={`Order #${safeOrder.order_number}`} description={`${safeOrder.order_type} order for ${safeOrder.customer_name}`} size="xl">
-        <div className="space-y-6 max-h-[80vh] overflow-y-auto p-4 sm:p-6">
+        <div className="space-y-6 max-h-[80vh] overflow-y-auto p-4 sm:p-6 font-sans">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-border">
             <div className="flex items-center gap-3">
-              <Badge className={`${getStatusColor(safeOrder.status)} text-white text-xs sm:text-sm px-2.5 py-1`}>
+              <Badge className={`${getStatusColor(safeOrder.status)} text-white text-sm font-bold px-3 py-1.5 tracking-wide`}>
                 {safeOrder.status.replace('_', ' ').toUpperCase()}
               </Badge>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-[15px] font-semibold text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 <span className="hidden sm:inline">
                   {format(new Date(safeOrder.order_time), 'MMM dd, yyyy hh:mm a')}
@@ -240,7 +240,7 @@ export function NewOrderDetailsModal({
               </div>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2.5">
               {/* Admin-only action buttons */}
               {isAdmin && (
                 <>
@@ -248,7 +248,7 @@ export function NewOrderDetailsModal({
                     onClick={() => setShowEmailSelector(true)}
                     variant="outline"
                     size="default"
-                    className="gap-2"
+                    className="gap-2 font-semibold text-[15px] border-2"
                   >
                     <Send className="h-4 w-4" />
                     <span className="hidden sm:inline">Send Email</span>
@@ -258,7 +258,7 @@ export function NewOrderDetailsModal({
                     onClick={handlePrint}
                     variant="outline"
                     size="default"
-                    className="gap-2"
+                    className="gap-2 font-semibold text-[15px] border-2"
                   >
                     <Printer className="h-4 w-4" />
                     <span className="hidden sm:inline">Print</span>
@@ -272,13 +272,13 @@ export function NewOrderDetailsModal({
                 disabled={isGenerating}
                 variant="default"
                 size="default"
-                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg font-semibold px-6"
+                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg font-bold text-[15px] px-6 tracking-wide"
               >
                 <Download className={`h-5 w-5 ${isGenerating ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">
+                <span className="hidden sm:inline font-bold">
                   {isGenerating ? 'Generating PDF...' : 'Download PDF Receipt'}
                 </span>
-                <span className="sm:hidden">
+                <span className="sm:hidden font-bold">
                   {isGenerating ? 'Generating...' : 'Download PDF'}
                 </span>
               </Button>
@@ -293,23 +293,23 @@ export function NewOrderDetailsModal({
           {/* Customer Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2 text-[17px] font-black tracking-wide uppercase border-b-2 border-border pb-3">
                 <User className="h-5 w-5" />
                 Customer Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
+            <CardContent className="space-y-3.5">
+              <div className="flex items-center gap-2.5">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-base">{safeOrder.customer_name}</span>
+                <span className="font-bold text-[15px]">{safeOrder.customer_name}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-base">{safeOrder.customer_email}</span>
+                <span className="text-[15px] font-semibold">{safeOrder.customer_email}</span>
               </div>
-              {safeOrder.customer_phone && <div className="flex items-center gap-2">
+              {safeOrder.customer_phone && <div className="flex items-center gap-2.5">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-base">{safeOrder.customer_phone}</span>
+                  <span className="text-[15px] font-semibold">{safeOrder.customer_phone}</span>
                   {isAdmin && (() => {
                 // Clean and format Nigerian phone number
                 const cleanNumber = safeOrder.customer_phone.replace(/[^0-9]/g, '');
@@ -332,19 +332,19 @@ export function NewOrderDetailsModal({
           {/* Order Summary */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2 text-[17px] font-black tracking-wide uppercase border-b-2 border-border pb-3">
                 <FileText className="h-5 w-5" />
                 Order Summary
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-base">
-                <div className="text-muted-foreground">Order Type:</div>
-                <div className="font-medium capitalize">{safeOrder.order_type}</div>
+              <div className="grid grid-cols-2 gap-3.5 text-[15px]">
+                <div className="text-muted-foreground font-bold">Order Type:</div>
+                <div className="font-bold capitalize">{safeOrder.order_type}</div>
                 
-                <div className="text-muted-foreground">Payment Status:</div>
+                <div className="text-muted-foreground font-bold">Payment Status:</div>
                 <div>
-                  <Badge className={`${getPaymentStatusColor(safeOrder.payment_status)} text-white`}>
+                  <Badge className={`${getPaymentStatusColor(safeOrder.payment_status)} text-white font-bold tracking-wide`}>
                     {safeOrder.payment_status.toUpperCase()}
                   </Badge>
                 </div>
@@ -354,22 +354,22 @@ export function NewOrderDetailsModal({
               {safeOrder.order_type === 'delivery' ? <>
                   {/* Delivery Address */}
                   {safeOrder.delivery_address && <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
+                      <Separator className="my-4" />
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-[15px] font-bold">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
                           Delivery Address
                         </div>
-                        <p className="text-sm text-muted-foreground pl-6">
+                        <p className="text-[15px] text-foreground font-semibold pl-6 leading-relaxed">
                           {formatAddress(safeOrder.delivery_address)}
                         </p>
                       </div>
                     </>}
 
                   {/* Delivery Time Window (1-hour window from delivery_time) */}
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
+                  <Separator className="my-4" />
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2 text-[15px] font-bold">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       Delivery Window
                     </div>
@@ -377,22 +377,22 @@ export function NewOrderDetailsModal({
                     {!hasValidTimeField(safeOrder) ? <div className="pl-6">
                         <Alert variant="destructive">
                           <AlertTriangle className="h-4 w-4" />
-                          <AlertDescription>
-                            <strong>Data Error:</strong> Missing delivery time for this order. Please contact support.
+                          <AlertDescription className="font-semibold text-[14px]">
+                            <strong className="font-bold">Data Error:</strong> Missing delivery time for this order. Please contact support.
                           </AlertDescription>
                         </Alert>
-                      </div> : <div className="pl-6 space-y-1">
-                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-muted-foreground">Date:</span>
-                            <span className="font-medium">
+                      </div> : <div className="pl-6 space-y-2">
+                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && <div className="flex items-center gap-2 text-[15px]">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground font-bold">Date:</span>
+                            <span className="font-bold">
                               {formatDeliveryDate(safeOrder.delivery_date)}
                             </span>
                           </div>}
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-muted-foreground">Time:</span>
-                          <span className="font-medium">
+                        <div className="flex items-center gap-2 text-[15px]">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground font-bold">Time:</span>
+                          <span className="font-bold">
                             {getOrderTimeWindow(safeOrder) || 'Time not available'}
                           </span>
                           <Badge variant="outline" className="ml-2 text-xs">
@@ -404,36 +404,36 @@ export function NewOrderDetailsModal({
                 </> : safeOrder.order_type === 'pickup' ? <>
                   {/* Pickup Location */}
                   {isLoadingPickupPoint ? <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
+                      <Separator className="my-4" />
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-[15px] font-bold">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
                           Pickup Location
                         </div>
-                        <div className="pl-6 text-sm text-muted-foreground animate-pulse">
+                        <div className="pl-6 text-[15px] text-muted-foreground font-semibold animate-pulse">
                           Loading pickup location...
                         </div>
                       </div>
                     </> : pickupPoint ? <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
+                      <Separator className="my-4" />
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-[15px] font-bold">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
                           Pickup Location
                         </div>
-                        <div className="pl-6 space-y-1">
-                          <p className="text-sm font-medium">{pickupPoint.name}</p>
-                          <p className="text-sm text-muted-foreground">{pickupPoint.address}</p>
-                          {pickupPoint.contact_phone && <p className="text-xs text-muted-foreground">📞 {pickupPoint.contact_phone}</p>}
-                          {pickupPoint.instructions && <p className="text-xs text-muted-foreground italic mt-1">ℹ️ {pickupPoint.instructions}</p>}
+                        <div className="pl-6 space-y-2">
+                          <p className="text-[15px] font-bold">{pickupPoint.name}</p>
+                          <p className="text-[15px] text-foreground font-semibold">{pickupPoint.address}</p>
+                          {pickupPoint.contact_phone && <p className="text-[14px] text-muted-foreground font-semibold">📞 {pickupPoint.contact_phone}</p>}
+                          {pickupPoint.instructions && <p className="text-[14px] text-muted-foreground italic font-semibold mt-1">ℹ️ {pickupPoint.instructions}</p>}
                         </div>
                       </div>
                     </> : null}
 
                   {/* Pickup Time Window (1-hour window from pickup_time) */}
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
+                  <Separator className="my-4" />
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2 text-[15px] font-bold">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       Pickup Time
                     </div>
@@ -441,25 +441,25 @@ export function NewOrderDetailsModal({
                     {!hasValidTimeField(safeOrder) ? <div className="pl-6">
                         <Alert variant="destructive">
                           <AlertTriangle className="h-4 w-4" />
-                          <AlertDescription>
-                            <strong>Data Error:</strong> Missing pickup time for this order. Please contact support.
+                          <AlertDescription className="font-semibold text-[14px]">
+                            <strong className="font-bold">Data Error:</strong> Missing pickup time for this order. Please contact support.
                           </AlertDescription>
                         </Alert>
-                      </div> : <div className="pl-6 space-y-1">
-                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-muted-foreground">Date:</span>
-                            <span className="font-medium">
+                      </div> : <div className="pl-6 space-y-2">
+                        {safeOrder.delivery_date && formatDeliveryDate(safeOrder.delivery_date) && <div className="flex items-center gap-2 text-[15px]">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground font-bold">Date:</span>
+                            <span className="font-bold">
                               {formatDeliveryDate(safeOrder.delivery_date)}
                             </span>
                           </div>}
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-muted-foreground">Time Window:</span>
-                          <span className="font-medium">
+                        <div className="flex items-center gap-2 text-[15px]">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground font-bold">Time Window:</span>
+                          <span className="font-bold">
                             {getOrderTimeWindow(safeOrder) || 'Time not available'}
                           </span>
-                          <Badge variant="outline" className="ml-2 text-xs">
+                          <Badge variant="outline" className="ml-2 text-xs font-bold">
                             1-hour window
                           </Badge>
                         </div>
@@ -469,18 +469,18 @@ export function NewOrderDetailsModal({
 
               {/* Special Instructions */}
               {(safeOrder.special_instructions || deliverySchedule?.special_instructions) && <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
+                  <Separator className="my-4" />
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2 text-[15px] font-bold">
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       Special Instructions
                     </div>
-                    <div className="pl-6 space-y-1">
-                      {safeOrder.special_instructions && <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded">
+                    <div className="pl-6 space-y-2">
+                      {safeOrder.special_instructions && <div className="text-[15px] text-foreground font-semibold bg-muted/30 px-4 py-3 rounded leading-relaxed">
                           {safeOrder.special_instructions}
                         </div>}
-                      {deliverySchedule?.special_instructions && deliverySchedule.special_instructions !== safeOrder.special_instructions && <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded">
-                          <span className="text-xs font-medium">Delivery: </span>
+                      {deliverySchedule?.special_instructions && deliverySchedule.special_instructions !== safeOrder.special_instructions && <div className="text-[15px] text-foreground font-semibold bg-muted/30 px-4 py-3 rounded leading-relaxed">
+                          <span className="text-sm font-bold">Delivery: </span>
                           {deliverySchedule.special_instructions}
                         </div>}
                     </div>
@@ -499,62 +499,62 @@ export function NewOrderDetailsModal({
           {/* Order Items */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2 text-[17px] font-black tracking-wide uppercase border-b-2 border-border pb-3">
                 <Package className="h-5 w-5" />
                 Order Items
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {items.length === 0 ? <div className="text-center py-8 text-muted-foreground">
+              {items.length === 0 ? <div className="text-center py-8 text-muted-foreground font-semibold text-[15px]">
                   No items found
                 </div> : <div className="space-y-4">
                   {items.map((item: any) => {
                 const features = item.product?.features ? parseProductFeatures(item.product.features) : [];
                 const productImage = item.product?.image_url || item.product?.images && item.product.images[0] || '/placeholder.svg';
-                return <div key={item.id} className="flex gap-4 p-4 bg-muted/50 rounded-lg border border-border/50 hover:shadow-sm transition-shadow">
+                return <div key={item.id} className="flex gap-4 p-4 bg-muted/50 rounded-lg border-2 border-border/50 hover:shadow-md transition-all">
                         {/* Product Image */}
                         <div className="flex-shrink-0">
-                          <img src={productImage} alt={item.product?.name || item.product_name || 'Product'} className="w-20 h-20 rounded-lg object-cover border border-border" onError={e => {
+                          <img src={productImage} alt={item.product?.name || item.product_name || 'Product'} className="w-20 h-20 rounded-lg object-cover border-2 border-border" onError={e => {
                       (e.target as HTMLImageElement).src = '/placeholder.svg';
                     }} />
                         </div>
 
                         {/* Product Details */}
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-base">
+                          <div className="font-bold text-[15px]">
                             {item.product?.name || item.product_name || 'Unknown Product'}
                           </div>
                           
-                          {item.product?.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          {item.product?.description && <p className="text-[14px] text-muted-foreground font-semibold mt-1 line-clamp-2 leading-relaxed">
                               {sanitizeText(item.product.description)}
                             </p>}
 
-                          {features.length > 0 && <div className="text-xs text-muted-foreground mt-2 flex flex-wrap gap-1">
-                              {features.map((feature, idx) => <span key={idx} className="px-2 py-0.5 bg-background/80 rounded-md border">
-                                  {feature}
+                          {features.length > 0 && <div className="text-[13px] text-muted-foreground font-semibold mt-2 flex flex-wrap gap-1.5">
+                              {features.map((feature, idx) => <span key={idx} className="px-2.5 py-1 bg-background/80 rounded-md border font-semibold">
+                                  • {feature}
                                 </span>)}
                             </div>}
 
-                          {item.special_instructions && <div className="text-sm italic text-muted-foreground mt-2 p-2 bg-muted/50 rounded">
+                          {item.special_instructions && <div className="text-[14px] italic text-foreground font-semibold mt-2 p-2.5 bg-muted/50 rounded leading-relaxed">
                               📝 {item.special_instructions}
                             </div>}
 
-                          <div className="flex items-center gap-4 mt-2 text-sm">
-                            <span className="text-muted-foreground">
-                              Quantity: <span className="font-medium text-foreground">{item.quantity}</span>
+                          <div className="flex items-center gap-4 mt-2.5 text-[15px]">
+                            <span className="text-muted-foreground font-bold">
+                              Quantity: <span className="font-bold text-foreground">{item.quantity}</span>
                             </span>
-                            <span className="text-muted-foreground">
-                              Unit Price: <span className="font-medium text-foreground">₦{item.unit_price.toLocaleString()}</span>
+                            <span className="text-muted-foreground font-bold">
+                              Unit Price: <span className="font-bold text-foreground">₦{item.unit_price.toLocaleString()}</span>
                             </span>
                           </div>
                         </div>
 
                         {/* Price */}
                         <div className="flex-shrink-0 text-right">
-                          <div className="font-bold text-lg">
+                          <div className="font-black text-[18px]">
                             ₦{item.total_price.toLocaleString()}
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-[13px] text-muted-foreground font-bold">
                             Total
                           </div>
                         </div>
@@ -567,37 +567,37 @@ export function NewOrderDetailsModal({
           {/* Pricing Breakdown */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
+              <CardTitle className="flex items-center gap-2 text-[17px] font-black tracking-wide uppercase border-b-2 border-border pb-3">
                 <DollarSign className="h-5 w-5" />
                 Pricing Breakdown
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {safeOrder.subtotal !== undefined && <div className="flex justify-between text-base">
-                    <span className="text-muted-foreground">Subtotal:</span>
-                    <span>₦{safeOrder.subtotal.toLocaleString()}</span>
+              <div className="space-y-3.5">
+                {safeOrder.subtotal !== undefined && <div className="flex justify-between text-[15px]">
+                    <span className="text-muted-foreground font-bold">Subtotal:</span>
+                    <span className="font-bold">₦{safeOrder.subtotal.toLocaleString()}</span>
                   </div>}
-                {safeOrder.tax_amount !== undefined && safeOrder.tax_amount > 0 && <div className="flex justify-between text-base">
-                    <span className="text-muted-foreground">Tax/VAT:</span>
-                    <span>₦{safeOrder.tax_amount.toLocaleString()}</span>
+                {safeOrder.tax_amount !== undefined && safeOrder.tax_amount > 0 && <div className="flex justify-between text-[15px]">
+                    <span className="text-muted-foreground font-bold">Tax/VAT:</span>
+                    <span className="font-bold">₦{safeOrder.tax_amount.toLocaleString()}</span>
                   </div>}
-                {safeOrder.delivery_fee !== undefined && safeOrder.delivery_fee > 0 && <div className="space-y-1">
-                    <div className="flex justify-between text-base">
-                      <span className="text-muted-foreground">Delivery Fee:</span>
-                      <span>₦{safeOrder.delivery_fee.toLocaleString()}</span>
+                {safeOrder.delivery_fee !== undefined && safeOrder.delivery_fee > 0 && <div className="space-y-2">
+                    <div className="flex justify-between text-[15px]">
+                      <span className="text-muted-foreground font-bold">Delivery Fee:</span>
+                      <span className="font-bold">₦{safeOrder.delivery_fee.toLocaleString()}</span>
                     </div>
-                    {deliveryZone && <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground/70">Delivery Zone:</span>
-                        <span className="text-muted-foreground">{deliveryZone.name}</span>
+                    {deliveryZone && <div className="flex justify-between text-[13px]">
+                        <span className="text-muted-foreground/70 font-semibold">Delivery Zone:</span>
+                        <span className="text-muted-foreground font-semibold">{deliveryZone.name}</span>
                       </div>}
                   </div>}
-                {safeOrder.discount_amount !== undefined && safeOrder.discount_amount > 0 && <div className="flex justify-between text-base text-green-600">
+                {safeOrder.discount_amount !== undefined && safeOrder.discount_amount > 0 && <div className="flex justify-between text-[15px] text-green-600 font-bold">
                     <span>Discount:</span>
                     <span>-₦{safeOrder.discount_amount.toLocaleString()}</span>
                   </div>}
-                <Separator />
-                <div className="flex justify-between font-bold text-xl">
+                <Separator className="my-2" />
+                <div className="flex justify-between font-black text-[20px] pt-2">
                   <span>Total:</span>
                   <span>₦{safeOrder.total_amount.toLocaleString()}</span>
                 </div>
@@ -608,19 +608,19 @@ export function NewOrderDetailsModal({
           {/* Payment Information */}
           {(safeOrder.payment_method || safeOrder.payment_reference) && <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
+                <CardTitle className="flex items-center gap-2 text-[17px] font-black tracking-wide uppercase border-b-2 border-border pb-3">
                   <CreditCard className="h-5 w-5" />
                   Payment Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {safeOrder.payment_method && <div className="flex justify-between text-base">
-                    <span className="text-muted-foreground">Method:</span>
-                    <span className="font-medium capitalize">{safeOrder.payment_method}</span>
+              <CardContent className="space-y-3.5">
+                {safeOrder.payment_method && <div className="flex justify-between text-[15px]">
+                    <span className="text-muted-foreground font-bold">Method:</span>
+                    <span className="font-bold capitalize">{safeOrder.payment_method}</span>
                   </div>}
-                {safeOrder.payment_reference && <div className="flex justify-between text-base">
-                    <span className="text-muted-foreground">Reference:</span>
-                    <span className="font-mono text-sm">{safeOrder.payment_reference}</span>
+                {safeOrder.payment_reference && <div className="flex justify-between text-[15px]">
+                    <span className="text-muted-foreground font-bold">Reference:</span>
+                    <span className="font-mono text-[14px] font-semibold">{safeOrder.payment_reference}</span>
                   </div>}
               </CardContent>
             </Card>}

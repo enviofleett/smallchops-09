@@ -106,32 +106,59 @@ serve(async (req) => {
       total_amount: order.total_amount
     };
 
+    // Parse delivery address properly (handles string, object, or null)
+    let deliveryAddressText = 'Address not available';
+    if (orderData.delivery_address) {
+      if (typeof orderData.delivery_address === 'string') {
+        deliveryAddressText = orderData.delivery_address;
+      } else if (typeof orderData.delivery_address === 'object') {
+        const addr = orderData.delivery_address;
+        deliveryAddressText = [
+          addr.address_line_1,
+          addr.address_line_2,
+          addr.city,
+          addr.state
+        ].filter(Boolean).join(', ') || 'Address not available';
+      }
+    }
+
+    // Fetch business settings for support email
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('admin_notification_email, name')
+      .single();
+
+    const supportEmail = businessSettings?.admin_notification_email || 'support@startersmallchops.com';
+    const businessName = businessSettings?.name || 'Starters';
+
     // Prepare comprehensive template variables for delivery emails (production-ready)
     const templateVariables = {
-      customer_name: orderData.customer_name,
+      customer_name: orderData.customer_name || 'Customer',
       order_number: orderData.order_number,
-      delivery_address: orderData.delivery_address ? 
-        `${orderData.delivery_address?.street || ''} ${orderData.delivery_address?.city || ''}`.trim() : 'N/A',
-      delivery_instructions: orderData.delivery_instructions || '',
+      delivery_address: deliveryAddressText,
+      delivery_instructions: orderData.delivery_instructions || 'No special instructions',
       estimated_delivery_time: orderData.estimated_delivery_time ? 
-        new Date(orderData.estimated_delivery_time).toLocaleString() : '',
+        new Date(orderData.estimated_delivery_time).toLocaleString() : 'To be confirmed',
       // Complete driver information
       driver_name: driver?.name || 'Our delivery team',
-      driver_phone: driver?.phone || '',
+      driver_phone: driver?.phone || 'Will be provided shortly',
       driver_email: driver?.email || '',
-      driver_vehicle_type: driver?.vehicle_type || '',
+      driver_vehicle_type: driver?.vehicle_type || 'Vehicle',
       driver_vehicle_brand: driver?.vehicle_brand || '',
       driver_vehicle_model: driver?.vehicle_model || '',
       driver_license_plate: driver?.license_plate || '',
       driver_vehicle_full: driver ? 
-        `${driver.vehicle_brand || ''} ${driver.vehicle_model || ''}`.trim() || driver.vehicle_type || '' : '',
+        `${driver.vehicle_brand || ''} ${driver.vehicle_model || ''}`.trim() || driver.vehicle_type || 'Vehicle' : 'Vehicle',
       has_driver_assigned: driver ? 'true' : 'false',
       order_items_html: buildOrderItemsHtml(orderData.order_items || []),
       order_items_text: buildOrderItemsText(orderData.order_items || []),
-      total_amount: orderData.total_amount?.toLocaleString() || '0',
-      business_name: 'Starters',
-      support_email: 'support@startersmallchops.com',
-      current_year: new Date().getFullYear().toString()
+      total_amount: `₦${orderData.total_amount?.toLocaleString() || '0'}`,
+      order_total: orderData.total_amount?.toLocaleString() || '0',
+      business_name: businessName,
+      support_email: supportEmail,
+      current_year: new Date().getFullYear().toString(),
+      status_display: 'Out for Delivery',
+      new_status: 'out_for_delivery'
     };
 
     console.log('Template variables prepared with driver info:', {

@@ -160,6 +160,39 @@ export type Database = {
           },
         ]
       }
+      admin_ip_history: {
+        Row: {
+          created_at: string
+          first_seen_at: string
+          id: string
+          ip_address: unknown
+          is_trusted: boolean | null
+          last_seen_at: string
+          location_data: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          ip_address: unknown
+          is_trusted?: boolean | null
+          last_seen_at?: string
+          location_data?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          ip_address?: unknown
+          is_trusted?: boolean | null
+          last_seen_at?: string
+          location_data?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_notification_preferences: {
         Row: {
           admin_id: string | null
@@ -9465,6 +9498,42 @@ export type Database = {
           success_rate_percent: number | null
           successful_payments: number | null
           total_payments: number | null
+        }
+        Relationships: []
+      }
+      security_events_categorized: {
+        Row: {
+          action: string | null
+          category: string | null
+          created_at: string | null
+          event_category: string | null
+          id: string | null
+          ip_address: string | null
+          message: string | null
+          threat_level: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          category?: string | null
+          created_at?: string | null
+          event_category?: never
+          id?: string | null
+          ip_address?: string | null
+          message?: string | null
+          threat_level?: never
+          user_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          category?: string | null
+          created_at?: string | null
+          event_category?: never
+          id?: string | null
+          ip_address?: string | null
+          message?: string | null
+          threat_level?: never
+          user_id?: string | null
         }
         Relationships: []
       }

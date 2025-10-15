@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.email-queue-cleanup-stale]
 verify_jwt = false
+
+[functions.security-monitor-alerts]
+verify_jwt = false

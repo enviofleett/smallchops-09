@@ -9606,6 +9606,14 @@ export type Database = {
       }
       activate_admin_user: { Args: { p_user_id: string }; Returns: Json }
       adjust_quantities_for_moq: { Args: { order_items: Json }; Returns: Json }
+      admin_assign_rider_with_audit: {
+        Args: {
+          p_admin_user_id?: string
+          p_order_id: string
+          p_rider_id: string
+        }
+        Returns: Json
+      }
       admin_queue_order_email: {
         Args: { p_order_id: string; p_status: string }
         Returns: undefined
@@ -9624,6 +9632,10 @@ export type Database = {
       }
       admin_safe_update_order_status_with_officer_tracking: {
         Args: { p_admin_id?: string; p_new_status: string; p_order_id: string }
+        Returns: Json
+      }
+      admin_unassign_rider_with_audit: {
+        Args: { p_admin_user_id?: string; p_order_id: string }
         Returns: Json
       }
       admin_update_order_status_bulletproof: {

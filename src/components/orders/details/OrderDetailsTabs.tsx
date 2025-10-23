@@ -3,6 +3,7 @@ import { SummaryTab } from './SummaryTab';
 import { FulfillmentTab } from './FulfillmentTab';
 import { ActionsTab } from './ActionsTab';
 import { TimelineTab } from './TimelineTab';
+import { OrderHistoryTab } from './OrderHistoryTab';
 
 interface OrderDetailsTabsProps {
   order: any;
@@ -68,6 +69,7 @@ export const OrderDetailsTabs: React.FC<OrderDetailsTabsProps> = ({
     { key: 'summary', label: 'Summary' },
     { key: 'fulfillment', label: 'Fulfillment' },
     { key: 'actions', label: 'Actions' },
+    { key: 'history', label: 'History' },
     { key: 'timeline', label: 'Timeline' }
   ];
 
@@ -107,6 +109,14 @@ export const OrderDetailsTabs: React.FC<OrderDetailsTabsProps> = ({
             assignedRiderId={assignedRiderId}
             onRiderAssignment={onRiderAssignment}
             isAssigningRider={isAssigningRider}
+          />
+        )}
+        {selectedTab === 'history' && (
+          <OrderHistoryTab 
+            detailedOrderData={detailedOrderData} 
+            isLoading={isLoading} 
+            error={error} 
+            order={order} 
           />
         )}
         {selectedTab === 'timeline' && (

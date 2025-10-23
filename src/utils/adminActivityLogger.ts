@@ -177,6 +177,140 @@ export class AdminActivityLogger {
       }
     });
   }
+
+  /**
+   * Log rider assignment/reassignment
+   */
+  static async logRiderAssignment(
+    orderId: string,
+    orderNumber: string,
+    riderId: string | null,
+    riderName: string | null,
+    previousRiderId?: string | null,
+    previousRiderName?: string | null
+  ): Promise<void> {
+    const action = !previousRiderId ? 'rider_assigned' : 'rider_reassigned';
+    const message = !previousRiderId
+      ? `Rider ${riderName} assigned to order #${orderNumber}`
+      : `Rider changed from ${previousRiderName} to ${riderName} for order #${orderNumber}`;
+
+    await this.logActivity({
+      action,
+      category: 'Order Management',
+      entityType: 'order_rider',
+      entityId: orderId,
+      message,
+      oldValues: previousRiderId
+        ? { rider_id: previousRiderId, rider_name: previousRiderName }
+        : undefined,
+      newValues: { rider_id: riderId, rider_name: riderName },
+      metadata: {
+        securityLevel: 'medium',
+        orderNumber
+      }
+    });
+  }
+
+  /**
+   * Log rider unassignment
+   */
+  static async logRiderUnassignment(
+    orderId: string,
+    orderNumber: string,
+    previousRiderId: string,
+    previousRiderName: string
+  ): Promise<void> {
+    await this.logActivity({
+      action: 'rider_unassigned',
+      category: 'Order Management',
+      entityType: 'order_rider',
+      entityId: orderId,
+      message: `Rider ${previousRiderName} unassigned from order #${orderNumber}`,
+      oldValues: { rider_id: previousRiderId, rider_name: previousRiderName },
+      newValues: null,
+      metadata: {
+        securityLevel: 'medium',
+        orderNumber
+      }
+    });
+  }
+
+  /**
+   * Log order updates (general modifications)
+   */
+  static async logOrderUpdate(
+    orderId: string,
+    orderNumber: string,
+    field: string,
+    oldValue: any,
+    newValue: any,
+    description?: string
+  ): Promise<void> {
+    await this.logActivity({
+      action: 'order_updated',
+      category: 'Order Management',
+      entityType: 'orders',
+      entityId: orderId,
+      message: description || `Order #${orderNumber} ${field} updated`,
+      oldValues: { [field]: oldValue },
+      newValues: { [field]: newValue },
+      metadata: {
+        securityLevel: 'low',
+        orderNumber,
+        field
+      }
+    });
+  }
+
+  /**
+   * Log payment status changes
+   */
+  static async logPaymentUpdate(
+    orderId: string,
+    orderNumber: string,
+    oldStatus: string,
+    newStatus: string,
+    paymentMethod?: string
+  ): Promise<void> {
+    await this.logActivity({
+      action: 'payment_updated',
+      category: 'Order Management',
+      entityType: 'order_payment',
+      entityId: orderId,
+      message: `Payment status changed from ${oldStatus} to ${newStatus} for order #${orderNumber}`,
+      oldValues: { payment_status: oldStatus },
+      newValues: { payment_status: newStatus, payment_method: paymentMethod },
+      metadata: {
+        securityLevel: 'high',
+        orderNumber
+      }
+    });
+  }
+
+  /**
+   * Log order cancellations
+   */
+  static async logOrderCancellation(
+    orderId: string,
+    orderNumber: string,
+    reason: string,
+    refundAmount?: number
+  ): Promise<void> {
+    await this.logActivity({
+      action: 'order_cancelled',
+      category: 'Order Management',
+      entityType: 'orders',
+      entityId: orderId,
+      message: `Order #${orderNumber} cancelled: ${reason}`,
+      oldValues: { status: 'active' },
+      newValues: { status: 'cancelled', reason, refund_amount: refundAmount },
+      metadata: {
+        securityLevel: 'high',
+        orderNumber,
+        requiresReview: true
+      }
+    });
+  }
 }
 
 /**
@@ -187,3 +321,8 @@ export const logPermissionChange = AdminActivityLogger.logPermissionChange;
 export const logUserManagement = AdminActivityLogger.logUserManagement;
 export const logSystemConfig = AdminActivityLogger.logSystemConfig;
 export const logSecurityEvent = AdminActivityLogger.logSecurityEvent;
+export const logRiderAssignment = AdminActivityLogger.logRiderAssignment;
+export const logRiderUnassignment = AdminActivityLogger.logRiderUnassignment;
+export const logOrderUpdate = AdminActivityLogger.logOrderUpdate;
+export const logPaymentUpdate = AdminActivityLogger.logPaymentUpdate;
+export const logOrderCancellation = AdminActivityLogger.logOrderCancellation;

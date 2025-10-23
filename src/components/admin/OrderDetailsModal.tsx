@@ -83,31 +83,41 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     setIsAssigningRider(true);
     try {
       if (riderId) {
-        const { data, error } = await supabase.rpc('assign_rider_to_order', {
+        // Use new database function with audit logging
+        const { data, error } = await supabase.rpc('admin_assign_rider_with_audit', {
           p_order_id: order.id,
           p_rider_id: riderId
         });
         
         if (error) throw error;
         
-        setAssignedRiderId(riderId);
-        const rider = drivers.find(d => d.id === riderId);
-        toast.success(`Rider ${rider?.name} assigned successfully`);
+        const result = data as { success: boolean; error?: string; rider_name?: string };
+        if (result?.success) {
+          setAssignedRiderId(riderId);
+          const rider = drivers.find(d => d.id === riderId);
+          toast.success(`Rider ${rider?.name || result.rider_name} assigned successfully`);
+        } else {
+          throw new Error(result?.error || 'Failed to assign rider');
+        }
       } else {
-        // Unassign rider
-        const { error } = await supabase
-          .from('orders')
-          .update({ assigned_rider_id: null })
-          .eq('id', order.id);
+        // Unassign rider with audit logging
+        const { data, error } = await supabase.rpc('admin_unassign_rider_with_audit', {
+          p_order_id: order.id
+        });
         
         if (error) throw error;
         
-        setAssignedRiderId(null);
-        toast.success('Rider unassigned successfully');
+        const result = data as { success: boolean; error?: string };
+        if (result?.success) {
+          setAssignedRiderId(null);
+          toast.success('Rider unassigned successfully');
+        } else {
+          throw new Error(result?.error || 'Failed to unassign rider');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Rider assignment failed:', error);
-      toast.error('Failed to assign rider');
+      toast.error(error.message || 'Failed to assign rider');
     } finally {
       setIsAssigningRider(false);
     }

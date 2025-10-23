@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Shield, User, AlertTriangle, Clock } from "lucide-react";
+import { Loader2, Shield, User, AlertTriangle, Clock, Package, CheckCircle, ChefHat, Truck, ShoppingBag, XCircle } from "lucide-react";
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow } from "@/components/ui/responsive-table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SafeHtml } from "@/components/ui/safe-html";
@@ -243,6 +243,57 @@ const AdminUserDisplay: React.FC<{ log: AuditLogRow }> = ({ log }) => {
       </div>
     </div>
   );
+};
+
+/**
+ * PRODUCTION UTILITY: Get icon for order status actions
+ */
+const getOrderStatusIcon = (action: string, status?: string) => {
+  if (action === 'order_status_updated') {
+    // Map to specific status icons based on new_values
+    switch (status) {
+      case 'confirmed':
+        return CheckCircle;
+      case 'preparing':
+        return ChefHat;
+      case 'ready':
+        return Package;
+      case 'out_for_delivery':
+        return Truck;
+      case 'delivered':
+        return ShoppingBag;
+      case 'cancelled':
+        return XCircle;
+      default:
+        return Package;
+    }
+  }
+  return Shield;
+};
+
+/**
+ * PRODUCTION UTILITY: Get color for order status actions
+ */
+const getOrderStatusColor = (action: string, status?: string) => {
+  if (action === 'order_status_updated') {
+    switch (status) {
+      case 'confirmed':
+        return 'text-green-600 bg-green-50';
+      case 'preparing':
+        return 'text-orange-600 bg-orange-50';
+      case 'ready':
+        return 'text-blue-600 bg-blue-50';
+      case 'out_for_delivery':
+        return 'text-purple-600 bg-purple-50';
+      case 'delivered':
+        return 'text-emerald-600 bg-emerald-50';
+      case 'cancelled':
+        return 'text-red-600 bg-red-50';
+      default:
+        return 'text-gray-600 bg-gray-50';
+    }
+  }
+  return 'text-blue-600 bg-blue-50';
 };
 
 /**
@@ -492,12 +543,19 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
           <MobileCard key={log.id}>
             <MobileCardHeader>
               <div>
-                 <p className="font-medium text-gray-800">
-                   <SafeHtml className="capitalize font-semibold text-blue-700">
-                     {getActionMessage(log.action, log.category, log.entity_type)}
-                   </SafeHtml>
-                 </p>
-                <p className="text-sm text-gray-600">{new Date(log.event_time).toLocaleString()}</p>
+                 <div className="flex items-center gap-2">
+                   {log.action === 'order_status_updated' && log.new_values?.status && (
+                     <div className={`p-1.5 rounded ${getOrderStatusColor(log.action, log.new_values.status)}`}>
+                       {React.createElement(getOrderStatusIcon(log.action, log.new_values.status), { className: 'w-4 h-4' })}
+                     </div>
+                   )}
+                   <p className="font-medium text-gray-800">
+                     <SafeHtml className="capitalize font-semibold text-blue-700">
+                       {getActionMessage(log.action, log.category, log.entity_type)}
+                     </SafeHtml>
+                   </p>
+                 </div>
+                 <p className="text-sm text-gray-600">{new Date(log.event_time).toLocaleString()}</p>
               </div>
               <div className="text-right">
                 {log.category && (
@@ -632,9 +690,16 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
                   <AdminUserDisplay log={log as AuditLogRow} />
                 </TableCell>
                 <TableCell>
-                  <SafeHtml className="capitalize font-semibold text-blue-700">
-                    {getActionMessage(log.action, log.category, log.entity_type)}
-                  </SafeHtml>
+                  <div className="flex items-center gap-2">
+                    {log.action === 'order_status_updated' && log.new_values?.status && (
+                      <div className={`p-1.5 rounded ${getOrderStatusColor(log.action, log.new_values.status)}`}>
+                        {React.createElement(getOrderStatusIcon(log.action, log.new_values.status), { className: 'w-4 h-4' })}
+                      </div>
+                    )}
+                    <SafeHtml className="capitalize font-semibold text-blue-700">
+                      {getActionMessage(log.action, log.category, log.entity_type)}
+                    </SafeHtml>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <SafeHtml>{log.category || '-'}</SafeHtml>

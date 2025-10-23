@@ -70,6 +70,7 @@ const getActionMessage = (action: string, category?: string | null, entityType?:
     'order_created': 'New order placed',
     'order_updated': 'Order details updated',
     'order_status_changed': 'Order status changed',
+    'order_status_updated': 'Order status updated',
     'order_cancelled': 'Order cancelled',
     'order_confirmed': 'Order confirmed',
     'order_completed': 'Order completed',

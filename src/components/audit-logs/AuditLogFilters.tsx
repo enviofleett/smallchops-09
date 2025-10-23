@@ -1,7 +1,7 @@
 
 import React from "react";
 
-const CATEGORIES = ["All", "Order", "Product", "Category", "User"];
+const CATEGORIES = ["All", "Order Management", "User Management", "Security", "System Maintenance", "Communication"];
 interface Filters {
   category: string;
   user: string;

@@ -1,6 +1,6 @@
 // Global discount configuration - applies 10% discount to all products
 export const GLOBAL_DISCOUNT_CONFIG = {
-  enabled: true,
+  enabled: false,
   discountPercentage: 10,
   displayName: "Store-Wide Discount",
   badgeText: "10% OFF",

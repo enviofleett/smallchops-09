@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { ResponsiveGrid } from '@/components/layout/ResponsiveGrid';
 import { ResponsiveCard } from '@/components/layout/ResponsiveCard';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -172,6 +173,69 @@ const ProductDetail = () => {
   const getMinimumQuantity = () => {
     if (!product) return 1;
     return product.minimum_order_quantity || 1;
+  };
+
+  // Handle manual quantity input with validation
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Allow empty input for better UX (will be validated onBlur)
+    if (value === '') {
+      setQuantity(0);
+      return;
+    }
+    
+    // Allow only numeric input
+    const numericValue = value.replace(/[^0-9]/g, '');
+    if (numericValue === '') return;
+    
+    const parsedValue = parseInt(numericValue, 10);
+    
+    // Set the value immediately for responsive feel
+    // But don't enforce limits yet (onBlur will handle that)
+    if (!isNaN(parsedValue) && parsedValue >= 0) {
+      setQuantity(parsedValue);
+    }
+  };
+
+  // Validate and correct quantity on blur
+  const handleQuantityBlur = () => {
+    if (!product) return;
+    
+    const minQty = getMinimumQuantity();
+    const maxQty = product.stock_quantity;
+    
+    // Handle empty or invalid input
+    if (quantity === 0 || isNaN(quantity)) {
+      setQuantity(minQty);
+      toast({
+        title: "Quantity adjusted",
+        description: `Minimum order quantity is ${minQty}`,
+        variant: "default"
+      });
+      return;
+    }
+    
+    // Enforce minimum quantity
+    if (quantity < minQty) {
+      setQuantity(minQty);
+      toast({
+        title: "Quantity adjusted",
+        description: `Minimum order quantity is ${minQty}`,
+        variant: "default"
+      });
+      return;
+    }
+    
+    // Enforce stock limit
+    if (quantity > maxQty) {
+      setQuantity(maxQty);
+      toast({
+        title: "Quantity adjusted",
+        description: `Only ${maxQty} units available in stock`,
+        variant: "default"
+      });
+    }
   };
 
   const handleAddToCart = () => {
@@ -415,11 +479,30 @@ const ProductDetail = () => {
                   >
                     <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
-                  <span className="px-3 sm:px-4 py-2 min-w-[50px] sm:min-w-[60px] text-center text-sm">{quantity}</span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={quantity === 0 ? '' : quantity}
+                    onChange={handleQuantityChange}
+                    onBlur={handleQuantityBlur}
+                    className="h-8 w-[60px] sm:w-[70px] text-center border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+                    placeholder={String(getMinimumQuantity())}
+                  />
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => {
+                      const maxQty = product?.stock_quantity || 1000;
+                      const newQty = Math.min(maxQty, quantity + 1);
+                      setQuantity(newQty);
+                      if (newQty === maxQty && newQty === quantity) {
+                        toast({
+                          title: "Stock limit",
+                          description: `Only ${maxQty} units available`,
+                          variant: "default"
+                        });
+                      }
+                    }}
                     className="h-8 w-8 p-0"
                   >
                     <Plus className="h-3 w-3 sm:h-4 sm:w-4" />

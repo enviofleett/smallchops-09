@@ -253,6 +253,7 @@ const ProductDetail = () => {
       vat_rate: 7.5, // Default VAT rate
       image_url: product.image_url,
       minimum_order_quantity: moq,
+      stock_quantity: product.stock_quantity,
     }, actualQuantity);
     
     const addedQuantityText = actualQuantity > quantity ? 
@@ -662,6 +663,7 @@ const ProductDetail = () => {
                               discount_amount: relatedProduct.discount_amount,
                               vat_rate: 7.5,
                               image_url: relatedProduct.image_url,
+                              stock_quantity: relatedProduct.stock_quantity,
                             });
                             toast({
                               title: "Added to Cart",

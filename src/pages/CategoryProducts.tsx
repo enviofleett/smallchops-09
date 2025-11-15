@@ -298,6 +298,7 @@ const CategoryProductsContent = () => {
         vat_rate: product.vat_rate || 7.5,
         image_url: product.image_url,
         minimum_order_quantity: moq,
+        stock_quantity: product.stock_quantity,
       }, quantityToAdd);
       
       toast({

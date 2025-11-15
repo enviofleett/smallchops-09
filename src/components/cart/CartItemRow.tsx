@@ -1,10 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { CartItem } from '@/hooks/useCart';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { MOQBadge } from '@/components/ui/moq-badge';
 import { formatCurrency } from '@/lib/discountCalculations';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 interface CartItemRowProps {
   item: CartItem;
@@ -13,12 +16,102 @@ interface CartItemRowProps {
 }
 
 export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowProps) {
+  const { toast } = useToast();
+  const [inputValue, setInputValue] = useState(String(item.quantity));
+  
   const hasDiscount = item.original_price && item.discount_amount && item.original_price > item.price;
   const lineTotal = item.price * item.quantity;
   const originalLineTotal = item.original_price ? item.original_price * item.quantity : lineTotal;
   const savings = originalLineTotal - lineTotal;
   const moq = item.minimum_order_quantity || 1;
   const isMOQViolated = item.quantity < moq;
+
+  // Handle manual quantity input
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Allow empty input for better UX
+    if (value === '') {
+      setInputValue('');
+      return;
+    }
+    
+    // Allow only numeric input
+    const numericValue = value.replace(/[^0-9]/g, '');
+    if (numericValue === '') return;
+    
+    setInputValue(numericValue);
+  };
+
+  // Validate and update quantity on blur
+  const handleQuantityBlur = () => {
+    const parsedValue = parseInt(inputValue, 10);
+    const maxQty = item.stock_quantity || 1000;
+    
+    // Handle empty or invalid input
+    if (inputValue === '' || isNaN(parsedValue) || parsedValue === 0) {
+      setInputValue(String(moq));
+      onUpdateQuantity(item.id, moq);
+      toast({
+        title: "Quantity adjusted",
+        description: `Minimum order quantity is ${moq}`,
+        variant: "default"
+      });
+      return;
+    }
+    
+    // Enforce minimum quantity
+    if (parsedValue < moq) {
+      setInputValue(String(moq));
+      onUpdateQuantity(item.id, moq);
+      toast({
+        title: "Quantity adjusted",
+        description: `Minimum order quantity is ${moq}`,
+        variant: "default"
+      });
+      return;
+    }
+    
+    // Enforce stock limit
+    if (parsedValue > maxQty) {
+      setInputValue(String(maxQty));
+      onUpdateQuantity(item.id, maxQty);
+      toast({
+        title: "Quantity adjusted",
+        description: `Only ${maxQty} units available in stock`,
+        variant: "default"
+      });
+      return;
+    }
+    
+    // Valid quantity
+    if (parsedValue !== item.quantity) {
+      onUpdateQuantity(item.id, parsedValue);
+    }
+  };
+
+  // Handle Plus button click
+  const handleIncrement = () => {
+    const maxQty = item.stock_quantity || 1000;
+    const newQty = Math.min(maxQty, item.quantity + 1);
+    
+    if (newQty === item.quantity) {
+      toast({
+        title: "Stock limit reached",
+        description: `Only ${maxQty} units available`,
+        variant: "default"
+      });
+      return;
+    }
+    
+    setInputValue(String(newQty));
+    onUpdateQuantity(item.id, newQty);
+  };
+
+  // Sync input value when item.quantity changes externally
+  if (String(item.quantity) !== inputValue && document.activeElement?.getAttribute('data-cart-item-id') !== item.id) {
+    setInputValue(String(item.quantity));
+  }
 
   return (
     <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
@@ -154,15 +247,22 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
               <Minus className="h-3 w-3" />
             </Button>
             
-            <span className="w-8 text-center text-sm font-medium">
-              {item.quantity}
-            </span>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={inputValue}
+              onChange={handleQuantityChange}
+              onBlur={handleQuantityBlur}
+              data-cart-item-id={item.id}
+              className="h-8 w-12 text-center border-input focus-visible:ring-1 focus-visible:ring-ring text-sm font-medium px-1"
+              placeholder={String(moq)}
+            />
             
             <Button
               variant="outline"
               size="sm"
               className="h-8 w-8 p-0"
-              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+              onClick={handleIncrement}
             >
               <Plus className="h-3 w-3" />
             </Button>
@@ -213,15 +313,22 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
               <Minus className="h-3 w-3" />
             </Button>
             
-            <span className="w-8 text-center text-sm font-medium">
-              {item.quantity}
-            </span>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={inputValue}
+              onChange={handleQuantityChange}
+              onBlur={handleQuantityBlur}
+              data-cart-item-id={item.id}
+              className="h-8 w-12 text-center border-input focus-visible:ring-1 focus-visible:ring-ring text-sm font-medium px-1"
+              placeholder={String(moq)}
+            />
             
             <Button
               variant="outline"
               size="sm"
               className="h-8 w-8 p-0"
-              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+              onClick={handleIncrement}
             >
               <Plus className="h-3 w-3" />
             </Button>

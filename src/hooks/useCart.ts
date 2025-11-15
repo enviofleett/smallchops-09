@@ -23,6 +23,7 @@ export interface CartItem {
   customizations?: Record<string, any>;
   special_instructions?: string;
   minimum_order_quantity?: number; // Add MOQ to cart items
+  stock_quantity?: number; // Add stock quantity for validation
 }
 
 export interface OrderSummary {
@@ -200,6 +201,7 @@ export const useCartInternal = () => {
     customizations?: Record<string, any>;
     special_instructions?: string;
     minimum_order_quantity?: number;
+    stock_quantity?: number;
   }, quantity = 1) => {
     console.log('🛒 addItem called with:', { product, quantity });
     console.log('🛒 Current cart state:', cart);
@@ -270,7 +272,8 @@ export const useCartInternal = () => {
           image_url: product.image_url,
           customizations: product.customizations,
           special_instructions: product.special_instructions,
-          minimum_order_quantity: moq
+          minimum_order_quantity: moq,
+          stock_quantity: product.stock_quantity
         };
         console.log('🛒 New item created:', newItem);
         updatedItems = [...cart.items, newItem];

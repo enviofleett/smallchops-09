@@ -88,6 +88,7 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
       vat_rate: 7.5, // Default VAT rate
       image_url: product.image_url,
       minimum_order_quantity: product.minimum_order_quantity || 1,
+      stock_quantity: product.stock_quantity,
     });
     
     const discountMessage = isGlobalDiscountActive() 

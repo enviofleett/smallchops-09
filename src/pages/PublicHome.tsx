@@ -240,7 +240,8 @@ const PublicHome = () => {
         discount_amount: product.discount_amount,
         vat_rate: product.vat_rate || 7.5,
         image_url: product.image_url,
-        minimum_order_quantity: moq
+        minimum_order_quantity: moq,
+        stock_quantity: product.stock_quantity,
       }, moq); // Add MOQ quantity instead of 1
 
       toast({

@@ -92,17 +92,6 @@ const PublicHeaderContent = () => {
             ))}
           </nav>
 
-          {/* Search Bar - Hidden on mobile, shown in mobile menu */}
-          <div className="hidden lg:flex flex-1 max-w-md mx-8">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                className="w-full pl-10 pr-4 py-2 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-sm"
-              />
-            </div>
-          </div>
 
           {/* Right Actions - Mobile optimized */}
           <div className="flex items-center space-x-2 sm:space-x-4">
@@ -164,15 +153,6 @@ const PublicHeaderContent = () => {
         {isMobileMenuOpen && (
           <div className="lg:hidden border-t border-border py-4 bg-background">
             <div className="space-y-4">
-              {/* Mobile Search */}
-              <div className="relative px-4">
-                <Search className="absolute left-7 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  className="w-full pl-10 pr-4 py-3 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-base"
-                />
-              </div>
 
               {/* Mobile Navigation */}
               <nav className="flex flex-col space-y-1 px-4">

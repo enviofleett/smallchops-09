@@ -90,6 +90,13 @@ const PublicHeaderContent = () => {
                 {item.label}
               </Link>
             ))}
+            {/* Special Deals Link */}
+            <Link
+              to="/categories/deals"
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
+            >
+              Deals
+            </Link>
           </nav>
 
 
@@ -167,6 +174,14 @@ const PublicHeaderContent = () => {
                     {item.label}
                   </Link>
                 ))}
+                {/* Special Deals Link - Mobile */}
+                <Link
+                  to="/categories/deals"
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-md font-medium transition-colors text-base"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Deals
+                </Link>
                 {isAuthenticated && (
                   <button 
                     className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"

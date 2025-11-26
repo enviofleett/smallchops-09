@@ -40,14 +40,18 @@ export const useCustomerAuth = () => {
                          window.location.pathname === '/dashboard';
     
     if (isAdminRoute) {
-      console.log('⏭️ Skipping customer auth on admin route:', window.location.pathname);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⏭️ Skipping customer auth on admin route:', window.location.pathname);
+      }
       setAuthState(prev => ({ ...prev, isLoading: false }));
       return;
     }
 
     const loadCustomerAccount = async (userId: string) => {
       try {
-        console.log('🔍 useCustomerAuth: Loading customer account for userId:', userId);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useCustomerAuth: Loading customer account for userId:', userId);
+        }
         const { data, error } = await supabase
           .from('customer_accounts')
           .select('*')
@@ -59,13 +63,13 @@ export const useCustomerAuth = () => {
           return null;
         }
         
-        if (data) {
+        if (data && process.env.NODE_ENV === 'development') {
           console.log('✅ Customer account loaded:', {
             id: data.id,
             name: data.name,
             email: data.email
           });
-        } else {
+        } else if (!data) {
           console.warn('⚠️ No customer account found for userId:', userId);
         }
         
@@ -78,14 +82,18 @@ export const useCustomerAuth = () => {
 
     const initializeAuth = async () => {
       try {
-        console.log('🔍 useCustomerAuth: Initializing auth...');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useCustomerAuth: Initializing auth...');
+        }
         
         // Set up auth state listener
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('🔍 useCustomerAuth: Auth state changed:', event, {
-            hasSession: !!session,
-            userEmail: session?.user?.email
-          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 useCustomerAuth: Auth state changed:', event, {
+              hasSession: !!session,
+              userEmail: session?.user?.email
+            });
+          }
           
           if (!mounted) return;
           
@@ -130,13 +138,17 @@ export const useCustomerAuth = () => {
         subscription = data.subscription;
 
         // Check for existing session
-        console.log('🔍 useCustomerAuth: Checking for existing session...');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 useCustomerAuth: Checking for existing session...');
+        }
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (!mounted) return;
 
         if (initialSession?.user) {
-          console.log('✅ useCustomerAuth: Found existing session for:', initialSession.user.email);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ useCustomerAuth: Found existing session for:', initialSession.user.email);
+          }
           setAuthState(prev => ({ 
             ...prev, 
             user: initialSession.user, 
@@ -147,11 +159,13 @@ export const useCustomerAuth = () => {
           const customerAccount = await loadCustomerAccount(initialSession.user.id);
           
           if (mounted) {
-            console.log('✅ useCustomerAuth: Auth state fully initialized', {
-              hasUser: true,
-              hasCustomerAccount: !!customerAccount,
-              customerEmail: customerAccount?.email
-            });
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ useCustomerAuth: Auth state fully initialized', {
+                hasUser: true,
+                hasCustomerAccount: !!customerAccount,
+                customerEmail: customerAccount?.email
+              });
+            }
             setAuthState(prev => ({
               ...prev,
               customerAccount,
@@ -161,7 +175,9 @@ export const useCustomerAuth = () => {
             }));
           }
         } else {
-          console.log('⚠️ useCustomerAuth: No existing session found');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('⚠️ useCustomerAuth: No existing session found');
+          }
           if (mounted) {
             setAuthState(prev => ({ ...prev, isLoading: false }));
           }

@@ -25,15 +25,14 @@ export const BrandedErrorFallback: React.FC<BrandedErrorFallbackProps> = ({
   currentRetries = 0,
   isNetworkError = false
 }) => {
-  const { data: businessSettings, isLoading } = useBusinessSettings();
+  const { data: businessSettings } = useBusinessSettings();
   
   const remainingAttempts = maxRetries - currentRetries;
   const canRetry = remainingAttempts > 0 && onRetry;
 
-  // Use business settings for branding
-  const logoUrl = businessSettings?.logo_url || '/lovable-uploads/4b7e8feb-69d6-41e6-bf51-31bc57291f4a.png';
+  // Use business settings for branding with graceful fallbacks
+  const logoUrl = businessSettings?.logo_url || '/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png';
   const businessName = businessSettings?.name || 'Starters';
-  const primaryColor = businessSettings?.primary_color || 'hsl(var(--primary))';
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] p-6 space-y-6">
@@ -44,7 +43,7 @@ export const BrandedErrorFallback: React.FC<BrandedErrorFallbackProps> = ({
           alt={`${businessName} Logo`}
           className="h-12 w-auto object-contain"
           onError={(e) => {
-            e.currentTarget.src = '/lovable-uploads/4b7e8feb-69d6-41e6-bf51-31bc57291f4a.png';
+            e.currentTarget.src = '/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png';
           }}
         />
       </div>

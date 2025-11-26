@@ -26,7 +26,7 @@ import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
 import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
 
 const CategoryProductsContent = () => {
-  const { categoryId } = useParams<{ categoryId: string }>();
+  const { categoryId, categorySlug } = useParams<{ categoryId?: string; categorySlug?: string }>();
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { toast } = useToast();
@@ -42,21 +42,27 @@ const CategoryProductsContent = () => {
   const [isValidatingMOQ, setIsValidatingMOQ] = useState(false);
   const itemsPerPage = 12;
 
-  // Fetch products for this category
-  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['products-with-discounts', categoryId],
-    queryFn: () => getProductsWithDiscounts(categoryId),
-    enabled: !!categoryId,
-  });
-
-  // Fetch categories to get category name
+  // Fetch categories first to resolve slug if needed
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
   });
 
-  const currentCategory = categories.find(cat => cat.id === categoryId);
+  // Find category by ID or slug
+  const currentCategory = categories.find(cat => 
+    categoryId ? cat.id === categoryId : cat.slug === categorySlug
+  );
+  
+  // Use the resolved category ID for product queries
+  const resolvedCategoryId = currentCategory?.id;
   const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
+
+  // Fetch products for this category
+  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['products-with-discounts', resolvedCategoryId],
+    queryFn: () => getProductsWithDiscounts(resolvedCategoryId),
+    enabled: !!resolvedCategoryId,
+  });
 
   // Helper function to get lunch box priority
   const getLunchBoxPriority = (productName: string): number => {

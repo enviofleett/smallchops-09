@@ -240,6 +240,7 @@ const App = () => {
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
               <Route path="/categories/:categorySlug" element={<CategoryProducts />} />
+              <Route path="/deals" element={<Navigate to="/categories/deals" replace />} />
               
               {/* Authentication routes */}
               <Route path="/auth" element={<ErrorBoundaryWrapper context="Auth Page"><AuthPage /></ErrorBoundaryWrapper>} />

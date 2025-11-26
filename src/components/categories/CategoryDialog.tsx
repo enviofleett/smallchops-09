@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Category } from '@/types/database';
 import CategoryForm from './CategoryForm';
 import { CategoryFormData } from '@/lib/validations/category';
@@ -21,6 +21,9 @@ const CategoryDialog = ({ open, onOpenChange, category, onSubmit, isLoading }: C
           <DialogTitle className="text-xl">
             {category ? 'Edit Category' : 'Add New Category'}
           </DialogTitle>
+          <DialogDescription>
+            {category ? 'Update the category information below.' : 'Create a new category to organize your products.'}
+          </DialogDescription>
         </DialogHeader>
         <div className="p-4 sm:p-0">
           <CategoryForm 

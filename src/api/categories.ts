@@ -91,6 +91,12 @@ export const getCategory = async (id: string): Promise<Category | null> => {
 
 export const createCategory = async (categoryData: NewCategory & { bannerFile?: File }): Promise<Category> => {
   try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User must be authenticated to create categories');
+    }
+
     let bannerUrl: string | null = null;
 
     if (categoryData.bannerFile) {
@@ -102,6 +108,8 @@ export const createCategory = async (categoryData: NewCategory & { bannerFile?: 
     const finalCategoryData = {
       ...categoryToInsert,
       banner_url: bannerUrl,
+      created_by: user.id,
+      updated_by: user.id,
     };
 
     console.log('Creating category:', finalCategoryData);
@@ -126,6 +134,12 @@ export const createCategory = async (categoryData: NewCategory & { bannerFile?: 
 
 export const updateCategory = async (id: string, updates: UpdatedCategory & { bannerFile?: File }): Promise<Category> => {
   try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User must be authenticated to update categories');
+    }
+
     let bannerUrl: string | null = updates.banner_url ?? null;
 
     // If new banner file is provided, upload it
@@ -144,6 +158,7 @@ export const updateCategory = async (id: string, updates: UpdatedCategory & { ba
     const finalCategoryUpdates = {
       ...categoryToUpdate,
       banner_url: bannerUrl,
+      updated_by: user.id,
     };
 
     console.log('Updating category:', id, finalCategoryUpdates);

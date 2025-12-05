@@ -30,8 +30,8 @@ export const BrandedErrorFallback: React.FC<BrandedErrorFallbackProps> = ({
   const remainingAttempts = maxRetries - currentRetries;
   const canRetry = remainingAttempts > 0 && onRetry;
 
-  // Use business settings for branding with graceful fallbacks
-  const logoUrl = businessSettings?.logo_url || '/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png';
+  // Use business settings for branding with graceful fallbacks - Christmas edition
+  const logoUrl = businessSettings?.logo_url || '/lovable-uploads/christmas-starters-logo.png';
   const businessName = businessSettings?.name || 'Starters';
 
   return (
@@ -43,7 +43,7 @@ export const BrandedErrorFallback: React.FC<BrandedErrorFallbackProps> = ({
           alt={`${businessName} Logo`}
           className="h-12 w-auto object-contain"
           onError={(e) => {
-            e.currentTarget.src = '/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png';
+            e.currentTarget.src = '/lovable-uploads/christmas-starters-logo.png';
           }}
         />
       </div>

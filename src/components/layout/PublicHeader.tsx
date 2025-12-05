@@ -43,8 +43,8 @@ const PublicHeaderContent = () => {
     setDismissedBanners(prev => new Set([...prev, bannerId]));
   };
 
-  // Graceful degradation for logo and business name
-  const logoUrl = settings?.logo_url || "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
+  // Graceful degradation for logo and business name - Christmas edition
+  const logoUrl = settings?.logo_url || "/lovable-uploads/christmas-starters-logo.png";
   const businessName = settings?.name || "Starters";
 
   // Filter out dismissed banners
@@ -73,7 +73,7 @@ const PublicHeaderContent = () => {
               alt={`${businessName} Logo`}
               className="h-12 w-auto"
               onError={(e) => {
-                e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
+                e.currentTarget.src = "/lovable-uploads/christmas-starters-logo.png";
               }}
             />
           </Link>

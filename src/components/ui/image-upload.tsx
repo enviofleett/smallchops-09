@@ -59,6 +59,33 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
     return null;
   }, []);
 
+  // Estimate Base64 size and warn if too large for edge function
+  const estimateBase64Size = useCallback((fileSize: number): number => {
+    // Base64 encoding increases size by ~33%
+    return Math.ceil(fileSize * 1.37);
+  }, []);
+
+  const checkBase64SizeLimit = useCallback((file: File): { safe: boolean; warning?: string } => {
+    const estimatedSize = estimateBase64Size(file.size);
+    const maxPayloadSize = 6 * 1024 * 1024; // 6MB edge function limit
+    
+    if (estimatedSize > maxPayloadSize) {
+      return {
+        safe: false,
+        warning: `Image is too large for upload (${(file.size / (1024 * 1024)).toFixed(1)}MB). After processing, files must be under 4.5MB. Please use a smaller image.`
+      };
+    }
+    
+    if (estimatedSize > maxPayloadSize * 0.8) {
+      return {
+        safe: true,
+        warning: `Large image detected. Upload may be slow on slower connections.`
+      };
+    }
+    
+    return { safe: true };
+  }, [estimateBase64Size]);
+
   const processImageWithRetry = useCallback(async (file: File, attempt: number = 1): Promise<File> => {
     const maxAttempts = 3;
     
@@ -75,11 +102,11 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         throw new Error(validation.error + (validation.suggestedAction ? ` - ${validation.suggestedAction}` : ''));
       }
       
-      // Resize image to max 1000x1000 for better performance
+      // Resize image to max 800x800 for better performance and smaller payload
       const resizedBlob = await resizeImage(file, {
-        targetWidth: 1000,
-        targetHeight: 1000,
-        quality: 0.9,
+        targetWidth: 800,
+        targetHeight: 800,
+        quality: 0.85,
         format: 'jpeg'
       });
 
@@ -93,8 +120,15 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
       console.log('Image processing successful:', {
         originalSize: file.size,
         processedSize: processedFile.size,
-        reduction: `${(((file.size - processedFile.size) / file.size) * 100).toFixed(1)}%`
+        reduction: `${(((file.size - processedFile.size) / file.size) * 100).toFixed(1)}%`,
+        estimatedBase64Size: `${(estimateBase64Size(processedFile.size) / (1024 * 1024)).toFixed(2)}MB`
       });
+
+      // Check if processed file is still too large
+      const sizeCheck = checkBase64SizeLimit(processedFile);
+      if (!sizeCheck.safe) {
+        throw new Error(sizeCheck.warning || 'Processed image is still too large for upload');
+      }
 
       return processedFile;
     } catch (error) {
@@ -104,7 +138,8 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (errorMessage.includes('Unsupported file format') || 
           errorMessage.includes('File size') || 
-          errorMessage.includes('File is empty')) {
+          errorMessage.includes('File is empty') ||
+          errorMessage.includes('too large')) {
         throw error; // Don't retry validation errors
       }
       
@@ -116,7 +151,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
       
       throw new Error(`Failed to process image after ${maxAttempts} attempts: ${errorMessage}`);
     }
-  }, []);
+  }, [estimateBase64Size, checkBase64SizeLimit]);
 
   const handleFileChange = useCallback(async (file: File | null) => {
     setError(null);
@@ -131,9 +166,28 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         return;
       }
 
+      // Check Base64 size limit before processing
+      const sizeCheck = checkBase64SizeLimit(file);
+      if (!sizeCheck.safe) {
+        setError(sizeCheck.warning || 'Image is too large for upload');
+        return;
+      }
+      if (sizeCheck.warning) {
+        console.warn('ImageUpload: Size warning:', sizeCheck.warning);
+      }
+
+      // Show immediate preview before processing (better UX)
+      try {
+        const immediatePreviewUrl = URL.createObjectURL(file);
+        setPreview(immediatePreviewUrl);
+        console.log("ImageUpload: Showing immediate preview while processing");
+      } catch (previewErr) {
+        console.warn("ImageUpload: Could not create immediate preview:", previewErr);
+      }
+
       try {
         setIsProcessing(true);
-        console.log("ImageUpload: Processing image to 1000x1000px");
+        console.log("ImageUpload: Processing image to 800x800px");
         
         // Enhanced validation before processing
         if (!file.type.startsWith('image/')) {
@@ -293,7 +347,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
                 <div className="text-white text-center">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                   <p className="text-sm">Processing image...</p>
-                  <p className="text-xs opacity-75">Resizing to 1000x1000px</p>
+                  <p className="text-xs opacity-75">Optimizing for upload...</p>
                 </div>
               </div>
             )}
@@ -309,8 +363,8 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
               <X className="h-4 w-4" />
             </Button>
           )}
-          <div className="mt-2 text-xs text-gray-500 text-center">
-            Image will be automatically resized to 1000×1000px
+          <div className="mt-2 text-xs text-muted-foreground text-center">
+            Image optimized for fast upload (800×800px)
           </div>
         </div>
       ) : (
@@ -337,8 +391,8 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
           <p className="text-xs text-gray-400">
             PNG, JPG, WebP up to 10MB
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Images will be automatically resized to 1000×1000px
+          <p className="text-xs text-muted-foreground mt-1">
+            Images optimized automatically for fast upload
           </p>
           <input
             ref={fileInputRef}

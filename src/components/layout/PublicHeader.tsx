@@ -71,7 +71,7 @@ const PublicHeaderContent = () => {
             <img
               src={logoUrl}
               alt={`${businessName} Logo`}
-              className="h-12 w-auto"
+              className="h-16 w-auto"
               onError={(e) => {
                 e.currentTarget.src = "/lovable-uploads/christmas-starters-logo.png";
               }}

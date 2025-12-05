@@ -87,32 +87,6 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  /* 🎄 CHRISTMAS THEME COLOR OVERRIDE 🎄 */
-  .theme-christmas {
-    /* Classic Christmas Red (Primary) */
-    --primary: 350 85% 50%;
-    --primary-foreground: 0 0% 100%;
-    --primary-glow: 350 85% 65%;
-    --ring: 350 85% 50%;
-
-    /* Christmas Green (Secondary/Accent) */
-    --secondary: 135 60% 30%;
-    --secondary-foreground: 0 0% 100%;
-    --accent: 135 60% 45%;
-    --accent-foreground: 0 0% 100%;
-
-    /* Gold for accents */
-    --warning: 45 100% 55%;
-    --warning-foreground: 26 83.3% 14.1%;
-  }
-
-  .theme-christmas.dark {
-    --primary: 350 85% 60%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 135 60% 45%;
-    --secondary-foreground: 210 40% 98%;
-  }
-
   .dark {
     /* Core colors */
     --background: 222.2 84% 4.9%;
@@ -299,51 +273,6 @@
   .zoom-in {
     @apply animate-in zoom-in-95 duration-200;
   }
-
-  /* 🎄 CHRISTMAS BORDER DECORATION 🎄 */
-  .christmas-border {
-    border-image: linear-gradient(to right, 
-        hsl(var(--primary)) 20%, 
-        hsl(var(--warning)) 40%, 
-        hsl(var(--secondary)) 60%, 
-        hsl(var(--primary)) 80%) 1;
-    border-bottom-width: 4px;
-  }
-}
-
-/* ❄️ SNOWFALL LAYER STYLES ❄️ */
-.snowfall-layer {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 10;
-  overflow: hidden;
-}
-
-.snowfall-layer.layer-1 {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.8) 1px, transparent 1px);
-  background-size: 50px 50px;
-  animation: snow-fall 20s linear infinite, snow-drift 10s ease-in-out alternate infinite;
-}
-
-.snowfall-layer.layer-2 {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.6) 1.5px, transparent 1px);
-  background-size: 75px 75px;
-  animation: snow-fall 30s linear infinite reverse, snow-drift 15s ease-in-out alternate-reverse infinite;
-}
-
-@keyframes snow-fall {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-
-@keyframes snow-drift {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(50px); }
-  100% { transform: translateX(0); }
 }
 
 /* Print styles for order details modal */

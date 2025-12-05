@@ -14,9 +14,9 @@ const PublicFooterContent = () => {
     error
   } = useBusinessSettings();
 
-  // Graceful degradation - Christmas edition
+  // Graceful degradation
   const businessName = settings?.name || 'Starters';
-  const logoUrl = settings?.logo_url || "/lovable-uploads/christmas-starters-logo.png";
+  const logoUrl = settings?.logo_url || "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
   return <footer className="bg-gray-900 text-white py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
@@ -116,7 +116,7 @@ const PublicFooterContent = () => {
             {/* Logo and Tagline */}
             <div className="flex items-center space-x-3">
               <img src={logoUrl} alt={`${businessName} Logo`} className="h-8 w-auto" onError={e => {
-              e.currentTarget.src = "/lovable-uploads/christmas-starters-logo.png";
+              e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
             }} />
               <span className="text-gray-400 text-sm"></span>
             </div>

@@ -24,7 +24,6 @@ import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
 import { CheckoutButton } from '@/components/ui/checkout-button';
 import ProductsFilters, { FilterState } from '@/components/products/ProductsFilters';
-import { ChristmasSnowfall } from '@/components/seasonal/ChristmasSnowfall';
 
 // Memoized components for better performance
 const MemoizedProductCard = memo(({
@@ -265,8 +264,7 @@ const PublicHome = () => {
   }, []);
   return <>
       <SEOHead title="Starters - Premium Food Delivery" description="Order delicious food from Starters. Fresh ingredients, fast delivery, and amazing taste delivered to your door." keywords="food delivery, restaurant, online ordering, fast food, delivery service, starters" type="website" />
-    <div className="theme-christmas min-h-screen bg-white">
-      <ChristmasSnowfall />
+    <div className="min-h-screen bg-white">
       <PublicHeader />
 
       {/* Hero Section */}

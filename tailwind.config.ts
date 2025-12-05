@@ -153,21 +153,12 @@ export default {
 					'70%': { transform: 'scale(0.9)' },
 					'100%': { transform: 'scale(1)', opacity: '1' }
 				},
-			'shimmer': {
-				'0%': { transform: 'translateX(-100%)' },
-				'100%': { transform: 'translateX(100%)' }
+				'shimmer': {
+					'0%': { transform: 'translateX(-100%)' },
+					'100%': { transform: 'translateX(100%)' }
+				}
 			},
-			'snow-fall': {
-				'0%': { transform: 'translateY(-100%)' },
-				'100%': { transform: 'translateY(100vh)' }
-			},
-			'snow-drift': {
-				'0%': { transform: 'translateX(0)' },
-				'50%': { transform: 'translateX(50px)' },
-				'100%': { transform: 'translateX(0)' }
-			}
-		},
-		animation: {
+			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.3s ease-out',
@@ -178,13 +169,11 @@ export default {
 				'slide-out-right': 'slide-out-right 0.3s ease-out',
 				'slide-in-left': 'slide-in-left 0.3s ease-out',
 				'slide-out-left': 'slide-out-left 0.3s ease-out',
-			'bounce-in': 'bounce-in 0.6s ease-out',
-			'shimmer': 'shimmer 2s ease-in-out infinite',
-			'enter': 'fade-in 0.3s ease-out, scale-in 0.2s ease-out',
-			'exit': 'fade-out 0.3s ease-out, scale-out 0.2s ease-out',
-			'snow-layer-1': 'snow-fall 20s linear infinite, snow-drift 10s ease-in-out alternate infinite',
-			'snow-layer-2': 'snow-fall 30s linear infinite reverse, snow-drift 15s ease-in-out alternate-reverse infinite'
-		}
+				'bounce-in': 'bounce-in 0.6s ease-out',
+				'shimmer': 'shimmer 2s ease-in-out infinite',
+				'enter': 'fade-in 0.3s ease-out, scale-in 0.2s ease-out',
+				'exit': 'fade-out 0.3s ease-out, scale-out 0.2s ease-out'
+			}
 		}
 	},
 	plugins: [require("tailwindcss-animate")],

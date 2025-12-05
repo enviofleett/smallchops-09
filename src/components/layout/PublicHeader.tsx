@@ -14,6 +14,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { NotificationPreview } from '@/components/notifications/NotificationPreview';
 import { NotificationIntegration } from '@/components/notifications/NotificationIntegration';
 import { HeaderBanner } from '@/components/banners/HeaderBanner';
+import startersLogo from '@/assets/starters-logo-christmas.png';
 
 export const PublicHeader = () => {
   return (
@@ -44,7 +45,7 @@ const PublicHeaderContent = () => {
   };
 
   // Graceful degradation for logo and business name
-  const logoUrl = settings?.logo_url || "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
+  const logoUrl = settings?.logo_url || startersLogo;
   const businessName = settings?.name || "Starters";
 
   // Filter out dismissed banners
@@ -73,7 +74,7 @@ const PublicHeaderContent = () => {
               alt={`${businessName} Logo`}
               className="h-12 w-auto"
               onError={(e) => {
-                e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
+                e.currentTarget.src = startersLogo;
               }}
             />
           </Link>

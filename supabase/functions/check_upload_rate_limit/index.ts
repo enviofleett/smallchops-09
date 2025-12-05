@@ -53,13 +53,15 @@ Deno.serve(async (req) => {
       }
 
       const uploadCount = recentUploads?.length || 0;
-      const allowed = uploadCount < 10;
+      const RATE_LIMIT = 100; // Increased from 10 to 100 for production
+      const allowed = uploadCount < RATE_LIMIT;
 
       return new Response(
         JSON.stringify({
           allowed,
           current_count: uploadCount,
-          limit: 10,
+          limit: RATE_LIMIT,
+          remaining: Math.max(0, RATE_LIMIT - uploadCount),
           reset_time: new Date(Date.now() + 60 * 60 * 1000).toISOString()
         }),
         {

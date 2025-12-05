@@ -1,11 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0'
 
-// Production-ready CORS configuration
+// Production-ready CORS configuration with wildcard support
 const getCorsHeaders = (origin: string | null): Record<string, string> => {
   const allowedOrigins = [
     'https://oknnklksdiqaifhxaccs.supabase.co',
     'https://lovable.dev',
     'https://startersmallchops.com',
+    'https://www.startersmallchops.com',
     'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com',
     'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
     'https://id-preview--7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.app',
@@ -15,10 +16,39 @@ const getCorsHeaders = (origin: string | null): Record<string, string> => {
     'http://localhost:8000'
   ];
   
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : '*';
+  // Check for exact match first
+  if (origin && allowedOrigins.includes(origin)) {
+    return {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Max-Age': '86400',
+    };
+  }
   
+  // Check for wildcard patterns (subdomains of startersmallchops.com and lovable domains)
+  if (origin) {
+    const wildcardPatterns = [
+      /^https:\/\/.*\.startersmallchops\.com$/,
+      /^https:\/\/.*\.lovable\.dev$/,
+      /^https:\/\/.*\.lovable\.app$/,
+      /^https:\/\/.*\.lovableproject\.com$/,
+      /^https:\/\/.*\.supabase\.co$/
+    ];
+    
+    if (wildcardPatterns.some(pattern => pattern.test(origin))) {
+      return {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Max-Age': '86400',
+      };
+    }
+  }
+  
+  // Fallback for development or unknown origins
   return {
-    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
@@ -33,6 +63,10 @@ interface ProductImageUploadRequest {
     data: string; // base64 encoded
   };
 }
+
+// Rate limit configuration - increased for production use
+const RATE_LIMIT_MAX_UPLOADS = 100; // Increased from 10 to 100 per hour
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin');
@@ -86,15 +120,16 @@ Deno.serve(async (req) => {
 
     console.log('Admin access confirmed');
 
-    // Check rate limiting using direct database query instead of RPC
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    // Check rate limiting using direct database query
+    const oneHourAgo = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
     
     const { data: recentUploads, error: rateLimitError } = await supabase
       .from('audit_logs')
-      .select('id')
+      .select('id, created_at')
       .eq('action', 'product_image_upload')
       .eq('user_id', user.id)
-      .gte('created_at', oneHourAgo);
+      .gte('created_at', oneHourAgo)
+      .order('created_at', { ascending: true });
 
     if (rateLimitError) {
       console.error('Rate limit check error:', rateLimitError);
@@ -114,26 +149,46 @@ Deno.serve(async (req) => {
     }
 
     const uploadCount = recentUploads?.length || 0;
-    if (uploadCount >= 10) {
-      console.log(`Rate limit exceeded for user ${user.id}: ${uploadCount} uploads in last hour`);
+    const remainingUploads = RATE_LIMIT_MAX_UPLOADS - uploadCount;
+    
+    // Calculate time until oldest upload expires (for reset time)
+    let resetTimeSeconds = 3600;
+    if (recentUploads && recentUploads.length > 0) {
+      const oldestUpload = new Date(recentUploads[0].created_at);
+      const resetTime = new Date(oldestUpload.getTime() + RATE_LIMIT_WINDOW_MS);
+      resetTimeSeconds = Math.max(0, Math.ceil((resetTime.getTime() - Date.now()) / 1000));
+    }
+    
+    if (uploadCount >= RATE_LIMIT_MAX_UPLOADS) {
+      const minutesUntilReset = Math.ceil(resetTimeSeconds / 60);
+      console.log(`Rate limit exceeded for user ${user.id}: ${uploadCount}/${RATE_LIMIT_MAX_UPLOADS} uploads in last hour`);
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Rate limit exceeded. Maximum 10 uploads per hour.',
-          retry_after: 3600 // seconds
+          error: `Rate limit exceeded. You've uploaded ${uploadCount} images in the last hour. Please wait ${minutesUntilReset} minutes before uploading more.`,
+          rate_limit: {
+            current: uploadCount,
+            limit: RATE_LIMIT_MAX_UPLOADS,
+            remaining: 0,
+            reset_in_seconds: resetTimeSeconds,
+            reset_in_minutes: minutesUntilReset
+          }
         }),
         {
           status: 429,
           headers: {
             ...corsHeaders,
             'Content-Type': 'application/json',
-            'Retry-After': '3600'
+            'Retry-After': String(resetTimeSeconds),
+            'X-RateLimit-Limit': String(RATE_LIMIT_MAX_UPLOADS),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(resetTimeSeconds)
           }
         }
       );
     }
 
-    console.log(`Rate limit check passed: ${uploadCount}/10 uploads used`);
+    console.log(`Rate limit check passed: ${uploadCount}/${RATE_LIMIT_MAX_UPLOADS} uploads used (${remainingUploads} remaining)`);
 
     if (req.method === 'POST') {
       const body: ProductImageUploadRequest = await req.json();
@@ -153,7 +208,7 @@ Deno.serve(async (req) => {
         throw new Error(`Invalid file type. Allowed types: ${allowedTypes.join(', ')}`);
       }
 
-      // Check file size (10MB limit)
+      // Check file size (10MB limit for original, but Base64 will be ~33% larger)
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (file.size > maxSize) {
         throw new Error('File size exceeds 10MB limit');
@@ -221,12 +276,19 @@ Deno.serve(async (req) => {
             fileName: uploadData.path,
             fileSize: file.size,
             fileType: file.type
+          },
+          rate_limit: {
+            current: uploadCount + 1,
+            limit: RATE_LIMIT_MAX_UPLOADS,
+            remaining: remainingUploads - 1
           }
         }),
         {
           headers: {
             ...corsHeaders,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-RateLimit-Limit': String(RATE_LIMIT_MAX_UPLOADS),
+            'X-RateLimit-Remaining': String(remainingUploads - 1)
           }
         }
       );

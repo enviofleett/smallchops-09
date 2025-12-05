@@ -86,6 +86,13 @@ export const useImageUpload = () => {
                 errorMessage.includes('Rate limit') ||
                 errorMessage.includes('Invalid file type') ||
                 errorMessage.includes('File size exceeds')) {
+              // Provide user-friendly messages for specific errors
+              if (errorMessage.includes('Rate limit')) {
+                throw new Error('You\'ve reached the upload limit (100 images/hour). Please wait before uploading more images.');
+              }
+              if (errorMessage.includes('Unauthorized') || errorMessage.includes('Admin access')) {
+                throw new Error('You don\'t have permission to upload images. Please ensure you\'re logged in as an admin.');
+              }
               throw new Error(errorMessage); // Don't retry these errors
             }
             
@@ -121,13 +128,20 @@ export const useImageUpload = () => {
           lastError = error instanceof Error ? error : new Error('Unknown upload error');
           console.error(`Upload attempt ${attempt} failed:`, lastError.message);
           
+          // Provide user-friendly messages for timeout errors
+          if (lastError.message.includes('timed out')) {
+            lastError = new Error('Upload timed out. This usually means the image is too large or your connection is slow. Try a smaller image.');
+          }
+          
           // Check if this is a non-retryable error
           if (lastError.message.includes('Unauthorized') || 
               lastError.message.includes('Admin access') ||
               lastError.message.includes('Rate limit') ||
+              lastError.message.includes('permission') ||
               lastError.message.includes('Invalid file type') ||
               lastError.message.includes('File size exceeds') ||
-              lastError.message.includes('Invalid file format')) {
+              lastError.message.includes('Invalid file format') ||
+              lastError.message.includes('too large')) {
             throw lastError; // Don't retry these errors
           }
           

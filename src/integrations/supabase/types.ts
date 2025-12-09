@@ -9581,7 +9581,7 @@ export type Database = {
       acquire_order_lock:
         | {
             Args: {
-              p_admin_user_id: string
+              p_admin_session_id: string
               p_order_id: string
               p_timeout_seconds?: number
             }
@@ -9589,7 +9589,7 @@ export type Database = {
           }
         | {
             Args: {
-              p_admin_session_id: string
+              p_admin_user_id: string
               p_order_id: string
               p_timeout_seconds?: number
             }
@@ -9700,29 +9700,6 @@ export type Database = {
       cache_idempotent_request_enhanced:
         | {
             Args: {
-              p_admin_user_id?: string
-              p_idempotency_key: string
-              p_order_id?: string
-              p_request_data: Json
-              p_response_data?: Json
-              p_status?: string
-              p_timeout_seconds?: number
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_admin_user_id?: string
-              p_idempotency_key: string
-              p_order_id?: string
-              p_request_data: Json
-              p_response_data?: Json
-              p_status?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
               p_admin_id?: string
               p_bypass_cache?: boolean
               p_idempotency_key: string
@@ -9730,6 +9707,29 @@ export type Database = {
               p_request_data: Json
               p_response_data?: Json
               p_status?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_admin_user_id?: string
+              p_idempotency_key: string
+              p_order_id?: string
+              p_request_data: Json
+              p_response_data?: Json
+              p_status?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_admin_user_id?: string
+              p_idempotency_key: string
+              p_order_id?: string
+              p_request_data: Json
+              p_response_data?: Json
+              p_status?: string
+              p_timeout_seconds?: number
             }
             Returns: Json
           }
@@ -9837,11 +9837,7 @@ export type Database = {
       }
       check_email_rate_limit:
         | {
-            Args: {
-              p_max_emails?: number
-              p_recipient_email: string
-              p_window_minutes?: number
-            }
+            Args: { email_address: string; time_window_minutes?: number }
             Returns: Json
           }
         | {
@@ -9849,7 +9845,11 @@ export type Database = {
             Returns: boolean
           }
         | {
-            Args: { email_address: string; time_window_minutes?: number }
+            Args: {
+              p_max_emails?: number
+              p_recipient_email: string
+              p_window_minutes?: number
+            }
             Returns: Json
           }
       check_enhanced_rate_limit: {
@@ -9883,16 +9883,16 @@ export type Database = {
       check_paystack_production_readiness: { Args: never; Returns: Json }
       check_permission_change_rate_limit:
         | {
-            Args: { max_changes_per_hour?: number; target_user_id: string }
-            Returns: Json
-          }
-        | {
             Args: {
               p_max_changes?: number
               p_target_user_id: string
               p_window_minutes?: number
             }
             Returns: boolean
+          }
+        | {
+            Args: { max_changes_per_hour?: number; target_user_id: string }
+            Returns: Json
           }
       check_production_payment_safety: { Args: never; Returns: Json }
       check_production_readiness: { Args: never; Returns: Json }
@@ -9984,8 +9984,8 @@ export type Database = {
       cleanup_promotion_rate_limits: { Args: never; Returns: number }
       cleanup_stuck_emails: { Args: never; Returns: Json }
       cleanup_stuck_request_cache:
-        | { Args: { p_minutes_threshold?: number }; Returns: Json }
         | { Args: never; Returns: Json }
+        | { Args: { p_minutes_threshold?: number }; Returns: Json }
       clear_production_data: { Args: never; Returns: string }
       confirm_payment_atomic: {
         Args: {
@@ -10767,15 +10767,6 @@ export type Database = {
       log_admin_action:
         | {
             Args: {
-              p_action: string
-              p_details?: Json
-              p_entity_id?: string
-              p_entity_type?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
               action_type: string
               entity_id: string
               entity_type: string
@@ -10784,6 +10775,15 @@ export type Database = {
               old_values?: Json
             }
             Returns: undefined
+          }
+        | {
+            Args: {
+              p_action: string
+              p_details?: Json
+              p_entity_id?: string
+              p_entity_type?: string
+            }
+            Returns: string
           }
         | {
             Args: {
@@ -11019,6 +11019,15 @@ export type Database = {
       log_security_event:
         | {
             Args: {
+              p_description: string
+              p_event_type: string
+              p_metadata?: Json
+              p_severity?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
               p_description?: string
               p_event_type: string
               p_ip_address?: unknown
@@ -11026,15 +11035,6 @@ export type Database = {
               p_severity?: string
               p_user_agent?: string
               p_user_id?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_description: string
-              p_event_type: string
-              p_metadata?: Json
-              p_severity?: string
             }
             Returns: string
           }
@@ -11210,11 +11210,11 @@ export type Database = {
         Returns: string
       }
       record_permission_change_rate_limit:
+        | { Args: { p_target_user_id: string }; Returns: undefined }
         | {
             Args: { changes_count?: number; target_user_id: string }
             Returns: undefined
           }
-        | { Args: { p_target_user_id: string }; Returns: undefined }
       record_smtp_health_metric: {
         Args: {
           p_metric_type: string
@@ -11237,11 +11237,11 @@ export type Database = {
       }
       release_order_lock:
         | {
-            Args: { p_admin_user_id: string; p_order_id: string }
+            Args: { p_admin_session_id: string; p_order_id: string }
             Returns: boolean
           }
         | {
-            Args: { p_admin_session_id: string; p_order_id: string }
+            Args: { p_admin_user_id: string; p_order_id: string }
             Returns: boolean
           }
       release_order_lock_enhanced: {
@@ -11395,10 +11395,6 @@ export type Database = {
       }
       update_user_permissions_secure:
         | {
-            Args: { permissions_data: Json; target_user_id: string }
-            Returns: Json
-          }
-        | {
             Args: {
               p_change_reason?: string
               p_permissions: Json
@@ -11406,18 +11402,11 @@ export type Database = {
             }
             Returns: Json
           }
-      upsert_communication_event:
         | {
-            Args: {
-              p_dedupe_key?: string
-              p_event_type: string
-              p_order_id?: string
-              p_recipient_email: string
-              p_template_key: string
-              p_template_variables?: Json
-            }
+            Args: { permissions_data: Json; target_user_id: string }
             Returns: Json
           }
+      upsert_communication_event:
         | {
             Args: {
               p_dedupe_key?: string
@@ -11429,6 +11418,17 @@ export type Database = {
               p_template_variables: Json
             }
             Returns: string
+          }
+        | {
+            Args: {
+              p_dedupe_key?: string
+              p_event_type: string
+              p_order_id?: string
+              p_recipient_email: string
+              p_template_key: string
+              p_template_variables?: Json
+            }
+            Returns: Json
           }
       upsert_communication_event_enhanced: {
         Args: {
@@ -11495,8 +11495,8 @@ export type Database = {
         Returns: Json
       }
       validate_email_template:
-        | { Args: { template_data: Json }; Returns: Json }
         | { Args: { p_template_key: string }; Returns: Json }
+        | { Args: { template_data: Json }; Returns: Json }
       validate_order_access_token: {
         Args: { p_order_id: string; p_token: string }
         Returns: boolean
@@ -11566,7 +11566,7 @@ export type Database = {
         | {
             Args: {
               p_email: string
-              p_ip_address?: string
+              p_ip_address?: unknown
               p_otp_code: string
               p_otp_type: string
             }
@@ -11575,7 +11575,7 @@ export type Database = {
         | {
             Args: {
               p_email: string
-              p_ip_address?: unknown
+              p_ip_address?: string
               p_otp_code: string
               p_otp_type: string
             }

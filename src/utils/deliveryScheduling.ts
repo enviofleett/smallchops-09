@@ -2,6 +2,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { addMinutes, isBefore, isAfter, startOfDay, addDays, isSameDay } from 'date-fns';
 import { format, parseISO } from 'date-fns';
 import { getLagosTime, toLagosTime } from './lagosTimezone';
+import { 
+  FIXED_CLOSED_DATES, 
+  SPECIAL_OPENING_TIMES, 
+  PRE_ORDER_CUTOFF_DAYS,
+  getClosureReason,
+  getCutoffReason 
+} from '@/config/deliveryExceptions';
 
 export interface BusinessHours {
   open: string;
@@ -45,7 +52,70 @@ export interface DeliverySlot {
   is_holiday: boolean;
   holiday_name?: string;
   is_business_day: boolean;
+  closure_reason?: string;
 }
+
+// ============= Exception Rule Helpers =============
+
+/**
+ * Check if a date is completely closed (hardcoded exceptions)
+ */
+export function isDateClosed(date: Date): { closed: boolean; reason?: string } {
+  const monthDay = format(date, 'MM-dd');
+  
+  if (FIXED_CLOSED_DATES.includes(monthDay)) {
+    return { closed: true, reason: getClosureReason(monthDay) };
+  }
+  
+  return { closed: false };
+}
+
+/**
+ * Get the minimum opening time for a specific date
+ * Returns [hour, minute] in 24-hour format
+ */
+export function getMinimumOpeningTime(date: Date): [number, number] {
+  const dateStr = format(date, 'yyyy-MM-dd');
+  
+  const specialTime = SPECIAL_OPENING_TIMES.find(entry => entry.date === dateStr);
+  if (specialTime) {
+    return [specialTime.hour, specialTime.minute];
+  }
+  
+  // Default: return null to use standard business hours
+  return [8, 0]; // 8:00 AM default
+}
+
+/**
+ * Check if ordering cutoff has passed for a pre-order date
+ */
+export function isOrderingCutoffPassed(deliveryDate: Date, currentTime: Date): boolean {
+  const monthDay = format(deliveryDate, 'MM-dd');
+  
+  if (PRE_ORDER_CUTOFF_DAYS.includes(monthDay)) {
+    // Cutoff is at midnight (00:00) on the delivery date
+    const cutoffTime = startOfDay(deliveryDate);
+    return !isBefore(currentTime, cutoffTime);
+  }
+  
+  return false;
+}
+
+/**
+ * Check if a date has a special late opening time
+ */
+export function hasSpecialOpeningTime(date: Date): { hasSpecial: boolean; hour?: number; minute?: number } {
+  const dateStr = format(date, 'yyyy-MM-dd');
+  const specialTime = SPECIAL_OPENING_TIMES.find(entry => entry.date === dateStr);
+  
+  if (specialTime) {
+    return { hasSpecial: true, hour: specialTime.hour, minute: specialTime.minute };
+  }
+  
+  return { hasSpecial: false };
+}
+
+// ============= Main Service Class =============
 
 class DeliverySchedulingService {
   private config: DeliverySchedulingConfig | null = null;
@@ -149,6 +219,20 @@ class DeliverySchedulingService {
   isDateAvailable(date: Date): { available: boolean; reason?: string } {
     if (!this.config) return { available: false, reason: 'Configuration not loaded' };
 
+    const now = getLagosTime();
+
+    // Check hardcoded closed dates FIRST (highest priority)
+    const closedCheck = isDateClosed(date);
+    if (closedCheck.closed) {
+      return { available: false, reason: closedCheck.reason };
+    }
+
+    // Check pre-order cutoff (e.g., Dec 25th after midnight)
+    if (isOrderingCutoffPassed(date, now)) {
+      const monthDay = format(date, 'MM-dd');
+      return { available: false, reason: getCutoffReason(monthDay) };
+    }
+
     // Check if date is too soon
     const minDeliveryTime = this.getMinimumDeliveryTime();
     if (isBefore(date, startOfDay(minDeliveryTime))) {
@@ -167,7 +251,7 @@ class DeliverySchedulingService {
       };
     }
 
-    // Check if it's a holiday
+    // Check if it's a holiday (from database)
     const dateStr = format(date, 'yyyy-MM-dd');
     const holiday = this.holidays.find(h => h.date === dateStr);
     if (holiday) {
@@ -198,13 +282,25 @@ class DeliverySchedulingService {
 
     if (!businessHours.is_open) return [];
 
+    // Check if date is closed due to hardcoded exceptions
+    const closedCheck = isDateClosed(date);
+    if (closedCheck.closed) return [];
+
     const slots: DeliveryTimeSlot[] = [];
     
-    // Production: Use dynamic hours based on day of week
-    // Monday-Saturday: 8am-7pm, Sunday: 10am-4pm
-    const openTime = this.parseTime(businessHours.open);
+    // Check for special opening time (e.g., Jan 8th opens at 12 PM)
+    const specialOpening = hasSpecialOpeningTime(date);
+    
+    // Determine actual opening time
+    let openTime: Date;
+    if (specialOpening.hasSpecial) {
+      openTime = this.parseTime(`${String(specialOpening.hour).padStart(2, '0')}:${String(specialOpening.minute).padStart(2, '0')}`);
+    } else {
+      openTime = this.parseTime(businessHours.open);
+    }
+    
     const closeTime = this.parseTime(businessHours.close);
-    const slotDuration = this.config.default_delivery_duration_minutes; // Use config duration
+    const slotDuration = this.config.default_delivery_duration_minutes;
     const minDeliveryTime = this.getMinimumDeliveryTime();
 
     let currentTime = openTime;
@@ -276,13 +372,15 @@ class DeliverySchedulingService {
       while (!isAfter(currentDate, end) && iterations < maxIterations) {
         const availability = this.isDateAvailable(currentDate);
         const holiday = this.holidays.find(h => h.date === format(currentDate, 'yyyy-MM-dd'));
+        const closedCheck = isDateClosed(currentDate);
         
         const slot: DeliverySlot = {
           date: format(currentDate, 'yyyy-MM-dd'),
           time_slots: availability.available ? this.generateTimeSlots(currentDate) : [],
-          is_holiday: !!holiday,
-          holiday_name: holiday?.name,
-          is_business_day: availability.available
+          is_holiday: !!holiday || closedCheck.closed,
+          holiday_name: holiday?.name || (closedCheck.closed ? closedCheck.reason : undefined),
+          is_business_day: availability.available,
+          closure_reason: closedCheck.closed ? closedCheck.reason : undefined
         };
 
         slots.push(slot);

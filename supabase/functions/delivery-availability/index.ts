@@ -6,6 +6,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ============= HARDCODED DELIVERY EXCEPTIONS =============
+// These override all database-driven scheduling rules
+
+// Fixed closed dates (recurring annually) - MM-DD format
+const FIXED_CLOSED_DATES = ['01-05', '01-06', '01-07'];
+
+// Special opening times for specific dates - YYYY-MM-DD format
+const SPECIAL_OPENING_TIMES = [
+  { date: '2026-01-08', hour: 12, minute: 0 }, // Jan 8th 2026: Opens at 12 PM
+];
+
+// Pre-order cutoff dates - MM-DD format (ordering closes at midnight)
+const PRE_ORDER_CUTOFF_DAYS = ['12-25'];
+
+// Helper functions for exception rules
+function isDateClosed(dateStr: string): { closed: boolean; reason?: string } {
+  const monthDay = dateStr.substring(5); // Extract MM-DD from YYYY-MM-DD
+  if (FIXED_CLOSED_DATES.includes(monthDay)) {
+    return { closed: true, reason: 'Store closed for annual break' };
+  }
+  return { closed: false };
+}
+
+function getSpecialOpeningTime(dateStr: string): { hour: number; minute: number } | null {
+  const special = SPECIAL_OPENING_TIMES.find(entry => entry.date === dateStr);
+  return special ? { hour: special.hour, minute: special.minute } : null;
+}
+
+function isOrderingCutoffPassed(deliveryDateStr: string, now: Date): boolean {
+  const monthDay = deliveryDateStr.substring(5);
+  if (PRE_ORDER_CUTOFF_DAYS.includes(monthDay)) {
+    const cutoffDate = new Date(deliveryDateStr + 'T00:00:00Z');
+    return now >= cutoffDate;
+  }
+  return false;
+}
+
+// ============= END EXCEPTIONS =============
+
 interface DeliverySlotRequest {
   start_date: string;
   end_date: string;
@@ -26,6 +65,7 @@ interface DeliverySlot {
   is_business_day: boolean;
   is_holiday: boolean;
   holiday_name?: string;
+  closure_reason?: string;
   time_slots: TimeSlot[];
 }
 
@@ -93,7 +133,7 @@ serve(async (req) => {
         config.business_hours = configData.business_hours;
       }
 
-      // Load holidays
+      // Load holidays from database
       const { data: holidays } = await supabase
         .from('public_holidays')
         .select('name, date')
@@ -123,6 +163,7 @@ serve(async (req) => {
       // Generate delivery slots for the date range
       const deliverySlots: DeliverySlot[] = [];
       const currentDate = new Date(startDate);
+      const now = new Date();
       const maxIterations = 100;
       let iterations = 0;
 
@@ -131,26 +172,45 @@ serve(async (req) => {
         const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const dayOfWeek = dayNames[currentDate.getDay()] as keyof typeof config.business_hours;
         
-        // Check if it's a holiday
+        // ============= APPLY EXCEPTION RULES =============
+        
+        // Check hardcoded closed dates FIRST (highest priority)
+        const closedCheck = isDateClosed(dateStr);
+        
+        // Check pre-order cutoff
+        const cutoffPassed = isOrderingCutoffPassed(dateStr, now);
+        
+        // Check database holidays
         const holiday = holidays?.find(h => h.date === dateStr);
-        const isHoliday = !!holiday;
+        const isHoliday = !!holiday || closedCheck.closed;
         
         // Get business hours for this day
         const businessHours = config.business_hours[dayOfWeek];
-        const isBusinessDay = businessHours.is_open && !isHoliday;
+        
+        // Determine if it's a business day (not closed, not holiday, is_open)
+        const isBusinessDay = !closedCheck.closed && !cutoffPassed && businessHours.is_open && !holiday;
         
         // Generate time slots for business days
         const timeSlots: TimeSlot[] = [];
         
         if (isBusinessDay) {
-          // Production: Generate hourly slots based on day-specific hours
-          const openHour = parseInt(businessHours.open.split(':')[0]);
-          const openMinute = parseInt(businessHours.open.split(':')[1]);
+          // Check for special opening time (e.g., Jan 8th opens at 12 PM)
+          const specialOpening = getSpecialOpeningTime(dateStr);
+          
+          // Determine actual opening time
+          let openHour = parseInt(businessHours.open.split(':')[0]);
+          let openMinute = parseInt(businessHours.open.split(':')[1]);
+          
+          if (specialOpening) {
+            openHour = specialOpening.hour;
+            openMinute = specialOpening.minute;
+            console.log(`📌 Special opening time for ${dateStr}: ${openHour}:${String(openMinute).padStart(2, '0')}`);
+          }
+          
           const closeHour = parseInt(businessHours.close.split(':')[0]);
           const closeMinute = parseInt(businessHours.close.split(':')[1]);
           
           const slotDuration = config.default_delivery_duration_minutes;
-          const now = new Date();
           const minDeliveryTime = new Date(now.getTime() + config.minimum_lead_time_minutes * 60 * 1000);
           const isToday = dateStr === now.toISOString().split('T')[0];
 
@@ -194,8 +254,8 @@ serve(async (req) => {
               end_time: slotEndTime,
               available,
               reason,
-              capacity: 10, // Default capacity
-              booked_count: 0 // Simplified for now
+              capacity: 10,
+              booked_count: 0
             });
 
             // Move to next hour
@@ -207,11 +267,22 @@ serve(async (req) => {
           }
         }
 
+        // Determine closure reason for display
+        let closureReason: string | undefined;
+        if (closedCheck.closed) {
+          closureReason = closedCheck.reason;
+        } else if (cutoffPassed) {
+          closureReason = 'Ordering window has closed for this date';
+        } else if (holiday) {
+          closureReason = holiday.name;
+        }
+
         deliverySlots.push({
           date: dateStr,
           is_business_day: isBusinessDay,
           is_holiday: isHoliday,
-          holiday_name: holiday?.name,
+          holiday_name: holiday?.name || (closedCheck.closed ? 'Annual Break' : undefined),
+          closure_reason: closureReason,
           time_slots: timeSlots
         });
 
@@ -220,12 +291,13 @@ serve(async (req) => {
       }
 
       const businessDaysCount = deliverySlots.filter(s => s.is_business_day).length;
+      const closedDaysCount = deliverySlots.filter(s => s.closure_reason).length;
       const totalSlots = deliverySlots.reduce((total, slot) => total + slot.time_slots.length, 0);
       const availableSlots = deliverySlots.reduce((total, slot) => 
         total + slot.time_slots.filter(timeSlot => timeSlot.available).length, 0
       );
 
-      console.log('✅ Generated', deliverySlots.length, 'delivery slots,', businessDaysCount, 'business days,', totalSlots, 'total slots,', availableSlots, 'available');
+      console.log('✅ Generated', deliverySlots.length, 'delivery slots,', businessDaysCount, 'business days,', closedDaysCount, 'closed days,', totalSlots, 'total slots,', availableSlots, 'available');
 
       return new Response(
         JSON.stringify({ 
@@ -233,6 +305,7 @@ serve(async (req) => {
           slots: deliverySlots,
           total_days: deliverySlots.length,
           business_days: businessDaysCount,
+          closed_days: closedDaysCount,
           total_slots: totalSlots,
           available_slots: availableSlots,
           config: {

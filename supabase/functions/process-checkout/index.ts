@@ -7,6 +7,67 @@ import { getCorsHeaders, handleCorsPreflightResponse } from '../_shared/cors.ts'
 // Lagos timezone constant
 const LAGOS_TIMEZONE = 'Africa/Lagos';
 
+// ============= HARDCODED DELIVERY EXCEPTIONS =============
+// CRITICAL: These rules are enforced server-side to prevent manipulation
+
+// Fixed closed dates (recurring annually) - MM-DD format
+const FIXED_CLOSED_DATES = ['01-05', '01-06', '01-07'];
+
+// Special opening times for specific dates - YYYY-MM-DD format
+const SPECIAL_OPENING_TIMES = [
+  { date: '2026-01-08', hour: 12, minute: 0 }, // Jan 8th 2026: Opens at 12 PM
+];
+
+// Pre-order cutoff dates - MM-DD format (ordering closes at midnight)
+const PRE_ORDER_CUTOFF_DAYS = ['12-25'];
+
+// Exception validation helpers
+function validateDeliveryScheduleExceptions(deliveryDate: string, deliveryTime: string): { valid: boolean; error?: string } {
+  const now = new Date();
+  const monthDay = deliveryDate.substring(5); // Extract MM-DD from YYYY-MM-DD
+  
+  // Rule 1: Check if date is completely closed (Jan 5-7)
+  if (FIXED_CLOSED_DATES.includes(monthDay)) {
+    console.log(`❌ Delivery validation failed: ${deliveryDate} is a closed date`);
+    return { 
+      valid: false, 
+      error: 'Cannot schedule delivery on this date - store is closed for annual break' 
+    };
+  }
+  
+  // Rule 2: Check pre-order cutoff (Dec 25th)
+  if (PRE_ORDER_CUTOFF_DAYS.includes(monthDay)) {
+    const cutoffDate = new Date(deliveryDate + 'T00:00:00Z');
+    if (now >= cutoffDate) {
+      console.log(`❌ Delivery validation failed: Ordering cutoff passed for ${deliveryDate}`);
+      return { 
+        valid: false, 
+        error: 'Ordering for this date has closed. Please select a different date.' 
+      };
+    }
+  }
+  
+  // Rule 3: Check special opening times (Jan 8th at 12 PM)
+  const specialTime = SPECIAL_OPENING_TIMES.find(s => s.date === deliveryDate);
+  if (specialTime && deliveryTime) {
+    const [requestedHour, requestedMinute] = deliveryTime.split(':').map(Number);
+    const requestedMinutes = requestedHour * 60 + requestedMinute;
+    const minimumMinutes = specialTime.hour * 60 + specialTime.minute;
+    
+    if (requestedMinutes < minimumMinutes) {
+      const formattedTime = `${String(specialTime.hour).padStart(2, '0')}:${String(specialTime.minute).padStart(2, '0')}`;
+      console.log(`❌ Delivery validation failed: ${deliveryTime} is before special opening time ${formattedTime}`);
+      return { 
+        valid: false, 
+        error: `Delivery on this date starts at ${formattedTime}. Please select a later time.` 
+      };
+    }
+  }
+  
+  return { valid: true };
+}
+// ============= END EXCEPTIONS =============
+
 /**
  * Convert Lagos local time to UTC for database storage
  * @param lagosDate - Date string in YYYY-MM-DD format
@@ -108,6 +169,19 @@ serve(async (req: Request) => {
     if (!delivery_schedule?.delivery_date) {
       throw new Error('Delivery/pickup date is required')
     }
+
+    // 🔒 CRITICAL: Validate against hardcoded delivery exceptions
+    console.log('🔒 Validating delivery schedule against exception rules...')
+    const scheduleValidation = validateDeliveryScheduleExceptions(
+      delivery_schedule.delivery_date,
+      delivery_schedule.delivery_time_start
+    );
+    
+    if (!scheduleValidation.valid) {
+      console.error('❌ Schedule validation failed:', scheduleValidation.error)
+      throw new Error(scheduleValidation.error)
+    }
+    console.log('✅ Delivery schedule validation passed')
 
     // Calculate amounts (Paystack will add their own fees at checkout)
     const subtotal = items.reduce((sum: number, item: any) => 

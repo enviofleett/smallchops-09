@@ -43,6 +43,8 @@ export interface BusinessSettings {
   created_at: string;
   updated_at: string;
   allow_guest_checkout?: boolean;
+  /** Admin-managed array of disabled dates (YYYY-MM-DD format) */
+  disabled_calendar_dates?: string[] | null;
   // Sensitive fields moved to business_sensitive_data table
 }
 

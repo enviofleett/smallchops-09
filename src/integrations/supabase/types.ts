@@ -885,6 +885,7 @@ export type Database = {
           created_at: string
           default_vat_rate: number | null
           delivery_scheduling_config: Json | null
+          disabled_calendar_dates: Json | null
           facebook_url: string | null
           favicon_url: string | null
           id: string
@@ -922,6 +923,7 @@ export type Database = {
           created_at?: string
           default_vat_rate?: number | null
           delivery_scheduling_config?: Json | null
+          disabled_calendar_dates?: Json | null
           facebook_url?: string | null
           favicon_url?: string | null
           id?: string
@@ -959,6 +961,7 @@ export type Database = {
           created_at?: string
           default_vat_rate?: number | null
           delivery_scheduling_config?: Json | null
+          disabled_calendar_dates?: Json | null
           facebook_url?: string | null
           favicon_url?: string | null
           id?: string

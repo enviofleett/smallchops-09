@@ -101,10 +101,10 @@ serve(async (req) => {
       
       console.log('📅 Fetching delivery slots from', start_date, 'to', end_date);
 
-      // Load configuration with production-ready defaults
+      // Load configuration with production-ready defaults (including disabled_calendar_dates)
       const { data: configData } = await supabase
         .from('business_settings')
-        .select('delivery_scheduling_config, business_hours')
+        .select('delivery_scheduling_config, business_hours, disabled_calendar_dates')
         .single();
 
       // Production-ready default config with new hours
@@ -132,6 +132,9 @@ serve(async (req) => {
       if (configData?.business_hours) {
         config.business_hours = configData.business_hours;
       }
+      
+      // Get admin-disabled dates from database
+      const adminDisabledDates: string[] = configData?.disabled_calendar_dates || [];
 
       // Load holidays from database
       const { data: holidays } = await supabase
@@ -177,6 +180,9 @@ serve(async (req) => {
         // Check hardcoded closed dates FIRST (highest priority)
         const closedCheck = isDateClosed(dateStr);
         
+        // Check admin-disabled dates from database
+        const isAdminDisabled = adminDisabledDates.includes(dateStr);
+        
         // Check pre-order cutoff
         const cutoffPassed = isOrderingCutoffPassed(dateStr, now);
         
@@ -187,8 +193,8 @@ serve(async (req) => {
         // Get business hours for this day
         const businessHours = config.business_hours[dayOfWeek];
         
-        // Determine if it's a business day (not closed, not holiday, is_open)
-        const isBusinessDay = !closedCheck.closed && !cutoffPassed && businessHours.is_open && !holiday;
+        // Determine if it's a business day (not closed, not holiday, not admin-disabled, is_open)
+        const isBusinessDay = !closedCheck.closed && !isAdminDisabled && !cutoffPassed && businessHours.is_open && !holiday;
         
         // Generate time slots for business days
         const timeSlots: TimeSlot[] = [];
@@ -271,6 +277,8 @@ serve(async (req) => {
         let closureReason: string | undefined;
         if (closedCheck.closed) {
           closureReason = closedCheck.reason;
+        } else if (isAdminDisabled) {
+          closureReason = 'Date disabled by administrator';
         } else if (cutoffPassed) {
           closureReason = 'Ordering window has closed for this date';
         } else if (holiday) {

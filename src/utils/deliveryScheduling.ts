@@ -58,13 +58,22 @@ export interface DeliverySlot {
 // ============= Exception Rule Helpers =============
 
 /**
- * Check if a date is completely closed (hardcoded exceptions)
+ * Check if a date is completely closed (hardcoded exceptions + admin-disabled dates)
+ * @param date - The date to check
+ * @param adminDisabledDates - Optional array of admin-disabled dates in YYYY-MM-DD format
  */
-export function isDateClosed(date: Date): { closed: boolean; reason?: string } {
+export function isDateClosed(date: Date, adminDisabledDates?: string[] | null): { closed: boolean; reason?: string } {
   const monthDay = format(date, 'MM-dd');
+  const dateStr = format(date, 'yyyy-MM-dd');
   
+  // Check hardcoded fixed closed dates first
   if (FIXED_CLOSED_DATES.includes(monthDay)) {
     return { closed: true, reason: getClosureReason(monthDay) };
+  }
+  
+  // Check admin-disabled dates from database
+  if (adminDisabledDates?.includes(dateStr)) {
+    return { closed: true, reason: 'Date disabled by administrator' };
   }
   
   return { closed: false };

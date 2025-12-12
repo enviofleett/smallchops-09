@@ -144,17 +144,20 @@ export const BusinessSettingsTab = () => {
         ])
       );
 
-      const { data: result, error } = await supabase.functions.invoke('business-settings', {
-        method: 'POST',
+      const response = await supabase.functions.invoke('business-settings', {
         body: cleanedData,
       });
 
-      if (error) {
-        throw error;
+      // Handle Supabase function invoke response structure
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to update business settings');
       }
 
+      // The response data contains the actual result from our edge function
+      const result = response.data;
+      
       if (!result?.success) {
-        throw new Error(result?.error || 'Failed to update business settings');
+        throw new Error(result?.error || result?.message || 'Failed to update business settings');
       }
 
       toast.success('Business settings updated successfully!');

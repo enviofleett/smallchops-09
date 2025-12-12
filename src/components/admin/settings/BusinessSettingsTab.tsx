@@ -153,11 +153,15 @@ export const BusinessSettingsTab = () => {
         throw new Error(response.error.message || 'Failed to update business settings');
       }
 
-      // The response data contains the actual result from our edge function
+      // The edge function returns { data: {...} } on success or { error: "..." } on failure
       const result = response.data;
       
-      if (!result?.success) {
-        throw new Error(result?.error || result?.message || 'Failed to update business settings');
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      if (!result?.data) {
+        throw new Error('Invalid response from server');
       }
 
       toast.success('Business settings updated successfully!');

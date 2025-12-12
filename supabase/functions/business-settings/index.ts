@@ -411,6 +411,24 @@ serve(async (req) => {
         }
       }
 
+      // Validate disabled_calendar_dates if present
+      if (body.disabled_calendar_dates !== undefined && body.disabled_calendar_dates !== null) {
+        if (!Array.isArray(body.disabled_calendar_dates)) {
+          throw new Error('disabled_calendar_dates must be an array');
+        }
+        
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        const invalidDates = body.disabled_calendar_dates.filter(
+          (date: string) => !dateRegex.test(date)
+        );
+        
+        if (invalidDates.length > 0) {
+          throw new Error(`Invalid date format: ${invalidDates.join(', ')}. Use YYYY-MM-DD format.`);
+        }
+        
+        console.log('Validated disabled_calendar_dates:', body.disabled_calendar_dates.length, 'dates');
+      }
+
       // Clean up empty strings to null for database
       const cleanedBody = { ...body };
       Object.keys(cleanedBody).forEach(key => {

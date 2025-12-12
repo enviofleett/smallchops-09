@@ -22,7 +22,11 @@ const SPECIAL_OPENING_TIMES = [
 const PRE_ORDER_CUTOFF_DAYS = ['12-25'];
 
 // Exception validation helpers
-function validateDeliveryScheduleExceptions(deliveryDate: string, deliveryTime: string): { valid: boolean; error?: string } {
+function validateDeliveryScheduleExceptions(
+  deliveryDate: string, 
+  deliveryTime: string,
+  adminDisabledDates?: string[]
+): { valid: boolean; error?: string } {
   const now = new Date();
   const monthDay = deliveryDate.substring(5); // Extract MM-DD from YYYY-MM-DD
   
@@ -35,7 +39,16 @@ function validateDeliveryScheduleExceptions(deliveryDate: string, deliveryTime: 
     };
   }
   
-  // Rule 2: Check pre-order cutoff (Dec 25th)
+  // Rule 2: Check admin-disabled dates from database
+  if (adminDisabledDates?.includes(deliveryDate)) {
+    console.log(`❌ Delivery validation failed: ${deliveryDate} is admin-disabled`);
+    return { 
+      valid: false, 
+      error: 'Selected delivery date is not available. Please choose another date.' 
+    };
+  }
+  
+  // Rule 3: Check pre-order cutoff (Dec 25th)
   if (PRE_ORDER_CUTOFF_DAYS.includes(monthDay)) {
     const cutoffDate = new Date(deliveryDate + 'T00:00:00Z');
     if (now >= cutoffDate) {
@@ -47,7 +60,7 @@ function validateDeliveryScheduleExceptions(deliveryDate: string, deliveryTime: 
     }
   }
   
-  // Rule 3: Check special opening times (Jan 8th at 12 PM)
+  // Rule 4: Check special opening times (Jan 8th at 12 PM)
   const specialTime = SPECIAL_OPENING_TIMES.find(s => s.date === deliveryDate);
   if (specialTime && deliveryTime) {
     const [requestedHour, requestedMinute] = deliveryTime.split(':').map(Number);
@@ -170,11 +183,23 @@ serve(async (req: Request) => {
       throw new Error('Delivery/pickup date is required')
     }
 
-    // 🔒 CRITICAL: Validate against hardcoded delivery exceptions
+    // 🔒 CRITICAL: Fetch admin-disabled dates for validation
+    console.log('🔒 Fetching admin-disabled dates...')
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('disabled_calendar_dates')
+      .limit(1)
+      .maybeSingle();
+    
+    const adminDisabledDates: string[] = businessSettings?.disabled_calendar_dates || [];
+    console.log(`📅 Found ${adminDisabledDates.length} admin-disabled dates`)
+
+    // 🔒 CRITICAL: Validate against hardcoded + admin-disabled delivery exceptions
     console.log('🔒 Validating delivery schedule against exception rules...')
     const scheduleValidation = validateDeliveryScheduleExceptions(
       delivery_schedule.delivery_date,
-      delivery_schedule.delivery_time_start
+      delivery_schedule.delivery_time_start,
+      adminDisabledDates
     );
     
     if (!scheduleValidation.valid) {

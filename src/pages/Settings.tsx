@@ -27,8 +27,10 @@ import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger
 import { ErrorTestComponent } from '@/components/error/ErrorTestComponent';
 import { EmailCredentialsManager } from '@/components/admin/EmailCredentialsManager';
 import { SMSManagementDashboard } from '@/components/admin/SMSManagementDashboard';
+import { BusinessSettingsTab } from '@/components/admin/settings/BusinessSettingsTab';
+
 const Settings = () => {
-  const [activeTab, setActiveTab] = useState("communications");
+  const [activeTab, setActiveTab] = useState("business");
 
   // Check if current user is admin to show admin controls
   const {
@@ -66,13 +68,18 @@ const Settings = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
         <div className="overflow-x-auto pb-2 -mx-4 px-4">
-          <TabsList className="grid w-full min-w-[400px] sm:min-w-[480px] grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 lg:min-w-0 h-auto p-1">
+          <TabsList className="grid w-full min-w-[500px] sm:min-w-[560px] grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 lg:min-w-0 h-auto p-1">
+            <TabsTrigger value="business" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Business</TabsTrigger>
             <TabsTrigger value="communications" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Comms</TabsTrigger>
             <TabsTrigger value="payments" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Payments</TabsTrigger>
             {isAdmin && <TabsTrigger value="admin" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Admin</TabsTrigger>}
             {isAdmin && <TabsTrigger value="developer" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Dev</TabsTrigger>}
           </TabsList>
         </div>
+
+        <TabsContent value="business" className="space-y-4 md:space-y-6">
+          <BusinessSettingsTab />
+        </TabsContent>
 
         <TabsContent value="communications" className="space-y-4 md:space-y-6">
           <Tabs defaultValue="branding" className="space-y-4 md:space-y-6">

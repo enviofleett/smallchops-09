@@ -871,6 +871,13 @@ export type Database = {
             referencedRelation: "business_settings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "business_sensitive_data_business_settings_id_fkey"
+            columns: ["business_settings_id"]
+            isOneToOne: false
+            referencedRelation: "public_business_settings"
+            referencedColumns: ["id"]
+          },
         ]
       }
       business_settings: {
@@ -9507,6 +9514,37 @@ export type Database = {
         }
         Relationships: []
       }
+      public_business_settings: {
+        Row: {
+          accent_color: string | null
+          allow_guest_checkout: boolean | null
+          business_hours: Json | null
+          delivery_scheduling_config: Json | null
+          disabled_calendar_dates: Json | null
+          facebook_url: string | null
+          favicon_url: string | null
+          id: string | null
+          instagram_url: string | null
+          linkedin_url: string | null
+          logo_dark_url: string | null
+          logo_url: string | null
+          name: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          seo_description: string | null
+          seo_keywords: string | null
+          seo_title: string | null
+          social_card_url: string | null
+          tagline: string | null
+          tiktok_url: string | null
+          twitter_url: string | null
+          website_url: string | null
+          whatsapp_support_number: string | null
+          working_hours: string | null
+          youtube_url: string | null
+        }
+        Relationships: []
+      }
       security_events_categorized: {
         Row: {
           action: string | null
@@ -10490,6 +10528,16 @@ export type Database = {
       get_order_tracking_secure: {
         Args: { p_order_number: string; p_tracking_token?: string }
         Returns: Json
+      }
+      get_order_tracking_status: {
+        Args: { p_order_number: string }
+        Returns: {
+          created_at: string
+          delivery_status: string
+          estimated_delivery_date: string
+          order_number: string
+          status: string
+        }[]
       }
       get_orders_with_payment: {
         Args: { p_customer_id?: string; p_limit?: number; p_order_id?: string }

@@ -10618,6 +10618,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_reviewer_display_name: {
+        Args: { p_customer_id: string }
+        Returns: string
+      }
       get_security_events: {
         Args: { p_limit?: number; p_risk_level?: string }
         Returns: {

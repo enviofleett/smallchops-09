@@ -36,7 +36,7 @@ export const TeamMembersManager = () => {
 
   const fetchMembers = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('team_members')
         .select('*')
         .order('sort_order');
@@ -54,7 +54,7 @@ export const TeamMembersManager = () => {
   const handleSave = async (memberData: Partial<TeamMember>) => {
     try {
       if (editingMember) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('team_members')
           .update(memberData)
           .eq('id', editingMember.id);
@@ -62,7 +62,7 @@ export const TeamMembersManager = () => {
         if (error) throw error;
         toast.success('Team member updated successfully');
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('team_members')
           .insert({
             ...memberData,
@@ -87,7 +87,7 @@ export const TeamMembersManager = () => {
     if (!confirm('Are you sure you want to delete this team member?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('team_members')
         .delete()
         .eq('id', id);
@@ -103,7 +103,7 @@ export const TeamMembersManager = () => {
 
   const toggleActive = async (member: TeamMember) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('team_members')
         .update({ 
           is_active: !member.is_active

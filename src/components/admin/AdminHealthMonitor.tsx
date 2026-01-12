@@ -37,7 +37,7 @@ export const AdminHealthMonitor = () => {
 
     try {
       // 1. Database connectivity check
-      const { data: dbTest, error: dbError } = await supabase
+      const { data: dbTest, error: dbError } = await (supabase as any)
         .from('profiles')
         .select('count')
         .limit(1);
@@ -75,7 +75,7 @@ export const AdminHealthMonitor = () => {
       }
 
       // 3. Menu structure check
-      const { data: menuData, error: menuError } = await supabase
+      const { data: menuData, error: menuError } = await (supabase as any)
         .from('menu_structure')
         .select('count')
         .eq('is_active', true);
@@ -89,7 +89,7 @@ export const AdminHealthMonitor = () => {
       });
 
       // 4. Payment integration check
-      const { data: paymentData, error: paymentError } = await supabase
+      const { data: paymentData, error: paymentError } = await (supabase as any)
         .from('payment_integrations')
         .select('provider, connection_status')
         .eq('provider', 'paystack')
@@ -108,7 +108,7 @@ export const AdminHealthMonitor = () => {
       });
 
       // 5. User permissions check
-      const { data: permissionsData, error: permissionsError } = await supabase
+      const { data: permissionsData, error: permissionsError } = await (supabase as any)
         .from('user_permissions')
         .select('count');
       
@@ -121,7 +121,7 @@ export const AdminHealthMonitor = () => {
       });
 
       // 6. Audit logging check
-      const { data: auditData, error: auditError } = await supabase
+      const { data: auditData, error: auditError } = await (supabase as any)
         .from('audit_logs')
         .select('count')
         .gte('event_time', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())

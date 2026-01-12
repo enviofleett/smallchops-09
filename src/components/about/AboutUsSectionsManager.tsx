@@ -44,7 +44,7 @@ export const AboutUsSectionsManager = () => {
 
   const fetchSections = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('about_us_sections')
         .select('*')
         .order('sort_order');
@@ -62,7 +62,7 @@ export const AboutUsSectionsManager = () => {
   const handleSave = async (sectionData: Partial<AboutUsSection>) => {
     try {
       if (editingSection) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('about_us_sections')
           .update(sectionData)
           .eq('id', editingSection.id);
@@ -70,7 +70,7 @@ export const AboutUsSectionsManager = () => {
         if (error) throw error;
         toast.success('Section updated successfully');
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('about_us_sections')
           .insert({
             ...sectionData,
@@ -94,7 +94,7 @@ export const AboutUsSectionsManager = () => {
     if (!confirm('Are you sure you want to delete this section?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('about_us_sections')
         .delete()
         .eq('id', id);
@@ -110,7 +110,7 @@ export const AboutUsSectionsManager = () => {
 
   const togglePublished = async (section: AboutUsSection) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('about_us_sections')
         .update({ 
           is_published: !section.is_published

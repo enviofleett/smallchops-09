@@ -44,7 +44,7 @@ export interface SendSMSResponse {
 class SMSService {
   // SMS Templates Management
   async getTemplates(): Promise<SMSTemplate[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('sms_templates')
       .select('*')
       .order('created_at', { ascending: false });
@@ -52,7 +52,7 @@ class SMSService {
     if (error) throw error;
 
     // Transform the data to handle Json type for variables
-    return (data || []).map(template => ({
+    return (data || []).map((template: any) => ({
       ...template,
       variables: Array.isArray(template.variables) ? template.variables : 
                 typeof template.variables === 'string' ? 
@@ -61,7 +61,7 @@ class SMSService {
   }
 
   async getTemplate(templateKey: string): Promise<SMSTemplate | null> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('sms_templates')
       .select('*')
       .eq('template_key', templateKey)
@@ -82,7 +82,7 @@ class SMSService {
   }
 
   async createTemplate(template: Omit<SMSTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<SMSTemplate> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('sms_templates')
       .insert([template])
       .select()
@@ -99,7 +99,7 @@ class SMSService {
   }
 
   async updateTemplate(id: string, updates: Partial<SMSTemplate>): Promise<SMSTemplate> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('sms_templates')
       .update(updates)
       .eq('id', id)
@@ -117,7 +117,7 @@ class SMSService {
   }
 
   async deleteTemplate(id: string): Promise<void> {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('sms_templates')
       .delete()
       .eq('id', id);
@@ -127,7 +127,7 @@ class SMSService {
 
   // SMS Configuration Management
   async getConfiguration(): Promise<SMSConfiguration | null> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('sms_configuration')
       .select('*')
       .eq('provider', 'mysmstab')
@@ -142,7 +142,7 @@ class SMSService {
   }
 
   async updateConfiguration(id: string, updates: Partial<SMSConfiguration>): Promise<SMSConfiguration> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('sms_configuration')
       .update(updates)
       .eq('id', id)
@@ -223,7 +223,7 @@ class SMSService {
     status?: string;
     limit?: number;
   }) {
-    let query = supabase
+    let query = (supabase as any)
       .from('notification_delivery_log')
       .select('*')
       .eq('channel', 'sms')
@@ -251,7 +251,7 @@ class SMSService {
     startDate.setDate(startDate.getDate() - days);
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('notification_delivery_log')
         .select('status, sms_cost, created_at')
         .eq('channel', 'sms')

@@ -82,7 +82,7 @@ export function AdminUsersList() {
       console.log(`👥 Processing ${adminUserIds.length} unique admin users`);
 
       // Fetch profiles for these users
-      const { data: profilesData, error: profilesError } = await supabase
+      const { data: profilesData, error: profilesError } = await (supabase as any)
         .from('profiles')
         .select('id, email, name, is_active, created_at, first_login_at, updated_at')
         .in('id', adminUserIds);
@@ -145,7 +145,7 @@ export function AdminUsersList() {
 
   const deactivateMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('profiles')
         .update({ is_active: false })
         .eq('id', userId);
@@ -170,7 +170,7 @@ export function AdminUsersList() {
 
   const activateMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('profiles')
         .update({ is_active: true })
         .eq('id', userId);

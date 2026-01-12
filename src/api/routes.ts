@@ -28,7 +28,7 @@ export interface RouteOrderAssignment {
 }
 
 export const getRoutes = async (selectedDate?: string): Promise<DeliveryRoute[]> => {
-  let query = supabase
+  let query = (supabase as any)
     .from('delivery_routes')
     .select('*')
     .order('created_at', { ascending: false });
@@ -43,7 +43,7 @@ export const getRoutes = async (selectedDate?: string): Promise<DeliveryRoute[]>
 };
 
 export const createRoute = async (routeData: Omit<DeliveryRoute, 'id' | 'created_at' | 'updated_at'>): Promise<DeliveryRoute> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('delivery_routes')
     .insert(routeData)
     .select()
@@ -54,7 +54,7 @@ export const createRoute = async (routeData: Omit<DeliveryRoute, 'id' | 'created
 };
 
 export const updateRoute = async (id: string, updates: Partial<DeliveryRoute>): Promise<DeliveryRoute> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('delivery_routes')
     .update(updates)
     .eq('id', id)
@@ -73,21 +73,21 @@ export const assignOrdersToRoute = async (routeId: string, orderIds: string[]): 
     delivery_status: 'pending' as const
   }));
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('route_order_assignments')
     .insert(assignments)
     .select();
 
   if (error) throw error;
   // Type cast to handle the string -> union type conversion
-  return (data || []).map(item => ({
+  return (data || []).map((item: any) => ({
     ...item,
     delivery_status: item.delivery_status as 'pending' | 'en_route' | 'delivered' | 'failed'
   }));
 };
 
 export const getRouteAssignments = async (routeId: string): Promise<RouteOrderAssignment[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('route_order_assignments')
     .select('*')
     .eq('route_id', routeId)
@@ -95,7 +95,7 @@ export const getRouteAssignments = async (routeId: string): Promise<RouteOrderAs
 
   if (error) throw error;
   // Type cast to handle the string -> union type conversion
-  return (data || []).map(item => ({
+  return (data || []).map((item: any) => ({
     ...item,
     delivery_status: item.delivery_status as 'pending' | 'en_route' | 'delivered' | 'failed'
   }));
@@ -110,7 +110,7 @@ export const updateDeliveryStatus = async (
   if (notes) updates.delivery_notes = notes;
   if (status === 'delivered') updates.actual_arrival = new Date().toISOString();
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('route_order_assignments')
     .update(updates)
     .eq('id', assignmentId);

@@ -38,7 +38,7 @@ export function AdminInvitations() {
   const { data: invitations, isLoading } = useQuery<Invitation[]>({
     queryKey: ['admin-invitations'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('admin_invitations')
         .select('*')
         .eq('status', 'pending')
@@ -52,7 +52,7 @@ export function AdminInvitations() {
 
   const revokeMutation = useMutation({
     mutationFn: async (invitationId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('admin_invitations')
         .update({ status: 'revoked' })
         .eq('id', invitationId);

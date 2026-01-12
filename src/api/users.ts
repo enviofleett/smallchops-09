@@ -10,7 +10,7 @@ export interface DispatchRider {
 }
 
 export async function getDispatchRiders(): Promise<DispatchRider[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('drivers')
     .select('id, name, phone, email, vehicle_type, is_active')
     .eq('is_active', true)

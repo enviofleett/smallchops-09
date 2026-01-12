@@ -832,15 +832,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 id="customer_name" 
                 value={formData.customer_name} 
                 onChange={e => handleFormChange('customer_name', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your name..." : "Enter your full name"} 
+                placeholder="Enter your full name" 
                 required 
-                className={cn(
-                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
-                  isAuthenticated && formData.customer_name && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_name && "animate-pulse"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_name}
-                disabled={isAuthenticated && !!formData.customer_name}
+                className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all"
               />
               {isAuthenticated && !formData.customer_name && (
                 <p className="text-xs text-amber-600 mt-1">
@@ -860,15 +854,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 type="email" 
                 value={formData.customer_email} 
                 onChange={e => handleFormChange('customer_email', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your email..." : "Enter your email"} 
+                placeholder="Enter your email" 
                 required 
-                className={cn(
-                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
-                  isAuthenticated && formData.customer_email && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_email && "animate-pulse"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_email}
-                disabled={isAuthenticated && !!formData.customer_email}
+                className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all"
               />
               {isAuthenticated && !formData.customer_email && (
                 <p className="text-xs text-amber-600 mt-1">
@@ -888,15 +876,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
                 type="tel" 
                 value={formData.customer_phone} 
                 onChange={e => handleFormChange('customer_phone', e.target.value)} 
-                placeholder={isAuthenticated ? "Loading your phone..." : "Enter your phone number"} 
+                placeholder="Enter your phone number" 
                 required
-                className={cn(
-                  "h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all",
-                  isAuthenticated && formData.customer_phone && "bg-muted border-green-200",
-                  isAuthenticated && !formData.customer_phone && "animate-pulse"
-                )}
-                readOnly={isAuthenticated && !!formData.customer_phone}
-                disabled={isAuthenticated && !!formData.customer_phone}
+                className="h-10 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:bg-green-50/30 transition-all"
               />
               {isAuthenticated && !formData.customer_phone && (
                 <p className="text-xs text-muted-foreground mt-1">

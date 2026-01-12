@@ -25,16 +25,6 @@ export type ProductReview = {
     image_url: string | null;
   };
 };
-  customer_accounts?: {
-    name: string;
-  };
-  review_responses?: ReviewResponse[];
-  products?: {
-    id: string;
-    name: string;
-    image_url: string | null;
-  };
-};
 
 export type ReviewResponse = {
   id: string;
@@ -62,10 +52,14 @@ export type ReviewVote = {
   vote_type: 'helpful' | 'not_helpful';
   created_at: string;
 };
+
+export type CreateReviewData = {
+  product_id: string;
+  rating: number;
   title?: string;
   content?: string;
   order_id?: string;
-}
+};
 
 // Get reviews for a product
 export const getProductReviews = async (
@@ -80,7 +74,7 @@ export const getProductReviews = async (
   const { page = 1, limit = 10, rating, sortBy = 'newest' } = options;
   const offset = (page - 1) * limit;
 
-  let query = supabase
+  let query = (supabase as any)
     .from('product_reviews')
     .select(`
       *,
@@ -113,7 +107,7 @@ export const getProductReviews = async (
   }
 
   // Get total count
-  const { count } = await supabase
+  const { count } = await (supabase as any)
     .from('product_reviews')
     .select('*', { count: 'exact', head: true })
     .eq('product_id', productId)
@@ -132,7 +126,7 @@ export const getProductReviews = async (
 
 // Get rating summary for a product
 export const getProductRatingSummary = async (productId: string): Promise<ProductRatingSummary | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('product_ratings_summary')
     .select('*')
     .eq('product_id', productId)
@@ -152,7 +146,7 @@ export const createReview = async (reviewData: CreateReviewData): Promise<Produc
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Must be logged in to create a review');
 
-  const { data: customerAccount, error: customerError } = await supabase
+  const { data: customerAccount, error: customerError } = await (supabase as any)
     .from('customer_accounts')
     .select('id, name')
     .eq('user_id', user.id)
@@ -163,7 +157,7 @@ export const createReview = async (reviewData: CreateReviewData): Promise<Produc
   }
 
   // Check if customer already reviewed this product
-  const { data: existingReview } = await supabase
+  const { data: existingReview } = await (supabase as any)
     .from('product_reviews')
     .select('id')
     .eq('product_id', reviewData.product_id)
@@ -175,7 +169,7 @@ export const createReview = async (reviewData: CreateReviewData): Promise<Produc
   }
 
   // Check if customer purchased the product
-  const { data: purchaseVerification, error: verificationError } = await supabase
+  const { data: purchaseVerification, error: verificationError } = await (supabase as any)
     .rpc('customer_purchased_product', {
       customer_uuid: customerAccount.id,
       product_uuid: reviewData.product_id
@@ -185,7 +179,7 @@ export const createReview = async (reviewData: CreateReviewData): Promise<Produc
     console.warn('Could not verify purchase:', verificationError);
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('product_reviews')
     .insert({
       ...reviewData,
@@ -209,7 +203,7 @@ export const updateReview = async (
   reviewId: string,
   updates: Partial<Pick<ProductReview, 'rating' | 'title' | 'content'>>
 ): Promise<ProductReview> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('product_reviews')
     .update(updates)
     .eq('id', reviewId)
@@ -226,7 +220,7 @@ export const updateReview = async (
 
 // Delete a review
 export const deleteReview = async (reviewId: string): Promise<void> => {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('product_reviews')
     .delete()
     .eq('id', reviewId);
@@ -243,7 +237,7 @@ export const voteOnReview = async (
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Must be logged in to vote');
 
-  const { data: customerAccount, error: customerError } = await supabase
+  const { data: customerAccount, error: customerError } = await (supabase as any)
     .from('customer_accounts')
     .select('id')
     .eq('user_id', user.id)
@@ -254,7 +248,7 @@ export const voteOnReview = async (
   }
 
   // Upsert the vote (insert or update if exists)
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('review_votes')
     .upsert({
       review_id: reviewId,
@@ -279,7 +273,7 @@ export const getCustomerReviews = async (
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Must be logged in');
 
-  const { data: customerAccount, error: customerError } = await supabase
+  const { data: customerAccount, error: customerError } = await (supabase as any)
     .from('customer_accounts')
     .select('id')
     .eq('user_id', user.id)
@@ -290,13 +284,13 @@ export const getCustomerReviews = async (
   }
 
   // Get total count
-  const { count } = await supabase
+  const { count } = await (supabase as any)
     .from('product_reviews')
     .select('*', { count: 'exact', head: true })
     .eq('customer_id', customerAccount.id);
 
   // Get paginated reviews with product info
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('product_reviews')
     .select(`
       *,
@@ -323,7 +317,7 @@ export const createReviewResponse = async (
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Must be logged in to respond');
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('review_responses')
     .insert({
       review_id: reviewId,

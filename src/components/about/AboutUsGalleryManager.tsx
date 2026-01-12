@@ -43,7 +43,7 @@ export const AboutUsGalleryManager = () => {
 
   const fetchItems = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('about_us_gallery')
         .select('*')
         .order('sort_order');
@@ -61,7 +61,7 @@ export const AboutUsGalleryManager = () => {
   const handleSave = async (itemData: Partial<GalleryItem>) => {
     try {
       if (editingItem) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('about_us_gallery')
           .update(itemData)
           .eq('id', editingItem.id);
@@ -69,7 +69,7 @@ export const AboutUsGalleryManager = () => {
         if (error) throw error;
         toast.success('Gallery item updated successfully');
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('about_us_gallery')
           .insert({
             ...itemData,
@@ -93,7 +93,7 @@ export const AboutUsGalleryManager = () => {
     if (!confirm('Are you sure you want to delete this gallery item?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('about_us_gallery')
         .delete()
         .eq('id', id);
@@ -109,7 +109,7 @@ export const AboutUsGalleryManager = () => {
 
   const togglePublished = async (item: GalleryItem) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('about_us_gallery')
         .update({ 
           is_published: !item.is_published

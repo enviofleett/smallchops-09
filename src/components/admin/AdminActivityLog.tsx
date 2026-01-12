@@ -36,7 +36,7 @@ export function AdminActivityLog() {
   const { data: logs, isLoading } = useQuery<AuditLog[]>({
     queryKey: ['admin-activity-logs'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('audit_logs')
         .select('id, action, message, user_name, category, event_time')
         .eq('category', 'User Management')

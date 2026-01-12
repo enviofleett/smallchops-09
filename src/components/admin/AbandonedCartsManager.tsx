@@ -53,7 +53,7 @@ const AbandonedCartsManager = () => {
     
     try {
       // Fetch customer details and order statistics
-      const { data: ordersData } = await supabase
+      const { data: ordersData } = await (supabase as any)
         .from('orders')
         .select('total_amount')
         .eq('customer_email', cart.customer_email);
@@ -62,7 +62,7 @@ const AbandonedCartsManager = () => {
       const totalOrders = ordersData?.length || 0;
       
       // Check if customer account exists
-      const { data: customerAccount } = await supabase
+      const { data: customerAccount } = await (supabase as any)
         .from('customer_accounts')
         .select('*')
         .eq('email', cart.customer_email)

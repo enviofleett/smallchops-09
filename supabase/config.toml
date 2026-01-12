@@ -1,4 +1,4 @@
-project_id = "oknnklksdiqaifhxaccs"
+project_id = "viafrwswgzxedelsceha"
 
 [functions.validate-moq-requirements]
 verify_jwt = false
@@ -19,4 +19,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.seed-admin-users]
+verify_jwt = false
+
+[functions.reset-admin-passwords]
 verify_jwt = false

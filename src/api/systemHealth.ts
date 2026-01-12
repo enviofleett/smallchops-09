@@ -23,7 +23,7 @@ export const checkSystemHealth = async (): Promise<SystemHealthStatus> => {
 
   // Check database connectivity
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .rpc('get_public_business_info');
     
     if (error) {
@@ -49,7 +49,7 @@ export const checkSystemHealth = async (): Promise<SystemHealthStatus> => {
 
   // Check payment system (basic connectivity test)
   try {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('payment_transactions')
       .select('id')
       .limit(1)
@@ -84,7 +84,7 @@ export const checkSystemHealth = async (): Promise<SystemHealthStatus> => {
 
 export const logSystemHealth = async (healthStatus: SystemHealthStatus): Promise<void> => {
   try {
-    await supabase.from('audit_logs').insert({
+    await (supabase as any).from('audit_logs').insert({
       action: 'system_health_check',
       category: 'System Monitoring',
       message: `System health check: ${healthStatus.overall}`,

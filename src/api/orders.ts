@@ -117,7 +117,7 @@ function normalizeOrderItems(order: any): OrderWithItems {
 }
 
 export async function getOrders(params?: GetOrdersParams) {
-  let query = supabase
+  let query = (supabase as any)
     .from('orders')
     .select(`
       *,
@@ -226,12 +226,12 @@ export async function updateOrder({ orderId, updates }: OrderUpdatePayload) {
 }
 
 export async function deleteOrder(orderId: string) {
-  const { error } = await supabase.from('orders').delete().eq('id', orderId);
+  const { error } = await (supabase as any).from('orders').delete().eq('id', orderId);
   if (error) throw error;
 }
 
 export async function bulkDeleteOrders(orderIds: string[]) {
-  const { error } = await supabase.from('orders').delete().in('id', orderIds);
+  const { error } = await (supabase as any).from('orders').delete().in('id', orderIds);
   if (error) throw error;
 }
 
@@ -260,7 +260,7 @@ export async function bulkUpdateOrders(orderIds: string[], updates: Record<strin
       validateBulkUpdate({ orderIds, updates });
 
       // Perform bulk update
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('orders')
         .update(updates)
         .in('id', orderIds);
@@ -295,7 +295,7 @@ export async function manuallyQueueCommunicationEvent(orderId: string, eventType
 export async function manuallyQueueCommunicationEvent(order: OrderWithItems, eventType: string): Promise<any>;
 export async function manuallyQueueCommunicationEvent(orderOrId: string | OrderWithItems, eventType: string) {
   const orderId = typeof orderOrId === 'string' ? orderOrId : orderOrId.id;
-  const { data, error } = await supabase.from('communication_events').insert({
+  const { data, error } = await (supabase as any).from('communication_events').insert({
     event_type: eventType,
     order_id: orderId,
     status: 'queued'
@@ -305,7 +305,7 @@ export async function manuallyQueueCommunicationEvent(orderOrId: string | OrderW
 }
 
 export async function getDispatchRiders() {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('drivers')
     .select('id, name, phone, email, vehicle_type, is_active')
     .eq('is_active', true)

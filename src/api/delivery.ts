@@ -18,14 +18,14 @@ export type DeliveryZoneWithFee = {
 };
 
 export const getDeliveryZonesWithFees = async (): Promise<DeliveryZoneWithFee[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('delivery_zones')
     .select('*')
     .order('name');
 
   if (error) throw error;
 
-  return (data?.map(zone => ({
+  return (data?.map((zone: any) => ({
       id: zone.id,
       name: zone.name,
       base_fee: zone.base_fee || 0, // Ensure base_fee is always a number
@@ -50,7 +50,7 @@ export const upsertDeliveryZoneWithFee = async ({
         ...(zone.id && { id: zone.id })
     };
 
-    const { data: savedZone, error: zoneError } = await supabase
+    const { data: savedZone, error: zoneError } = await (supabase as any)
         .from('delivery_zones')
         .upsert(zoneData)
         .select()
@@ -70,6 +70,6 @@ export const upsertDeliveryZoneWithFee = async ({
 };
 
 export const deleteDeliveryZone = async (zoneId: string) => {
-    const { error } = await supabase.from('delivery_zones').delete().eq('id', zoneId);
+    const { error } = await (supabase as any).from('delivery_zones').delete().eq('id', zoneId);
     if (error) throw error;
 };

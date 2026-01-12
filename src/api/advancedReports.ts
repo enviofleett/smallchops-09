@@ -64,7 +64,7 @@ export async function getDailyRevenueReport(
   startDate: Date,
   endDate: Date
 ): Promise<DailyRevenueReport[]> {
-  const { data, error } = await supabase.rpc('get_daily_revenue_report', {
+  const { data, error } = await (supabase as any).rpc('get_daily_revenue_report', {
     p_start_date: format(startDate, 'yyyy-MM-dd'),
     p_end_date: format(endDate, 'yyyy-MM-dd'),
   });
@@ -78,7 +78,7 @@ export async function getProductsSoldReport(
   endDate: Date,
   interval: 'day' | 'week' | 'month' = 'day'
 ): Promise<ProductsSoldReport[]> {
-  const { data, error } = await supabase.rpc('get_products_sold_report', {
+  const { data, error } = await (supabase as any).rpc('get_products_sold_report', {
     p_start_date: format(startDate, 'yyyy-MM-dd'),
     p_end_date: format(endDate, 'yyyy-MM-dd'),
     p_interval: interval,
@@ -93,7 +93,7 @@ export async function getTopSellingProducts(
   endDate: Date,
   limit: number = 10
 ): Promise<TopSellingProduct[]> {
-  const { data, error } = await supabase.rpc('get_top_selling_products', {
+  const { data, error } = await (supabase as any).rpc('get_top_selling_products', {
     p_start_date: format(startDate, 'yyyy-MM-dd'),
     p_end_date: format(endDate, 'yyyy-MM-dd'),
     p_limit: limit,
@@ -109,7 +109,7 @@ export async function getProductSalesTrends(
   endDate: Date,
   interval: 'day' | 'week' | 'month' = 'day'
 ): Promise<ProductTrend[]> {
-  const { data, error } = await supabase.rpc('get_product_sales_trends', {
+  const { data, error } = await (supabase as any).rpc('get_product_sales_trends', {
     p_product_id: productId,
     p_start_date: format(startDate, 'yyyy-MM-dd'),
     p_end_date: format(endDate, 'yyyy-MM-dd'),
@@ -125,7 +125,7 @@ export async function getDriverRevenueReport(
   endDate: Date,
   interval: 'day' | 'week' | 'month' = 'day'
 ): Promise<DriverRevenueReport[]> {
-  const { data, error } = await supabase.rpc('get_driver_revenue_report', {
+  const { data, error } = await (supabase as any).rpc('get_driver_revenue_report', {
     p_start_date: format(startDate, 'yyyy-MM-dd'),
     p_end_date: format(endDate, 'yyyy-MM-dd'),
     p_interval: interval,
@@ -140,7 +140,7 @@ export async function getDriverOrdersDetail(
   startDate: Date,
   endDate: Date
 ): Promise<DriverOrderDetail[]> {
-  const { data, error } = await supabase.rpc('get_driver_orders_detail', {
+  const { data, error } = await (supabase as any).rpc('get_driver_orders_detail', {
     p_driver_id: driverId,
     p_start_date: format(startDate, 'yyyy-MM-dd'),
     p_end_date: format(endDate, 'yyyy-MM-dd'),
@@ -154,7 +154,7 @@ export async function getAnalyticsDashboard(
   startDate: Date,
   endDate: Date
 ): Promise<any> {
-  const { data, error } = await supabase.rpc('get_analytics_dashboard', {
+  const { data, error } = await (supabase as any).rpc('get_analytics_dashboard', {
     p_start_date: format(startDate, 'yyyy-MM-dd'),
     p_end_date: format(endDate, 'yyyy-MM-dd'),
   });
@@ -164,7 +164,7 @@ export async function getAnalyticsDashboard(
 }
 
 export async function getAllProducts(): Promise<{ id: string; name: string }[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('products')
     .select('id, name')
     .order('name');

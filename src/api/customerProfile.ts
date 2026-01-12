@@ -79,7 +79,7 @@ export const getCustomerProfile = async (): Promise<CustomerProfile | null> => {
       return null; // Guest user, return null
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('customer_accounts')
       .select('*')
       .eq('user_id', user.id)
@@ -90,7 +90,7 @@ export const getCustomerProfile = async (): Promise<CustomerProfile | null> => {
       throw new Error(error.message);
     }
 
-    return data;
+    return data as CustomerProfile;
   } catch (error) {
     console.error('Error getting customer profile:', error);
     return null;
@@ -105,7 +105,7 @@ export const updateCustomerProfile = async (updates: Partial<CustomerProfile>): 
   const currentProfile = await getCustomerProfile();
   if (!currentProfile) throw new Error('Profile not found');
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_accounts')
     .update({
       ...updates,
@@ -126,7 +126,7 @@ export const updateCustomerProfile = async (updates: Partial<CustomerProfile>): 
     }
   });
 
-  return data;
+  return data as CustomerProfile;
 };
 
 // Address Management
@@ -134,7 +134,7 @@ export const getCustomerAddresses = async (): Promise<CustomerAddress[]> => {
   const profile = await getCustomerProfile();
   if (!profile) throw new Error('Profile not found');
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_addresses')
     .select('*')
     .eq('customer_id', profile.id)
@@ -142,7 +142,7 @@ export const getCustomerAddresses = async (): Promise<CustomerAddress[]> => {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data as CustomerAddress[]) || [];
+  return (data || []) as CustomerAddress[];
 };
 
 export const addCustomerAddress = async (address: Omit<CustomerAddress, 'id' | 'customer_id' | 'created_at' | 'updated_at'>): Promise<CustomerAddress> => {
@@ -151,13 +151,13 @@ export const addCustomerAddress = async (address: Omit<CustomerAddress, 'id' | '
 
   // If this is set as default, unset other defaults
   if (address.is_default) {
-    await supabase
+    await (supabase as any)
       .from('customer_addresses')
       .update({ is_default: false })
       .eq('customer_id', profile.id);
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_addresses')
     .insert({
       ...address,
@@ -187,14 +187,14 @@ export const updateCustomerAddress = async (addressId: string, updates: Partial<
 
   // If this is set as default, unset other defaults
   if (updates.is_default) {
-    await supabase
+    await (supabase as any)
       .from('customer_addresses')
       .update({ is_default: false })
       .eq('customer_id', profile.id)
       .neq('id', addressId);
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_addresses')
     .update({
       ...updates,
@@ -213,7 +213,7 @@ export const deleteCustomerAddress = async (addressId: string): Promise<void> =>
   const profile = await getCustomerProfile();
   if (!profile) throw new Error('Profile not found');
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('customer_addresses')
     .delete()
     .eq('id', addressId)
@@ -235,7 +235,7 @@ export const getCustomerPreferences = async (): Promise<CustomerPreferences | nu
   const profile = await getCustomerProfile();
   if (!profile) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_preferences')
     .select('*')
     .eq('customer_id', profile.id)
@@ -246,14 +246,14 @@ export const getCustomerPreferences = async (): Promise<CustomerPreferences | nu
     throw new Error(error.message);
   }
 
-  return data;
+  return data as CustomerPreferences;
 };
 
 export const updateCustomerPreferences = async (preferences: Partial<CustomerPreferences>): Promise<CustomerPreferences> => {
   const profile = await getCustomerProfile();
   if (!profile) throw new Error('Profile not found');
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_preferences')
     .upsert({
       customer_id: profile.id,
@@ -273,7 +273,7 @@ export const updateCustomerPreferences = async (preferences: Partial<CustomerPre
     }
   });
 
-  return data;
+  return data as CustomerPreferences;
 };
 
 // Analytics and Activity
@@ -286,14 +286,14 @@ export const getCustomerAnalytics = async (): Promise<CustomerAnalytics> => {
   if (!user?.email) throw new Error('User email not found');
 
   // Get order analytics
-  const { data: analytics } = await supabase
+  const { data: analytics } = await (supabase as any)
     .from('customer_purchase_analytics')
     .select('*')
     .eq('customer_email', user.email)
     .single();
 
   // Get recent orders
-  const { data: recentOrders } = await supabase
+  const { data: recentOrders } = await (supabase as any)
     .from('orders')
     .select(`
       id,
@@ -315,7 +315,7 @@ export const getCustomerAnalytics = async (): Promise<CustomerAnalytics> => {
     .limit(5);
 
   // Get favorite categories
-  const { data: favoriteCategories } = await supabase
+  const { data: favoriteCategories } = await (supabase as any)
     .from('customer_favorites')
     .select(`
       product:products (
@@ -328,7 +328,7 @@ export const getCustomerAnalytics = async (): Promise<CustomerAnalytics> => {
 
   // Process favorite categories
   const categoryCount: Record<string, number> = {};
-  favoriteCategories?.forEach(fav => {
+  favoriteCategories?.forEach((fav: any) => {
     const categoryName = fav.product?.categories?.name;
     if (categoryName) {
       categoryCount[categoryName] = (categoryCount[categoryName] || 0) + 1;
@@ -354,7 +354,7 @@ export const getProfileActivity = async (): Promise<ProfileActivity[]> => {
   const profile = await getCustomerProfile();
   if (!profile) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('profile_activity_log')
     .select('*')
     .eq('customer_id', profile.id)
@@ -362,14 +362,14 @@ export const getProfileActivity = async (): Promise<ProfileActivity[]> => {
     .limit(20);
 
   if (error) throw new Error(error.message);
-  return data || [];
+  return (data || []) as ProfileActivity[];
 };
 
 export const calculateProfileCompletion = async (): Promise<number> => {
   const profile = await getCustomerProfile();
   if (!profile) return 0;
 
-  const { data, error } = await supabase.rpc('calculate_profile_completion', {
+  const { data, error } = await (supabase as any).rpc('calculate_profile_completion', {
     customer_uuid: profile.id
   });
 

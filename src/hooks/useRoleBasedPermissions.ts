@@ -250,9 +250,14 @@ export const useRoleBasedPermissions = () => {
         return;
       }
 
-      // PRODUCTION: emmanuelaudokw@gmail.com - store_owner access
-      if (user.email === 'emmanuelaudokw@gmail.com') {
-        console.log('🔐 STORE OWNER ACCESS: emmanuelaudokw@gmail.com detected, granting store_owner role');
+      // PRODUCTION: Store owner emails with automatic access
+      const storeOwnerEmails = [
+        'emmanuelaudokw@gmail.com',
+        'support@telesoftas.africa'
+      ];
+      
+      if (storeOwnerEmails.includes(user.email || '')) {
+        console.log(`🔐 STORE OWNER ACCESS: ${user.email} detected, granting store_owner role`);
         setUserRole('store_owner');
         setIsLoading(false);
         return;

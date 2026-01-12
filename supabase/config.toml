@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.security-monitor-alerts]
 verify_jwt = false
+
+[functions.seed-admin-users]
+verify_jwt = false

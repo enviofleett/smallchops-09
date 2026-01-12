@@ -16,7 +16,7 @@ export interface FavoriteProduct extends ProductWithCategory {
 export const addProductToFavorites = async (customerId: string, productId: string): Promise<CustomerFavorite> => {
   console.log('🔍 Adding to favorites:', { customerId, productId });
   
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_favorites')
     .insert({
       customer_id: customerId,
@@ -34,11 +34,11 @@ export const addProductToFavorites = async (customerId: string, productId: strin
     throw new Error(error.message);
   }
   
-  return data;
+  return data as CustomerFavorite;
 };
 
 export const removeProductFromFavorites = async (customerId: string, productId: string): Promise<void> => {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('customer_favorites')
     .delete()
     .eq('customer_id', customerId)
@@ -50,7 +50,7 @@ export const removeProductFromFavorites = async (customerId: string, productId: 
 export const getCustomerFavorites = async (customerId: string): Promise<FavoriteProduct[]> => {
   console.log('🔍 Getting favorites for customer:', customerId);
   
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_favorites')
     .select(`
       id,
@@ -70,7 +70,7 @@ export const getCustomerFavorites = async (customerId: string): Promise<Favorite
   
   console.log('🔍 Favorites data returned:', data?.length || 0);
   
-  return data?.map(favorite => ({
+  return data?.map((favorite: any) => ({
     ...favorite.products,
     favorite_id: favorite.id,
     favorited_at: favorite.created_at,
@@ -78,7 +78,7 @@ export const getCustomerFavorites = async (customerId: string): Promise<Favorite
 };
 
 export const checkIsFavorite = async (customerId: string, productId: string): Promise<boolean> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_favorites')
     .select('id')
     .eq('customer_id', customerId)
@@ -91,7 +91,7 @@ export const checkIsFavorite = async (customerId: string, productId: string): Pr
 };
 
 export const getFavoritesByProductIds = async (customerId: string, productIds: string[]): Promise<Record<string, boolean>> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_favorites')
     .select('product_id')
     .eq('customer_id', customerId)
@@ -104,7 +104,7 @@ export const getFavoritesByProductIds = async (customerId: string, productIds: s
     favoritesMap[id] = false;
   });
   
-  data?.forEach(favorite => {
+  data?.forEach((favorite: any) => {
     favoritesMap[favorite.product_id] = true;
   });
   

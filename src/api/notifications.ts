@@ -40,18 +40,18 @@ export interface NotificationRequest {
 
 // Notification Templates API
 export const getNotificationTemplates = async (): Promise<NotificationTemplate[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('notification_templates')
     .select('*')
     .eq('is_active', true)
     .order('template_name');
 
   if (error) throw error;
-  return (data || []) as any;
+  return (data || []) as NotificationTemplate[];
 };
 
 export const getNotificationTemplate = async (templateKey: string): Promise<NotificationTemplate | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('notification_templates')
     .select('*')
     .eq('template_key', templateKey)
@@ -59,22 +59,22 @@ export const getNotificationTemplate = async (templateKey: string): Promise<Noti
     .maybeSingle();
 
   if (error) throw error;
-  return data as any;
+  return data as NotificationTemplate | null;
 };
 
 export const createNotificationTemplate = async (template: Omit<NotificationTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<NotificationTemplate> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('notification_templates')
     .insert(template)
     .select()
     .single();
 
   if (error) throw error;
-  return data as any;
+  return data as NotificationTemplate;
 };
 
 export const updateNotificationTemplate = async (id: string, updates: Partial<NotificationTemplate>): Promise<NotificationTemplate> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('notification_templates')
     .update(updates)
     .eq('id', id)
@@ -82,7 +82,7 @@ export const updateNotificationTemplate = async (id: string, updates: Partial<No
     .single();
 
   if (error) throw error;
-  return data as any;
+  return data as NotificationTemplate;
 };
 
 // Notification Delivery API
@@ -93,7 +93,7 @@ export const getNotificationLogs = async (filters?: {
   channel?: string;
   limit?: number;
 }): Promise<NotificationDeliveryLog[]> => {
-  let query = supabase
+  let query = (supabase as any)
     .from('notification_delivery_log')
     .select('*')
     .order('created_at', { ascending: false });

@@ -13,7 +13,7 @@ export const getCustomerEmailStatuses = async (customerEmails: string[]): Promis
     if (customerEmails.length === 0) return {};
 
     // Get communication events for these customers
-    const { data: events, error } = await supabase
+    const { data: events, error } = await (supabase as any)
       .from('communication_events')
       .select('recipient_email, status, sent_at, updated_at, event_type')
       .in('recipient_email', customerEmails)
@@ -96,11 +96,11 @@ export const resendWelcomeEmail = async (customerEmail: string): Promise<boolean
 // Requeue all failed emails (admin action)
 export const requeueFailedEmails = async (): Promise<{ success: boolean; count: number }> => {
   try {
-    const { data, error } = await supabase.rpc('requeue_failed_welcome_emails');
+    const { data, error } = await (supabase as any).rpc('requeue_failed_welcome_emails');
     
     if (error) throw error;
     
-    return { success: true, count: data || 0 };
+    return { success: true, count: (data as number) || 0 };
   } catch (error) {
     console.error('Error requeuing failed emails:', error);
     return { success: false, count: 0 };

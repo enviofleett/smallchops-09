@@ -14,29 +14,29 @@ export interface NotificationPreferences {
 export type DigestFrequency = 'daily' | 'weekly' | 'monthly';
 
 export const getNotificationPreferences = async (customerId: string): Promise<NotificationPreferences | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_notification_preferences')
     .select('*')
     .eq('customer_id', customerId)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  return data;
+  return data as NotificationPreferences | null;
 };
 
 export const createNotificationPreferences = async (preferences: Omit<NotificationPreferences, 'id' | 'created_at' | 'updated_at'>): Promise<NotificationPreferences> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_notification_preferences')
     .insert(preferences)
     .select()
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return data as NotificationPreferences;
 };
 
 export const updateNotificationPreferences = async (customerId: string, preferences: Partial<NotificationPreferences>): Promise<NotificationPreferences> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_notification_preferences')
     .update(preferences)
     .eq('customer_id', customerId)
@@ -44,16 +44,16 @@ export const updateNotificationPreferences = async (customerId: string, preferen
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return data as NotificationPreferences;
 };
 
 export const upsertNotificationPreferences = async (preferences: Omit<NotificationPreferences, 'id' | 'created_at' | 'updated_at'>): Promise<NotificationPreferences> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_notification_preferences')
     .upsert(preferences, { onConflict: 'customer_id' })
     .select()
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return data as NotificationPreferences;
 };

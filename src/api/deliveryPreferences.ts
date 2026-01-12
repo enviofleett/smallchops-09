@@ -45,25 +45,25 @@ export interface PickupPoint {
 
 // Customer Delivery Preferences API
 export const getDeliveryPreferences = async (customerId: string): Promise<DeliveryPreferences | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_delivery_preferences')
     .select('*')
     .eq('customer_id', customerId)
     .maybeSingle();
 
   if (error) throw error;
-  return data;
+  return data as DeliveryPreferences | null;
 };
 
 export const upsertDeliveryPreferences = async (preferences: Omit<DeliveryPreferences, 'id' | 'created_at' | 'updated_at'>): Promise<DeliveryPreferences> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_delivery_preferences')
     .upsert(preferences, { onConflict: 'customer_id' })
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as DeliveryPreferences;
 };
 
 // Delivery Time Slots API
@@ -102,18 +102,18 @@ export const getAvailableTimeSlots = async (zoneId?: string, date?: string): Pro
 };
 
 export const createTimeSlot = async (timeSlot: Omit<DeliveryTimeSlot, 'id' | 'created_at' | 'updated_at'>): Promise<DeliveryTimeSlot> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('delivery_time_slots')
     .insert(timeSlot)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as DeliveryTimeSlot;
 };
 
 export const updateTimeSlot = async (id: string, updates: Partial<DeliveryTimeSlot>): Promise<DeliveryTimeSlot> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('delivery_time_slots')
     .update(updates)
     .eq('id', id)
@@ -121,34 +121,34 @@ export const updateTimeSlot = async (id: string, updates: Partial<DeliveryTimeSl
     .single();
 
   if (error) throw error;
-  return data;
+  return data as DeliveryTimeSlot;
 };
 
 // Pickup Points API
 export const getPickupPoints = async (): Promise<PickupPoint[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('pickup_points')
     .select('*')
     .eq('is_active', true)
     .order('name');
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as PickupPoint[];
 };
 
 export const createPickupPoint = async (pickupPoint: Omit<PickupPoint, 'id' | 'created_at' | 'updated_at'>): Promise<PickupPoint> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('pickup_points')
     .insert(pickupPoint)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as PickupPoint;
 };
 
 export const updatePickupPoint = async (id: string, updates: Partial<PickupPoint>): Promise<PickupPoint> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('pickup_points')
     .update(updates)
     .eq('id', id)
@@ -156,11 +156,11 @@ export const updatePickupPoint = async (id: string, updates: Partial<PickupPoint
     .single();
 
   if (error) throw error;
-  return data;
+  return data as PickupPoint;
 };
 
 export const deletePickupPoint = async (id: string): Promise<void> => {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('pickup_points')
     .update({ is_active: false })
     .eq('id', id);

@@ -7,7 +7,7 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
   console.log('🔍 Fetching products with discounts:', { categoryId });
   
   // Build the query
-  let query = supabase
+  let query = (supabase as any)
     .from("products")
     .select(`
       *,
@@ -75,7 +75,7 @@ export async function getProductWithDiscounts(productId: string): Promise<Produc
   console.log('🔍 Fetching single product with discounts:', { productId });
   
   try {
-    const { data: product, error: productError } = await supabase
+    const { data: product, error: productError } = await (supabase as any)
       .from("products")
       .select(`
         *,
@@ -132,7 +132,7 @@ export async function validatePromotionCode(
   orderAmount: number
 ): Promise<{ valid: boolean; promotion?: any; discount_amount?: number; error?: string }> {
   try {
-    const { data: promotion, error } = await supabase
+    const { data: promotion, error } = await (supabase as any)
       .from("promotions")
       .select("*")
       .eq("code", code)

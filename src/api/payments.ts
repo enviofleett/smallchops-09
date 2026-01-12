@@ -166,7 +166,7 @@ export class PaymentsAPI {
    */
   static async getPaymentDetails(reference: string) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('payment_transactions')
         .select(`
           *,
@@ -204,7 +204,7 @@ export class PaymentsAPI {
    */
   static async getPaymentHistory(customerEmail: string, limit = 10) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('payment_transactions')
         .select(`
           *,

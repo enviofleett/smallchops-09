@@ -126,7 +126,7 @@ export async function trackPromotionUsage(
   discountAmount: number
 ): Promise<void> {
   try {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('promotion_usage')
       .insert({
         promotion_id: promotionId,

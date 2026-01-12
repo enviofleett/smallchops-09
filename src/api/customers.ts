@@ -67,7 +67,7 @@ export const getCustomerDeliveryHistory = async (
     }[];
   }>
 > => {
-  let query = supabase
+  let query = (supabase as any)
     .from('orders')
     .select(`
       id,
@@ -111,7 +111,7 @@ export const resolveOrCreateCustomer = async ({
   phone,
 }: { email: string; name: string; phone?: string }): Promise<CustomerDb> => {
   // Try fetch by email first
-  const { data: found, error: fetchError } = await supabase
+  const { data: found, error: fetchError } = await (supabase as any)
     .from('customers')
     .select('*')
     .eq('email', email)
@@ -120,7 +120,7 @@ export const resolveOrCreateCustomer = async ({
   if (found) return found as CustomerDb;
 
   // If not found, create new
-  const { data: created, error: createError } = await supabase
+  const { data: created, error: createError } = await (supabase as any)
     .from('customers')
     .insert([{ email, name, phone }])
     .select('*')
@@ -142,7 +142,7 @@ export const createCustomer = async (
     const userAgent = navigator?.userAgent || 'Unknown';
     
     // Call the enhanced database function with validations
-    const { data: result, error } = await supabase.rpc('create_customer_with_validation', {
+    const { data: result, error } = await (supabase as any).rpc('create_customer_with_validation', {
       p_name: data.name,
       p_email: data.email,
       p_phone: data.phone || null,
@@ -164,7 +164,7 @@ export const createCustomer = async (
     }
 
     // Fetch the created customer data
-    const { data: customerData, error: fetchError } = await supabase
+    const { data: customerData, error: fetchError } = await (supabase as any)
       .from('customers')
       .select('*')
       .eq('id', resultData.customer_id)
@@ -208,7 +208,7 @@ export const updateCustomer = async (
     const userAgent = navigator?.userAgent || 'Unknown';
     
     // Call the enhanced database function with validations
-    const { data: result, error } = await supabase.rpc('update_customer_with_validation', {
+    const { data: result, error } = await (supabase as any).rpc('update_customer_with_validation', {
       p_customer_id: id,
       p_name: data.name || null,
       p_email: data.email || null,
@@ -230,7 +230,7 @@ export const updateCustomer = async (
     }
 
     // Fetch the updated customer data
-    const { data: customerData, error: fetchError } = await supabase
+    const { data: customerData, error: fetchError } = await (supabase as any)
       .from('customers')
       .select('*')
       .eq('id', id)
@@ -269,7 +269,7 @@ export const deleteCustomer = async (customerId: string) => {
   }
   
   // For registered customers, use the cascade function
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .rpc('delete_customer_cascade', { p_customer_id: customerId });
   
   if (error) throw new Error(error.message);
@@ -282,7 +282,7 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
 
   try {
     // Use the new safe analytics function
-    const { data: analyticsResult, error: analyticsError } = await supabase
+    const { data: analyticsResult, error: analyticsError } = await (supabase as any)
       .rpc('get_customer_analytics_safe', {
         p_start_date: from.toISOString(),
         p_end_date: to.toISOString()
@@ -295,7 +295,7 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
 
     // Get all customers for display WITH DATE FILTERING (PRODUCTION DATA SOURCE)
     // This function ensures only customers with PAID orders are returned
-    const { data: customersResult, error: customersError } = await supabase
+    const { data: customersResult, error: customersError } = await (supabase as any)
       .rpc('get_all_customers_display', {
         p_start_date: from.toISOString(),
         p_end_date: to.toISOString()

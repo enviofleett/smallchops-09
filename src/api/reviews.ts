@@ -1,7 +1,30 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
 
-export type ProductReview = Database['public']['Tables']['product_reviews']['Row'] & {
+// Define types locally since they don't exist in the generated types
+export type ProductReview = {
+  id: string;
+  product_id: string;
+  customer_id: string;
+  customer_email?: string;
+  rating: number;
+  title?: string;
+  content?: string;
+  status: string;
+  is_verified_purchase?: boolean;
+  helpful_votes?: number;
+  created_at: string;
+  updated_at?: string;
+  order_id?: string;
+  customer_accounts?: {
+    name: string;
+  };
+  review_responses?: ReviewResponse[];
+  products?: {
+    id: string;
+    name: string;
+    image_url: string | null;
+  };
+};
   customer_accounts?: {
     name: string;
   };
@@ -13,15 +36,32 @@ export type ProductReview = Database['public']['Tables']['product_reviews']['Row
   };
 };
 
-export type ReviewResponse = Database['public']['Tables']['review_responses']['Row'];
+export type ReviewResponse = {
+  id: string;
+  review_id: string;
+  business_user_id: string;
+  response_content: string;
+  created_at: string;
+};
 
-export type ProductRatingSummary = Database['public']['Tables']['product_ratings_summary']['Row'];
-
-export type ReviewVote = Database['public']['Tables']['review_votes']['Row'];
-
-export interface CreateReviewData {
+export type ProductRatingSummary = {
   product_id: string;
-  rating: number;
+  total_reviews: number;
+  average_rating: number;
+  rating_1_count?: number;
+  rating_2_count?: number;
+  rating_3_count?: number;
+  rating_4_count?: number;
+  rating_5_count?: number;
+};
+
+export type ReviewVote = {
+  id: string;
+  review_id: string;
+  customer_id: string;
+  vote_type: 'helpful' | 'not_helpful';
+  created_at: string;
+};
   title?: string;
   content?: string;
   order_id?: string;

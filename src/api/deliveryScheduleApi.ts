@@ -23,43 +23,43 @@ export interface DeliverySchedule {
 }
 
 export const createDeliverySchedule = async (scheduleData: CreateDeliverySchedule): Promise<DeliverySchedule> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('order_delivery_schedule')
     .insert(scheduleData)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as DeliverySchedule;
 };
 
 export const upsertDeliverySchedule = async (scheduleData: CreateDeliverySchedule): Promise<DeliverySchedule> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('order_delivery_schedule')
     .upsert(scheduleData, { onConflict: 'order_id' })
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as DeliverySchedule;
 };
 
 export const getDeliveryScheduleByOrderId = async (orderId: string): Promise<DeliverySchedule | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('order_delivery_schedule')
     .select('*')
     .eq('order_id', orderId)
     .maybeSingle();
 
   if (error) throw error;
-  return data;
+  return data as DeliverySchedule | null;
 };
 
 export const updateDeliverySchedule = async (
   id: string, 
   updates: Partial<CreateDeliverySchedule>
 ): Promise<DeliverySchedule> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('order_delivery_schedule')
     .update(updates)
     .eq('id', id)
@@ -67,11 +67,11 @@ export const updateDeliverySchedule = async (
     .single();
 
   if (error) throw error;
-  return data;
+  return data as DeliverySchedule;
 };
 
 export const deleteDeliverySchedule = async (id: string): Promise<void> => {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('order_delivery_schedule')
     .delete()
     .eq('id', id);
@@ -82,7 +82,7 @@ export const deleteDeliverySchedule = async (id: string): Promise<void> => {
 export const getSchedulesByOrderIds = async (orderIds: string[]): Promise<Record<string, DeliverySchedule>> => {
   if (orderIds.length === 0) return {};
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('order_delivery_schedule')
     .select('*')
     .in('order_id', orderIds);
@@ -90,7 +90,7 @@ export const getSchedulesByOrderIds = async (orderIds: string[]): Promise<Record
   if (error) throw error;
   
   // Convert array to map for easy lookup
-  return (data || []).reduce((acc, schedule) => {
+  return ((data || []) as DeliverySchedule[]).reduce((acc, schedule) => {
     acc[schedule.order_id] = schedule;
     return acc;
   }, {} as Record<string, DeliverySchedule>);

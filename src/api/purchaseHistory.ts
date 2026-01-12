@@ -87,7 +87,7 @@ export const getCustomerOrderHistory = async (
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = supabase
+  let query = (supabase as any)
     .from('orders')
     .select(`
       *,
@@ -150,7 +150,7 @@ export const getCustomerTransactionHistory = async (
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = supabase
+  let query = (supabase as any)
     .from('payment_transactions')
     .select(`
       *,
@@ -186,7 +186,7 @@ export const getCustomerTransactionHistory = async (
 export const getCustomerAnalytics = async (
   customerEmail: string
 ): Promise<CustomerAnalytics | null> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_purchase_analytics')
     .select(`
       *,
@@ -197,20 +197,17 @@ export const getCustomerAnalytics = async (
 
   if (error) {
     if (error.code === 'PGRST116') {
-      // No analytics found, return null
       return null;
     }
     console.error('Error fetching customer analytics:', error);
     throw new Error(error.message);
   }
 
-  return data;
+  return data as CustomerAnalytics;
 };
 
 export const downloadOrderReceipt = async (orderId: string): Promise<Blob> => {
-  // This would typically call an edge function to generate a PDF receipt
-  // For now, we'll return a simple text receipt
-  const { data: order, error } = await supabase
+  const { data: order, error } = await (supabase as any)
     .from('orders')
     .select('*, order_items (*)')
     .eq('id', orderId)

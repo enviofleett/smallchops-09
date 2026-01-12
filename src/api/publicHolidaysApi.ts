@@ -13,7 +13,7 @@ export interface PublicHoliday {
 
 export const getPublicHolidays = async (year?: number): Promise<PublicHoliday[]> => {
   try {
-    let query = supabase
+    let query = (supabase as any)
       .from('public_holidays')
       .select('*')
       .eq('is_active', true)
@@ -28,7 +28,7 @@ export const getPublicHolidays = async (year?: number): Promise<PublicHoliday[]>
     const { data, error } = await query;
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as PublicHoliday[];
   } catch (error) {
     console.error('Failed to fetch public holidays:', error);
     return [];
@@ -36,18 +36,18 @@ export const getPublicHolidays = async (year?: number): Promise<PublicHoliday[]>
 };
 
 export const createPublicHoliday = async (holiday: Omit<PublicHoliday, 'id' | 'created_at' | 'updated_at'>): Promise<PublicHoliday> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('public_holidays')
     .insert(holiday)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as PublicHoliday;
 };
 
 export const updatePublicHoliday = async (id: string, updates: Partial<PublicHoliday>): Promise<PublicHoliday> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('public_holidays')
     .update(updates)
     .eq('id', id)
@@ -55,11 +55,11 @@ export const updatePublicHoliday = async (id: string, updates: Partial<PublicHol
     .single();
 
   if (error) throw error;
-  return data;
+  return data as PublicHoliday;
 };
 
 export const deletePublicHoliday = async (id: string): Promise<void> => {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('public_holidays')
     .update({ is_active: false })
     .eq('id', id);

@@ -30,7 +30,7 @@ export interface NewDriver {
 }
 
 export const getDrivers = async (): Promise<Driver[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('drivers')
     .select('*')
     .order('name');
@@ -40,7 +40,7 @@ export const getDrivers = async (): Promise<Driver[]> => {
 };
 
 export const createDriver = async (driver: NewDriver): Promise<Driver> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('drivers')
     .insert(driver)
     .select()
@@ -51,7 +51,7 @@ export const createDriver = async (driver: NewDriver): Promise<Driver> => {
 };
 
 export const updateDriver = async (id: string, updates: Partial<Driver>): Promise<Driver> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('drivers')
     .update(updates)
     .eq('id', id)
@@ -63,7 +63,7 @@ export const updateDriver = async (id: string, updates: Partial<Driver>): Promis
 };
 
 export const deleteDriver = async (id: string): Promise<void> => {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('drivers')
     .delete()
     .eq('id', id);

@@ -66,7 +66,7 @@ export const getDeliveryMetrics = async (filters?: {
   driverId?: string;
   zoneId?: string;
 }): Promise<DeliveryPerformanceMetrics[]> => {
-  let query = supabase
+  let query = (supabase as any)
     .from('delivery_performance_metrics')
     .select('*')
     .order('metric_date', { ascending: false });
@@ -94,7 +94,7 @@ export const getDeliveryMetrics = async (filters?: {
 };
 
 export const createDeliveryMetric = async (metric: Omit<DeliveryPerformanceMetrics, 'id' | 'created_at'>): Promise<DeliveryPerformanceMetrics> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('delivery_performance_metrics')
     .insert(metric)
     .select()
@@ -111,7 +111,7 @@ export const getCustomerRatings = async (filters?: {
   driverId?: string;
   orderId?: string;
 }): Promise<CustomerSatisfactionRating[]> => {
-  let query = supabase
+  let query = (supabase as any)
     .from('customer_satisfaction_ratings')
     .select('*')
     .order('created_at', { ascending: false });
@@ -139,7 +139,7 @@ export const getCustomerRatings = async (filters?: {
 };
 
 export const createCustomerRating = async (rating: Omit<CustomerSatisfactionRating, 'id' | 'created_at'>): Promise<CustomerSatisfactionRating> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_satisfaction_ratings')
     .insert(rating)
     .select()
@@ -159,7 +159,7 @@ export const getDeliveryAnalytics = async (filters?: {
     const endDate = filters?.endDate || new Date().toISOString().split('T')[0];
 
     // Get delivery analytics from the new table
-    const { data: deliveryData, error: deliveryError } = await supabase
+    const { data: deliveryData, error: deliveryError } = await (supabase as any)
       .from('delivery_analytics')
       .select('*')
       .gte('date', startDate)

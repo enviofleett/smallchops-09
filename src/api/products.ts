@@ -197,7 +197,7 @@ export const deleteProductImage = async (imageUrl: string): Promise<void> => {
 export const getProducts = async (): Promise<ProductWithCategory[]> => {
   try {
     console.log('Fetching products from database...');
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('products')
       .select(`
         *,
@@ -223,7 +223,7 @@ export const getProducts = async (): Promise<ProductWithCategory[]> => {
 
 export const getProduct = async (id: string): Promise<ProductWithCategory | null> => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('products')
       .select(`
         *,
@@ -250,7 +250,7 @@ export const getProduct = async (id: string): Promise<ProductWithCategory | null
 export const checkSkuExists = async (sku: string, excludeId?: string): Promise<boolean> => {
   if (!sku) return false;
   
-  let query = supabase.from('products').select('id').eq('sku', sku);
+  let query = (supabase as any).from('products').select('id').eq('sku', sku);
   
   if (excludeId) {
     query = query.neq('id', excludeId);
@@ -298,7 +298,7 @@ export const createProduct = async (productData: NewProduct & { imageFile?: File
             image_url: imageUrl,
         };
 
-        const { data, error } = await supabase.from('products').insert(finalProductData).select().single();
+        const { data, error } = await (supabase as any).from('products').insert(finalProductData).select().single();
         
         if (error) {
             // Cleanup uploaded image if product creation fails
@@ -336,7 +336,7 @@ export const updateProduct = async (id: string, updates: UpdatedProduct & { imag
         }
 
         // Get current product to access old image URL - do this first
-        const { data: currentProduct, error: fetchError } = await supabase
+        const { data: currentProduct, error: fetchError } = await (supabase as any)
             .from('products')
             .select('image_url')
             .eq('id', id)
@@ -369,7 +369,7 @@ export const updateProduct = async (id: string, updates: UpdatedProduct & { imag
 
         console.log('Updating product in database...', { id, updates: finalProductUpdates });
         
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from('products')
             .update(finalProductUpdates)
             .eq('id', id)
@@ -432,21 +432,21 @@ export const deleteProduct = async (id: string): Promise<{ action: 'deleted' | '
       console.warn('RPC function failed, attempting direct deletion:', error.message);
       
       // Get product details for image cleanup
-      const { data: product } = await supabase
+      const { data: product } = await (supabase as any)
         .from('products')
         .select('image_url')
         .eq('id', id)
         .single();
       
       // Check for orders
-      const { count: orderCount } = await supabase
+      const { count: orderCount } = await (supabase as any)
         .from('order_items')
         .select('*', { count: 'exact', head: true })
         .eq('product_id', id);
       
       if (orderCount && orderCount > 0) {
         // Discontinue product
-        await supabase
+        await (supabase as any)
           .from('products')
           .update({ status: 'discontinued' as any })
           .eq('id', id);
@@ -457,7 +457,7 @@ export const deleteProduct = async (id: string): Promise<{ action: 'deleted' | '
         };
       } else {
         // Delete product and image
-        await supabase.from('products').delete().eq('id', id);
+        await (supabase as any).from('products').delete().eq('id', id);
         
         if (product?.image_url) {
           await deleteProductImage(product.image_url);

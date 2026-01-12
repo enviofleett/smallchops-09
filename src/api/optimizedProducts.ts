@@ -27,7 +27,7 @@ export async function getOptimizedProduct(productId: string): Promise<ProductWit
 
   try {
     const [productPromise, promotionsPromise] = await Promise.allSettled([
-      supabase
+      (supabase as any)
         .from('products')
         .select(`
           *,
@@ -73,7 +73,7 @@ export async function getOptimizedCategories() {
   if (cached) return cached;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('categories')
       .select('id, name, slug, description')
       .order('sort_order', { ascending: true })
@@ -99,7 +99,7 @@ export async function getBatchProducts(productIds: string[]): Promise<ProductWit
 
   try {
     const [productsPromise, promotionsPromise] = await Promise.allSettled([
-      supabase
+      (supabase as any)
         .from('products')
         .select(`
           *,
@@ -161,7 +161,7 @@ export async function getFreshProduct(productId: string): Promise<ProductWithDis
   
   try {
     const [productPromise, promotionsPromise] = await Promise.allSettled([
-      supabase
+      (supabase as any)
         .from('products')
         .select(`
           *,

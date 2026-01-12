@@ -250,6 +250,14 @@ export const useRoleBasedPermissions = () => {
         return;
       }
 
+      // PRODUCTION: emmanuelaudokw@gmail.com - store_owner access
+      if (user.email === 'emmanuelaudokw@gmail.com') {
+        console.log('🔐 STORE OWNER ACCESS: emmanuelaudokw@gmail.com detected, granting store_owner role');
+        setUserRole('store_owner');
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('user_roles')

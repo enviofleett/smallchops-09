@@ -1,7 +1,19 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
 
-export type CartSession = Tables<'cart_sessions'>;
+export interface CartSession {
+  id: string;
+  session_id: string;
+  customer_email?: string;
+  customer_phone?: string;
+  customer_id?: string;
+  cart_data: any;
+  total_items: number;
+  total_value: number;
+  is_abandoned: boolean;
+  abandoned_at?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface AbandonedCartFilters {
   timeRange?: 'hour' | 'day' | 'week' | 'all';
@@ -10,12 +22,12 @@ export interface AbandonedCartFilters {
   pageSize?: number;
 }
 
-export const getAbandonedCarts = async (filters: AbandonedCartFilters = {}) => {
+export const getAbandonedCarts = async (filters: AbandonedCartFilters = {}): Promise<{ carts: CartSession[]; count: number }> => {
   const { timeRange = 'all', minValue = 0, page = 1, pageSize = 20 } = filters;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = supabase
+  let query = (supabase as any)
     .from('cart_sessions')
     .select('*', { count: 'exact' })
     .eq('is_abandoned', true)

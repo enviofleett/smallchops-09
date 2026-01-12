@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Category, NewCategory, UpdatedCategory } from '@/types/database';
 
@@ -40,7 +39,7 @@ const deleteCategoryBanner = async (bannerUrl: string): Promise<void> => {
 export const getCategories = async (): Promise<Category[]> => {
   try {
     console.log('Fetching categories from database...');
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('categories')
       .select('*')
       .order('name');
@@ -54,8 +53,8 @@ export const getCategories = async (): Promise<Category[]> => {
     
     // Move customization category to the end
     const categories = data || [];
-    const customizationIndex = categories.findIndex(cat => 
-      cat.name.toLowerCase().includes('customization')
+    const customizationIndex = categories.findIndex((cat: any) => 
+      cat.name?.toLowerCase().includes('customization')
     );
     
     if (customizationIndex > -1) {
@@ -72,7 +71,7 @@ export const getCategories = async (): Promise<Category[]> => {
 
 export const getCategory = async (id: string): Promise<Category | null> => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('categories')
       .select('*')
       .eq('id', id)
@@ -113,7 +112,7 @@ export const createCategory = async (categoryData: NewCategory & { bannerFile?: 
     };
 
     console.log('Creating category:', finalCategoryData);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('categories')
       .insert(finalCategoryData)
       .select()
@@ -162,7 +161,7 @@ export const updateCategory = async (id: string, updates: UpdatedCategory & { ba
     };
 
     console.log('Updating category:', id, finalCategoryUpdates);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('categories')
       .update(finalCategoryUpdates)
       .eq('id', id)
@@ -188,7 +187,7 @@ export const deleteCategory = async (id: string): Promise<void> => {
     const category = await getCategory(id);
     
     console.log('Deleting category:', id);
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('categories')
       .delete()
       .eq('id', id);

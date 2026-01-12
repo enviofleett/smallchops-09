@@ -37,18 +37,18 @@ export interface BlogArticle {
 
 // Blog Categories API
 export const blogCategoriesApi = {
-  getAll: async () => {
-    const { data, error } = await supabase
+  getAll: async (): Promise<BlogCategory[]> => {
+    const { data, error } = await (supabase as any)
       .from('blog_categories')
       .select('*')
       .order('sort_order', { ascending: true });
     
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
-  getById: async (id: string) => {
-    const { data, error } = await supabase
+  getById: async (id: string): Promise<BlogCategory> => {
+    const { data, error } = await (supabase as any)
       .from('blog_categories')
       .select('*')
       .eq('id', id)
@@ -58,8 +58,8 @@ export const blogCategoriesApi = {
     return data;
   },
 
-  create: async (category: Omit<BlogCategory, 'id' | 'created_at' | 'updated_at'>) => {
-    const { data, error } = await supabase
+  create: async (category: Omit<BlogCategory, 'id' | 'created_at' | 'updated_at'>): Promise<BlogCategory> => {
+    const { data, error } = await (supabase as any)
       .from('blog_categories')
       .insert([category])
       .select()
@@ -69,8 +69,8 @@ export const blogCategoriesApi = {
     return data;
   },
 
-  update: async (id: string, updates: Partial<BlogCategory>) => {
-    const { data, error } = await supabase
+  update: async (id: string, updates: Partial<BlogCategory>): Promise<BlogCategory> => {
+    const { data, error } = await (supabase as any)
       .from('blog_categories')
       .update(updates)
       .eq('id', id)
@@ -81,8 +81,8 @@ export const blogCategoriesApi = {
     return data;
   },
 
-  delete: async (id: string) => {
-    const { error } = await supabase
+  delete: async (id: string): Promise<void> => {
+    const { error } = await (supabase as any)
       .from('blog_categories')
       .delete()
       .eq('id', id);
@@ -93,8 +93,8 @@ export const blogCategoriesApi = {
 
 // Blog Articles API
 export const blogArticlesApi = {
-  getAll: async (filters?: { status?: string; category_id?: string; limit?: number; offset?: number }) => {
-    let query = supabase
+  getAll: async (filters?: { status?: string; category_id?: string; limit?: number; offset?: number }): Promise<BlogArticle[]> => {
+    let query = (supabase as any)
       .from('blog_articles')
       .select(`
         *,
@@ -125,11 +125,11 @@ export const blogArticlesApi = {
     const { data, error } = await query;
     
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
-  getById: async (id: string) => {
-    const { data, error } = await supabase
+  getById: async (id: string): Promise<BlogArticle> => {
+    const { data, error } = await (supabase as any)
       .from('blog_articles')
       .select(`
         *,
@@ -146,8 +146,8 @@ export const blogArticlesApi = {
     return data;
   },
 
-  getBySlug: async (slug: string) => {
-    const { data, error } = await supabase
+  getBySlug: async (slug: string): Promise<BlogArticle> => {
+    const { data, error } = await (supabase as any)
       .from('blog_articles')
       .select(`
         *,
@@ -164,8 +164,8 @@ export const blogArticlesApi = {
     return data;
   },
 
-  create: async (article: Omit<BlogArticle, 'id' | 'created_at' | 'updated_at' | 'view_count' | 'blog_categories'>) => {
-    const { data, error } = await supabase
+  create: async (article: Omit<BlogArticle, 'id' | 'created_at' | 'updated_at' | 'view_count' | 'blog_categories'>): Promise<BlogArticle> => {
+    const { data, error } = await (supabase as any)
       .from('blog_articles')
       .insert([article])
       .select()
@@ -175,8 +175,8 @@ export const blogArticlesApi = {
     return data;
   },
 
-  update: async (id: string, updates: Partial<BlogArticle>) => {
-    const { data, error } = await supabase
+  update: async (id: string, updates: Partial<BlogArticle>): Promise<BlogArticle> => {
+    const { data, error } = await (supabase as any)
       .from('blog_articles')
       .update(updates)
       .eq('id', id)
@@ -187,8 +187,8 @@ export const blogArticlesApi = {
     return data;
   },
 
-  delete: async (id: string) => {
-    const { error } = await supabase
+  delete: async (id: string): Promise<void> => {
+    const { error } = await (supabase as any)
       .from('blog_articles')
       .delete()
       .eq('id', id);
@@ -196,14 +196,14 @@ export const blogArticlesApi = {
     if (error) throw error;
   },
 
-  incrementViewCount: async (id: string) => {
-    const { data: current } = await supabase
+  incrementViewCount: async (id: string): Promise<void> => {
+    const { data: current } = await (supabase as any)
       .from('blog_articles')
       .select('view_count')
       .eq('id', id)
       .single();
     
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('blog_articles')
       .update({ view_count: (current?.view_count || 0) + 1 })
       .eq('id', id);

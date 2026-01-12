@@ -8,7 +8,7 @@ export interface AdminInvitationStats {
 }
 
 export const getAdminInvitationStats = async (): Promise<AdminInvitationStats> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('admin_invitations')
     .select('status, expires_at, accepted_at');
 
@@ -19,8 +19,8 @@ export const getAdminInvitationStats = async (): Promise<AdminInvitationStats> =
 
   const now = new Date();
   
-  const stats = data.reduce(
-    (acc, invitation) => {
+  const stats = (data || []).reduce(
+    (acc: AdminInvitationStats, invitation: any) => {
       acc.total_invitations++;
       
       if (invitation.accepted_at) {
@@ -45,7 +45,7 @@ export const getAdminInvitationStats = async (): Promise<AdminInvitationStats> =
 };
 
 export const cleanupExpiredInvitations = async (): Promise<{ deleted_count: number }> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('admin_invitations')
     .delete()
     .lt('expires_at', new Date().toISOString())
@@ -61,11 +61,10 @@ export const cleanupExpiredInvitations = async (): Promise<{ deleted_count: numb
 };
 
 export const revokeInvitation = async (invitationId: string): Promise<void> => {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('admin_invitations')
     .update({ 
       status: 'revoked',
-      // Clear the token to prevent usage
       invitation_token: null,
     })
     .eq('id', invitationId);

@@ -1,9 +1,17 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
-export type CustomerCommunicationPreference = Tables<'customer_communication_preferences'>;
-export type UpdateCustomerCommunicationPreference = TablesUpdate<'customer_communication_preferences'>;
+export interface CustomerCommunicationPreference {
+  id: string;
+  customer_email: string;
+  email_notifications: boolean;
+  sms_notifications: boolean;
+  push_notifications: boolean;
+  marketing_emails: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UpdateCustomerCommunicationPreference = Partial<CustomerCommunicationPreference>;
 
 interface GetCustomerPreferencesParams {
   page?: number;
@@ -19,7 +27,7 @@ export const getCustomerPreferences = async ({
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let query = supabase
+  let query = (supabase as any)
     .from('customer_communication_preferences')
     .select('*', { count: 'exact' });
 
@@ -41,7 +49,7 @@ export const getCustomerPreferences = async ({
 
 
 export const updateCustomerPreference = async ({id, updates}: {id: string; updates: UpdateCustomerCommunicationPreference;}): Promise<CustomerCommunicationPreference> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('customer_communication_preferences')
     .update(updates)
     .eq('id', id)

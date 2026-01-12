@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import startersLogo from '@/assets/starters-logo-christmas.png';
+import startersLogo from '@/assets/starters-logo.png';
 import loginHero from '@/assets/login-hero.jpg';
 interface AuthLayoutProps {
   children: React.ReactNode;

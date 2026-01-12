@@ -17,7 +17,7 @@ import {
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useRoleBasedPermissions } from '@/hooks/useRoleBasedPermissions';
 import { MENU_PERMISSION_KEYS, type MenuPermissionKey } from '@/hooks/usePermissionGuard';
-import startersLogo from '@/assets/starters-logo-christmas.png';
+import startersLogo from '@/assets/starters-logo.png';
 import {
   Sidebar,
   SidebarContent,

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Settings, Building2, MessageCircle } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
-import startersLogo from '@/assets/starters-logo-christmas.png';
+import startersLogo from '@/assets/starters-logo.png';
 export const PublicFooter = () => {
   return <ProductionErrorBoundary context="PublicFooter" showErrorDetails={false}>
       <PublicFooterContent />

@@ -10,7 +10,7 @@ import { handlePostLoginRedirect } from '@/utils/redirect';
 import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
 import { User, Mail, Phone, Lock, Eye, EyeOff, Loader2, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import startersLogo from '@/assets/starters-logo-christmas.png';
+import startersLogo from '@/assets/starters-logo.png';
 import AuthFormValidation from '@/components/auth/AuthFormValidation';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 

@@ -14,7 +14,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { NotificationPreview } from '@/components/notifications/NotificationPreview';
 import { NotificationIntegration } from '@/components/notifications/NotificationIntegration';
 import { HeaderBanner } from '@/components/banners/HeaderBanner';
-import startersLogo from '@/assets/starters-logo-christmas.png';
+import startersLogo from '@/assets/starters-logo.png';
 
 export const PublicHeader = () => {
   return (

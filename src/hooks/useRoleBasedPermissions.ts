@@ -63,7 +63,7 @@ export const ROLE_PERMISSIONS: RolePermission[] = [
       customers_view: 'edit',
       categories_view: 'none',
       products_view: 'none',
-      catering_bookings: 'none',
+      catering_bookings: 'edit',
       delivery_zones: 'none',
       promotions_view: 'none',
       'reports-sales': 'none',

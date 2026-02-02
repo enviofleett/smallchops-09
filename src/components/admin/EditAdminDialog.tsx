@@ -43,7 +43,7 @@ export function EditAdminDialog({ user, open, onOpenChange }: EditAdminDialogPro
   const updateMutation = useMutation({
     mutationFn: async () => {
       // Update profile name
-      const { error: profileError } = await supabase
+      const { error: profileError } = await (supabase as any)
         .from('profiles')
         .update({ name })
         .eq('id', user.id);

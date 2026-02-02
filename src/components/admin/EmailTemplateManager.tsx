@@ -60,13 +60,13 @@ export const EmailTemplateManager: React.FC = () => {
 
   const fetchTemplates = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('enhanced_email_templates')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTemplates(data || []);
+      setTemplates((data || []) as EmailTemplate[]);
     } catch (error: any) {
       console.error('Error fetching templates:', error);
       toast({
@@ -94,7 +94,7 @@ export const EmailTemplateManager: React.FC = () => {
 
       if (editingTemplate?.id) {
         // Update existing template
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('enhanced_email_templates')
           .update({
             template_key: template.template_key!,
@@ -118,7 +118,7 @@ export const EmailTemplateManager: React.FC = () => {
         });
       } else {
         // Create new template
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('enhanced_email_templates')
           .insert({
             template_key: template.template_key!,
@@ -160,7 +160,7 @@ export const EmailTemplateManager: React.FC = () => {
     if (!confirm('Are you sure you want to delete this template?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('enhanced_email_templates')
         .delete()
         .eq('id', id);
@@ -214,21 +214,21 @@ export const EmailTemplateManager: React.FC = () => {
   const loadProductionData = async () => {
     try {
       // Get business settings for production branding (admin access to business_settings)
-      const { data: businessSettings } = await supabase
+      const { data: businessSettings } = await (supabase as any)
         .from('business_settings')
         .select('name, tagline, website_url, working_hours')
         .limit(1)
         .maybeSingle();
 
       // Get recent customer data for realistic examples
-      const { data: customerData } = await supabase
+      const { data: customerData } = await (supabase as any)
         .from('customer_accounts')
         .select('name, email')
         .limit(1)
         .maybeSingle();
 
       // Get recent order data for realistic examples
-      const { data: orderData } = await supabase
+      const { data: orderData } = await (supabase as any)
         .from('orders')
         .select('order_number, total_amount, status, created_at')
         .order('created_at', { ascending: false })
@@ -291,7 +291,7 @@ export const EmailTemplateManager: React.FC = () => {
     setIsSaving(true);
     try {
       // Get all verified customers
-      const { data: paidCustomers, error: customerError } = await supabase
+      const { data: paidCustomers, error: customerError } = await (supabase as any)
         .from('customer_accounts')
         .select('id, email, name')
         .eq('email_verified', true);
@@ -339,35 +339,35 @@ export const EmailTemplateManager: React.FC = () => {
             if (error) throw error;
             
             // Log successful send for audit
-            await supabase
+            await (supabase as any)
               .from('audit_logs')
               .insert({
                 action: 'mass_email_sent',
                 category: 'Email Marketing',
-                message: `Template "${template.template_name}" sent to ${customer.email}`,
+                message: `Template "${template.template_name}" sent to ${(customer as any).email}`,
                 new_values: {
                   template_key: template.template_key,
-                  recipient: customer.email,
-                  customer_id: customer.id
+                  recipient: (customer as any).email,
+                  customer_id: (customer as any).id
                 }
               });
 
             successCount++;
           } catch (error: any) {
-            console.error(`Failed to send email to ${customer.email}:`, error);
+            console.error(`Failed to send email to ${(customer as any).email}:`, error);
             failureCount++;
             
             // Log failed send for tracking
-            await supabase
+            await (supabase as any)
               .from('audit_logs')
               .insert({
                 action: 'mass_email_failed',
                 category: 'Email Marketing', 
-                message: `Failed to send template "${template.template_name}" to ${customer.email}: ${error.message}`,
+                message: `Failed to send template "${template.template_name}" to ${(customer as any).email}: ${error.message}`,
                 new_values: {
                   template_key: template.template_key,
-                  recipient: customer.email,
-                  customer_id: customer.id,
+                  recipient: (customer as any).email,
+                  customer_id: (customer as any).id,
                   error: error.message
                 }
               });

@@ -177,7 +177,7 @@ export const EmailTestingSimulation = () => {
 
   const testEmailSending = async (scenarioId: string, variables: any) => {
     // Create communication event
-    const { data: event, error: eventError } = await supabase
+    const { data: event, error: eventError } = await (supabase as any)
       .from('communication_events')
       .insert({
         event_type: scenarioId,

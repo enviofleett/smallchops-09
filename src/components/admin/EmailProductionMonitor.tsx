@@ -73,7 +73,7 @@ export const EmailProductionMonitor = () => {
       today.setHours(0, 0, 0, 0);
 
       // Get today's email stats
-      const { data: todayEvents, error: eventsError } = await supabase
+      const { data: todayEvents, error: eventsError } = await (supabase as any)
         .from('communication_events')
         .select('status, event_type, created_at, sent_at, processed_at')
         .gte('created_at', today.toISOString());

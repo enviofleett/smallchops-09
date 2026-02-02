@@ -34,7 +34,7 @@ export const EmailDeliveryDashboard: React.FC = () => {
   const { data: communicationEvents = [], isLoading: isLoadingEvents } = useQuery({
     queryKey: ['communication-events'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('communication_events')
         .select('*')
         .order('created_at', { ascending: false })

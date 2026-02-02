@@ -163,7 +163,7 @@ export const ComprehensiveEmailTestDashboard = () => {
     
     try {
       // Create a test order
-      const { data: orderData, error: orderError } = await supabase.rpc('create_order_with_items', {
+      const { data: orderData, error: orderError } = await (supabase as any).rpc('create_order_with_items', {
         p_customer_id: 'test-customer-id',
         p_fulfillment_type: 'delivery',
         p_delivery_address: null,
@@ -184,7 +184,7 @@ export const ComprehensiveEmailTestDashboard = () => {
       }
 
       // Check if communication event was created
-      const { data: commEvents, error: commError } = await supabase
+      const { data: commEvents, error: commError } = await (supabase as any)
         .from('communication_events')
         .select('*')
         .eq('order_id', orderResult.order_id)
@@ -302,7 +302,7 @@ export const ComprehensiveEmailTestDashboard = () => {
     updateTestResult('Queue Management', 'running', 'Testing email queue management...');
     
     try {
-      const { data: queuedEmails, error } = await supabase
+      const { data: queuedEmails, error } = await (supabase as any)
         .from('communication_events')
         .select('*')
         .eq('status', 'queued')

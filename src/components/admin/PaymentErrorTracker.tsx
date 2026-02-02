@@ -41,14 +41,14 @@ export const PaymentErrorTracker: React.FC = () => {
   const loadErrors = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('payment_error_tracking')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      setErrors(data || []);
+      setErrors((data || []) as PaymentError[]);
     } catch (error) {
       console.error('Failed to load payment errors:', error);
       toast({
@@ -64,7 +64,7 @@ export const PaymentErrorTracker: React.FC = () => {
   const resolveError = async (errorId: string, notes: string) => {
     try {
       setResolving(errorId);
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('payment_error_tracking')
         .update({
           resolved: true,

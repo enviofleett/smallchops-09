@@ -18,7 +18,7 @@ export const EmailSystemTester = () => {
     
     try {
       // Find the test order #ORD17571524652132db
-      const { data: order, error: orderError } = await supabase
+      const { data: order, error: orderError } = await (supabase as any)
         .from('orders')
         .select('*')
         .eq('order_number', 'ORD17571524652132db')
@@ -34,7 +34,7 @@ export const EmailSystemTester = () => {
       }
 
       // Update the order status to trigger email notification
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('orders')
         .update({ 
           status: 'ready',
@@ -50,7 +50,7 @@ export const EmailSystemTester = () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Check if communication event was created
-      const { data: events, error: eventsError } = await supabase
+      const { data: events, error: eventsError } = await (supabase as any)
         .from('communication_events')
         .select('*')
         .eq('order_id', order.id)

@@ -51,7 +51,7 @@ export const MOQAnalyticsDashboard = () => {
     setIsLoading(true);
     try {
       // Load MOQ audit logs
-      const { data: logs, error } = await supabase
+      const { data: logs, error } = await (supabase as any)
         .from('moq_audit_log')
         .select('*')
         .order('created_at', { ascending: false })

@@ -33,7 +33,7 @@ export const useEmailDeliveryTracking = () => {
   const deliveryLogsQuery = useQuery({
     queryKey: ['email-delivery-logs'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('smtp_delivery_logs')
         .select('*')
         .order('created_at', { ascending: false })
@@ -49,7 +49,7 @@ export const useEmailDeliveryTracking = () => {
   const emailStatsQuery = useQuery({
     queryKey: ['email-stats'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('smtp_delivery_logs')
         .select('delivery_status')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours

@@ -43,14 +43,14 @@ export const EmailStatusDashboard = () => {
       cutoff.setHours(cutoff.getHours() - 24);
 
       // Delivery logs for sent/failed counts
-      const { data: deliveryLogs } = await supabase
+      const { data: deliveryLogs } = await (supabase as any)
         .from('smtp_delivery_logs')
         .select('delivery_status, recipient_email, error_message, template_key, created_at')
         .gte('created_at', cutoff.toISOString())
         .order('created_at', { ascending: false });
 
       // Communication events for queue status
-      const { data: queueStatus } = await supabase
+      const { data: queueStatus } = await (supabase as any)
         .from('communication_events')
         .select('status')
         .in('status', ['queued', 'processing']);

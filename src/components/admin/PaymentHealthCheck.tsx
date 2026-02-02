@@ -71,7 +71,7 @@ export const PaymentHealthCheck: React.FC = () => {
       // Get transactions from last 24 hours
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       
-      const { data: transactions, error } = await supabase
+      const { data: transactions, error } = await (supabase as any)
         .from('payment_transactions')
         .select('status, created_at')
         .gte('created_at', twentyFourHoursAgo);
@@ -100,7 +100,7 @@ export const PaymentHealthCheck: React.FC = () => {
 
     try {
       // Check Paystack configuration
-      const { data: config, error: configError } = await supabase
+      const { data: config, error: configError } = await (supabase as any)
         .from('payment_integrations')
         .select('*')
         .eq('provider', 'paystack')
@@ -116,7 +116,7 @@ export const PaymentHealthCheck: React.FC = () => {
       });
 
       // Check database connectivity
-      const { error: dbError } = await supabase
+      const { error: dbError } = await (supabase as any)
         .from('payment_transactions')
         .select('id')
         .limit(1);
@@ -129,7 +129,7 @@ export const PaymentHealthCheck: React.FC = () => {
       });
 
       // Check Permission System Integrity - NEW
-      const { data: permissions, error: permError } = await supabase
+      const { data: permissions, error: permError } = await (supabase as any)
         .from('user_permissions')
         .select('menu_key, menu_section, permission_level');
 
@@ -162,7 +162,7 @@ export const PaymentHealthCheck: React.FC = () => {
       }
 
       // Check Menu Structure Consistency - NEW
-      const { data: menuItems, error: menuError } = await supabase
+      const { data: menuItems, error: menuError } = await (supabase as any)
         .from('menu_structure')
         .select('key, parent_key, is_active')
         .eq('is_active', true);
@@ -214,7 +214,7 @@ export const PaymentHealthCheck: React.FC = () => {
 
       // Check recent transaction processing
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { data: recentTransactions, error: transactionError } = await supabase
+      const { data: recentTransactions, error: transactionError } = await (supabase as any)
         .from('payment_transactions')
         .select('status')
         .gte('created_at', oneHourAgo);
@@ -238,7 +238,7 @@ export const PaymentHealthCheck: React.FC = () => {
 
   const checkWebhookStatus = async () => {
     try {
-      const { data: latestWebhook, error } = await supabase
+      const { data: latestWebhook, error } = await (supabase as any)
         .from('webhook_logs')
         .select('created_at')
         .order('created_at', { ascending: false })

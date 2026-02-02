@@ -84,14 +84,14 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     try {
       if (riderId) {
         // Use new database function with audit logging
-        const { data, error } = await supabase.rpc('admin_assign_rider_with_audit', {
+        const { data, error } = await (supabase as any).rpc('admin_assign_rider_with_audit', {
           p_order_id: order.id,
           p_rider_id: riderId
         });
         
         if (error) throw error;
         
-        const result = data as { success: boolean; error?: string; rider_name?: string };
+        const result = (data as any) as { success: boolean; error?: string; rider_name?: string };
         if (result?.success) {
           setAssignedRiderId(riderId);
           const rider = drivers.find(d => d.id === riderId);
@@ -101,13 +101,13 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         }
       } else {
         // Unassign rider with audit logging
-        const { data, error } = await supabase.rpc('admin_unassign_rider_with_audit', {
+        const { data, error } = await (supabase as any).rpc('admin_unassign_rider_with_audit', {
           p_order_id: order.id
         });
         
         if (error) throw error;
         
-        const result = data as { success: boolean; error?: string };
+        const result = (data as any) as { success: boolean; error?: string };
         if (result?.success) {
           setAssignedRiderId(null);
           toast.success('Rider unassigned successfully');

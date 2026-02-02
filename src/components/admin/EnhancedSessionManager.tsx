@@ -49,7 +49,7 @@ export const EnhancedSessionManager = () => {
     setIsLoading(true);
     try {
       // Load admin sessions with profile information
-      const { data: sessionsData, error: sessionsError } = await supabase
+      const { data: sessionsData, error: sessionsError } = await (supabase as any)
         .from('admin_sessions')
         .select(`
           *,
@@ -92,7 +92,7 @@ export const EnhancedSessionManager = () => {
     if (!user?.id) return;
 
     try {
-      const { data, error } = await supabase.rpc('create_admin_session', {
+      const { data, error } = await (supabase as any).rpc('create_admin_session', {
         p_user_id: user.id,
         p_ip_address: null, // Will be auto-detected by the function
         p_user_agent: navigator.userAgent
@@ -117,7 +117,7 @@ export const EnhancedSessionManager = () => {
 
   const terminateSession = async (sessionId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('admin_sessions')
         .update({ 
           is_active: false,
@@ -145,7 +145,7 @@ export const EnhancedSessionManager = () => {
 
   const validateSession = async (sessionToken: string) => {
     try {
-      const { data, error } = await supabase.rpc('validate_admin_session', {
+      const { data, error } = await (supabase as any).rpc('validate_admin_session', {
         p_session_token: sessionToken,
         p_ip_address: null
       });

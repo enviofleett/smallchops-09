@@ -206,7 +206,7 @@ const AbandonedCartsManager = () => {
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>{getTimeAgo(cart.abandoned_at || cart.last_activity)}</span>
+                          <span>{getTimeAgo(cart.abandoned_at || (cart as any).last_activity || cart.updated_at)}</span>
                         </div>
                       </div>
                     </div>

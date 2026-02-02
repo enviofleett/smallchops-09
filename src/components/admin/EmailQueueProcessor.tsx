@@ -25,7 +25,7 @@ export const EmailQueueProcessor = () => {
       console.log('Fetching queue statistics...');
       
       // Get all communication events with their statuses
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('communication_events')
         .select('status, retry_count, error_message');
       
@@ -225,7 +225,7 @@ If you received this email, SMTP is working correctly!
       console.log('🎯 Complete SMTP test results:', testResults);
 
       // Log to audit for production monitoring
-      await supabase.from('audit_logs').insert({
+      await (supabase as any).from('audit_logs').insert({
         action: 'smtp_comprehensive_test',
         category: 'SMTP Diagnostics',
         message: 'Comprehensive SMTP connection test completed',
@@ -252,7 +252,7 @@ If you received this email, SMTP is working correctly!
       };
 
       // Log error for production monitoring
-      await supabase.from('audit_logs').insert({
+      await (supabase as any).from('audit_logs').insert({
         action: 'smtp_test_failed',
         category: 'SMTP Error',
         message: 'SMTP connection test failed',

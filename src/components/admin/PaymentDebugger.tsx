@@ -105,7 +105,7 @@ export const PaymentDebugger: React.FC = () => {
 
       // Test 1: Check business settings (admin access to business_settings)
       try {
-        const { data: settings, error } = await supabase
+        const { data: settings, error } = await (supabase as any)
           .from('business_settings')
           .select('allow_guest_checkout')
           .single();
@@ -166,7 +166,7 @@ export const PaymentDebugger: React.FC = () => {
 
       // Test 3: Recent payment transactions
       try {
-        const { data: transactions, error } = await supabase
+        const { data: transactions, error } = await (supabase as any)
           .from('payment_transactions')
           .select('provider_reference, status, created_at')
           .order('created_at', { ascending: false })

@@ -34,7 +34,7 @@ export const CartAbandonmentDashboard = () => {
       setStats(statsData);
 
       // Get abandoned carts
-      const { data: carts, error } = await supabase
+      const { data: carts, error } = await (supabase as any)
         .from('cart_abandonment_tracking')
         .select('*')
         .eq('is_abandoned', true)
@@ -45,7 +45,7 @@ export const CartAbandonmentDashboard = () => {
       if (error) {
         console.error('Failed to fetch abandoned carts:', error);
       } else {
-        setAbandonedCarts(carts || []);
+        setAbandonedCarts((carts || []) as AbandonedCart[]);
       }
     } catch (error) {
       console.error('Error fetching cart abandonment data:', error);

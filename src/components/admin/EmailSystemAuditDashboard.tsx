@@ -79,7 +79,7 @@ export const EmailSystemAuditDashboard = () => {
     updateAuditResult('Infrastructure', 'Email Templates', 'running', 'Auditing email template system...');
     
     try {
-      const { data: templates, error } = await supabase
+      const { data: templates, error } = await (supabase as any)
         .from('enhanced_email_templates')
         .select('*');
 
@@ -164,7 +164,7 @@ export const EmailSystemAuditDashboard = () => {
     updateAuditResult('Infrastructure', 'SMTP Configuration', 'running', 'Auditing SMTP setup...');
     
     try {
-      const { data: smtpConfig, error } = await supabase
+      const { data: smtpConfig, error } = await (supabase as any)
         .from('communication_settings')
         .select('*')
         .eq('use_smtp', true)
@@ -222,7 +222,7 @@ export const EmailSystemAuditDashboard = () => {
     
     try {
       // Check communication events table
-      const { data: recentEvents, error: eventsError } = await supabase
+      const { data: recentEvents, error: eventsError } = await (supabase as any)
         .from('communication_events')
         .select('status, event_type')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
@@ -231,7 +231,7 @@ export const EmailSystemAuditDashboard = () => {
       if (eventsError) throw eventsError;
 
       // Check SMTP delivery logs
-      const { data: deliveryLogs, error: logsError } = await supabase
+      const { data: deliveryLogs, error: logsError } = await (supabase as any)
         .from('smtp_delivery_logs')
         .select('delivery_status')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
@@ -310,7 +310,7 @@ export const EmailSystemAuditDashboard = () => {
       // Step 2: Trigger welcome email
       updateUserJourneyStep(journeyName, 2, { action: 'Triggering welcome email' });
       
-      const { data: eventResult, error: eventError } = await supabase
+      const { data: eventResult, error: eventError } = await (supabase as any)
         .from('communication_events')
         .insert({
           event_type: 'customer_welcome',
@@ -378,7 +378,7 @@ export const EmailSystemAuditDashboard = () => {
       // Step 1: Create test order
       updateUserJourneyStep(journeyName, 1, { action: 'Creating test order' });
       
-      const { data: orderResult, error: orderError } = await supabase.rpc('create_order_with_items', {
+      const { data: orderResult, error: orderError } = await (supabase as any).rpc('create_order_with_items', {
         p_customer_id: 'test-customer-id',
         p_fulfillment_type: 'delivery',
         p_delivery_address: null,
@@ -406,7 +406,7 @@ export const EmailSystemAuditDashboard = () => {
       // Step 3: Check communication events
       updateUserJourneyStep(journeyName, 3, { action: 'Checking email events' });
       
-      const { data: commEvents, error: commError } = await supabase
+      const { data: commEvents, error: commError } = await (supabase as any)
         .from('communication_events')
         .select('*')
         .eq('order_id', orderData.order_id);

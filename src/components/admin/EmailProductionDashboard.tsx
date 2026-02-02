@@ -73,13 +73,13 @@ export const EmailProductionDashboard: React.FC = () => {
   const loadEmailStats = async () => {
     try {
       // Get email stats from last 24 hours
-      const { data: deliveryData } = await supabase
+      const { data: deliveryData } = await (supabase as any)
         .from('smtp_delivery_confirmations')
         .select('delivery_status, delivery_time_ms, created_at')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
       // Get queued emails
-      const { data: queueData } = await supabase
+      const { data: queueData } = await (supabase as any)
         .from('communication_events')
         .select('status')
         .in('status', ['queued', 'processing']);
@@ -112,7 +112,7 @@ export const EmailProductionDashboard: React.FC = () => {
   const loadSystemHealth = async () => {
     try {
       // Check SMTP configuration
-      const { data: smtpConfig } = await supabase
+      const { data: smtpConfig } = await (supabase as any)
         .from('communication_settings')
         .select('use_smtp, smtp_host, smtp_user')
         .eq('use_smtp', true)
@@ -120,13 +120,13 @@ export const EmailProductionDashboard: React.FC = () => {
         .maybeSingle();
 
       // Check active templates
-      const { data: templates } = await supabase
+      const { data: templates } = await (supabase as any)
         .from('enhanced_email_templates')
         .select('id')
         .eq('is_active', true);
 
       // Check queue health (items older than 1 hour in queue)
-      const { data: staleQueue } = await supabase
+      const { data: staleQueue } = await (supabase as any)
         .from('communication_events')
         .select('id')
         .eq('status', 'queued')
@@ -145,7 +145,7 @@ export const EmailProductionDashboard: React.FC = () => {
 
   const loadRecentEmails = async () => {
     try {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from('smtp_delivery_confirmations')
         .select('*')
         .order('created_at', { ascending: false })
@@ -162,7 +162,7 @@ export const EmailProductionDashboard: React.FC = () => {
   const loadTemplateStats = async () => {
     try {
       // Get template usage statistics
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from('smtp_delivery_logs')
         .select('subject, delivery_status, delivery_timestamp')
         .gte('delivery_timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())

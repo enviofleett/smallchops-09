@@ -51,7 +51,7 @@ export const EmailSystemStatus = () => {
     queryKey: ['email-system-metrics'],
     queryFn: async (): Promise<EmailSystemMetrics> => {
       // Get queue statistics
-      const { data: queueStats } = await supabase
+      const { data: queueStats } = await (supabase as any)
         .from('communication_events')
         .select('status')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
@@ -62,20 +62,20 @@ export const EmailSystemStatus = () => {
       }, {} as Record<string, number>) || {};
 
       // Check SMTP health
-      const { data: smtpSettings } = await supabase
+      const { data: smtpSettings } = await (supabase as any)
         .from('communication_settings')
         .select('smtp_host, smtp_port, use_smtp, updated_at')
         .limit(1)
         .maybeSingle();
 
       // Check for cleanup needs
-      const { data: staleProcessing } = await supabase
+      const { data: staleProcessing } = await (supabase as any)
         .from('communication_events')
         .select('id')
         .eq('status', 'processing')
         .lt('processing_started_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
 
-      const { data: oldQueued } = await supabase
+      const { data: oldQueued } = await (supabase as any)
         .from('communication_events')
         .select('id')
         .eq('status', 'queued')
@@ -107,14 +107,14 @@ export const EmailSystemStatus = () => {
   const cleanupMutation = useMutation({
     mutationFn: async (): Promise<CleanupResult> => {
       // Archive and clean stale processing records
-      const { data: staleProcessing } = await supabase
+      const { data: staleProcessing } = await (supabase as any)
         .from('communication_events')
         .select('*')
         .eq('status', 'processing')
         .lt('processing_started_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
 
       // Archive and clean old queued records
-      const { data: oldQueued } = await supabase
+      const { data: oldQueued } = await (supabase as any)
         .from('communication_events')
         .select('*')
         .eq('status', 'queued')
@@ -124,7 +124,7 @@ export const EmailSystemStatus = () => {
 
       // Reset stale processing to failed
       if (staleProcessing && staleProcessing.length > 0) {
-        const { error: updateError } = await supabase
+        const { error: updateError } = await (supabase as any)
           .from('communication_events')
           .update({ 
             status: 'failed', 
@@ -140,7 +140,7 @@ export const EmailSystemStatus = () => {
 
       // Archive and delete old queued items
       if (oldQueued && oldQueued.length > 0) {
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await (supabase as any)
           .from('communication_events')
           .delete()
           .in('id', oldQueued.map(item => item.id));

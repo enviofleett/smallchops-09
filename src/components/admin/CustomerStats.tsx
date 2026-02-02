@@ -11,7 +11,7 @@ export const CustomerStats = () => {
     queryKey: ['customer-stats'],
     queryFn: async () => {
       // Get customer data from orders
-      const { data: orders, error } = await supabase
+      const { data: orders, error } = await (supabase as any)
         .from('orders')
         .select('customer_email, created_at')
         .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());

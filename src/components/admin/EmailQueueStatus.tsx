@@ -21,14 +21,14 @@ export const EmailQueueStatus: React.FC = () => {
     setIsLoading(true);
     try {
       // Get communication events stats
-      const { data: eventStats, error: eventError } = await supabase
+      const { data: eventStats, error: eventError } = await (supabase as any)
         .from('communication_events')
         .select('status, template_key');
 
       if (eventError) throw eventError;
 
       // Get recent SMTP delivery logs
-      const { data: deliveryLogs, error: deliveryError } = await supabase
+      const { data: deliveryLogs, error: deliveryError } = await (supabase as any)
         .from('smtp_delivery_logs')
         .select('delivery_status')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
@@ -60,7 +60,7 @@ export const EmailQueueStatus: React.FC = () => {
 
   const retryFailedEmails = async () => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('communication_events')
         .update({ status: 'queued', retry_count: 0 })
         .eq('status', 'failed')

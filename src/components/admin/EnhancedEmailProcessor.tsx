@@ -24,7 +24,7 @@ export const EnhancedEmailProcessor = () => {
   const fetchQueueStats = async () => {
     try {
       // Use the communication_events table directly instead of email_processing_queue
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('communication_events')
         .select('status, priority, event_type');
 

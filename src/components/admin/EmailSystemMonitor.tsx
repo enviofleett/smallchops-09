@@ -34,16 +34,16 @@ export const EmailSystemMonitor = () => {
     try {
       // Fetch email health data from communication_events table
       const [queuedResult, failedResult, sentResult] = await Promise.all([
-        supabase
+        (supabase as any)
           .from('communication_events')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'queued'),
-        supabase
+        (supabase as any)
           .from('communication_events')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'failed')
           .gte('updated_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()),
-        supabase
+        (supabase as any)
           .from('communication_events')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'sent')
@@ -51,7 +51,7 @@ export const EmailSystemMonitor = () => {
       ]);
 
       // Check SMTP configuration
-      const { data: smtpConfig } = await supabase
+      const { data: smtpConfig } = await (supabase as any)
         .from('communication_settings')
         .select('use_smtp')
         .eq('use_smtp', true)

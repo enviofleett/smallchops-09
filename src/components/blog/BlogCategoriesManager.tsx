@@ -192,7 +192,9 @@ export const BlogCategoriesManager = () => {
             </CardHeader>
             {category.description && (
               <CardContent className="pt-0">
-                <CardDescription>{category.description}</CardDescription>
+                <CardDescription>
+                  {category.description.replace(/<[^>]*>/g, '')}
+                </CardDescription>
               </CardContent>
             )}
           </Card>

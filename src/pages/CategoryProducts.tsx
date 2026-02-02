@@ -443,7 +443,9 @@ const CategoryProductsContent = () => {
                 )}
               </div>
               {currentCategory?.description && (
-                <p className="text-muted-foreground mb-4 sm:mb-6">{currentCategory.description}</p>
+                <p className="text-muted-foreground mb-4 sm:mb-6">
+                  {currentCategory.description.replace(/<[^>]*>/g, '')}
+                </p>
               )}
               
               {/* Search */}

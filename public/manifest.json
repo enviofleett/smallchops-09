@@ -8,9 +8,19 @@
   "theme_color": "#3b82f6",
   "icons": [
     {
-      "src": "/favicon.ico",
+      "src": "/lovable-uploads/50d59cd7-3f0c-42a7-a9ca-00fa5aa7b9c1.png",
       "sizes": "32x32",
-      "type": "image/x-icon"
+      "type": "image/png"
+    },
+    {
+      "src": "/lovable-uploads/50d59cd7-3f0c-42a7-a9ca-00fa5aa7b9c1.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/lovable-uploads/50d59cd7-3f0c-42a7-a9ca-00fa5aa7b9c1.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }

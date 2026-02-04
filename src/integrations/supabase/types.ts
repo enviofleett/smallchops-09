@@ -47,6 +47,48 @@ export type Database = {
         }
         Relationships: []
       }
+      website_menu: {
+        Row: {
+          created_at: string
+          icon_name: string | null
+          id: string
+          is_active: boolean
+          label: string
+          menu_key: string
+          parent_id: string | null
+          sort_order: number
+          target: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          menu_key: string
+          parent_id?: string | null
+          sort_order?: number
+          target?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          menu_key?: string
+          parent_id?: string | null
+          sort_order?: number
+          target?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

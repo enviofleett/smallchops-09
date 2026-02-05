@@ -109,7 +109,7 @@ export function PickupPointsManager() {
 
   const fetchPickupPoints = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('pickup_points')
         .select('*')
         .order('created_at', { ascending: false });
@@ -155,7 +155,7 @@ export function PickupPointsManager() {
       };
 
       if (editingPoint) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('pickup_points')
           .update(pickupPointData)
           .eq('id', editingPoint.id);
@@ -167,9 +167,9 @@ export function PickupPointsManager() {
           description: "Pickup point updated successfully",
         });
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('pickup_points')
-          .insert(pickupPointData);
+          .insert([pickupPointData]);
 
         if (error) throw error;
 
@@ -216,7 +216,7 @@ export function PickupPointsManager() {
     if (!confirm('Are you sure you want to delete this pickup point?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('pickup_points')
         .delete()
         .eq('id', pointId);

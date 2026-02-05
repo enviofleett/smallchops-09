@@ -61,7 +61,7 @@ export const ProductionMonitoringDashboard = () => {
     setIsLoading(true);
     try {
       // Load health metrics
-      const { data: healthData, error: healthError } = await supabase
+      const { data: healthData, error: healthError } = await (supabase as any)
         .from('system_health_metrics')
         .select('*')
         .order('recorded_at', { ascending: false })
@@ -74,7 +74,7 @@ export const ProductionMonitoringDashboard = () => {
       })));
 
       // Load security alerts
-      const { data: alertsData, error: alertsError } = await supabase
+      const { data: alertsData, error: alertsError } = await (supabase as any)
         .from('security_alerts')
         .select('*')
         .eq('status', 'open')
@@ -88,7 +88,7 @@ export const ProductionMonitoringDashboard = () => {
       })));
 
       // Load performance metrics
-      const { data: perfData, error: perfError } = await supabase
+      const { data: perfData, error: perfError } = await (supabase as any)
         .from('performance_analytics')
         .select('*')
         .order('recorded_at', { ascending: false })
@@ -114,7 +114,7 @@ export const ProductionMonitoringDashboard = () => {
 
   const runSecurityCheck = async () => {
     try {
-      const { data, error } = await supabase.rpc('enhanced_security_check');
+      const { data, error } = await (supabase as any).rpc('enhanced_security_check');
       
       if (error) throw error;
       
@@ -138,7 +138,7 @@ export const ProductionMonitoringDashboard = () => {
 
   const resolveAlert = async (alertId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('security_alerts')
         .update({ 
           status: 'resolved',

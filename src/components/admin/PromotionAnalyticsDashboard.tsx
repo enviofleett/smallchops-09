@@ -25,7 +25,7 @@ interface PromotionSummary {
 }
 
 const fetchPromotionSummary = async (): Promise<PromotionSummary[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('promotions')
     .select('id, name, type, status, code, created_at')
     .order('created_at', { ascending: false });
@@ -35,7 +35,7 @@ const fetchPromotionSummary = async (): Promise<PromotionSummary[]> => {
   // Get usage counts for each promotion
   const promotionsWithUsage = await Promise.all(
     (data || []).map(async (promotion) => {
-      const { count } = await supabase
+      const { count } = await (supabase as any)
         .from('promotion_usage')
         .select('*', { count: 'exact', head: true })
         .eq('promotion_id', promotion.id);
@@ -51,7 +51,7 @@ const fetchPromotionSummary = async (): Promise<PromotionSummary[]> => {
 };
 
 const fetchRecentActivity = async () => {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('promotion_usage')
     .select(`
       *,

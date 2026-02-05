@@ -55,7 +55,7 @@ export const TransactionMonitor: React.FC = () => {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('payment_transactions')
         .select('*')
         .order('created_at', { ascending: false })

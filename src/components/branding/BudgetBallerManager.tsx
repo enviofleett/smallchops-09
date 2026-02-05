@@ -72,7 +72,7 @@ export const BudgetBallerManager = () => {
   const { data: budgetBaller, isLoading } = useQuery({
     queryKey: ['budget-baller-content'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('budget_baller_content')
         .select('*')
         .eq('is_active', true)

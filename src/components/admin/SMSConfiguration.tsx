@@ -36,7 +36,7 @@ export const SMSConfiguration = () => {
 
   const loadConfiguration = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sms_configuration')
         .select('*')
         .eq('provider', 'mysmstab')
@@ -57,7 +57,7 @@ export const SMSConfiguration = () => {
           balance_threshold: 100.00,
         };
         
-        const { data: newConfig, error: createError } = await supabase
+        const { data: newConfig, error: createError } = await (supabase as any)
           .from('sms_configuration')
           .insert([defaultConfig])
           .select()
@@ -83,7 +83,7 @@ export const SMSConfiguration = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sms_configuration')
         .update({
           sender_id: config.sender_id,

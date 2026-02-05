@@ -540,7 +540,7 @@ export const ProductionTemplateSeeder: React.FC = () => {
 
   const checkExistingTemplates = async () => {
     try {
-      const { data: templates } = await supabase
+      const { data: templates } = await (supabase as any)
         .from('enhanced_email_templates')
         .select('template_key')
         .in('template_key', criticalTemplates.map(t => t.template_key));
@@ -566,7 +566,7 @@ export const ProductionTemplateSeeder: React.FC = () => {
 
       for (const template of criticalTemplates) {
         // Check if template already exists
-        const { data: existing } = await supabase
+        const { data: existing } = await (supabase as any)
           .from('enhanced_email_templates')
           .select('id')
           .eq('template_key', template.template_key)
@@ -578,9 +578,9 @@ export const ProductionTemplateSeeder: React.FC = () => {
         }
 
         // Create the template
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('enhanced_email_templates')
-          .insert(template);
+          .insert([template]);
 
         if (error) {
           console.error(`Failed to create template ${template.template_key}:`, error);
@@ -609,9 +609,9 @@ export const ProductionTemplateSeeder: React.FC = () => {
 
   const seedSingleTemplate = async (template: EmailTemplate) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('enhanced_email_templates')
-        .insert(template);
+        .insert([template]);
 
       if (error) throw error;
 

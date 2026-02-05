@@ -19,7 +19,7 @@ export function PasswordChangeRequired({ children }: PasswordChangeRequiredProps
     queryFn: async () => {
       if (!user?.id) return null;
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('profiles')
         .select('must_change_password, created_with_temp_password')
         .eq('id', user.id)

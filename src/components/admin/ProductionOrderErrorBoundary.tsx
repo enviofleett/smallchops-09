@@ -63,7 +63,7 @@ class ProductionOrderErrorBoundary extends Component<Props, State> {
       const { supabase } = await import('@/integrations/supabase/client');
       
       // Log to audit_logs table directly instead of edge function
-      await supabase.from('audit_logs').insert({
+      await (supabase as any).from('audit_logs').insert({
         action: 'order_management_component_error',
         category: 'Error Boundary',
         message: `Production Order Error: ${error.message}`,

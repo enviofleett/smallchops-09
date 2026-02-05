@@ -84,7 +84,7 @@ export const UnifiedEmailControls = () => {
       cutoff.setHours(cutoff.getHours() - 24);
 
       // Get delivery stats from logs
-      const { data: logs, error } = await supabase
+      const { data: logs, error } = await (supabase as any)
         .from('smtp_delivery_logs')
         .select('delivery_status, error_message, metadata')
         .gte('created_at', cutoff.toISOString());
@@ -133,7 +133,7 @@ export const UnifiedEmailControls = () => {
       const cutoff = new Date();
       cutoff.setHours(cutoff.getHours() - 24);
 
-      const { data: failedLogs } = await supabase
+      const { data: failedLogs } = await (supabase as any)
         .from('smtp_delivery_logs')
         .select('recipient_email, template_key, metadata')
         .eq('delivery_status', 'failed')
@@ -156,7 +156,7 @@ export const UnifiedEmailControls = () => {
         email_type: 'transactional'
       }));
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('communication_events')
         .insert(events);
 

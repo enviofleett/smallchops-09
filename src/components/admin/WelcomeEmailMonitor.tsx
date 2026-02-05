@@ -44,7 +44,7 @@ export const WelcomeEmailMonitor = () => {
   const fetchWelcomeEmailStats = async () => {
     try {
       // Get welcome email statistics
-      const { data: eventsStats, error: statsError } = await supabase
+      const { data: eventsStats, error: statsError } = await (supabase as any)
         .from('communication_events')
         .select('status, variables, created_at, sent_at')
         .eq('event_type', 'customer_welcome')
@@ -90,7 +90,7 @@ export const WelcomeEmailMonitor = () => {
       });
 
       // Get recent events for detailed view
-      const { data: recentEventsData, error: eventsError } = await supabase
+      const { data: recentEventsData, error: eventsError } = await (supabase as any)
         .from('communication_events')
         .select('id, recipient_email, status, created_at, sent_at, variables, error_message')
         .eq('event_type', 'customer_welcome')

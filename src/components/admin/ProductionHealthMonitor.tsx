@@ -31,14 +31,14 @@ export const ProductionHealthMonitor = () => {
   const fetchHealthMetrics = async () => {
     try {
       // Fetch email health metrics
-      const { data: emailData } = await supabase
+      const { data: emailData } = await (supabase as any)
         .from('communication_events')
         .select('status, created_at')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false });
 
       // Fetch system metrics
-      const { data: auditData } = await supabase
+      const { data: auditData } = await (supabase as any)
         .from('audit_logs')
         .select('action, event_time')
         .eq('category', 'Security')
@@ -51,7 +51,7 @@ export const ProductionHealthMonitor = () => {
       const emailDeliveryRate = totalEmails > 0 ? (successfulEmails / totalEmails) * 100 : 0;
 
       // Fetch registration metrics
-      const { data: regData } = await supabase
+      const { data: regData } = await (supabase as any)
         .from('customer_accounts')
         .select('created_at, email_verified')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());

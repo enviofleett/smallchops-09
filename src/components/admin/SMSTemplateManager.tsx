@@ -50,7 +50,7 @@ export const SMSTemplateManager = () => {
 
   const loadTemplates = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sms_templates')
         .select('*')
         .order('created_at', { ascending: false });
@@ -95,14 +95,14 @@ export const SMSTemplateManager = () => {
 
       let result;
       if (isCreating) {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('sms_templates')
           .insert([templateData])
           .select()
           .single();
         result = { data, error };
       } else {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('sms_templates')
           .update(templateData)
           .eq('id', editingTemplate.id)
@@ -135,7 +135,7 @@ export const SMSTemplateManager = () => {
     if (!confirm('Are you sure you want to delete this SMS template?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('sms_templates')
         .delete()
         .eq('id', id);

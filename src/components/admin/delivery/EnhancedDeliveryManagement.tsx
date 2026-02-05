@@ -84,7 +84,7 @@ export function EnhancedDeliveryManagement() {
   const { data: readyOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['ready-orders'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('orders')
         .select(`
           *,
@@ -110,7 +110,7 @@ export function EnhancedDeliveryManagement() {
     queryKey: ['delivery-schedules', readyOrders.map(o => o.id)],
     queryFn: async () => {
       if (readyOrders.length === 0) return {};
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('order_delivery_schedule')
         .select('*')
         .in('order_id', readyOrders.map(o => o.id));
@@ -127,7 +127,7 @@ export function EnhancedDeliveryManagement() {
   const { data: assignments = [] } = useQuery({
     queryKey: ['delivery-assignments'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('delivery_assignments')
         .select('*')
         .in('order_id', readyOrders.map(o => o.id));
@@ -160,7 +160,7 @@ export function EnhancedDeliveryManagement() {
     try {
       const results = await Promise.all(
         orderIds.map(orderId => 
-          supabase.rpc('assign_driver_to_order', {
+          (supabase as any).rpc('assign_driver_to_order', {
             p_order_id: orderId,
             p_driver_id: driverId,
           })
@@ -188,7 +188,7 @@ export function EnhancedDeliveryManagement() {
   // Update assignment status
   const handleStatusUpdate = async (assignmentId: string, status: string, notes?: string) => {
     try {
-      const { data, error } = await supabase.rpc('update_delivery_status', {
+      const { data, error } = await (supabase as any).rpc('update_delivery_status', {
         p_assignment_id: assignmentId,
         p_status: status,
         p_notes: notes,
@@ -233,7 +233,7 @@ export function EnhancedDeliveryManagement() {
   // Update order status and notify customer if necessary
   const handleOrderStatusUpdate = async (orderId: string, newStatus: OrderStatus, previousStatus: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('orders')
         .update({ status: newStatus })
         .eq('id', orderId);

@@ -31,7 +31,7 @@ export const PaymentReferenceMonitor: React.FC = () => {
       const migrationResult = await checkOrderReferenceMigration(supabase);
       
       // Get comprehensive stats
-      const { data: orderStats, error: statsError } = await supabase
+      const { data: orderStats, error: statsError } = await (supabase as any)
         .from('orders')
         .select('payment_reference, payment_status, created_at')
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days

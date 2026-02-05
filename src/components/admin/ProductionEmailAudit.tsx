@@ -92,7 +92,7 @@ export const ProductionEmailAudit: React.FC = () => {
         'order_ready', 'customer_welcome', 'payment_confirmed'
       ];
       
-      const { data: templates } = await supabase
+      const { data: templates } = await (supabase as any)
         .from('enhanced_email_templates')
         .select('template_key, is_active')
         .in('template_key', requiredTemplates);
@@ -159,7 +159,7 @@ export const ProductionEmailAudit: React.FC = () => {
       }
 
       // 5. System Health Check
-      const { data: systemStats } = await supabase
+      const { data: systemStats } = await (supabase as any)
         .from('communication_events')
         .select('status')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());

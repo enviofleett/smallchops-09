@@ -65,7 +65,7 @@ export const ProductionReadinessOverview: React.FC = () => {
 
       // 2. Email Templates Check
       const requiredTemplates = ['order_confirmed', 'order_out_for_delivery', 'order_delivered', 'order_ready', 'customer_welcome', 'payment_confirmed'];
-      const { data: templates } = await supabase
+      const { data: templates } = await (supabase as any)
         .from('enhanced_email_templates')
         .select('template_key, is_active')
         .in('template_key', requiredTemplates);
@@ -114,7 +114,7 @@ export const ProductionReadinessOverview: React.FC = () => {
       }
 
       // 4. Email Delivery Health
-      const { data: recentEmails } = await supabase
+      const { data: recentEmails } = await (supabase as any)
         .from('communication_events')
         .select('status')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())

@@ -52,7 +52,7 @@ export const BrandingAnalytics = () => {
       setLoading(true);
 
       // Get brand consistency score
-      const { data: consistencyScore, error: scoreError } = await supabase
+      const { data: consistencyScore, error: scoreError } = await (supabase as any)
         .rpc('calculate_brand_consistency_score');
 
       if (scoreError) {
@@ -60,7 +60,7 @@ export const BrandingAnalytics = () => {
       }
 
       // Get branding audit logs
-      const { data: auditLogs, error: auditError } = await supabase
+      const { data: auditLogs, error: auditError } = await (supabase as any)
         .from('branding_audit_log')
         .select('*')
         .order('changed_at', { ascending: false })

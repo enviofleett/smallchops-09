@@ -401,7 +401,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
       }
 
       // PRODUCTION SECURITY: Query admin activities with enhanced security
-      let query = supabase
+      let query = (supabase as any)
         .from("audit_logs")
         .select(`
           id,
@@ -422,7 +422,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
       // Get admin profiles for enhanced display
-      const { data: adminProfiles, error: adminError } = await supabase
+      const { data: adminProfiles, error: adminError } = await (supabase as any)
         .from('profiles')
         .select('id, email, role, is_active')
         .eq('role', 'admin')

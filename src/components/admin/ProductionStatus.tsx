@@ -38,14 +38,14 @@ export const ProductionStatus: React.FC = () => {
     setLoading(true);
     try {
       // Check production readiness status
-      const { data: readinessData, error: readinessError } = await supabase.rpc('check_production_readiness');
+      const { data: readinessData, error: readinessError } = await (supabase as any).rpc('check_production_readiness');
       
       if (readinessError) {
         console.error('Error checking production readiness:', readinessError);
       }
       
       // Get environment config
-      const { data: envData, error: envError } = await supabase
+      const { data: envData, error: envError } = await (supabase as any)
         .from('environment_config')
         .select('*')
         .order('updated_at', { ascending: false })
@@ -96,7 +96,7 @@ export const ProductionStatus: React.FC = () => {
     setTesting(true);
     try {
       // Run production readiness check
-      const { data, error } = await supabase.rpc('check_production_readiness');
+      const { data, error } = await (supabase as any).rpc('check_production_readiness');
       
       if (error) throw error;
 

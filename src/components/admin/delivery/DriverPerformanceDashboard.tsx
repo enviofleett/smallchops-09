@@ -51,7 +51,7 @@ export function DriverPerformanceDashboard() {
   const { data: performanceData = [], isLoading, error } = useQuery({
     queryKey: ['driver-performance', format(weekStart, 'yyyy-MM-dd')],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('delivery_assignments')
         .select(`
           driver_id,

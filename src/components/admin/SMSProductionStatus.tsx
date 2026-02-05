@@ -133,7 +133,7 @@ export const SMSProductionStatus = () => {
 
   const checkSMSConfiguration = async (): Promise<{ status: 'pass' | 'warn' | 'fail'; message: string }> => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sms_configuration')
         .select('*')
         .eq('provider', 'mysmstab')
@@ -156,7 +156,7 @@ export const SMSProductionStatus = () => {
 
   const checkSMSTemplates = async (): Promise<{ status: 'pass' | 'warn' | 'fail'; message: string }> => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('sms_templates')
         .select('template_key, is_active')
         .eq('is_active', true);

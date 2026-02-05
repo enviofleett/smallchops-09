@@ -47,7 +47,7 @@ export const ProductionEmailStatus: React.FC = () => {
       // Check template availability
       const templateResults = await Promise.all(
         requiredTemplates.map(async (template) => {
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from('enhanced_email_templates')
             .select('template_name, is_active, updated_at')
             .eq('template_key', template.key)

@@ -30,7 +30,7 @@ export const PermissionMatrixHealthMonitor = () => {
       
       try {
         // Check admin users
-        const { data: adminUsers, error: adminError } = await supabase.rpc('get_admin_users_secure');
+        const { data: adminUsers, error: adminError } = await (supabase as any).rpc('get_admin_users_secure');
         if (adminError) {
           checks.push({
             name: 'Admin User Access',
@@ -55,7 +55,7 @@ export const PermissionMatrixHealthMonitor = () => {
         }
 
         // Check menu structure
-        const { data: menuData, error: menuError } = await supabase.rpc('get_menu_structure_secure');
+        const { data: menuData, error: menuError } = await (supabase as any).rpc('get_menu_structure_secure');
         if (menuError) {
           checks.push({
             name: 'Menu Structure',
@@ -82,7 +82,7 @@ export const PermissionMatrixHealthMonitor = () => {
 
         // Check permission functions availability
         try {
-          await supabase.rpc('update_user_permissions_secure', {
+          await (supabase as any).rpc('update_user_permissions_secure', {
             target_user_id: '00000000-0000-0000-0000-000000000000', // Test with dummy ID
             permissions_data: {}
           });
@@ -105,7 +105,7 @@ export const PermissionMatrixHealthMonitor = () => {
         }
 
         // Check database connection
-        const { error: dbError } = await supabase.from('profiles').select('count').limit(1);
+        const { error: dbError } = await (supabase as any).from('profiles').select('count').limit(1);
         if (dbError) {
           checks.push({
             name: 'Database Connection',

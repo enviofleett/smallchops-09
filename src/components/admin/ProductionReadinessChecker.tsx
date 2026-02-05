@@ -24,7 +24,7 @@ export const ProductionReadinessChecker = () => {
 
     try {
       // Check SMTP Configuration
-      const { data: smtpSettings } = await supabase
+      const { data: smtpSettings } = await (supabase as any)
         .from('communication_settings')
         .select('*')
         .limit(1)
@@ -46,7 +46,7 @@ export const ProductionReadinessChecker = () => {
       }
 
       // Check Email Queue Processing
-      const { data: queuedEmails } = await supabase
+      const { data: queuedEmails } = await (supabase as any)
         .from('communication_events')
         .select('status')
         .eq('status', 'queued')
@@ -68,7 +68,7 @@ export const ProductionReadinessChecker = () => {
       }
 
       // Check for Template Key Mapping
-      const { data: nullTemplateEvents } = await supabase
+      const { data: nullTemplateEvents } = await (supabase as any)
         .from('communication_events')
         .select('id')
         .is('template_key', null)
@@ -117,7 +117,7 @@ export const ProductionReadinessChecker = () => {
       }
 
       // Check Business Settings (admin access to business_settings)
-      const { data: businessSettings } = await supabase
+      const { data: businessSettings } = await (supabase as any)
         .from('business_settings')
         .select('*')
         .limit(1)

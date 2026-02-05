@@ -46,7 +46,7 @@ export const ProductionEmailSimulator: React.FC = () => {
   }, []);
 
   const loadActiveTemplates = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('enhanced_email_templates')
       .select('*')
       .eq('is_active', true)
@@ -59,7 +59,7 @@ export const ProductionEmailSimulator: React.FC = () => {
 
   const loadEmailMetrics = async () => {
     // Get recent email delivery stats
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('smtp_delivery_confirmations')
       .select('delivery_status, created_at, provider_used')
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
@@ -156,7 +156,7 @@ export const ProductionEmailSimulator: React.FC = () => {
     
     try {
       const coreTemplates = ['order_confirmation', 'customer_welcome', 'payment_confirmation', 'smtp_test'];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('enhanced_email_templates')
         .select('template_key, is_active, template_name')
         .in('template_key', coreTemplates)
@@ -334,7 +334,7 @@ export const ProductionEmailSimulator: React.FC = () => {
     updateResult('Rate Limiting', 'running', 'Testing rate limiting system...');
     
     try {
-      const { data, error } = await supabase.rpc('check_email_rate_limit', {
+      const { data, error } = await (supabase as any).rpc('check_email_rate_limit', {
         p_recipient_email: testEmail
       });
 
@@ -419,7 +419,7 @@ export const ProductionEmailSimulator: React.FC = () => {
       const checks = [];
       
       // Check SMTP settings
-      const { data: smtpSettings } = await supabase
+      const { data: smtpSettings } = await (supabase as any)
         .from('communication_settings')
         .select('*')
         .eq('use_smtp', true)

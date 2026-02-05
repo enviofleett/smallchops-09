@@ -53,24 +53,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('🔄 Processing communication events enhanced...');
     
-    // Build query for queued events - filter out NULL template_key to prevent spam
-    let query = supabase
-      .from('communication_events')
-      .select('*')
-      .eq('status', 'queued')
-      .not('template_key', 'is', null)
-      .order('created_at', { ascending: true })
-      .limit(batchSize);
-
-    // If processing specific event
-    if (event_id) {
-      query = supabase
-        .from('communication_events')
-        .select('*')
-        .eq('id', event_id);
-    }
-
-    const { data: events, error: fetchError } = await query;
+    // Use RPC to fetch and lock events atomically
+    const { data: events, error: fetchError } = await supabase
+      .rpc('fetch_and_lock_communication_events', { 
+        p_limit: batchSize 
+      });
 
     if (fetchError) {
       console.error('Failed to fetch communication events:', fetchError);
@@ -110,11 +97,7 @@ const handler = async (req: Request): Promise<Response> => {
       try {
         console.log(`Processing event ${event.id}: ${event.event_type} to ${event.recipient_email}`);
 
-        // Mark as processing
-        await supabase
-          .from('communication_events')
-          .update({ status: 'processing' })
-          .eq('id', event.id);
+        // Status is already set to 'processing' by the RPC
 
         // Send via unified SMTP sender
         const { data: emailResult, error: emailError } = await supabase.functions.invoke('unified-smtp-sender', {

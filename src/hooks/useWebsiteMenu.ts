@@ -19,24 +19,36 @@ export const useWebsiteMenu = () => {
     queryKey: ['website-menu'],
     queryFn: async (): Promise<WebsiteMenuItem[]> => {
       const { data, error } = await supabase
-        .from('website_menu')
+        .from('website_menu' as any)
         .select('*')
         .eq('is_active', true)
         .order('sort_order');
 
       if (error) throw error;
 
+      // Apply label overrides
+      const labelOverrides: Record<string, string> = {
+        'shop': 'Menu',
+        'event': 'Events',
+        'about': 'Our story'
+      };
+
+      const processedData = (data as any[]).map(item => ({
+        ...item,
+        label: labelOverrides[item.menu_key] || item.label
+      }));
+
       // Build hierarchical structure
       const menuMap = new Map<string, WebsiteMenuItem>();
       const rootItems: WebsiteMenuItem[] = [];
 
       // First pass: create map of all items
-      data.forEach(item => {
+      processedData.forEach(item => {
         menuMap.set(item.id, { ...item, children: [] });
       });
 
       // Second pass: build hierarchy
-      data.forEach(item => {
+      processedData.forEach(item => {
         const menuItem = menuMap.get(item.id);
         if (!menuItem) return;
 

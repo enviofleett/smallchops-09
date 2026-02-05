@@ -18,18 +18,20 @@ export const initializeSecurePayment = async (
   try {
     console.log('🔐 Initializing secure Paystack payment:', { orderId, amount });
     
-    // Call backend function for secure reference generation
-    const { data, error } = await supabase.functions.invoke('paystack-initialize', {
+    // Call secure backend function for reference generation
+    const { data, error } = await supabase.functions.invoke('paystack-secure', {
       body: {
-        order_id: orderId,
+        action: 'initialize',
         email: customerEmail,
         amount,
         metadata: {
           ...metadata,
           gateway: PAYMENT_GATEWAY,
           backend_generated: true,
-          source: 'frontend_secure_init'
-        }
+          source: 'frontend_secure_init',
+          order_id: orderId
+        },
+        order_id: orderId
       }
     });
 

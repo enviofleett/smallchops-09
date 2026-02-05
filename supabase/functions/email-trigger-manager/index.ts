@@ -30,7 +30,7 @@ const TRIGGER_HANDLERS = {
     };
 
     // Trigger welcome email automation
-    await supabase.functions.invoke('email-automation-engine', {
+    await supabase.functions.invoke('email-automation-trigger', {
       body: {
         action: 'trigger',
         eventType: 'customer_registered',
@@ -71,7 +71,7 @@ const TRIGGER_HANDLERS = {
     };
 
     // Trigger order confirmation email
-    await supabase.functions.invoke('email-automation-engine', {
+    await supabase.functions.invoke('email-automation-trigger', {
       body: {
         action: 'trigger',
         eventType: 'order_created',
@@ -106,7 +106,7 @@ const TRIGGER_HANDLERS = {
       changedAt: new Date().toISOString()
     };
 
-    await supabase.functions.invoke('email-automation-engine', {
+    await supabase.functions.invoke('email-automation-trigger', {
       body: {
         action: 'trigger',
         eventType: 'order_status_changed',
@@ -158,7 +158,7 @@ const TRIGGER_HANDLERS = {
 
     // Only trigger if cart value is significant
     if (cartData.cartTotal >= 1000) {
-      await supabase.functions.invoke('email-automation-engine', {
+      await supabase.functions.invoke('email-automation-trigger', {
         body: {
           action: 'trigger',
           eventType: 'cart_abandoned',
@@ -192,7 +192,7 @@ const TRIGGER_HANDLERS = {
       specialOfferUrl: 'https://startersmallchops.com/special-offers'
     };
 
-    await supabase.functions.invoke('email-automation-engine', {
+    await supabase.functions.invoke('email-automation-trigger', {
       body: {
         action: 'trigger',
         eventType: 'customer_inactive',

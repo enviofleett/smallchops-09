@@ -311,10 +311,20 @@ async function handleOrderStatusChangeJourney(
     console.log(`🚚 DELIVERY OUT FOR DELIVERY: Processing delivery notification for order ${orderData.order_number}`);
     
     try {
-      // Call the dedicated delivery notification function with driver info
-      const { data: deliveryEmailResponse, error: deliveryEmailError } = await supabase.functions.invoke('send-out-for-delivery-email', {
+      // Send out-for-delivery email via unified SMTP sender
+      const { data: deliveryEmailResponse, error: deliveryEmailError } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
-          order_id: orderData.order_id
+          to: orderDetails.customer_email,
+          templateKey: 'order_out_for_delivery',
+          variables: {
+            order_number: orderData.order_number,
+            customer_name: orderDetails.customer_name,
+            order_id: orderData.order_id,
+            fulfillment_type: 'delivery',
+            status: 'Out for delivery',
+            status_date: new Date().toISOString()
+          },
+          emailType: 'transactional'
         }
       });
 

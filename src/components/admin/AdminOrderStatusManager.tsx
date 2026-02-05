@@ -36,10 +36,30 @@ export const AdminOrderStatusManager = ({
   // Secure email notification mutation using edge function
   const sendDeliveryEmailMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      const { data, error } = await supabase.functions.invoke('send-out-for-delivery-email', {
-        body: { order_id: orderId }
+      // Fetch order details to populate email variables
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('id, order_number, customer_email, customer_name')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError) throw orderError;
+
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: {
+          to: order.customer_email,
+          templateKey: 'order_out_for_delivery',
+          variables: {
+            order_number: order.order_number,
+            customer_name: order.customer_name,
+            order_id: order.id,
+            status: 'Out for delivery',
+            status_date: new Date().toISOString()
+          },
+          emailType: 'transactional'
+        }
       });
-      
+
       if (error) throw error;
       return data;
     },

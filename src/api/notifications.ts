@@ -127,15 +127,42 @@ export const getNotificationLogs = async (filters?: {
 // Send Notification Function
 export const sendNotification = async (request: NotificationRequest): Promise<{ success: boolean; message: string }> => {
   try {
-    const { data, error } = await supabase.functions.invoke('send-delivery-notification', {
-      body: request
-    });
+    // Route email notifications through unified SMTP sender
+    if (request.channel === 'email' || request.channel === 'both') {
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: {
+          to: request.recipient,
+          templateKey: request.template_key,
+          variables: request.variables || {},
+          emailType: 'transactional'
+        }
+      });
 
-    if (error) {
-      throw error;
+      if (error) throw error;
+      // If only email, return immediately
+      if (request.channel === 'email') {
+        return data;
+      }
     }
 
-    return data;
+    // If SMS requested, invoke sms service
+    if (request.channel === 'sms' || request.channel === 'both') {
+      const { data: smsData, error: smsError } = await supabase.functions.invoke('sms-service', {
+        body: {
+          to: request.recipient,
+          templateKey: request.template_key,
+          variables: request.variables || {},
+          order_id: request.order_id,
+          customer_id: request.customer_id
+        }
+      });
+
+      if (smsError) throw smsError;
+
+      return smsData;
+    }
+
+    return { success: false, message: 'Unsupported notification channel' };
   } catch (error: any) {
     console.error('Failed to send notification:', error);
     throw new Error(error.message || 'Failed to send notification');

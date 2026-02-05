@@ -62,8 +62,8 @@ async function executeEmailQueueProcessing(supabase: any) {
   
   try {
     // Process all priority levels
-    const { data, error } = await supabase.functions.invoke('email-queue-processor', {
-      body: { action: 'process_all_priorities' }
+    const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
+      body: { priority: 'all' }
     });
 
     if (error) throw error;
@@ -80,7 +80,7 @@ async function executeAutomationQueueProcessing(supabase: any) {
   console.log('🔄 Executing: Automation Queue Processing');
   
   try {
-    const { data, error } = await supabase.functions.invoke('email-automation-engine', {
+    const { data, error } = await supabase.functions.invoke('email-automation-trigger', {
       body: { action: 'process_queue' }
     });
 
@@ -134,8 +134,8 @@ async function executeEmailSystemHealth(supabase: any) {
   console.log('🔄 Executing: Email System Health Check');
   
   try {
-    const { data, error } = await supabase.functions.invoke('email-queue-processor', {
-      body: { action: 'health_check' }
+    const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
+      body: { healthcheck: true }
     });
 
     if (error) throw error;
@@ -161,10 +161,10 @@ async function executeEmailCleanup(supabase: any) {
   console.log('🔄 Executing: Email System Cleanup');
   
   try {
-    const { data, error } = await supabase.functions.invoke('email-queue-processor', {
-      body: { action: 'cleanup' }
+    // Dry-run unified processor to surface any queue issues
+    const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
+      body: { dry_run: true }
     });
-
     if (error) throw error;
     
     // Additional cleanup tasks

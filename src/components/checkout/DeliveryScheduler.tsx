@@ -13,6 +13,7 @@ import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBounda
 import { HorizontalDatePicker } from './HorizontalDatePicker';
 import { DropdownDatePicker } from './DropdownDatePicker';
 import { useQuery } from '@tanstack/react-query';
+import { deliveryBookingAPI } from '@/api/deliveryBookingApi';
 
 interface DeliverySchedulerProps {
   selectedDate?: string;
@@ -50,7 +51,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
   } = useQuery({
     queryKey: ['delivery-availability', new Date().toISOString().split('T')[0]],
     queryFn: async () => {
-      const { deliveryBookingAPI } = await import('@/api/deliveryBookingApi');
       const now = new Date();
       const maxDate = addDays(now, 60); // 60 days from backend config
       

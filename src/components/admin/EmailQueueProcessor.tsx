@@ -416,7 +416,7 @@ If you received this email, SMTP is working correctly!
           <h4 className="text-sm font-medium">Queue Processing</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Button
-              onClick={() => processQueue('production-email-processor', 'Production Email Processor')}
+              onClick={() => processQueue('unified-email-queue-processor', 'Unified Email Queue Processor')}
               disabled={isProcessing || isTesting}
               className="justify-start"
               size="sm"
@@ -426,38 +426,10 @@ If you received this email, SMTP is working correctly!
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              Process (Production)
+              Process Queue
             </Button>
             
-            <Button
-              onClick={() => processQueue('enhanced-email-processor', 'Enhanced Email Processor')}
-              disabled={isProcessing || isTesting}
-              variant="outline"
-              className="justify-start"
-              size="sm"
-            >
-              {isProcessing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              Process (Enhanced)
-            </Button>
-            
-            <Button
-              onClick={() => processQueue('instant-email-processor', 'Instant Email Processor')}
-              disabled={isProcessing || isTesting}
-              variant="outline"
-              className="justify-start"
-              size="sm"
-            >
-              {isProcessing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              Process (Instant)
-            </Button>
+            {/* Legacy processors removed/consolidated */}
           </div>
         </div>
 

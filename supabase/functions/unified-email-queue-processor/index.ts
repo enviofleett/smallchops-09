@@ -84,23 +84,53 @@ serve(async (req) => {
     console.log(`📧 Batch size: ${batchSize}, Priority: ${priority}`);
 
     // Get queued emails based on priority and retry logic
-    let query = supabase
-      .from('communication_events')
-      .select('*')
-      .eq('status', 'queued')
-      .lt('retry_count', 3)
-      .order('priority', { ascending: false })
-      .order('created_at', { ascending: true })
-      .limit(batchSize);
+    // USE ATOMIC LOCKING to prevent race conditions
+    let { data: queuedEmails, error: fetchError } = await supabase
+      .rpc('fetch_and_lock_communication_events', { p_limit: batchSize });
 
-    if (priority !== 'all') {
-      query = query.eq('priority', priority);
+    // Fallback to regular select if RPC fails (e.g. not deployed yet)
+    if (fetchError) {
+      console.warn('⚠️ Atomic locking failed, falling back to standard select:', fetchError.message);
+      
+      let query = supabase
+        .from('communication_events')
+        .select('*')
+        .eq('status', 'queued')
+        .lt('retry_count', 3)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(batchSize);
+
+      if (priority !== 'all') {
+        query = query.eq('priority', priority);
+      }
+      
+      const { data: fallbackEmails, error: fallbackError } = await query;
+      if (fallbackError) throw fallbackError;
+      
+      // Manually mark as processing to minimize race window
+      if (fallbackEmails && fallbackEmails.length > 0) {
+        const ids = fallbackEmails.map((e: any) => e.id);
+        await supabase
+          .from('communication_events')
+          .update({ 
+            status: 'processing',
+            processing_started_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .in('id', ids);
+          
+        queuedEmails = fallbackEmails;
+        // Clear the error since we recovered
+        fetchError = null;
+      } else {
+        queuedEmails = [];
+        fetchError = null;
+      }
     }
 
-    const { data: queuedEmails, error: fetchError } = await query;
-
     if (fetchError) {
-      throw fetchError;
+       throw fetchError;
     }
 
     if (!queuedEmails || queuedEmails.length === 0) {
@@ -128,7 +158,9 @@ serve(async (req) => {
       try {
         console.log(`🔄 Processing email ${email.id} for ${email.recipient_email}`);
         
-        // Mark as processing
+        // Mark as processing - SKIPPED because fetch_and_lock_communication_events already does this!
+        // But we update the timestamp to be precise
+        /*
         await supabase
           .from('communication_events')
           .update({ 
@@ -137,6 +169,7 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           })
           .eq('id', email.id);
+        */
 
         // Send via unified SMTP sender
         const { data: emailResult, error: emailError } = await supabase.functions.invoke('unified-smtp-sender', {
@@ -146,7 +179,7 @@ serve(async (req) => {
             html: email.html_content || undefined,
             text: email.text_content || undefined,
             templateKey: email.template_key,
-            variables: email.variables || {},
+            variables: email.template_variables || email.variables || {},
             emailType: email.email_type || 'transactional',
             priority: email.priority || 'normal'
           }

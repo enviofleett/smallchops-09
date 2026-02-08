@@ -1388,9 +1388,12 @@ serve(async (req: Request) => {
     
     const businessName = businessSettings?.name || 'System';
 
+    // Normalize template key from various input formats
+    const templateKey = requestBody.templateKey || requestBody.template_key || requestBody.templateId;
+
     console.log('📧 SMTP sender request:', {
       to: requestBody.to,
-      templateKey: requestBody.templateKey,
+      templateKey: templateKey,
       businessName,
       hasVariables: !!requestBody.variables
     });
@@ -1459,7 +1462,7 @@ serve(async (req: Request) => {
     // Process template with fallback and explicit subject handling
     const { subject: templateSubject, html, text, templateFound, missingVariables, templateType } = await processTemplate(
       supabase,
-      requestBody.templateKey,
+      templateKey,
       requestBody.variables,
       businessName
     );
@@ -1467,8 +1470,8 @@ serve(async (req: Request) => {
     // Respect explicit subject from caller if provided, otherwise use template/fallback
     const finalSubject = requestBody.subject?.trim() || templateSubject;
 
-    if (!templateFound && requestBody.templateKey) {
-      console.warn(`⚠️ Template ${requestBody.templateKey} not found - proceeding with branded fallback content`);
+    if (!templateFound && templateKey) {
+      console.warn(`⚠️ Template ${templateKey} not found - proceeding with branded fallback content`);
     }
 
     // Execute email sending with retry logic
@@ -1507,7 +1510,7 @@ serve(async (req: Request) => {
     const elapsed = Date.now() - startTime;
 
     // Log successful delivery with enriched metadata
-    await supabase.from('smtp_delivery_logs').insert({
+      await supabase.from('smtp_delivery_logs').insert({
       recipient_email: requestBody.to,
       subject: finalSubject,
       delivery_status: 'sent',
@@ -1515,7 +1518,7 @@ serve(async (req: Request) => {
       delivery_timestamp: new Date().toISOString(),
       sender_email: smtpConfig.senderEmail,
       provider: 'native-smtp',
-      template_key: requestBody.templateKey || null,
+      template_key: templateKey || null,
       metadata: {
         implementation: 'production-native-deno',
         smtp_host: smtpConfig.host,
@@ -1531,7 +1534,7 @@ serve(async (req: Request) => {
          fallbackUsed: !templateFound,
          missingVariables: missingVariables,
          warnings: [
-           ...(!templateFound ? [`Template ${requestBody.templateKey} not found - using branded fallback`] : []),
+           ...(!templateFound ? [`Template ${templateKey} not found - using branded fallback`] : []),
            ...(missingVariables.length > 0 ? [`Missing template variables: ${missingVariables.join(', ')}`] : [])
          ].filter(Boolean)
       }
@@ -1574,7 +1577,7 @@ serve(async (req: Request) => {
         smtp_response: error.message,
         error_message: error.message,
         delivery_timestamp: new Date().toISOString(),
-        template_key: requestBody.templateKey || null,
+        template_key: templateKey || null,
         metadata: {
           implementation: 'production-native-deno',
           error_category: errorInfo.category,

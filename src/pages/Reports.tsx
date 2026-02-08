@@ -15,9 +15,8 @@ import { DeliveryFeesTable } from '@/components/reports/advanced/DeliveryFeesTab
 import {
   useDailyRevenue,
   useProductsSold,
-  useDriverRevenue,
-  useAnalyticsDashboard,
 } from '@/hooks/useAdvancedReports';
+import { useDashboardAggregates } from '@/hooks/useDashboardAggregates';
 import { Card, CardContent } from '@/components/ui/card';
 
 
@@ -55,8 +54,9 @@ export default function Reports() {
   // Fetch data using custom hooks with validated dates
   const { data: revenueData, isLoading: revenueLoading } = useDailyRevenue(validStartDate, validEndDate);
   const { data: productsData, isLoading: productsLoading } = useProductsSold(validStartDate, validEndDate, interval);
-  const { data: driverData, isLoading: driverLoading } = useDriverRevenue(validStartDate, validEndDate, interval);
-  const { data: dashboardData, isLoading: dashboardLoading } = useAnalyticsDashboard(validStartDate, validEndDate);
+  const { data: aggregates, isLoading: aggregatesLoading } = useDashboardAggregates(validStartDate, validEndDate, interval);
+  const driverData = aggregates?.driverRevenue;
+  const dashboardData = aggregates?.stats;
 
   return (
     <div className="space-y-6 p-6">
@@ -163,7 +163,7 @@ export default function Reports() {
             <CardContent className="p-6">
               <div className="text-sm font-medium text-muted-foreground">Total Revenue</div>
               <div className="text-2xl font-bold text-green-600">
-                ₦{Number(dashboardData.summary?.totalRevenue || 0).toLocaleString()}
+                ₦{Number(dashboardData.totalRevenue || 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -171,7 +171,7 @@ export default function Reports() {
             <CardContent className="p-6">
               <div className="text-sm font-medium text-muted-foreground">Total Orders</div>
               <div className="text-2xl font-bold">
-                {Number(dashboardData.summary?.totalOrders || 0).toLocaleString()}
+                {Number(dashboardData.totalOrders || 0).toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -179,7 +179,7 @@ export default function Reports() {
             <CardContent className="p-6">
               <div className="text-sm font-medium text-muted-foreground">Products Sold</div>
               <div className="text-2xl font-bold">
-                {Number(dashboardData.summary?.totalProducts || 0)}
+                {Number(dashboardData.totalProducts || 0)}
               </div>
             </CardContent>
           </Card>
@@ -187,7 +187,7 @@ export default function Reports() {
             <CardContent className="p-6">
               <div className="text-sm font-medium text-muted-foreground">Avg Order Value</div>
               <div className="text-2xl font-bold">
-                ₦{Number(dashboardData.summary?.avgOrderValue || 0).toFixed(2)}
+                ₦{Number((dashboardData.totalRevenue || 0) / Math.max(dashboardData.totalOrders || 0, 1)).toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -217,7 +217,7 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="drivers" className="space-y-4">
-          <DriverRevenueTable data={driverData} isLoading={driverLoading} />
+          <DriverRevenueTable data={driverData} isLoading={aggregatesLoading} />
         </TabsContent>
 
         <TabsContent value="delivery-fees" className="space-y-4">

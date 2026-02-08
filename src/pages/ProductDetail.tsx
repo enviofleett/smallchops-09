@@ -32,9 +32,6 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { useProductRatings } from '@/hooks/useProductRatings';
-import { RatingSummaryComponent } from '@/components/product/RatingSummary';
-import { ReviewsList } from '@/components/product/ReviewsList';
-import { ReviewForm } from '@/components/product/ReviewForm';
 import { useProductFavorite } from '@/hooks/useProductFavorite';
 import { WhatsAppSupportWidget } from '@/components/ui/WhatsAppSupportWidget';
 import { PriceDisplay } from '@/components/ui/price-display';
@@ -303,11 +300,13 @@ const ProductDetail = () => {
     const promotion = product.active_promotion;
     if (promotion.type === 'percentage') {
       return `${promotion.value}% OFF`;
-    } else if (promotion.type === 'fixed_amount') {
+    } else if (promotion.type === 'fixed') {
       return `₦${promotion.value} OFF`;
-    } else if (promotion.type === 'free_delivery') {
-      return 'FREE DELIVERY';
     }
+    // Free delivery not currently supported in types
+    // else if (promotion.type === 'free_delivery') {
+    //   return 'FREE DELIVERY';
+    // }
     return 'SPECIAL OFFER';
   };
 
@@ -578,40 +577,7 @@ const ProductDetail = () => {
           </div>
         </div>
 
-        {/* Reviews Section */}
-        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl sm:text-2xl font-bold">Customer Reviews</h3>
-          </div>
-
-          {/* Rating Summary */}
-          <ResponsiveCard>
-            {productRatings.ratingSummary ? (
-              <RatingSummaryComponent summary={productRatings.ratingSummary} />
-            ) : (
-              <div className="text-center py-6 sm:py-8">
-                <p className="text-muted-foreground text-sm sm:text-base">No ratings yet</p>
-              </div>
-            )}
-          </ResponsiveCard>
-
-          {/* Review Form */}
-          <ResponsiveCard title="Write a Review">
-            <ReviewForm
-              onSubmit={() => {}}
-              isSubmitting={false}
-            />
-          </ResponsiveCard>
-
-          {/* Reviews List */}
-          <ResponsiveCard title="All Reviews">
-            <ReviewsList
-              reviews={productRatings.reviews || []}
-              onToggleHelpfulness={() => {}}
-              isUpdatingHelpfulness={false}
-            />
-          </ResponsiveCard>
-        </div>
+        {/* Reviews Section Removed */}
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (

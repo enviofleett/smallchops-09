@@ -3,11 +3,12 @@ import { OrderWithItems, updateOrder, manuallyQueueCommunicationEvent } from '@/
 import { getDispatchRiders, DispatchRider } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { AdaptiveDialog } from '@/components/layout/AdaptiveDialog';
-import { X, FileText, Download, Printer, ExternalLink, Clock } from 'lucide-react';
+import { X, FileText, Download, Printer, ExternalLink, Clock, RefreshCw } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useCart } from '@/hooks/useCart';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,6 +49,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { addItem, clearCart } = useCart();
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(order.status);
   const [assignedRider, setAssignedRider] = useState<string | null>(order.assigned_rider_id);
@@ -287,6 +289,43 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     }
   };
 
+  // Buy Again handler
+  const handleBuyAgain = () => {
+    clearCart();
+
+    let itemsAdded = 0;
+    const items = detailedOrderData?.items || enrichedItems || order.order_items || [];
+    
+    if (items.length > 0) {
+      items.forEach((item: any) => {
+        addItem({
+          id: item.product_id,
+          name: item.product_name || item.product?.name || 'Unknown Product',
+          price: item.unit_price,
+          original_price: item.unit_price,
+          image_url: item.product?.image_url,
+          customizations: item.customizations,
+        }, item.quantity);
+        itemsAdded++;
+      });
+    }
+
+    if (itemsAdded > 0) {
+      toast({
+        title: "Cart Updated",
+        description: "Items from previous order added to cart",
+      });
+      onClose();
+      navigate('/checkout');
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not add items to cart",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Export handlers
   const handleExportPDF = () => {
     const exportData = {
@@ -479,11 +518,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowDataSources(true)}
+                  onClick={handleBuyAgain}
                   className="flex items-center gap-2"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  Data Sources
+                  <RefreshCw className="w-4 h-4" />
+                  Buy Again
                 </Button>
                 <Button
                   variant="outline"

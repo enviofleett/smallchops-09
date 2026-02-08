@@ -4,13 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Calendar, Download, Package, Eye } from 'lucide-react';
+import { Search, Calendar, Download, Package, Eye, RefreshCw } from 'lucide-react';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { getCustomerOrderHistory, PurchaseHistoryFilters } from '@/api/purchaseHistory';
 import { OrderWithItems } from '@/api/orders';
 import { useToast } from '@/hooks/use-toast';
 import { useCustomerReceiptPDF } from '@/hooks/useCustomerReceiptPDF';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { useCart } from '@/hooks/useCart';
+import { useNavigate } from 'react-router-dom';
 
 interface OrderHistoryTabProps {
   customerEmail: string;
@@ -18,6 +20,8 @@ interface OrderHistoryTabProps {
 
 export function OrderHistoryTab({ customerEmail }: OrderHistoryTabProps) {
   const { toast } = useToast();
+  const { addItem, clearCart } = useCart();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -74,6 +78,39 @@ export function OrderHistoryTab({ customerEmail }: OrderHistoryTabProps) {
       case 'ready': return 'bg-purple-100 text-purple-800';
       case 'out_for_delivery': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleBuyAgain = (order: OrderWithItems) => {
+    clearCart();
+    
+    let itemsAdded = 0;
+    if (order.order_items && order.order_items.length > 0) {
+      order.order_items.forEach(item => {
+        addItem({
+          id: item.product_id,
+          name: item.product_name || item.product?.name || 'Unknown Product',
+          price: item.unit_price,
+          original_price: item.unit_price,
+          image_url: item.product?.image_url,
+          customizations: item.customizations,
+        }, item.quantity);
+        itemsAdded++;
+      });
+    }
+
+    if (itemsAdded > 0) {
+      toast({
+        title: "Cart Updated",
+        description: "Items from previous order added to cart",
+      });
+      navigate('/checkout');
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not add items to cart",
+        variant: "destructive"
+      });
     }
   };
 
@@ -180,6 +217,16 @@ export function OrderHistoryTab({ customerEmail }: OrderHistoryTabProps) {
                   </div>
                   
                   <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBuyAgain(order)}
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Buy Again
+                    </Button>
+                    
                     <Button
                       variant="outline"
                       size="sm"

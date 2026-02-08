@@ -21,7 +21,7 @@ import { SafeUnifiedDeliveryManagement } from '@/components/admin/delivery/SafeU
 import { DriverPerformanceDashboard } from '@/components/admin/delivery/DriverPerformanceDashboard';
 import { DriverRevenueTable } from '@/components/reports/advanced/DriverRevenueTable';
 import { DeliveryFeesTable } from '@/components/reports/advanced/DeliveryFeesTable';
-import { useDriverRevenue } from '@/hooks/useAdvancedReports';
+import { useDashboardAggregates } from '@/hooks/useDashboardAggregates';
 import { usePaidOrders } from '@/hooks/usePaidOrders';
 import { useOrderFilters } from '@/hooks/useOrderFilters';
 import { DeliveryRouteManager } from '@/components/delivery/DeliveryRouteManager';
@@ -92,10 +92,8 @@ export default function AdminDelivery() {
   });
 
   // Fetch driver revenue data for reports tab
-  const {
-    data: driverData,
-    isLoading: driverLoading
-  } = useDriverRevenue(validStartDate, validEndDate, interval);
+  const { data: aggregates, isLoading: aggregatesLoading } = useDashboardAggregates(validStartDate, validEndDate, interval);
+  const driverData = aggregates?.driverRevenue;
 
   // Ready Orders and Schedules
   const readyOrdersBasic = useMemo(() => deliveryOrders.filter(order => order.status === 'ready'), [deliveryOrders]);
@@ -305,6 +303,52 @@ export default function AdminDelivery() {
             </div>}
         </div>
 
+        {/* Overdue & Efficiency Overview */}
+        {(activeTab === 'drivers' || activeTab === 'zones' || activeTab === 'driver-revenue' || activeTab === 'delivery-fees') && aggregates && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <Card>
+               <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                 <CardTitle className="text-sm font-medium">Overdue Orders</CardTitle>
+                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+               </CardHeader>
+               <CardContent>
+                 <div className="text-2xl font-bold">{aggregates.overdueStats?.total_overdue || 0}</div>
+                 <div className="flex gap-2 text-xs text-muted-foreground mt-1">
+                   <span className="text-red-500 font-medium">{aggregates.overdueStats?.critical || 0} Critical</span>
+                   <span>•</span>
+                   <span className="text-orange-500 font-medium">{aggregates.overdueStats?.moderate || 0} Moderate</span>
+                 </div>
+               </CardContent>
+             </Card>
+             <Card>
+               <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                 <CardTitle className="text-sm font-medium">Avg Delivery Time</CardTitle>
+                 <Clock className="h-4 w-4 text-muted-foreground" />
+               </CardHeader>
+               <CardContent>
+                 <div className="text-2xl font-bold">{aggregates.efficiencyStats?.average_delivery_time_minutes?.toFixed(1) || 0} min</div>
+                 <p className="text-xs text-muted-foreground">
+                    Based on {aggregates.efficiencyStats?.orders_per_driver_avg ? 'recent' : 'no'} data
+                 </p>
+               </CardContent>
+             </Card>
+             <Card>
+               <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                 <CardTitle className="text-sm font-medium">Top Zone</CardTitle>
+                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
+               </CardHeader>
+               <CardContent>
+                 <div className="text-2xl font-bold truncate">
+                    {aggregates.zoneBreakdown?.[0]?.zone_name || 'N/A'}
+                 </div>
+                 <p className="text-xs text-muted-foreground">
+                    {aggregates.zoneBreakdown?.[0]?.total_orders || 0} orders
+                 </p>
+               </CardContent>
+             </Card>
+          </div>
+        )}
+
         {/* Error Banner */}
         {ordersError && <ErrorBanner icon={<AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />} title="Failed to load orders data" description={ordersError instanceof Error ? ordersError.message : 'Unknown error occurred'} color="destructive" />}
 
@@ -361,12 +405,19 @@ export default function AdminDelivery() {
 
           {/* Driver Revenue Tab */}
           <TabsContent value="driver-revenue" className="space-y-4">
-            <DriverRevenueTable data={driverData} isLoading={driverLoading} />
+            <DriverRevenueTable data={driverData} isLoading={aggregatesLoading} />
           </TabsContent>
 
           {/* Delivery Fees Tab */}
           <TabsContent value="delivery-fees" className="space-y-4">
-            <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} />
+            <DeliveryFeesTable 
+              startDate={validStartDate} 
+              endDate={validEndDate} 
+              interval={interval} 
+              zoneBreakdown={aggregates?.zoneBreakdown}
+              driverRevenue={aggregates?.driverRevenue}
+              isLoading={aggregatesLoading}
+            />
           </TabsContent>
         </Tabs>
 

@@ -38,72 +38,84 @@ export const ProductMOQIndicator = ({
   const statusColor = getStatusColor();
 
   return (
-    <div className={cn(
-      "rounded-md border bg-card p-3 w-[70%]",
-      "border-l-4",
-      {
-        "border-l-green-500 bg-green-50/30 border-green-200": statusColor === 'success',
-        "border-l-amber-500 bg-amber-50/30 border-amber-200": statusColor === 'warning',
-        "border-l-red-500 bg-red-50/30 border-red-200": statusColor === 'destructive'
-      },
-      className
-    )}>
-      {/* Compact Header with Status */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "p-1 rounded",
-            {
-              "bg-green-100 text-green-600": statusColor === 'success',
-              "bg-amber-100 text-amber-600": statusColor === 'warning',
-              "bg-red-100 text-red-600": statusColor === 'destructive'
-            }
-          )}>
-            <ShoppingCart className="h-3 w-3" />
+    <div
+      className={cn(
+        "rounded-lg border bg-card/80 p-3 sm:p-4 w-full max-w-md",
+        {
+          "border-green-200 bg-green-50/60": statusColor === 'success',
+          "border-amber-200 bg-amber-50/60": statusColor === 'warning',
+          "border-red-200 bg-red-50/60": statusColor === 'destructive'
+        },
+        className
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div
+            className={cn(
+              "h-8 w-8 rounded-full flex items-center justify-center",
+              {
+                "bg-green-100 text-green-600": statusColor === 'success',
+                "bg-amber-100 text-amber-600": statusColor === 'warning',
+                "bg-red-100 text-red-600": statusColor === 'destructive'
+              }
+            )}
+          >
+            <ShoppingCart className="h-4 w-4" />
           </div>
-          <span className="text-xs font-medium text-muted-foreground">
-            Min Order: {minimumOrderQuantity} units
-          </span>
+          <div>
+            <p className="text-xs font-semibold text-foreground">
+              Minimum order: {minimumOrderQuantity} units
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Order at least this quantity to complete checkout
+            </p>
+          </div>
         </div>
-        
-        <span className="text-xs font-semibold text-foreground">
-          {formatCurrency(minimumCost)}
-        </span>
+
+        <div className="text-right">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            MOQ total
+          </div>
+          <div className="text-sm font-semibold text-foreground">
+            {formatCurrency(minimumCost)}
+          </div>
+        </div>
       </div>
 
-      {/* Compact Status Bar */}
-      <div className="space-y-1.5">
+      <div className="mt-3 space-y-1.5">
         {currentCartQuantity > 0 && (
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">In Cart:</span>
-            <span className={cn(
-              "font-medium",
-              {
-                "text-green-600": statusColor === 'success',
-                "text-amber-600": statusColor === 'warning', 
-                "text-red-600": statusColor === 'destructive'
-              }
-            )}>
+          <div className="flex items-center justify-between text-[11px] sm:text-xs">
+            <span className="text-muted-foreground">In cart</span>
+            <span
+              className={cn(
+                "font-medium",
+                {
+                  "text-green-600": statusColor === 'success',
+                  "text-amber-600": statusColor === 'warning',
+                  "text-red-600": statusColor === 'destructive'
+                }
+              )}
+            >
               {currentCartQuantity} / {minimumOrderQuantity}
             </span>
           </div>
         )}
 
-        {/* Single Status Message */}
         {!isStockSufficient ? (
-          <div className="flex items-center gap-1.5 p-1.5 rounded bg-red-100 text-red-700 text-xs">
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-full bg-red-100 text-red-700 text-[11px] sm:text-xs">
             <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-            <span>Insufficient stock</span>
+            <span>Insufficient stock for the minimum order</span>
           </div>
         ) : !isCurrentlyMet ? (
-          <div className="flex items-center justify-between p-1.5 rounded bg-amber-100 text-amber-700 text-xs">
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-full bg-amber-100 text-amber-700 text-[11px] sm:text-xs">
             <span>Need {shortfall} more</span>
             <span className="font-medium">+{formatCurrency(shortfall * price)}</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 p-1.5 rounded bg-green-100 text-green-600 text-xs">
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-full bg-green-100 text-green-600 text-[11px] sm:text-xs">
             <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-            <span>Requirement met</span>
+            <span>MOQ requirement met</span>
           </div>
         )}
       </div>

@@ -1,7 +1,7 @@
 import React, { useState, memo, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Star, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toImagesArray } from '@/lib/imageUtils';
@@ -31,11 +31,6 @@ const MemoizedProductCard = memo(({
   onAddToCart,
   navigate
 }: any) => {
-  const renderStars = (rating: number) => {
-    return Array.from({
-      length: 5
-    }, (_, i) => <Star key={i} className={`w-4 h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />);
-  };
   const moq = product.minimum_order_quantity || 1;
   return <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/product/${product.id}`)}>
       <div className="relative">
@@ -51,10 +46,6 @@ const MemoizedProductCard = memo(({
       </div>
       <CardContent className="p-2 sm:p-3 lg:p-4">
         <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
-        <div className="flex items-center space-x-1 mb-1 sm:mb-2">
-          {renderStars(4)}
-          <span className="text-xs text-gray-500">(0)</span>
-        </div>
         <div className="flex items-center justify-between">
           <PriceDisplay originalPrice={product.price} discountedPrice={product.discounted_price} hasDiscount={(product.discount_percentage || 0) > 0} size="sm" />
           <Button size="sm" onClick={e => {
@@ -257,11 +248,6 @@ const PublicHome = () => {
       });
     }
   }, [addItem, toast]);
-  const renderStars = React.useCallback((rating: number) => {
-    return Array.from({
-      length: 5
-    }, (_, i) => <Star key={i} className={`w-4 h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />);
-  }, []);
   return <>
       <SEOHead title="Starters - Premium Food Delivery" description="Order delicious food from Starters. Fresh ingredients, fast delivery, and amazing taste delivered to your door." keywords="food delivery, restaurant, online ordering, fast food, delivery service, starters" type="website" />
     <div className="min-h-screen bg-white">

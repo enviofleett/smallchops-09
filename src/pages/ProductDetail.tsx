@@ -390,16 +390,7 @@ const ProductDetail = () => {
           {/* Product Details */}
           <div className="space-y-4 sm:space-y-5 lg:space-y-6">
             <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 leading-tight">{product.name}</h1>
-              <div className="flex items-center gap-3 sm:gap-4 mb-4 flex-wrap">
-                <StarRating 
-                  rating={productRatings?.ratingSummary?.average_rating || 0} 
-                  size="md"
-                />
-                <span className="text-xs sm:text-sm text-muted-foreground">
-                  ({productRatings?.ratingSummary?.total_reviews || 0} review{productRatings?.ratingSummary?.total_reviews !== 1 ? 's' : ''})
-                </span>
-              </div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-4 leading-tight">{product.name}</h1>
             </div>
 
             {/* Promotion Banner */}

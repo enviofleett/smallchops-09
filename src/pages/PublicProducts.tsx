@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Star, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toImagesArray } from '@/lib/imageUtils';
@@ -16,10 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { FavoriteButton } from '@/components/ui/favorite-button';
-import { StarRating } from '@/components/ui/star-rating';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useCustomerFavorites, useFavoritesByProducts } from '@/hooks/useCustomerFavorites';
-import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import ProductsFilters, { FilterState } from '@/components/products/ProductsFilters';
 import { MOQBadge } from '@/components/ui/moq-badge';
@@ -177,26 +175,6 @@ const PublicProducts = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const ProductRatingDisplay = ({ productId }: { productId: string }) => {
-    const { data: ratingSummary } = useProductRatingSummary(productId);
-    
-    if (!ratingSummary || ratingSummary.total_reviews === 0) {
-      return (
-        <div className="flex items-center space-x-1">
-          <StarRating rating={0} size="sm" />
-          <span className="text-xs text-gray-500">(0)</span>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex items-center space-x-1">
-        <StarRating rating={ratingSummary.average_rating} size="sm" />
-        <span className="text-xs text-gray-500">({ratingSummary.total_reviews})</span>
-      </div>
-    );
   };
 
   return (
@@ -384,9 +362,6 @@ const PublicProducts = () => {
                               size="sm"
                               className="ml-2"
                             />
-                          </div>
-                          <div className="mb-1 sm:mb-2">
-                            <ProductRatingDisplay productId={product.id} />
                           </div>
                           <div className="flex items-center justify-between">
                             <PriceDisplay

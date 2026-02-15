@@ -14,8 +14,6 @@ import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { getCategories } from '@/api/categories';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
-import { StarRating } from '@/components/ui/star-rating';
-import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { CustomizationProvider, useCustomizationContext } from '@/context/CustomizationContext';
 import { CustomizationOrderBuilder } from '@/components/customization/CustomizationOrderBuilder';
 import { ShoppingCart } from 'lucide-react';
@@ -316,26 +314,6 @@ const CategoryProductsContent = () => {
     }
   };
 
-  const ProductRatingDisplay = ({ productId }: { productId: string }) => {
-    const { data: ratingSummary } = useProductRatingSummary(productId);
-    
-    if (!ratingSummary || ratingSummary.total_reviews === 0) {
-      return (
-        <div className="flex items-center space-x-1">
-          <StarRating rating={0} size="sm" />
-          <span className="text-xs text-muted-foreground">(0)</span>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex items-center space-x-1">
-        <StarRating rating={ratingSummary.average_rating} size="sm" />
-        <span className="text-xs text-muted-foreground">({ratingSummary.total_reviews})</span>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-white">
       <PublicHeader />
@@ -530,10 +508,7 @@ const CategoryProductsContent = () => {
                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 z-5" />
                        </div>
                        <CardContent className="p-2 sm:p-3 lg:p-4">
-                         <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
-                         <div className="mb-1 sm:mb-2">
-                           <ProductRatingDisplay productId={product.id} />
-                         </div>
+                         <h3 className="font-semibold mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
                          
                           {/* MOQ Requirements - Only for non-customization categories */}
                           {!isCustomizationCategory && product.minimum_order_quantity && product.minimum_order_quantity > 1 && (

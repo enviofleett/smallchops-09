@@ -4,8 +4,6 @@ import { ShoppingCart, Heart, Star } from 'lucide-react';
 import { ProductWithDiscount } from '@/lib/discountCalculations';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
-import { StarRating } from '@/components/ui/star-rating';
-import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { toImagesArray } from '@/lib/imageUtils';
 import { MOQBadge } from '@/components/ui/moq-badge';
@@ -25,7 +23,6 @@ export function DiscountedProductCard({
   isFavorite = false,
   showAddToCart = true
 }: DiscountedProductCardProps) {
-  const { data: ratingSummary } = useProductRatingSummary(product.id);
   return (
     <Card className="h-full flex flex-col hover:shadow-lg transition-all duration-200 group relative overflow-hidden">
       {/* Discount Badge */}
@@ -85,21 +82,6 @@ export function DiscountedProductCard({
                 {product.description}
               </p>
             )}
-            
-            {/* Rating Display */}
-            <div className="mb-1">
-              {ratingSummary && ratingSummary.total_reviews > 0 ? (
-                <div className="flex items-center space-x-1">
-                  <StarRating rating={ratingSummary.average_rating} size="sm" />
-                  <span className="text-xs text-muted-foreground">({ratingSummary.total_reviews})</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1">
-                  <StarRating rating={0} size="sm" />
-                  <span className="text-xs text-muted-foreground">(0)</span>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Price Section */}

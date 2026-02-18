@@ -15,6 +15,7 @@ import { DeliveryFeesTable } from '@/components/reports/advanced/DeliveryFeesTab
 import {
   useDailyRevenue,
   useProductsSold,
+  useDriverRevenue,
 } from '@/hooks/useAdvancedReports';
 import { useDashboardAggregates } from '@/hooks/useDashboardAggregates';
 import { Card, CardContent } from '@/components/ui/card';
@@ -55,7 +56,7 @@ export default function Reports() {
   const { data: revenueData, isLoading: revenueLoading } = useDailyRevenue(validStartDate, validEndDate);
   const { data: productsData, isLoading: productsLoading } = useProductsSold(validStartDate, validEndDate, interval);
   const { data: aggregates, isLoading: aggregatesLoading } = useDashboardAggregates(validStartDate, validEndDate, interval);
-  const driverData = aggregates?.driverRevenue;
+  const { data: driverRevenueData, isLoading: driverLoading } = useDriverRevenue(validStartDate, validEndDate, interval);
   const dashboardData = aggregates?.stats;
 
   return (
@@ -217,11 +218,11 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="drivers" className="space-y-4">
-          <DriverRevenueTable data={driverData} isLoading={aggregatesLoading} />
+          <DriverRevenueTable data={driverRevenueData} isLoading={driverLoading} />
         </TabsContent>
 
         <TabsContent value="delivery-fees" className="space-y-4">
-          <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} zoneBreakdown={aggregates?.zoneBreakdown} driverRevenue={aggregates?.driverRevenue} isLoading={aggregatesLoading} />
+          <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} zoneBreakdown={aggregates?.zoneBreakdown} driverRevenue={driverRevenueData} isLoading={driverLoading} />
         </TabsContent>
       </Tabs>
     </div>

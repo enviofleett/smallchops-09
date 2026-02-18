@@ -221,7 +221,7 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="delivery-fees" className="space-y-4">
-          <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} />
+          <DeliveryFeesTable startDate={validStartDate} endDate={validEndDate} interval={interval} zoneBreakdown={aggregates?.zoneBreakdown} driverRevenue={aggregates?.driverRevenue} isLoading={aggregatesLoading} />
         </TabsContent>
       </Tabs>
     </div>

@@ -35,6 +35,31 @@ export const PRE_ORDER_CUTOFF_DAYS: string[] = [
 ];
 
 /**
+ * Delivery disabled dates - YYYY-MM-DD format (one-off dates)
+ * On these dates, only pickup is available. Delivery option is disabled.
+ */
+export const DELIVERY_DISABLED_DATES: string[] = [
+  '2026-02-20', // February 20th 2026 - Pickup only
+];
+
+/**
+ * Helper: Check if delivery is disabled on a given date
+ */
+export function isDeliveryDisabledOnDate(dateStr: string): boolean {
+  return DELIVERY_DISABLED_DATES.includes(dateStr);
+}
+
+/**
+ * Helper: Get reason delivery is disabled
+ */
+export function getDeliveryDisabledReason(dateStr: string): string {
+  const reasons: Record<string, string> = {
+    '2026-02-20': 'Delivery is not available on this date. Please select pickup.',
+  };
+  return reasons[dateStr] || 'Delivery is not available on this date';
+}
+
+/**
  * Helper: Get closure reason for a closed date
  */
 export function getClosureReason(monthDay: string): string {

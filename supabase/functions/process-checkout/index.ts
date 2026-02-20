@@ -21,6 +21,9 @@ const SPECIAL_OPENING_TIMES = [
 // Pre-order cutoff dates - MM-DD format (ordering closes at midnight)
 const PRE_ORDER_CUTOFF_DAYS = ['12-25'];
 
+// Delivery disabled dates - YYYY-MM-DD format (pickup only on these dates)
+const DELIVERY_DISABLED_DATES = ['2026-02-20'];
+
 // Exception validation helpers
 function validateDeliveryScheduleExceptions(
   deliveryDate: string, 
@@ -175,6 +178,14 @@ serve(async (req: Request) => {
     // Validate delivery/pickup time fields (CRITICAL for 1-hour window logic)
     if (fulfillment.type === 'delivery' && !delivery_schedule?.delivery_time_start) {
       throw new Error('Delivery time is required for delivery orders')
+    }
+
+    // 🔒 CRITICAL: Check if delivery is disabled on the selected date
+    if (fulfillment.type === 'delivery' && delivery_schedule?.delivery_date) {
+      if (DELIVERY_DISABLED_DATES.includes(delivery_schedule.delivery_date)) {
+        console.error(`❌ Delivery disabled on ${delivery_schedule.delivery_date}`)
+        throw new Error('Delivery is not available on this date. Please select pickup instead.')
+      }
     }
     if (fulfillment.type === 'pickup' && !delivery_schedule?.delivery_time_start) {
       throw new Error('Pickup time is required for pickup orders')

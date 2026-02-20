@@ -28,6 +28,7 @@ import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
 import { safeErrorMessage, normalizePaymentResponse } from '@/utils/errorHandling';
 import { validatePaymentFlow, formatDiagnosticResults } from '@/utils/paymentDiagnostics';
 import { cn } from "@/lib/utils";
+import { isDeliveryDisabledOnDate, getDeliveryDisabledReason } from "@/config/deliveryExceptions";
 import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
 import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
@@ -307,6 +308,23 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [handleClose]);
+
+  // Check if delivery is disabled for the selected date
+  const deliveryDisabledForDate = useMemo(() => {
+    if (!formData.delivery_date) return false;
+    return isDeliveryDisabledOnDate(formData.delivery_date);
+  }, [formData.delivery_date]);
+
+  // Auto-switch to pickup when delivery is disabled for selected date
+  useEffect(() => {
+    if (deliveryDisabledForDate && formData.fulfillment_type === 'delivery') {
+      setFormData(prev => ({ ...prev, fulfillment_type: 'pickup' }));
+      toast({
+        title: "Delivery Unavailable",
+        description: getDeliveryDisabledReason(formData.delivery_date!),
+      });
+    }
+  }, [deliveryDisabledForDate, formData.delivery_date]);
 
   // Handle fulfillment type changes and provide price feedback
   useEffect(() => {
@@ -926,26 +944,36 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               onValueChange={value => handleFormChange('fulfillment_type', value)} 
               className="grid grid-cols-1 md:grid-cols-2 gap-4"
             >
-              <div className="relative">
-                <RadioGroupItem value="delivery" id="delivery" className="peer sr-only" />
+              <div className={cn("relative", deliveryDisabledForDate && "opacity-50 pointer-events-none")}>
+                <RadioGroupItem value="delivery" id="delivery" className="peer sr-only" disabled={deliveryDisabledForDate} />
                 <Label 
                   htmlFor="delivery" 
                   className={cn(
-                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all duration-300",
-                    "hover:border-primary/30 hover:bg-accent/10 hover:shadow-md",
+                    "flex flex-col items-center justify-center p-6 border-2 rounded-lg transition-all duration-300",
+                    deliveryDisabledForDate 
+                      ? "cursor-not-allowed border-muted bg-muted/30" 
+                      : "cursor-pointer hover:border-primary/30 hover:bg-accent/10 hover:shadow-md",
                     "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-xl peer-checked:ring-4 peer-checked:ring-green-200 peer-checked:scale-[1.02]",
-                    formData.fulfillment_type === 'delivery' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200 scale-[1.02]"
+                    !deliveryDisabledForDate && formData.fulfillment_type === 'delivery' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200 scale-[1.02]"
                   )}
                 >
                   <Truck className="w-8 h-8 mb-3 text-primary" />
                   <span className="font-medium text-base">Delivery</span>
-                  <span className="text-sm text-muted-foreground text-center mt-1">
-                    We'll deliver to your address
-                  </span>
-                  {deliveryFee > 0 && (
-                    <span className="text-xs text-primary mt-2 font-medium">
-                      Fee: ₦{deliveryFee.toLocaleString()}
+                  {deliveryDisabledForDate ? (
+                    <span className="text-xs text-destructive mt-2 font-medium text-center">
+                      Not available on selected date
                     </span>
+                  ) : (
+                    <>
+                      <span className="text-sm text-muted-foreground text-center mt-1">
+                        We'll deliver to your address
+                      </span>
+                      {deliveryFee > 0 && (
+                        <span className="text-xs text-primary mt-2 font-medium">
+                          Fee: ₦{deliveryFee.toLocaleString()}
+                        </span>
+                      )}
+                    </>
                   )}
                 </Label>
               </div>

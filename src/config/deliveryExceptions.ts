@@ -39,7 +39,7 @@ export const PRE_ORDER_CUTOFF_DAYS: string[] = [
  * On these dates, only pickup is available. Delivery option is disabled.
  */
 export const DELIVERY_DISABLED_DATES: string[] = [
-  '2026-02-20', // February 20th 2026 - Pickup only
+  '2026-02-21', // February 21st 2026 - Pickup only
 ];
 
 /**
@@ -54,7 +54,7 @@ export function isDeliveryDisabledOnDate(dateStr: string): boolean {
  */
 export function getDeliveryDisabledReason(dateStr: string): string {
   const reasons: Record<string, string> = {
-    '2026-02-20': 'Delivery is not available on this date. Please select pickup.',
+    '2026-02-21': 'Delivery is not available on this date. Please select pickup.',
   };
   return reasons[dateStr] || 'Delivery is not available on this date';
 }

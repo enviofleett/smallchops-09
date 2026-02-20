@@ -22,7 +22,7 @@ const SPECIAL_OPENING_TIMES = [
 const PRE_ORDER_CUTOFF_DAYS = ['12-25'];
 
 // Delivery disabled dates - YYYY-MM-DD format (pickup only on these dates)
-const DELIVERY_DISABLED_DATES = ['2026-02-20'];
+const DELIVERY_DISABLED_DATES = ['2026-02-21'];
 
 // Exception validation helpers
 function validateDeliveryScheduleExceptions(

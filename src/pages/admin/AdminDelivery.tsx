@@ -456,7 +456,17 @@ function MetricCard({
     'green-500': 'bg-green-500/10 text-green-600'
   }[color] || color;
   return <Card className="overflow-hidden">
-      
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className={`p-2 rounded-lg ${colorClass}`}>
+            {icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{label}</p>
+            <p className="text-lg sm:text-2xl font-bold">{value}</p>
+          </div>
+        </div>
+      </CardContent>
     </Card>;
 }
 

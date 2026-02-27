@@ -11,7 +11,6 @@ export const useUnifiedAuth = () => {
   const { user, isAuthenticated, isLoading, userType, session } = useAuth();
   const { userRole, hasPermission: roleBasedPermission, canAssignRoles, canCreateUsers, isLoading: roleLoading } = useRoleBasedPermissions();
   const { data: dbPermissions, isLoading: permissionsLoading } = usePermissions();
-  const { toast } = useToast();
   
   // User type validation removed - was causing 401 errors due to edge function project mismatch
 

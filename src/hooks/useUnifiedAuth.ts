@@ -1,9 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRoleBasedPermissions, UserRole } from './useRoleBasedPermissions';
 import { usePermissions } from './usePermissions';
-import { useMemo, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useMemo } from 'react';
 
 /**
  * Unified authentication hook that consolidates all auth-related checks
@@ -15,51 +13,7 @@ export const useUnifiedAuth = () => {
   const { data: dbPermissions, isLoading: permissionsLoading } = usePermissions();
   const { toast } = useToast();
   
-  // ✅ FIX #1: PRODUCTION - Non-blocking user type validation
-  // CORS errors from Edge Function won't block admin login
-  useEffect(() => {
-    const validateUserType = async () => {
-      if (!user?.id || !session) return;
-      
-      try {
-        console.log('🔍 Running non-blocking user type validation...');
-        
-        const { data, error } = await supabase.functions.invoke('validate-user-type', {
-          body: { userId: user.id }
-        });
-        
-        if (error) {
-          // ✅ Just log, don't block
-          console.warn('⚠️ User type validation failed (non-blocking):', error.message);
-          return;
-        }
-        
-        if (data?.violation) {
-          // ✅ Log security violation but don't block login
-          console.warn('⚠️ User type violation detected:', data);
-          
-          try {
-            await supabase.rpc('log_privilege_escalation_attempt', {
-              p_user_id: user.id,
-              p_email: user.email || '',
-              p_violation_type: 'dual_type_detected',
-              p_details: data
-            });
-          } catch (logError) {
-            console.warn('Failed to log violation:', logError);
-          }
-        }
-      } catch (err) {
-        // ✅ Catch all errors, never block login
-        console.warn('⚠️ User type validation error (non-blocking):', err);
-      }
-    };
-
-    // Run validation but don't await it (fire and forget)
-    if (isAuthenticated && !isLoading && user?.id) {
-      validateUserType();
-    }
-  }, [user?.id, session, isAuthenticated, isLoading]);
+  // User type validation removed - was causing 401 errors due to edge function project mismatch
 
   // Consolidate loading states
   const isAuthLoading = isLoading || permissionsLoading || roleLoading;

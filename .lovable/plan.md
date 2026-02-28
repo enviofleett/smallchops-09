@@ -1,108 +1,176 @@
 
 
-# Edge Function Redundancy Analysis
+# Admin Create Order for Customers
 
 ## Overview
 
-Your project has **133 edge functions** deployed. After cross-referencing each function against frontend invocations and inter-function dependencies, here is the breakdown.
+Build an "Admin Create Order" feature that reuses the exact storefront checkout experience, then generates a **Paystack Dedicated Virtual Account (DVA)** for the customer to pay via bank transfer, and emails the order details + virtual account info. Admins can also download a PDF of the created order.
 
-## Category 1: SAFE TO DELETE -- Test/Debug/One-off Utilities (18 functions)
+## How It Works (End-to-End Flow)
 
-These are test harnesses, debug tools, one-off migration scripts, or emergency fixes that serve no ongoing production purpose:
+```text
+Admin clicks "Create Order" on /admin/orders
+        |
+        v
+Full-screen dialog opens with the SAME checkout UI
+(product selection from catalog, delivery scheduler,
+ fulfillment type, customer info, order summary)
+        |
+        v
+Admin submits -> Edge function creates order
+with payment_status = "pending" and payment_method = "bank_transfer"
+        |
+        v
+Edge function calls Paystack "Create Dedicated Virtual Account"
+API to generate a temporary NUBAN for this customer
+        |
+        v
+System sends email to customer with:
+  - Full order details (items, totals, delivery schedule)
+  - Virtual account number, bank name, account name
+  - Payment instructions and expiry info
+        |
+        v
+Admin sees confirmation with option to download PDF
+(PDF includes order details + virtual account info)
+        |
+        v
+When customer pays via bank transfer, Paystack webhook
+(already exists) confirms payment and updates order status
+```
 
-| Function | Reason Safe to Remove |
-|---|---|
-| `testing-automation` | E2E/performance/security test harness -- dev-only |
-| `production-audit-fix` | One-off audit/fix script |
-| `production-deployment-check` | One-off pre-deploy checker |
-| `production-environment-setup` | One-off setup utility (invoked from PaystackProductionStatus admin panel only) |
-| `production-environment-validator` | One-off validator -- not invoked from frontend |
-| `production-monitoring-alerts` | Not invoked from frontend |
-| `production-customer-system-monitor` | Not invoked from frontend |
-| `test-promotion-system` | Test-only |
-| `backfill-missing-schedules` | One-off data migration |
-| `payment-recovery-migration` | One-off migration (only used in dev test utility) |
-| `emergency-payment-fix` | One-off emergency fix |
-| `emergency-payment-reconciliation` | One-off reconciliation |
-| `paystack-webhook-test` | Test webhook simulator |
-| `seed-admin-users` | One-off seeder |
-| `reset-admin-passwords` | One-off admin password reset |
-| `log-registration-debug` | Debug logging only |
-| `email-template-checker` | Not invoked from frontend |
-| `email-queue-cleanup-stale` | Listed in DELETED_FUNCTIONS_LOG as already deleted, but file still exists |
+## Technical Implementation
 
-## Category 2: SAFE TO DELETE -- Redundant/Superseded (16 functions)
+### 1. New Edge Function: `admin-create-order`
 
-These overlap with consolidated functions (`email-core`, `unified-smtp-sender`, `unified-email-queue-processor`):
+**File:** `supabase/functions/admin-create-order/index.ts`
 
-| Function | Superseded By |
-|---|---|
-| `email-queue-processor` | `unified-email-queue-processor` |
-| `email-queue-processor-cron` | `unified-email-queue-processor` (also listed as deleted in log) |
-| `email-cron-automation` | `email-core` + `unified-email-queue-processor` |
-| `email-cleanup-scheduler` | `email-queue-cleanup` handles this |
-| `email-automation-trigger` | `email-core` |
-| `email-trigger-manager` | `email-core` |
-| `instant-email-processor` | `unified-email-queue-processor` (many UI references, but can be redirected) |
-| `enhanced-email-retry` | `unified-email-queue-processor` handles retries |
-| `enhanced-email-rate-limiter` | Only used in EmailTestingSimulation admin component |
-| `fix-email-template-keys` | One-off fix, listed as deleted but file still exists |
-| `supabase-auth-email-sender` | `unified-smtp-sender` |
-| `clear-email-queue` | `email-queue-cleanup` |
-| `email-service-core` | `email-core` (duplicate naming pattern) |
-| `smtp-health-check` | `smtp-health-monitor` and `smtp-auth-healthcheck` cover this |
-| `paystack-batch-verifier` | `paystack-batch-verify` (duplicate) |
-| `validate-user-type` | No longer called after recent fix |
+- Requires admin authentication (same pattern as `admin-orders-manager`)
+- Accepts the same payload structure as `process-checkout` but with an additional `created_by_admin: true` flag
+- Creates order in DB with `payment_method: 'bank_transfer'`, `payment_status: 'pending'`
+- Calls Paystack Dedicated Virtual Account API:
+  ```
+  POST https://api.paystack.co/dedicated_account
+  Body: { customer: <customer_id_or_code>, preferred_bank: "wema-bank" }
+  ```
+- First creates/fetches the Paystack customer using `POST https://api.paystack.co/customer` with the customer's email, name, and phone
+- Stores the virtual account details (account_number, bank_name, account_name) in a new `order_payment_accounts` table
+- Queues an email via `communication_events` with template `admin_order_invoice` containing order details + payment account info
+- Returns order + virtual account details to the admin UI
 
-## Category 3: SAFE TO DELETE -- Redundant Monitoring/Health (10 functions)
+### 2. New Database Table: `order_payment_accounts`
 
-Multiple overlapping health/monitoring functions:
+Stores temporary virtual account details for admin-created orders:
 
-| Function | Overlap With |
-|---|---|
-| `advanced-security-monitor` | `security-monitor` + `security-monitor-alerts` |
-| `security-monitoring` | `security-monitor` + `security-monitor-alerts` |
-| `payment-health-check` | `payment-health-diagnostic` |
-| `paystack-health` | `paystack-health-monitor` |
-| `paystack-production-config` | `production-paystack-setup` |
-| `email-health-monitor` | `email-production-monitor` + `email-delivery-monitor` |
-| `production-health-check` | `production-deployment-check` (both removable) |
-| `enhanced-payment-polling` | `verify-payment` already handles polling |
-| `enhanced-payment-templates` | Payment templates stored in DB |
-| `payment-analytics` | `dashboard-aggregates` covers analytics |
+```sql
+CREATE TABLE public.order_payment_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  account_number TEXT NOT NULL,
+  bank_name TEXT NOT NULL,
+  account_name TEXT NOT NULL,
+  provider TEXT NOT NULL DEFAULT 'paystack',
+  provider_reference TEXT,
+  expires_at TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(order_id)
+);
 
-## Category 4: KEEP -- Actively Used in Production (remaining ~89 functions)
+ALTER TABLE public.order_payment_accounts ENABLE ROW LEVEL SECURITY;
 
-Core functions that are actively invoked from the frontend for live features:
+-- Admin-only access
+CREATE POLICY "Admins can manage payment accounts"
+  ON public.order_payment_accounts FOR ALL
+  TO authenticated
+  USING (is_admin_user(auth.uid()));
 
-- **Payment**: `process-checkout`, `verify-payment`, `paystack-secure`, `paystack-webhook`, `paystack-webhook-secure`, `paystack-banks`, `paystack-health-monitor`, `secure-payment-processor`, `payment-callback`, `payment-environment-manager`, `payment-health-diagnostic`, `payment-integration`, `payment-reconcile`, `payment-recovery`, `payment-timeout-handler`, `refund-management`, `production-paystack-setup`
-- **Email**: `email-core`, `unified-smtp-sender`, `unified-email-queue-processor`, `email-delivery-monitor`, `email-production-monitor`, `email-template-seeder`, `email-template-generator`, `email-queue-cleanup`, `email-compliance-manager`, `bounce-complaint-processor`, `welcome-series-processor`, `customer-welcome-processor`, `send-delivery-notification`, `send-out-for-delivery-email`, `unsubscribe-email`, `smtp-auth-healthcheck`, `smtp-health-monitor`
-- **Auth/Users**: `auth-register`, `auth-profile`, `auth-verify-otp`, `auth-security-validator`, `customer-auth-register`, `customer-otp-verification`, `secure-customer-auth`, `finalize-customer-registration`, `check-otp-rate-limit`, `role-management`, `role-management-v2`, `admin-user-creator`, `admin-management`, `admin-password-reset`, `admin-security-lockdown`
-- **Orders/Business**: `admin-orders-manager`, `admin-order-notification`, `process-order-with-promotions`, `business-settings`, `calculate-vat-breakdown`, `validate-moq-requirements`, `validate-promotion-code`, `validate-promotion-day`, `track-promotion-usage`, `promotion-analytics`, `check-promotion-alerts`, `shipping-fees-report`, `shipping-integration`
-- **Public API**: `public-api`, `public-about-api`, `public-blog-api`, `get-products-by-category`, `get-promotional-products`, `get-public-categories`, `get-public-products`
-- **Other**: `dashboard-aggregates`, `delivery-availability`, `delivery-booking`, `delivery-schedule-health`, `recover-order-schedule`, `sms-service`, `cart-abandonment-processor`, `track-cart-session`, `customer-experience-manager`, `user-journey-automation`, `review-request-processor`, `process-communication-events-enhanced`, `upload-hero-image`, `upload-logo`, `upload-product-image`, `validate-logo`, `check_upload_rate_limit`, `reports`, `analytics-dashboard`, `security-monitor`, `security-monitor-alerts`
+-- Service role access for webhooks
+CREATE POLICY "Service role full access"
+  ON public.order_payment_accounts FOR ALL
+  TO service_role
+  USING (true);
+```
 
-## Summary
+### 3. New Email Template: `admin_order_invoice`
 
-| Category | Count | Action |
+Seed into `enhanced_email_templates` table:
+
+- Subject: "Order {{order_number}} - Payment Required"
+- Body includes: order items table, totals, delivery schedule, virtual account details (account number, bank name, account name), payment instructions, expiry notice
+
+### 4. New Admin UI Component: `AdminCreateOrderDialog`
+
+**File:** `src/components/admin/AdminCreateOrderDialog.tsx`
+
+This is a full-screen dialog that reuses the EXACT storefront components:
+
+- **Product Selection Step**: Fetch products from the catalog, let admin add items to a temporary cart with quantities (reuse existing product cards/list)
+- **Customer Info Step**: Admin enters customer name, email, phone (or searches existing customers)
+- **Fulfillment Step**: Reuses `DeliveryScheduler`, `DeliveryZoneDropdown`, `PickupPointSelector` -- identical to storefront
+- **Order Summary Step**: Reuses `OrderSummaryCard` component showing items, subtotal, delivery fee, total
+- **Confirmation Step**: Shows order created successfully with virtual account details and "Download PDF" button
+
+Key reused components (100% same as storefront):
+- `DeliveryScheduler` (date/time selection)
+- `DeliveryZoneDropdown` (delivery zone + fee calculation)
+- `PickupPointSelector` (pickup locations)
+- `OrderSummaryCard` (order totals display)
+- Same validation logic (`validateCheckoutForm`)
+- Same fulfillment type radio group (delivery vs pickup)
+
+### 5. Enhanced PDF: `generateAdminOrderPDF`
+
+**File:** `src/utils/adminOrderPDF.ts`
+
+Extends the existing `customerReceiptPDF.ts` to include:
+- All existing receipt content (logo, items, totals, customer info)
+- New section: "Payment Instructions" with virtual account details
+- New section: "Payment Deadline" with expiry info
+- "Created by Admin" watermark/badge
+- Can be downloaded from both the create dialog and the order details page
+
+### 6. Wire into Admin Orders Page
+
+**File:** `src/pages/admin/AdminOrders.tsx`
+
+- The existing `Plus` icon button (already imported) opens the `AdminCreateOrderDialog`
+- After order creation, auto-refresh the orders list
+- Add "Download Invoice PDF" action to existing order cards/details for admin-created orders
+
+### 7. Webhook Integration (Existing)
+
+The existing `paystack-webhook` / `paystack-webhook-secure` functions already handle `charge.success` events. When a customer pays via the virtual account (bank transfer), Paystack sends a webhook that updates the order's `payment_status` to `paid` -- no changes needed here.
+
+## Component Reuse Summary
+
+| Storefront Component | Reused in Admin? | Notes |
 |---|---|---|
-| Test/Debug/One-off | 18 | Delete |
-| Redundant/Superseded | 16 | Delete |
-| Redundant Monitoring | 10 | Delete |
-| **Total Removable** | **44** | **Delete safely** |
-| Keep (Active Production) | ~89 | No change |
+| `DeliveryScheduler` | Yes, 100% | Same date/time picker |
+| `DeliveryZoneDropdown` | Yes, 100% | Same zone selection |
+| `PickupPointSelector` | Yes, 100% | Same pickup points |
+| `OrderSummaryCard` | Yes, 100% | Same totals display |
+| `validateCheckoutForm` | Yes, 100% | Same validation rules |
+| Fulfillment type radio | Yes, 100% | Same delivery/pickup choice |
+| MOQ validation | Yes, 100% | Same minimum order checks |
 
-## Recommended Implementation Approach
+## Files to Create/Modify
 
-1. Delete the 18 test/debug/one-off functions first (zero risk to production)
-2. Delete the 16 superseded email/payment functions, updating the ~5 admin UI components that reference them to use the consolidated function names instead
-3. Delete the 10 redundant monitoring functions, keeping only one health monitor per domain (email, payment, security)
-4. Update `supabase/config.toml` to remove entries for deleted functions
+| Action | File |
+|---|---|
+| Create | `supabase/functions/admin-create-order/index.ts` |
+| Create | `src/components/admin/AdminCreateOrderDialog.tsx` |
+| Create | `src/utils/adminOrderPDF.ts` |
+| Migration | New `order_payment_accounts` table |
+| Seed | `admin_order_invoice` email template |
+| Modify | `src/pages/admin/AdminOrders.tsx` (add create button handler) |
+| Modify | `src/components/admin/EnhancedOrderCard.tsx` (add PDF download for admin orders) |
 
-## Risk Notes
+## Paystack DVA Requirements
 
-- `instant-email-processor` is referenced in ~6 admin UI components. Before deleting it, those references should be updated to call `unified-email-queue-processor` instead.
-- `email-service-core` is used by `src/utils/emailOperations.ts` -- redirect to `email-core`.
-- `production-paystack-setup` is actively used by `PaystackSetup.tsx` -- keep this one.
-- `paystack-debug` is used by `src/lib/paystackDebug.ts` -- useful for debugging but could be removed if you want to minimize; recommend keeping for now.
+- Uses the existing `PAYSTACK_SECRET_KEY` secret (already configured)
+- Paystack DVA is available for Nigerian merchants on the Business plan
+- The API creates a NUBAN (Nigerian Uniform Bank Account Number) on Wema Bank or Titan by default
+- Customer must have: email (required), first_name, last_name, phone (recommended for validation)
+- The virtual account persists until deactivated -- payment is matched automatically via the webhook
 

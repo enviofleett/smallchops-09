@@ -3,23 +3,11 @@ project_id = "viafrwswgzxedelsceha"
 [functions.validate-moq-requirements]
 verify_jwt = false
 
-[functions.email-queue-processor-cron]
-verify_jwt = false
-
 [functions.process-communication-events-enhanced]
 verify_jwt = false
 
 [functions.unified-smtp-sender]
 verify_jwt = false
 
-[functions.email-queue-cleanup-stale]
-verify_jwt = false
-
 [functions.security-monitor-alerts]
-verify_jwt = false
-
-[functions.seed-admin-users]
-verify_jwt = false
-
-[functions.reset-admin-passwords]
 verify_jwt = false

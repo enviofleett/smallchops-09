@@ -128,7 +128,7 @@ export const useEmailAutomation = () => {
 
       // Trigger immediate processing for order confirmations
       const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'instant-email-processor'
+        'unified-email-queue-processor'
       );
 
       if (processError) {
@@ -351,7 +351,7 @@ export const useEmailAutomation = () => {
     failed: number;
   }> => {
     try {
-      const { data: result, error } = await supabase.functions.invoke('instant-email-processor');
+      const { data: result, error } = await supabase.functions.invoke('unified-email-queue-processor');
       
       if (error) {
         throw new Error(`Queue processing failed: ${error.message}`);

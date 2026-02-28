@@ -69,7 +69,7 @@ export const PaystackProductionStatus = () => {
     setError(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('production-environment-setup');
+      const { data, error } = await supabase.functions.invoke('production-paystack-setup');
       
       if (error) {
         throw new Error(error.message);

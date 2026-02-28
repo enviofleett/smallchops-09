@@ -215,7 +215,7 @@ export const EmailTestingSimulation = () => {
 
     for (let i = 0; i < emailCount; i++) {
       const { data, error } = await supabase.functions.invoke(
-        'enhanced-email-rate-limiter',
+        'email-core',
         {
           body: {
             identifier: variables.customer_email,

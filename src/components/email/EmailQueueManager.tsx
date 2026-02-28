@@ -112,7 +112,7 @@ export const EmailQueueManager: React.FC = () => {
   // Clear ALL emails - complete queue reset
   const clearAllEmailsMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('clear-email-queue', {
+      const { data, error } = await supabase.functions.invoke('email-queue-cleanup', {
         body: { 
           action: 'clear_queue', 
           statuses: ['queued', 'failed', 'processing'] 

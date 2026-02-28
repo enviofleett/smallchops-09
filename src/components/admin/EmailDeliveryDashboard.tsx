@@ -102,7 +102,7 @@ export const EmailDeliveryDashboard: React.FC = () => {
 
   const processQueue = async () => {
     try {
-      const { error } = await supabase.functions.invoke('instant-email-processor');
+      const { error } = await supabase.functions.invoke('unified-email-queue-processor');
       if (error) throw error;
       
       toast({

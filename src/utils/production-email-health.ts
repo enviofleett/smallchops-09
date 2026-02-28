@@ -26,7 +26,7 @@ export class ProductionEmailHealthChecker {
     validation_details?: any;
   }> {
     try {
-      const { data, error } = await supabase.functions.invoke('smtp-health-check', {
+      const { data, error } = await supabase.functions.invoke('smtp-health-monitor', {
         body: { healthcheck: true }
       });
 

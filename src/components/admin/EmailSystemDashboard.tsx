@@ -67,7 +67,7 @@ export const EmailSystemDashboard: React.FC = () => {
 
   const fetchHealthStatus = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('email-health-monitor');
+      const { data, error } = await supabase.functions.invoke('email-production-monitor');
 
       if (error) throw error;
 
@@ -80,7 +80,7 @@ export const EmailSystemDashboard: React.FC = () => {
   const processQueue = async (priority: 'high' | 'all' = 'all') => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
+      const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
         body: { priority }
       });
 

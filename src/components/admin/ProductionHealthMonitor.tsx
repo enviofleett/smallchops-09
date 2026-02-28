@@ -92,7 +92,7 @@ export const ProductionHealthMonitor = () => {
     setIsLoading(true);
     try {
       // Trigger health check function
-      const { data, error } = await supabase.functions.invoke('production-health-check');
+      const { data, error } = await supabase.functions.invoke('security-monitor');
       
       if (error) throw error;
       

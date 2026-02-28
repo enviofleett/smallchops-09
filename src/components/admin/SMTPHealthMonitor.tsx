@@ -60,7 +60,7 @@ export const SMTPHealthMonitor: React.FC = () => {
   const processEmailQueue = async () => {
     setIsProcessingQueue(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
+      const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
         body: { priority: 'all', limit: 50 },
         headers: { 'Content-Type': 'application/json' }
       });

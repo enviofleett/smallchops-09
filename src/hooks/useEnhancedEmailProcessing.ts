@@ -17,7 +17,7 @@ export const useEnhancedEmailProcessing = () => {
     setIsProcessing(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
+      const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
         body: { priority }
       });
 
@@ -62,8 +62,8 @@ export const useEnhancedEmailProcessing = () => {
     setIsProcessing(true);
     
     try {
-      // Use instant-email-processor for welcome emails too
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
+      // Use unified-email-queue-processor for welcome emails too
+      const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
         body: { 
           priority: 'high',
           event_types: ['customer_welcome', 'welcome_series']

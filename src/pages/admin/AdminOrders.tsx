@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import '../../styles/thermal-print.css';
 import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Search, Download, Package, TrendingUp, Clock, CheckCircle, Plus, BarChart3, RefreshCw, Calendar, Printer, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { AdminCreateOrderDialog } from '@/components/admin/AdminCreateOrderDialog';
 import { DeliveryDateFilter } from '@/components/admin/orders/DeliveryDateFilter';
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
 import { getFilterDescription, getFilterStats } from '@/utils/dateFilterUtils';
@@ -30,6 +31,7 @@ import { OrdersStatusIndicators } from '@/components/admin/orders/OrdersStatusIn
 import { toast } from 'sonner';
 function AdminOrdersContent() {
   const isMobile = useIsMobile();
+  const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
 
   // Consolidated state management
   const {
@@ -215,7 +217,7 @@ function AdminOrdersContent() {
           <div className="flex flex-col sm:flex-row gap-2">
             
             <OrderDetailsTestButton />
-            <Button className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto" onClick={() => setIsCreateOrderOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Create Order
             </Button>
@@ -482,6 +484,13 @@ function AdminOrdersContent() {
 
         {/* Thermal Receipt Preview Modal */}
         <ThermalReceiptPreview isOpen={isPreviewOpen} onClose={closePreview} onPrint={printFromPreview} order={previewOrder} deliverySchedule={previewDeliverySchedule} businessInfo={previewBusinessInfo} />
+
+        {/* Admin Create Order Dialog */}
+        <AdminCreateOrderDialog 
+          isOpen={isCreateOrderOpen} 
+          onClose={() => setIsCreateOrderOpen(false)} 
+          onOrderCreated={() => refetch()} 
+        />
       </div>
     </>;
 }

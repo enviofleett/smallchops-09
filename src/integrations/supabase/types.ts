@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      order_payment_accounts: {
+        Row: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          order_id: string
+          provider: string
+          provider_reference: string | null
+        }
+        Insert: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          order_id: string
+          provider?: string
+          provider_reference?: string | null
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          bank_name?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          order_id?: string
+          provider?: string
+          provider_reference?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

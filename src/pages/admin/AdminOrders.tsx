@@ -14,7 +14,7 @@ import { EnhancedOrderCard } from '@/components/admin/EnhancedOrderCard';
 import { ThermalReceiptPreview } from '@/components/orders/ThermalReceiptPreview';
 import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Search, Download, Package, TrendingUp, Clock, CheckCircle, Plus, BarChart3, RefreshCw, Calendar, Printer, Loader2 } from 'lucide-react';
+import { Search, Package, TrendingUp, Clock, CheckCircle, Plus, BarChart3, Calendar, Printer, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminCreateOrderDialog } from '@/components/admin/AdminCreateOrderDialog';
 import { DeliveryDateFilter } from '@/components/admin/orders/DeliveryDateFilter';
@@ -26,8 +26,6 @@ import { useAdminOrdersFilters } from '@/hooks/useAdminOrdersFilters';
 import { extractDeliverySchedules, prioritySortOrders, applyDeliveryDateFilter, calculateOrderCounts, detectOrderWarnings } from '@/utils/adminOrdersLogic';
 import { OrdersErrorBoundary } from '@/components/admin/orders/OrdersErrorBoundary';
 import { OrdersEmptyState, OrdersErrorState, OrdersLoadingSkeleton } from '@/components/admin/orders/OrdersEmptyStates';
-import { OrdersStatusIndicators } from '@/components/admin/orders/OrdersStatusIndicators';
-import { toast } from 'sonner';
 function AdminOrdersContent() {
   const isMobile = useIsMobile();
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
@@ -429,11 +427,6 @@ function AdminOrdersContent() {
               </TabsList>
             </div>
           </div>
-
-          {/* Status Indicators - Temporarily disabled */}
-          {/* {orderWarnings.length > 0 && (
-            <OrdersStatusIndicators warnings={orderWarnings} />
-           )} */}
 
           {/* Mobile and Desktop Content */}
           {isMobile ? <MobileOrderTabs orders={filteredOrders} activeTab={state.activeTab} onTabChange={handleTabChange} onOrderSelect={handleOrderClick} deliverySchedules={deliverySchedules} orderCounts={orderCounts} useSimpleMode={state.useSimpleMode} /> : <TabsContent value={state.activeTab} className="space-y-4">

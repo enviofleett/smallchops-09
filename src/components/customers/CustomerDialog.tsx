@@ -138,7 +138,7 @@ export const CustomerDialog = ({
         // Trigger instant email processing for welcome emails
         if (result.welcomeEmailQueued) {
           try {
-            await supabase.functions.invoke('instant-email-processor');
+            await supabase.functions.invoke('unified-email-queue-processor');
             console.log('Instant email processing triggered');
           } catch (emailError) {
             console.warn('Failed to trigger instant email processing:', emailError);

@@ -314,7 +314,7 @@ export const ComprehensiveEmailTestDashboard = () => {
       }
 
       // Test processing queue
-      const { data: processResult, error: processError } = await supabase.functions.invoke('instant-email-processor');
+      const { data: processResult, error: processError } = await supabase.functions.invoke('unified-email-queue-processor');
       
       if (processError) {
         updateTestResult('Queue Management', 'error', `Queue processing error: ${processError.message}`);

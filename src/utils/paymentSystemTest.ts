@@ -86,7 +86,7 @@ export class PaymentSystemTester {
    */
   static async checkMigrationStatus() {
     try {
-      const { data, error } = await supabase.functions.invoke('payment-recovery-migration', {
+      const { data, error } = await supabase.functions.invoke('payment-recovery', {
         body: { action: 'recovery_status' }
       });
       
@@ -126,7 +126,7 @@ export class PaymentSystemTester {
     try {
       console.log('🔄 Starting reference migration');
       
-      const { data, error } = await supabase.functions.invoke('payment-recovery-migration', {
+      const { data, error } = await supabase.functions.invoke('payment-recovery', {
         body: { action: 'migrate_references' }
       });
       
@@ -149,7 +149,7 @@ export class PaymentSystemTester {
     try {
       console.log('💾 Creating missing transaction records');
       
-      const { data, error } = await supabase.functions.invoke('payment-recovery-migration', {
+      const { data, error } = await supabase.functions.invoke('payment-recovery', {
         body: { action: 'create_missing_transactions' }
       });
       

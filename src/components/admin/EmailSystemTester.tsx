@@ -82,7 +82,7 @@ export const EmailSystemTester = () => {
         });
 
         // Now process the email queue
-        const { error: processError } = await supabase.functions.invoke('instant-email-processor');
+        const { error: processError } = await supabase.functions.invoke('unified-email-queue-processor');
         if (processError) {
           console.warn('Email processing error:', processError);
         }

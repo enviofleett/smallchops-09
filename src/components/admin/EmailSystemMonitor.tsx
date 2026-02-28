@@ -91,7 +91,7 @@ export const EmailSystemMonitor = () => {
   const processHighPriorityEmails = async () => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor');
+      const { data, error } = await supabase.functions.invoke('unified-email-queue-processor');
       
       if (error) {
         throw error;

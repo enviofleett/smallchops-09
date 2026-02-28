@@ -98,7 +98,7 @@ export const ProductionReadinessMonitor: React.FC = () => {
 
   const triggerImmediateProcessing = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor');
+      const { data, error } = await supabase.functions.invoke('unified-email-queue-processor');
       
       if (error) {
         throw new Error(error.message);

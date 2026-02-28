@@ -390,7 +390,7 @@ export function PaystackTestingSuite() {
         name: 'API Connectivity',
         test: async () => {
           const startTime = Date.now();
-          const { data, error } = await supabase.functions.invoke('paystack-production-config');
+          const { data, error } = await supabase.functions.invoke('production-paystack-setup');
           const responseTime = Date.now() - startTime;
           
           if (error) throw new Error(error.message);

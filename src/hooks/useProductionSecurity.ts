@@ -67,7 +67,7 @@ export const useProductionSecurity = () => {
           .limit(100),
 
         // System health check
-        supabase.functions.invoke('production-health-check')
+        supabase.functions.invoke('security-monitor')
       ]);
 
       // Process results safely

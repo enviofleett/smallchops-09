@@ -110,7 +110,7 @@ export const useEnhancedPayment = () => {
           message: `Checking payment status... (${pollCount}/${maxRetries})`
         }));
         
-        const { data, error } = await supabase.functions.invoke('enhanced-payment-polling', {
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
           body: { reference, maxRetries }
         });
         

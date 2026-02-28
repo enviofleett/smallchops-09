@@ -85,7 +85,7 @@ export class EmailOperations {
    */
   static async triggerEmailCleanup(daysOld: number = 30): Promise<EmailOperationResult> {
     try {
-      const { data, error } = await supabase.functions.invoke('email-service-core', {
+      const { data, error } = await supabase.functions.invoke('email-core', {
         body: { 
           action: 'cleanup',
           cleanup_options: { days_old: daysOld }
@@ -112,7 +112,7 @@ export class EmailOperations {
    */
   static async getEmailStats(): Promise<EmailOperationResult> {
     try {
-      const { data, error } = await supabase.functions.invoke('email-service-core', {
+      const { data, error } = await supabase.functions.invoke('email-core', {
         body: { action: 'get_stats' }
       });
 
@@ -136,7 +136,7 @@ export class EmailOperations {
    */
   static async checkEmailHealth(): Promise<EmailOperationResult> {
     try {
-      const { data, error } = await supabase.functions.invoke('email-service-core', {
+      const { data, error } = await supabase.functions.invoke('email-core', {
         body: { action: 'health_check' }
       });
 

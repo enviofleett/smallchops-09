@@ -46,7 +46,7 @@ export const RealTimeEmailProcessor: React.FC = () => {
       setIsProcessing(true);
       
       // Call the instant email processor
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
+      const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
         body: { immediate: true }
       });
 
@@ -102,7 +102,7 @@ export const RealTimeEmailProcessor: React.FC = () => {
   const clearQueuedEmails = async () => {
     try {
       setIsProcessing(true);
-      const { data, error } = await supabase.functions.invoke('clear-email-queue', {
+      const { data, error } = await supabase.functions.invoke('email-queue-cleanup', {
         body: {
           action: 'clear_queue',
           statuses: ['queued']
@@ -132,7 +132,7 @@ export const RealTimeEmailProcessor: React.FC = () => {
   const clearFailedEmails = async () => {
     try {
       setIsProcessing(true);
-      const { data, error } = await supabase.functions.invoke('clear-email-queue', {
+      const { data, error } = await supabase.functions.invoke('email-queue-cleanup', {
         body: {
           action: 'clear_queue',
           statuses: ['failed']
@@ -162,7 +162,7 @@ export const RealTimeEmailProcessor: React.FC = () => {
   const retryFailedEmails = async () => {
     try {
       setIsProcessing(true);
-      const { data, error } = await supabase.functions.invoke('clear-email-queue', {
+      const { data, error } = await supabase.functions.invoke('email-queue-cleanup', {
         body: {
           action: 'retry_failed',
           statuses: ['failed']

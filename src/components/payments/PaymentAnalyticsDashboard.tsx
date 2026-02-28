@@ -59,7 +59,7 @@ export const PaymentAnalyticsDashboard: React.FC = () => {
   const loadAnalytics = async () => {
     setLoading(true);
     try {
-      const { data: analyticsData, error } = await supabase.functions.invoke('payment-analytics', {
+      const { data: analyticsData, error } = await supabase.functions.invoke('dashboard-aggregates', {
         body: {
           startDate: format(startOfDay(dateRange.start), 'yyyy-MM-dd'),
           endDate: format(endOfDay(dateRange.end), 'yyyy-MM-dd'),

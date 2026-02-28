@@ -149,13 +149,16 @@ serve(async (req: Request) => {
 
     // Save delivery schedule if provided
     if (delivery_schedule?.delivery_date) {
-      await supabase.from('delivery_schedules').insert({
+      const { error: scheduleError } = await supabase.from('delivery_schedules').insert({
         order_id: orderId,
         delivery_date: delivery_schedule.delivery_date,
         delivery_time_start: delivery_schedule.delivery_time_start || '09:00',
         delivery_time_end: delivery_schedule.delivery_time_end || '17:00',
         status: 'scheduled'
-      }).single();
+      });
+      if (scheduleError) {
+        console.error('⚠️ Delivery schedule insert failed:', scheduleError.message);
+      }
     }
 
     // 💳 Create Paystack customer and DVA

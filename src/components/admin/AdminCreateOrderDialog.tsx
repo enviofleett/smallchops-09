@@ -150,7 +150,7 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
   const canProceedFromProducts = cart.length > 0;
   const canProceedFromCustomer = customerName.trim() && /\S+@\S+\.\S+/.test(customerEmail) && customerPhone.trim().length >= 10;
   const canProceedFromFulfillment = deliveryDate && deliveryTimeSlot && (
-    fulfillmentType === 'pickup' ? !!pickupPoint : (!!deliveryZone && deliveryAddress.address_line_1.trim())
+    fulfillmentType === 'pickup' ? !!pickupPoint : (!!deliveryZone && deliveryAddress.address_line_1.trim() && deliveryAddress.city.trim())
   );
 
   const handleSubmit = async () => {
@@ -225,23 +225,21 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
   };
 
   const handleClose = () => {
-    if (step === 'confirmation') {
-      // Reset state
-      setStep('products');
-      setCart([]);
-      setCustomerName('');
-      setCustomerEmail('');
-      setCustomerPhone('');
-      setFulfillmentType('delivery');
-      setDeliveryZone(null);
-      setPickupPoint(null);
-      setDeliveryDate('');
-      setDeliveryTimeSlot(undefined);
-      setDeliveryAddress({ address_line_1: '', city: '', landmark: '' });
-      setSpecialInstructions('');
-      setCreatedOrder(null);
-      setVirtualAccount(null);
-    }
+    // Always reset state so the dialog starts fresh on next open
+    setStep('products');
+    setCart([]);
+    setCustomerName('');
+    setCustomerEmail('');
+    setCustomerPhone('');
+    setFulfillmentType('delivery');
+    setDeliveryZone(null);
+    setPickupPoint(null);
+    setDeliveryDate('');
+    setDeliveryTimeSlot(undefined);
+    setDeliveryAddress({ address_line_1: '', city: '', landmark: '' });
+    setSpecialInstructions('');
+    setCreatedOrder(null);
+    setVirtualAccount(null);
     onClose();
   };
 

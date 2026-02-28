@@ -21,7 +21,6 @@ import { DeliveryDateFilter } from '@/components/admin/orders/DeliveryDateFilter
 import { OrderTabDropdown } from '@/components/admin/orders/OrderTabDropdown';
 import { getFilterDescription, getFilterStats } from '@/utils/dateFilterUtils';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
-import { OrderDetailsTestButton } from '@/components/admin/OrderDetailsTestButton';
 import { useAdminOrdersState } from '@/hooks/useAdminOrdersState';
 import { useAdminOrdersFilters } from '@/hooks/useAdminOrdersFilters';
 import { extractDeliverySchedules, prioritySortOrders, applyDeliveryDateFilter, calculateOrderCounts, detectOrderWarnings } from '@/utils/adminOrdersLogic';
@@ -215,8 +214,6 @@ function AdminOrdersContent() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            
-            <OrderDetailsTestButton />
             <Button className="w-full sm:w-auto" onClick={() => setIsCreateOrderOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Create Order

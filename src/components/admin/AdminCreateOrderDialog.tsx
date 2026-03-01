@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -18,7 +19,7 @@ import { toast } from 'sonner';
 import { generateAdminOrderPDF } from '@/utils/adminOrderPDF';
 import { cn } from '@/lib/utils';
 import { 
-  X, Truck, MapPin, ShoppingBag, User, Mail, Phone, Clock, 
+  X, Truck, MapPin, ShoppingBag, User, Clock, 
   ChevronLeft, ChevronRight, CheckCircle, Download, Loader2,
   Plus, Minus, Search, Package
 } from 'lucide-react';
@@ -72,7 +73,7 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
   const [deliveryAddress, setDeliveryAddress] = useState({ address_line_1: '', city: '', landmark: '' });
   const [specialInstructions, setSpecialInstructions] = useState('');
 
-  // Fetch products
+  // Fetch products from the actual products table
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['admin-products-catalog'],
     queryFn: async () => {
@@ -83,10 +84,11 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
         .order('name');
       if (error) throw error;
       return data || [];
-    }
+    },
+    enabled: isOpen
   });
 
-  // Fetch business info
+  // Fetch business info for PDF
   const { data: businessInfo } = useQuery({
     queryKey: ['business-settings-pdf'],
     queryFn: async () => {
@@ -138,7 +140,7 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
       const product = products.find((p: any) => p.id === productId);
       const moq = product?.minimum_order_quantity || 1;
       const newQty = item.quantity + delta;
-      if (newQty < moq) return item; // Don't go below MOQ
+      if (newQty < moq) return item;
       return { ...item, quantity: newQty };
     }));
   }, [products]);
@@ -183,12 +185,21 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
         }
       };
 
+      console.log('📦 Submitting admin order:', payload);
+
       const { data, error } = await supabase.functions.invoke('admin-create-order', { body: payload });
 
-      if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || 'Failed to create order');
+      if (error) {
+        console.error('❌ Edge function error:', error);
+        throw new Error(error.message || 'Failed to create order');
       }
 
+      if (!data?.success) {
+        console.error('❌ Order creation failed:', data);
+        throw new Error(data?.error || 'Failed to create order');
+      }
+
+      console.log('✅ Order created:', data);
       setCreatedOrder(data.order);
       setVirtualAccount(data.virtual_account || null);
       setStep('confirmation');
@@ -224,23 +235,27 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
     );
   };
 
+  const resetState = () => {
+    setStep('products');
+    setCart([]);
+    setCustomerName('');
+    setCustomerEmail('');
+    setCustomerPhone('');
+    setFulfillmentType('delivery');
+    setDeliveryZone(null);
+    setPickupPoint(null);
+    setDeliveryDate('');
+    setDeliveryTimeSlot(undefined);
+    setDeliveryAddress({ address_line_1: '', city: '', landmark: '' });
+    setSpecialInstructions('');
+    setCreatedOrder(null);
+    setVirtualAccount(null);
+    setSearchQuery('');
+  };
+
   const handleClose = () => {
     if (step === 'confirmation') {
-      // Reset state
-      setStep('products');
-      setCart([]);
-      setCustomerName('');
-      setCustomerEmail('');
-      setCustomerPhone('');
-      setFulfillmentType('delivery');
-      setDeliveryZone(null);
-      setPickupPoint(null);
-      setDeliveryDate('');
-      setDeliveryTimeSlot(undefined);
-      setDeliveryAddress({ address_line_1: '', city: '', landmark: '' });
-      setSpecialInstructions('');
-      setCreatedOrder(null);
-      setVirtualAccount(null);
+      resetState();
     }
     onClose();
   };
@@ -254,10 +269,32 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
 
   const currentStepIndex = steps.findIndex(s => s.key === step);
 
+  const goToNext = () => {
+    const nextMap: Record<Step, Step> = {
+      products: 'customer',
+      customer: 'fulfillment',
+      fulfillment: 'review',
+      review: 'review',
+      confirmation: 'confirmation'
+    };
+    setStep(nextMap[step]);
+  };
+
+  const goToPrev = () => {
+    const prevMap: Record<Step, Step> = {
+      products: 'products',
+      customer: 'products',
+      fulfillment: 'customer',
+      review: 'fulfillment',
+      confirmation: 'review'
+    };
+    setStep(prevMap[step]);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden p-0">
-        {/* Header */}
+      <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden p-0 flex flex-col">
+        {/* Header with stepper */}
         <div className="flex items-center justify-between p-4 border-b bg-background flex-shrink-0">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={handleClose} className="h-8 w-8 p-0">
@@ -281,9 +318,17 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
               ))}
             </div>
           )}
+          {/* Mobile step indicator */}
+          {step !== 'confirmation' && (
+            <div className="flex md:hidden items-center gap-1.5">
+              <Badge variant="outline" className="text-xs">
+                Step {currentStepIndex + 1}/{steps.length}
+              </Badge>
+            </div>
+          )}
         </div>
 
-        {/* Content */}
+        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {/* STEP 1: Product Selection */}
           {step === 'products' && (
@@ -334,16 +379,31 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <ShoppingBag className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No products found</p>
+                  <p className="text-sm mt-1">
+                    {searchQuery ? 'Try a different search term' : 'No active products available'}
+                  </p>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredProducts.map((product: any) => {
                     const cartItem = cart.find(c => c.product_id === product.id);
                     return (
-                      <Card key={product.id} className={cn("cursor-pointer transition-all hover:shadow-md", cartItem && "ring-2 ring-primary")}>
+                      <Card key={product.id} className={cn(
+                        "cursor-pointer transition-all hover:shadow-md",
+                        cartItem && "ring-2 ring-primary"
+                      )} onClick={() => !cartItem && addToCart(product)}>
                         <CardContent className="p-3">
                           <div className="flex items-start gap-3">
-                            {product.image_url && (
+                            {product.image_url ? (
                               <img src={product.image_url} alt={product.name} className="w-14 h-14 rounded-md object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="w-14 h-14 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                                <Package className="h-6 w-6 text-muted-foreground" />
+                              </div>
                             )}
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm truncate">{product.name}</p>
@@ -353,10 +413,18 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                               )}
                             </div>
                             {cartItem ? (
-                              <Badge variant="default" className="flex-shrink-0">{cartItem.quantity}</Badge>
+                              <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(product.id, -1)}>
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <Badge variant="default" className="min-w-[28px] justify-center">{cartItem.quantity}</Badge>
+                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(product.id, 1)}>
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
                             ) : (
-                              <Button size="sm" variant="outline" onClick={() => addToCart(product)}>
-                                <Plus className="h-3 w-3" />
+                              <Button size="sm" variant="outline" className="flex-shrink-0" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>
+                                <Plus className="h-3 w-3 mr-1" /> Add
                               </Button>
                             )}
                           </div>
@@ -376,6 +444,7 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                 <CardTitle className="text-base flex items-center gap-2">
                   <User className="w-4 h-4" /> Customer Information
                 </CardTitle>
+                <CardDescription>Enter the customer's contact details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -385,10 +454,16 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                 <div>
                   <RequiredFieldLabel htmlFor="admin_customer_email" required>Email</RequiredFieldLabel>
                   <Input id="admin_customer_email" type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="customer@example.com" />
+                  {customerEmail && !/\S+@\S+\.\S+/.test(customerEmail) && (
+                    <p className="text-xs text-destructive mt-1">Please enter a valid email address</p>
+                  )}
                 </div>
                 <div>
                   <RequiredFieldLabel htmlFor="admin_customer_phone" required>Phone Number</RequiredFieldLabel>
                   <Input id="admin_customer_phone" type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="08012345678" />
+                  {customerPhone && customerPhone.trim().length < 10 && (
+                    <p className="text-xs text-destructive mt-1">Phone number must be at least 10 digits</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -403,7 +478,7 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                   <CardTitle className="text-base flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     When does the customer need the order?
-                    <span className="text-red-500 text-sm font-bold ml-1">*</span>
+                    <span className="text-destructive text-sm font-bold ml-1">*</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -419,23 +494,33 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                 </CardContent>
               </Card>
 
-              {/* Fulfillment Type - Same as storefront */}
+              {/* Fulfillment Type */}
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-base text-center">Fulfillment Type <span className="text-red-500">*</span></CardTitle>
+                  <CardTitle className="text-base text-center">
+                    Fulfillment Type <span className="text-destructive">*</span>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <RadioGroup
                     value={fulfillmentType}
-                    onValueChange={value => setFulfillmentType(value as 'delivery' | 'pickup')}
+                    onValueChange={value => {
+                      setFulfillmentType(value as 'delivery' | 'pickup');
+                      // Reset the other option
+                      if (value === 'pickup') {
+                        setDeliveryZone(null);
+                        setDeliveryAddress({ address_line_1: '', city: '', landmark: '' });
+                      } else {
+                        setPickupPoint(null);
+                      }
+                    }}
                     className="grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
                       <RadioGroupItem value="delivery" id="admin_delivery" className="peer sr-only" />
                       <Label htmlFor="admin_delivery" className={cn(
                         "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all duration-300 hover:border-primary/30",
-                        "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-xl peer-checked:ring-4 peer-checked:ring-green-200",
-                        fulfillmentType === 'delivery' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200"
+                        fulfillmentType === 'delivery' && "border-primary bg-primary/5 shadow-lg ring-4 ring-primary/20"
                       )}>
                         <Truck className="w-8 h-8 mb-3 text-primary" />
                         <span className="font-medium">Delivery</span>
@@ -446,12 +531,11 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                       <RadioGroupItem value="pickup" id="admin_pickup" className="peer sr-only" />
                       <Label htmlFor="admin_pickup" className={cn(
                         "flex flex-col items-center justify-center p-6 border-2 rounded-lg cursor-pointer transition-all duration-300 hover:border-primary/30",
-                        "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-xl peer-checked:ring-4 peer-checked:ring-green-200",
-                        fulfillmentType === 'pickup' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200"
+                        fulfillmentType === 'pickup' && "border-primary bg-primary/5 shadow-lg ring-4 ring-primary/20"
                       )}>
                         <MapPin className="w-8 h-8 mb-3 text-primary" />
                         <span className="font-medium">Pickup</span>
-                        <span className="text-xs text-green-600 mt-2">No delivery fee</span>
+                        <span className="text-xs text-muted-foreground mt-2">No delivery fee</span>
                       </Label>
                     </div>
                   </RadioGroup>
@@ -463,27 +547,29 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <MapPin className="w-4 h-4" /> Delivery Address
+                      <MapPin className="w-4 h-4" /> Delivery Details
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <RequiredFieldLabel htmlFor="admin_address" required>Street Address</RequiredFieldLabel>
-                      <Input id="admin_address" value={deliveryAddress.address_line_1} onChange={e => setDeliveryAddress(prev => ({ ...prev, address_line_1: e.target.value }))} placeholder="Enter street address" />
-                    </div>
-                    <div>
-                      <RequiredFieldLabel htmlFor="admin_city" required>City</RequiredFieldLabel>
-                      <Input id="admin_city" value={deliveryAddress.city} onChange={e => setDeliveryAddress(prev => ({ ...prev, city: e.target.value }))} placeholder="City" />
-                    </div>
-                    <div>
-                      <RequiredFieldLabel htmlFor="admin_landmark">Landmark</RequiredFieldLabel>
-                      <Input id="admin_landmark" value={deliveryAddress.landmark} onChange={e => setDeliveryAddress(prev => ({ ...prev, landmark: e.target.value }))} placeholder="Nearby landmark" />
-                    </div>
+                  <CardContent className="space-y-4">
                     <DeliveryZoneDropdown
                       selectedZoneId={deliveryZone?.id}
                       onZoneSelect={(zoneId, fee) => setDeliveryZone({ id: zoneId, base_fee: fee })}
                       orderSubtotal={subtotal}
                     />
+                    <div>
+                      <RequiredFieldLabel htmlFor="admin_address" required>Street Address</RequiredFieldLabel>
+                      <Input id="admin_address" value={deliveryAddress.address_line_1} onChange={e => setDeliveryAddress(prev => ({ ...prev, address_line_1: e.target.value }))} placeholder="Enter street address" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <RequiredFieldLabel htmlFor="admin_city">City / Area</RequiredFieldLabel>
+                        <Input id="admin_city" value={deliveryAddress.city} onChange={e => setDeliveryAddress(prev => ({ ...prev, city: e.target.value }))} placeholder="City" />
+                      </div>
+                      <div>
+                        <RequiredFieldLabel htmlFor="admin_landmark">Landmark</RequiredFieldLabel>
+                        <Input id="admin_landmark" value={deliveryAddress.landmark} onChange={e => setDeliveryAddress(prev => ({ ...prev, landmark: e.target.value }))} placeholder="Nearby landmark" />
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -494,20 +580,18 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                   <CardHeader className="pb-4">
                     <CardTitle className="text-base text-center flex items-center justify-center gap-2">
                       <MapPin className="w-5 h-5 text-primary" />
-                      Select Pickup Location <span className="text-red-500">*</span>
+                      Select Pickup Location <span className="text-destructive">*</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <PickupPointSelector
                       selectedPointId={pickupPoint?.id}
-                      onSelect={point => {
-                        setPickupPoint(point);
-                      }}
+                      onSelect={point => setPickupPoint(point)}
                     />
                     {pickupPoint && (
-                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-sm text-green-800 font-medium">✅ Selected: {pickupPoint.name}</p>
-                        <p className="text-xs text-green-700 mt-1">{pickupPoint.address}</p>
+                      <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                        <p className="text-sm font-medium">✅ Selected: {pickupPoint.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{pickupPoint.address}</p>
                       </div>
                     )}
                   </CardContent>
@@ -517,13 +601,15 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
               {/* Special Instructions */}
               <div>
                 <RequiredFieldLabel htmlFor="admin_instructions">Special Instructions</RequiredFieldLabel>
-                <Input 
+                <Textarea 
                   id="admin_instructions" 
                   value={specialInstructions} 
-                  onChange={e => setSpecialInstructions(e.target.value.slice(0, 160))} 
-                  placeholder="Any special instructions..." 
-                  maxLength={160} 
+                  onChange={e => setSpecialInstructions(e.target.value.slice(0, 250))} 
+                  placeholder="Any special instructions for this order..." 
+                  className="resize-none"
+                  rows={3}
                 />
+                <p className="text-xs text-muted-foreground mt-1">{specialInstructions.length}/250</p>
               </div>
             </div>
           )}
@@ -533,7 +619,9 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Customer</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="w-4 h-4" /> Customer
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
                   <p><strong>Name:</strong> {customerName}</p>
@@ -544,32 +632,37 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Fulfillment</CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    {fulfillmentType === 'delivery' ? <Truck className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+                    Fulfillment
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
-                  <p><strong>Type:</strong> {fulfillmentType === 'delivery' ? 'Delivery' : 'Pickup'}</p>
-                  {deliveryDate && <p><strong>Date:</strong> {deliveryDate}</p>}
+                  <p><strong>Type:</strong> {fulfillmentType === 'delivery' ? '🚚 Delivery' : '📍 Pickup'}</p>
+                  {deliveryDate && <p><strong>Date:</strong> {new Date(deliveryDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>}
                   {deliveryTimeSlot && <p><strong>Time:</strong> {deliveryTimeSlot.start_time} - {deliveryTimeSlot.end_time}</p>}
                   {fulfillmentType === 'delivery' && deliveryAddress.address_line_1 && (
-                    <p><strong>Address:</strong> {deliveryAddress.address_line_1}, {deliveryAddress.city}</p>
+                    <p><strong>Address:</strong> {deliveryAddress.address_line_1}{deliveryAddress.city ? `, ${deliveryAddress.city}` : ''}{deliveryAddress.landmark ? ` (Near ${deliveryAddress.landmark})` : ''}</p>
                   )}
                   {fulfillmentType === 'pickup' && pickupPoint && (
-                    <p><strong>Pickup:</strong> {pickupPoint.name}</p>
+                    <p><strong>Pickup:</strong> {pickupPoint.name} — {pickupPoint.address}</p>
                   )}
+                  {specialInstructions && <p><strong>Instructions:</strong> {specialInstructions}</p>}
                 </CardContent>
               </Card>
 
+              {/* Order Summary - show on all screen sizes */}
               <OrderSummaryCard
                 items={cart}
                 subtotal={subtotal}
                 deliveryFee={deliveryFee}
                 total={total}
-                className="block border shadow-sm"
+                className="block md:block border shadow-sm"
               />
 
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                <p className="font-medium">Payment Method: Bank Transfer</p>
-                <p className="mt-1">A virtual account number will be generated for the customer to make payment via bank transfer.</p>
+              <div className="p-3 bg-accent/50 border border-accent rounded-lg text-sm">
+                <p className="font-medium text-accent-foreground">💳 Payment Method: Bank Transfer</p>
+                <p className="mt-1 text-muted-foreground">A virtual account number will be generated for the customer to make payment.</p>
               </div>
             </div>
           )}
@@ -578,53 +671,65 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
           {step === 'confirmation' && createdOrder && (
             <div className="space-y-6 text-center py-8">
               <div className="flex justify-center">
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-                  <CheckCircle className="w-10 h-10 text-green-600" />
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <CheckCircle className="w-10 h-10 text-primary" />
                 </div>
               </div>
               <div>
                 <h3 className="text-xl font-bold">Order Created Successfully!</h3>
                 <p className="text-muted-foreground mt-1">Order #{createdOrder.order_number}</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Total: <span className="font-bold text-primary">₦{createdOrder.total_amount?.toLocaleString()}</span>
+                </p>
               </div>
 
               {virtualAccount && (
-                <Card className="text-left border-blue-200 bg-blue-50/50">
-                  <CardHeader>
-                    <CardTitle className="text-base text-blue-800">Virtual Account Details</CardTitle>
+                <Card className="text-left border-accent bg-accent/30 max-w-md mx-auto">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base text-accent-foreground">🏦 Virtual Account Details</CardTitle>
                     <CardDescription>Customer should transfer to this account</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <span className="text-muted-foreground">Bank:</span>
-                      <span className="font-medium">{virtualAccount.bank_name}</span>
-                      <span className="text-muted-foreground">Account Number:</span>
-                      <span className="font-bold text-lg">{virtualAccount.account_number}</span>
-                      <span className="text-muted-foreground">Account Name:</span>
-                      <span className="font-medium">{virtualAccount.account_name}</span>
-                      <span className="text-muted-foreground">Amount:</span>
-                      <span className="font-bold text-primary">₦{total.toLocaleString()}</span>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Bank:</span>
+                        <span className="font-medium">{virtualAccount.bank_name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Account No:</span>
+                        <span className="font-bold text-lg tracking-wider">{virtualAccount.account_number}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Account Name:</span>
+                        <span className="font-medium">{virtualAccount.account_name}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Amount:</span>
+                        <span className="font-bold text-primary text-lg">₦{total.toLocaleString()}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
               )}
 
               {!virtualAccount && (
-                <Card className="text-left border-yellow-200 bg-yellow-50/50">
+                <Card className="text-left border-muted bg-muted/50 max-w-md mx-auto">
                   <CardContent className="p-4">
-                    <p className="text-sm text-yellow-800">
-                      Virtual account generation is pending. The customer will receive payment details via email once available.
+                    <p className="text-sm text-muted-foreground">
+                      ⚠️ Virtual account generation is pending. The customer will receive payment details via email once available.
                     </p>
                   </CardContent>
                 </Card>
               )}
 
-              <div className="flex justify-center gap-3">
-                <Button onClick={handleDownloadPDF} variant="outline">
+              <div className="flex justify-center gap-3 pt-4">
+                <Button onClick={handleDownloadPDF} variant="outline" size="lg">
                   <Download className="w-4 h-4 mr-2" />
                   Download Invoice PDF
                 </Button>
-                <Button onClick={handleClose}>
-                  Close
+                <Button onClick={handleClose} size="lg">
+                  Done
                 </Button>
               </div>
             </div>
@@ -636,30 +741,30 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
           <div className="flex items-center justify-between p-4 border-t bg-background flex-shrink-0">
             <Button
               variant="outline"
-              onClick={() => {
-                const prevStep: Record<Step, Step> = { products: 'products', customer: 'products', fulfillment: 'customer', review: 'fulfillment', confirmation: 'review' };
-                setStep(prevStep[step]);
-              }}
+              onClick={goToPrev}
               disabled={step === 'products'}
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back
             </Button>
 
+            <div className="text-sm text-muted-foreground">
+              {cart.length > 0 && step !== 'products' && (
+                <span>{cart.length} items • ₦{total.toLocaleString()}</span>
+              )}
+            </div>
+
             {step === 'review' ? (
               <Button onClick={handleSubmit} disabled={isSubmitting} className="min-w-[180px]">
                 {isSubmitting ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating Order...</>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</>
                 ) : (
                   <>Create Order • ₦{total.toLocaleString()}</>
                 )}
               </Button>
             ) : (
               <Button
-                onClick={() => {
-                  const nextStep: Record<Step, Step> = { products: 'customer', customer: 'fulfillment', fulfillment: 'review', review: 'review', confirmation: 'confirmation' };
-                  setStep(nextStep[step]);
-                }}
+                onClick={goToNext}
                 disabled={
                   (step === 'products' && !canProceedFromProducts) ||
                   (step === 'customer' && !canProceedFromCustomer) ||

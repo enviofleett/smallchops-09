@@ -1,6 +1,16 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { fromZonedTime } from "https://esm.sh/date-fns-tz@3.2.0"
 import { getCorsHeaders, handleCorsPreflightResponse } from '../_shared/cors.ts';
+
+const LAGOS_TIMEZONE = 'Africa/Lagos';
+
+function lagosToUTC(lagosDate: string, lagosTime: string): string {
+  const dateTimeStr = `${lagosDate}T${lagosTime}:00`;
+  const parsedDate = new Date(dateTimeStr);
+  const utcDate = fromZonedTime(parsedDate, LAGOS_TIMEZONE);
+  return utcDate.toISOString();
+}
 
 serve(async (req: Request) => {
   const origin = req.headers.get('origin');
@@ -12,7 +22,7 @@ serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(origin);
 
   try {
-    // 🔒 SECURITY: Verify admin authentication
+    // 🔒 Verify admin authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -66,6 +76,8 @@ serve(async (req: Request) => {
     if (!customer?.email) throw new Error('Customer email is required');
     if (!customer?.name) throw new Error('Customer name is required');
     if (!customer?.phone) throw new Error('Customer phone is required');
+    if (!delivery_schedule?.delivery_date) throw new Error('Delivery/pickup date is required');
+    if (!delivery_schedule?.delivery_time_start) throw new Error('Delivery/pickup time is required');
 
     // Calculate amounts
     const subtotal = items.reduce((sum: number, item: any) => 
@@ -73,22 +85,24 @@ serve(async (req: Request) => {
     const deliveryFee = fulfillment?.type === 'delivery' ? (fulfillment.delivery_fee || 0) : 0;
     const totalAmount = subtotal + deliveryFee;
 
-    // Generate order identifiers
+    // Generate order identifiers (same pattern as process-checkout)
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substr(2, 9);
     const orderNumber = `ORD-${timestamp}-${randomId}`;
+    const paymentReference = `admin_${timestamp}_${randomId}`;
     const orderId = crypto.randomUUID();
     const orderTime = new Date().toISOString();
 
     console.log('📦 Creating admin order:', { orderNumber, totalAmount, customerEmail: customer.email });
 
-    // Create order in database
-    const orderData = {
+    // Create order in database - ALIGNED with process-checkout schema exactly
+    const orderData: Record<string, any> = {
       id: orderId,
       order_number: orderNumber,
       customer_name: customer.name,
       customer_email: customer.email,
       customer_phone: customer.phone,
+      guest_session_id: null,
       order_type: fulfillment?.type === 'pickup' ? 'pickup' : 'delivery',
       status: 'pending',
       payment_status: 'pending',
@@ -98,17 +112,25 @@ serve(async (req: Request) => {
       delivery_fee: deliveryFee,
       transaction_fee: 0,
       total_amount: totalAmount,
-      payment_reference: `admin_${timestamp}_${randomId}`,
+      payment_reference: paymentReference,
+      paystack_reference: paymentReference,
       pickup_point_id: fulfillment?.pickup_point_id || null,
       delivery_address: fulfillment?.type === 'delivery' ? {
-        address: fulfillment.address?.address_line_1 || '',
-        location: fulfillment.address?.city || '',
-        zone_id: fulfillment.delivery_zone_id || null
+        address: fulfillment.address?.address_line_1 || fulfillment.address || '',
+        location: fulfillment.address?.city || fulfillment.location || '',
+        zone_id: fulfillment.delivery_zone_id || null,
+        landmark: fulfillment.address?.landmark || ''
       } : null,
       delivery_zone_id: fulfillment?.delivery_zone_id || null,
-      delivery_date: delivery_schedule?.delivery_date || null,
-      special_instructions: delivery_schedule?.special_instructions || '',
-      created_by: user.id,
+      // Convert Lagos local time to UTC (same as process-checkout)
+      pickup_time: fulfillment?.type === 'pickup' 
+        ? lagosToUTC(delivery_schedule.delivery_date, delivery_schedule.delivery_time_start)
+        : null,
+      delivery_time: fulfillment?.type === 'delivery' 
+        ? lagosToUTC(delivery_schedule.delivery_date, delivery_schedule.delivery_time_start)
+        : null,
+      delivery_date: delivery_schedule.delivery_date || null,
+      special_instructions: delivery_schedule.special_instructions || '',
       order_time: orderTime,
       created_at: orderTime,
       updated_at: orderTime
@@ -127,7 +149,7 @@ serve(async (req: Request) => {
 
     console.log('✅ Order created:', orderResult.order_number);
 
-    // Create order items
+    // Create order items (same structure as process-checkout)
     const orderItemsData = items.map((item: any) => ({
       id: crypto.randomUUID(),
       order_id: orderId,
@@ -137,25 +159,42 @@ serve(async (req: Request) => {
       unit_price: item.unit_price || item.price,
       total_price: (item.unit_price || item.price) * item.quantity,
       customizations: item.customizations || null,
+      special_instructions: null,
       created_at: orderTime,
       updated_at: orderTime
     }));
 
     const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
     if (itemsError) {
+      console.error('❌ Order items creation error:', itemsError);
       await supabase.from('orders').delete().eq('id', orderId);
       throw new Error(`Order items creation failed: ${itemsError.message}`);
     }
 
-    // Save delivery schedule if provided
+    console.log('✅ Order items created');
+
+    // Save delivery schedule using correct table: order_delivery_schedule
     if (delivery_schedule?.delivery_date) {
-      await supabase.from('delivery_schedules').insert({
-        order_id: orderId,
-        delivery_date: delivery_schedule.delivery_date,
-        delivery_time_start: delivery_schedule.delivery_time_start || '09:00',
-        delivery_time_end: delivery_schedule.delivery_time_end || '17:00',
-        status: 'scheduled'
-      }).single();
+      try {
+        const { error: scheduleError } = await supabase
+          .from('order_delivery_schedule')
+          .upsert({
+            order_id: orderId,
+            delivery_date: delivery_schedule.delivery_date,
+            delivery_time_start: delivery_schedule.delivery_time_start || '09:00',
+            delivery_time_end: delivery_schedule.delivery_time_end || '17:00',
+            is_flexible: false,
+            special_instructions: delivery_schedule.special_instructions || null
+          }, { onConflict: 'order_id' });
+
+        if (scheduleError) {
+          console.warn('⚠️ Delivery schedule insert failed (non-blocking):', scheduleError);
+        } else {
+          console.log('✅ Delivery schedule created');
+        }
+      } catch (scheduleErr) {
+        console.warn('⚠️ Delivery schedule error (non-blocking):', scheduleErr);
+      }
     }
 
     // 💳 Create Paystack customer and DVA
@@ -230,16 +269,15 @@ serve(async (req: Request) => {
             console.log('✅ Virtual account created:', virtualAccount.account_number);
           } else {
             console.warn('⚠️ DVA creation failed:', dvaData.message);
-            // DVA failed but order is still created - admin can retry or provide account manually
           }
         }
       } catch (paystackError) {
         console.error('❌ Paystack DVA error:', paystackError);
-        // Don't fail the order - DVA is optional
+        // Don't fail the order - DVA is optional enhancement
       }
     }
 
-    // 📧 Queue email notification
+    // 📧 Queue email notification (non-blocking)
     try {
       await supabase.from('communication_events').insert({
         event_type: 'admin_order_invoice',
@@ -262,7 +300,7 @@ serve(async (req: Request) => {
       });
       console.log('📧 Email notification queued');
     } catch (emailError) {
-      console.warn('⚠️ Email queue failed:', emailError);
+      console.warn('⚠️ Email queue failed (non-blocking):', emailError);
     }
 
     return new Response(JSON.stringify({
@@ -271,11 +309,14 @@ serve(async (req: Request) => {
         id: orderId,
         order_number: orderNumber,
         total_amount: totalAmount,
+        subtotal,
+        delivery_fee: deliveryFee,
         status: 'pending',
         payment_status: 'pending',
         payment_method: 'bank_transfer',
         customer_name: customer.name,
         customer_email: customer.email,
+        customer_phone: customer.phone,
         items_count: items.length,
         created_at: orderTime
       },

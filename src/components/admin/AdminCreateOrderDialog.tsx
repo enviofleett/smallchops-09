@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -79,8 +79,9 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('products')
-        .select('id, name, price, image_url, minimum_order_quantity, stock_quantity, is_active, category_id')
-        .eq('is_active', true)
+        .select('id, name, price, image_url, minimum_order_quantity, stock_quantity, status, category_id')
+        .eq('status', 'active')
+        .gt('stock_quantity', 0)
         .order('name');
       if (error) throw error;
       return data || [];
@@ -294,6 +295,8 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden p-0 flex flex-col">
+        <DialogTitle className="sr-only">Create Order for Customer</DialogTitle>
+        <DialogDescription className="sr-only">Multi-step form to create an order on behalf of a customer</DialogDescription>
         {/* Header with stepper */}
         <div className="flex items-center justify-between p-4 border-b bg-background flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -657,7 +660,7 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
                 subtotal={subtotal}
                 deliveryFee={deliveryFee}
                 total={total}
-                className="block md:block border shadow-sm"
+                className="!block border shadow-sm"
               />
 
               <div className="p-3 bg-accent/50 border border-accent rounded-lg text-sm">

@@ -188,12 +188,28 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
 
       console.log('📦 Submitting admin order:', payload);
 
-      const { data, error } = await supabase.functions.invoke('admin-create-order', { body: payload });
+      // Call the edge function on Lovable Cloud (not the external Supabase project)
+      const cloudProjectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const cloudAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const functionUrl = `https://${cloudProjectId}.supabase.co/functions/v1/admin-create-order`;
+      
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${cloudAnonKey}`,
+          'apikey': cloudAnonKey,
+        },
+        body: JSON.stringify(payload),
+      });
 
-      if (error) {
-        console.error('❌ Edge function error:', error);
-        throw new Error(error.message || 'Failed to create order');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Edge function error:', response.status, errorText);
+        throw new Error(errorText || 'Failed to create order');
       }
+
+      const data = await response.json();
 
       if (!data?.success) {
         console.error('❌ Order creation failed:', data);

@@ -9,6 +9,7 @@ import { Download, Package, Check, ChevronsUpDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { exportToCSV } from '@/api/advancedReports';
 import { useDriverOrders } from '@/hooks/useAdvancedReports';
+import { useDrivers } from '@/hooks/useDrivers';
 import { ZoneFeeBreakdown, DriverRevenue } from '@/types/dashboard';
 import { Badge } from '@/components/ui/badge';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -38,23 +39,52 @@ export function DeliveryFeesTable({
   const [searchQuery, setSearchQuery] = useState('');
   
   const { data: driverOrders, isLoading: ordersLoading } = useDriverOrders(selectedDriverId, startDate, endDate);
+  const { data: allDrivers } = useDrivers();
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Get unique drivers from driver revenue data
-  const uniqueDrivers = driverRevenue?.reduce((acc, curr) => {
-    if (!acc.find(d => d.driver_id === curr.driver_id)) {
-      acc.push({ driver_id: curr.driver_id, driver_name: curr.driver_name });
+  // Get drivers list - Combine drivers from revenue report and all active drivers
+  // This ensures we can select any driver, even if they have no revenue in the selected period
+  const availableDrivers = React.useMemo(() => {
+    const drivers = new Map<string, { driver_id: string; driver_name: string }>();
+    
+    // Add drivers from revenue report first
+    if (driverRevenue) {
+      driverRevenue.forEach(d => {
+        drivers.set(d.driver_id, { driver_id: d.driver_id, driver_name: d.driver_name });
+      });
     }
-    return acc;
-  }, [] as Array<{ driver_id: string; driver_name: string }>);
+    
+    // Add all active drivers if not already present
+    if (allDrivers) {
+      allDrivers.forEach(d => {
+        if (!drivers.has(d.id)) {
+          drivers.set(d.id, { driver_id: d.id, driver_name: d.name });
+        }
+      });
+    }
+    
+    return Array.from(drivers.values()).sort((a, b) => a.driver_name.localeCompare(b.driver_name));
+  }, [driverRevenue, allDrivers]);
 
   // Filter drivers based on search query
-  const filteredDrivers = uniqueDrivers?.filter(driver =>
-    driver.driver_name.toLowerCase().includes(debouncedSearch.toLowerCase())
-  );
+  const filteredDrivers = React.useMemo(() => {
+    return availableDrivers.filter(driver =>
+      driver.driver_name.toLowerCase().includes(debouncedSearch.toLowerCase())
+    );
+  }, [availableDrivers, debouncedSearch]);
 
-  const selectedDriver = uniqueDrivers?.find(d => d.driver_id === selectedDriverId);
+  const selectedDriver = React.useMemo(() => {
+    return availableDrivers.find(d => d.driver_id === selectedDriverId);
+  }, [availableDrivers, selectedDriverId]);
+  
+  // Fallback for zone breakdown if undefined
+  const safeZoneBreakdown = React.useMemo(() => {
+    // Ensure we always return an array, even if zoneBreakdown is undefined
+    const breakdown = zoneBreakdown || [];
+    // Sort by total fees descending by default
+    return [...breakdown].sort((a, b) => b.total_fees - a.total_fees);
+  }, [zoneBreakdown]);
 
   const handleExport = () => {
     if (!driverOrders || driverOrders.length === 0) return;
@@ -154,9 +184,14 @@ export function DeliveryFeesTable({
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Select a driver to view detailed fee breakdown</p>
               </div>
+            ) : ordersLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-64 w-full" />
+              </div>
             ) : !driverOrders || driverOrders.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                No delivery orders found for this driver
+                No delivery orders found for this driver in the selected period
               </div>
             ) : (
               <>
@@ -212,7 +247,7 @@ export function DeliveryFeesTable({
 
           <TabsContent value="zones">
             <h3 className="text-lg font-medium mb-4">Zone Fees Breakdown</h3>
-            {!zoneBreakdown || zoneBreakdown.length === 0 ? (
+            {safeZoneBreakdown.length === 0 ? (
                <div className="text-center py-12 text-muted-foreground">
                  No zone data available for this period.
                </div>
@@ -227,7 +262,7 @@ export function DeliveryFeesTable({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {zoneBreakdown.map((zone) => (
+                  {safeZoneBreakdown.map((zone) => (
                     <TableRow key={zone.zone_id}>
                       <TableCell className="font-medium">{zone.zone_name}</TableCell>
                       <TableCell className="text-right">{zone.total_orders}</TableCell>

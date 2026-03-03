@@ -12,16 +12,17 @@ export function useDashboardAggregates(
   return useQuery({
     queryKey: ['dashboard-aggregates', startDate.toISOString(), endDate.toISOString(), interval, limit, topLimit],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('dashboard-aggregates', {
-        body: {
-          dateFrom: startDate.toISOString(),
-          dateTo: endDate.toISOString(),
-          interval,
-          limit,
-          topLimit
-        }
+      // Use SQL RPC function instead of Edge Function
+      const { data, error } = await (supabase as any).rpc('get_dashboard_aggregates', {
+        p_date_from: startDate.toISOString(),
+        p_date_to: endDate.toISOString(),
+        p_interval: interval,
+        p_limit: limit,
+        p_top_limit: topLimit
       });
+      
       if (error) {
+        console.error('RPC Error:', error);
         throw new Error(error.message);
       }
       return data as DashboardAggregatesResponse;

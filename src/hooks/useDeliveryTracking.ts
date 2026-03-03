@@ -32,57 +32,35 @@ export const useDeliveryTracking = (orderIdOrNumber?: string) => {
     setError(null);
 
     try {
-      // First try to find by order_number (most common for guests)
-      let { data: order, error: orderError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          profiles:assigned_rider_id(name, phone),
-          vehicle_assignments(
-            vehicles(type, brand, model, license_plate)
-          )
-        `)
-        .eq('order_number', orderIdentifier)
-        .maybeSingle();
+      // Use the secure RPC function to bypass RLS for guest tracking
+      const { data: orderData, error: rpcError } = await (supabase as any)
+        .rpc('get_order_for_tracking', { p_order_identifier: orderIdentifier });
 
-      // If not found by order_number, try by ID
-      if (!order) {
-        const { data: orderById, error: orderByIdError } = await supabase
-          .from('orders')
-          .select(`
-            *,
-            profiles:assigned_rider_id(name, phone),
-            vehicle_assignments(
-              vehicles(type, brand, model, license_plate)
-            )
-          `)
-          .eq('id', orderIdentifier)
-          .maybeSingle();
-        
-        order = orderById;
-        orderError = orderByIdError;
-      }
-
-      if (orderError) throw orderError;
+      if (rpcError) throw rpcError;
       
-      if (!order) {
+      if (!orderData) {
         throw new Error('Order not found. Please check your order number and try again.');
       }
 
+      // Transform the RPC result to match the expected format
+      // Note: The RPC returns a JSON object with specific fields
       const trackingData: DeliveryTracking = {
-        orderId: order.id,
-        orderNumber: order.order_number,
-        status: order.status,
-        estimatedDeliveryTime: order.delivery_time,
-        riderInfo: order.profiles ? {
-          name: order.profiles.name || 'Delivery Rider',
-          phone: order.profiles.phone || '',
-          vehicleInfo: 'Delivery Vehicle'
+        orderId: orderData.id,
+        orderNumber: orderData.order_number,
+        status: orderData.status,
+        estimatedDeliveryTime: orderData.delivery_time,
+        riderInfo: orderData.profiles ? {
+          name: orderData.profiles.name || 'Delivery Rider',
+          phone: orderData.profiles.phone || '',
+          vehicleInfo: orderData.vehicle_assignments?.[0]?.vehicles 
+            ? `${orderData.vehicle_assignments[0].vehicles.color || ''} ${orderData.vehicle_assignments[0].vehicles.brand} ${orderData.vehicle_assignments[0].vehicles.model} (${orderData.vehicle_assignments[0].vehicles.license_plate})`
+            : 'Delivery Vehicle'
         } : undefined
       };
 
       setTracking(trackingData);
     } catch (err) {
+      console.error('Tracking error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to track order. Please check your order number and try again.';
       setError(errorMessage);
       toast.error(errorMessage);

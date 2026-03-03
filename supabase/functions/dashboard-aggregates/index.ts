@@ -150,14 +150,25 @@ serve(async (req) => {
     const driverKey = (ts: string, driverId: string) => `${ts}|${driverId}`;
     const driverMap = new Map<string, { interval_start: string; driver_id: string; driver_name: string; total_deliveries: number; total_revenue: number; total_delivery_fees: number; avg_delivery_fee_acc: number }>();
     (ordersData || []).forEach(o => {
+      // Include any order that has a rider assigned, regardless of current status (to capture pending/historical)
+      // Or strictly stick to completed deliveries for revenue accuracy? 
+      // User complaint "data not showing" suggests strict filtering might be hiding recent activity.
+      // Let's relax status check slightly to include 'out_for_delivery' or just rely on having an assigned_rider_id
+      // BUT for *Revenue*, we should typically only count paid/completed orders.
+      // Let's stick to delivery type but ensure we catch valid completed states.
+      
       if (o.order_type !== 'delivery') return;
-      if (!(o.status === 'delivered' || o.status === 'completed')) return;
+      if (!o.assigned_rider_id) return; // Must have a rider
+      
+      // Allow more statuses if we want to show "projected" revenue, but for actual revenue:
+      if (!['delivered', 'completed'].includes(o.status)) return; 
+
       const ts = new Date(o.created_at);
       const it = interval === 'day' ? new Date(ts.getFullYear(), ts.getMonth(), ts.getDate()) :
         interval === 'week' ? new Date(ts.getFullYear(), ts.getMonth(), ts.getDate() - ts.getDay()) :
         new Date(ts.getFullYear(), ts.getMonth(), 1);
       const iso = it.toISOString();
-      const did = o.assigned_rider_id || 'unassigned';
+      const did = o.assigned_rider_id;
       const key = driverKey(iso, did);
       const name = driverNameMap.get(did) || 'Unassigned';
       const fee = parseFloat((o.delivery_fee ?? 0).toString()) || 0;

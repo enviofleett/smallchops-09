@@ -29,6 +29,7 @@ export interface ProductWithDiscount {
   stock_quantity?: number;
   preparation_time?: number;
   minimum_order_quantity?: number;
+  order_cutoff_time?: string;
 }
 
 export interface CartPromotion {

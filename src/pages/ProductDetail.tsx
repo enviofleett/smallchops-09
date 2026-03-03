@@ -64,6 +64,20 @@ const ProductDetail = () => {
   // Initialize favorites for this product
   const { isFavorite, isLoading: favoriteLoading, toggleFavorite } = useProductFavorite(id || '');
 
+  // Check if ordering is allowed based on cutoff time
+  const isPastCutoff = React.useMemo(() => {
+    if (!product?.order_cutoff_time) return false;
+    
+    const now = new Date();
+    const [cutoffHour, cutoffMinute] = product.order_cutoff_time.split(':').map(Number);
+    
+    // Create cutoff date object for today
+    const cutoffDate = new Date(now);
+    cutoffDate.setHours(cutoffHour, cutoffMinute, 0, 0);
+    
+    return now > cutoffDate;
+  }, [product?.order_cutoff_time]);
+
   useEffect(() => {
     console.log('ProductDetail component mounted, ID from params:', id);
     if (id) {
@@ -506,9 +520,20 @@ const ProductDetail = () => {
                   onClick={handleAddToCart}
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                   size="lg"
+                  disabled={isPastCutoff}
+                  variant={isPastCutoff ? "secondary" : "default"}
                 >
-                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  Add to Cart
+                  {isPastCutoff ? (
+                    <>
+                      <Timer className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                      Order Closed (Cutoff: {product.order_cutoff_time})
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                      Add to Cart
+                    </>
+                  )}
                 </Button>
                 <div className="flex justify-center">
                   <FavoriteButton

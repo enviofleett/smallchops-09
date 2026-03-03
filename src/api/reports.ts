@@ -43,13 +43,13 @@ export async function fetchDailyAnalytics(
       console.log('[Analytics API] Session validated successfully');
 
       // Call the endpoint directly via fetch with proper error handling
-      // Use environment variable or fallback to production URL
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://oknnklksdiqaifhxaccs.supabase.co';
+      // We use the client's configured URL to ensure consistency and avoid CSP issues
+      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL || 'https://oknnklksdiqaifhxaccs.supabase.co';
       const url = `${supabaseUrl}/functions/v1/analytics-dashboard/daily-analytics?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
       
       console.log('[Analytics API] Calling endpoint:', { url, startDate, endDate });
       
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
+      const supabaseAnonKey = (supabase as any).supabaseKey || import.meta.env.VITE_SUPABASE_ANON_KEY;
       
       const response = await fetch(url, {
         method: 'GET',

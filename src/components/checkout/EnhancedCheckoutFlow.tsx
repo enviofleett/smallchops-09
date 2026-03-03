@@ -5,6 +5,7 @@ import { useCart } from "@/hooks/useCart";
 import { useGuestSession } from "@/hooks/useGuestSession";
 import { useGuestSessionCleanup } from "@/hooks/useGuestSessionCleanup";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
+import { useBusinessSettings } from "@/hooks/useBusinessSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,7 +71,8 @@ interface EnhancedCheckoutFlowProps {
 const validateCheckoutForm = (
   formData: CheckoutData, 
   deliveryZone: any, 
-  pickupPoint: any
+  pickupPoint: any,
+  isDeliveryDisabledByAdmin: boolean
 ): string[] => {
   const errors: string[] = [];
 
@@ -94,6 +96,10 @@ const validateCheckoutForm = (
   // Fulfillment type validation
   if (!formData.fulfillment_type) {
     errors.push("Please select delivery or pickup option");
+  }
+
+  if (isDeliveryDisabledByAdmin && formData.fulfillment_type === 'delivery') {
+    errors.push("Delivery is currently disabled. Please select Pickup.");
   }
 
   // Delivery-specific validation
@@ -192,6 +198,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
   const {
     addresses
   } = useCustomerAddresses();
+  const { data: businessSettings } = useBusinessSettings();
+  const isDeliveryDisabledByAdmin = businessSettings?.delivery_enabled === false;
 
   // Initialize checkout step based on authentication status
   const getInitialCheckoutStep = () => {
@@ -325,6 +333,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       });
     }
   }, [deliveryDisabledForDate, formData.delivery_date]);
+
+  useEffect(() => {
+    if (isDeliveryDisabledByAdmin && formData.fulfillment_type === 'delivery') {
+      setFormData(prev => ({ ...prev, fulfillment_type: 'pickup' }));
+      toast({
+        title: "Delivery Unavailable",
+        description: "Delivery is currently unavailable for this store.",
+      });
+    }
+  }, [isDeliveryDisabledByAdmin, formData.fulfillment_type]);
 
   // Handle fulfillment type changes and provide price feedback
   useEffect(() => {
@@ -555,7 +573,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       }
 
       // Enhanced validation with friendly messages
-      const validationErrors = validateCheckoutForm(formData, deliveryZone, pickupPoint);
+      const validationErrors = validateCheckoutForm(formData, deliveryZone, pickupPoint, isDeliveryDisabledByAdmin);
       if (validationErrors.length > 0) {
         // Show friendly validation message with helpful guidance
         const errorCount = validationErrors.length;
@@ -775,10 +793,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
       try {
         const {
           data: requireTermsData
-        } = await supabase.from('content_management').select('content').eq('key', 'legal_require_terms_acceptance').single();
+        } = await (supabase as any).from('content_management').select('content').eq('key', 'legal_require_terms_acceptance').single();
         const {
           data: termsContentData
-        } = await supabase.from('content_management').select('content, is_published').eq('key', 'legal_terms').single();
+        } = await (supabase as any).from('content_management').select('content, is_published').eq('key', 'legal_terms').single();
         if (requireTermsData?.content === 'true' && termsContentData?.is_published) {
           setTermsRequired(true);
           setTermsContent(termsContentData.content || '');
@@ -944,22 +962,26 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
               onValueChange={value => handleFormChange('fulfillment_type', value)} 
               className="grid grid-cols-1 md:grid-cols-2 gap-4"
             >
-              <div className={cn("relative", deliveryDisabledForDate && "opacity-50 pointer-events-none")}>
-                <RadioGroupItem value="delivery" id="delivery" className="peer sr-only" disabled={deliveryDisabledForDate} />
+              <div className={cn("relative", (deliveryDisabledForDate || isDeliveryDisabledByAdmin) && "opacity-50 pointer-events-none")}>
+                <RadioGroupItem value="delivery" id="delivery" className="peer sr-only" disabled={deliveryDisabledForDate || isDeliveryDisabledByAdmin} />
                 <Label 
                   htmlFor="delivery" 
                   className={cn(
                     "flex flex-col items-center justify-center p-6 border-2 rounded-lg transition-all duration-300",
-                    deliveryDisabledForDate 
+                    (deliveryDisabledForDate || isDeliveryDisabledByAdmin) 
                       ? "cursor-not-allowed border-muted bg-muted/30" 
                       : "cursor-pointer hover:border-primary/30 hover:bg-accent/10 hover:shadow-md",
                     "peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:shadow-xl peer-checked:ring-4 peer-checked:ring-green-200 peer-checked:scale-[1.02]",
-                    !deliveryDisabledForDate && formData.fulfillment_type === 'delivery' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200 scale-[1.02]"
+                    !(deliveryDisabledForDate || isDeliveryDisabledByAdmin) && formData.fulfillment_type === 'delivery' && "border-green-500 bg-green-50 shadow-xl ring-4 ring-green-200 scale-[1.02]"
                   )}
                 >
                   <Truck className="w-8 h-8 mb-3 text-primary" />
                   <span className="font-medium text-base">Delivery</span>
-                  {deliveryDisabledForDate ? (
+                  {isDeliveryDisabledByAdmin ? (
+                    <span className="text-xs text-destructive mt-2 font-medium text-center">
+                      Delivery is currently unavailable
+                    </span>
+                  ) : deliveryDisabledForDate ? (
                     <span className="text-xs text-destructive mt-2 font-medium text-center">
                       Not available on selected date
                     </span>

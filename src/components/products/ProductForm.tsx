@@ -47,6 +47,7 @@ export const ProductForm = ({
       vat_rate: product?.vat_rate || 7.5,
       allergen_info: Array.isArray(product?.allergen_info) ? product.allergen_info as string[] : [],
       minimum_order_quantity: (product as any)?.minimum_order_quantity || 1,
+      order_cutoff_time: (product as any)?.order_cutoff_time || '',
     }
   });
 
@@ -304,6 +305,28 @@ export const ProductForm = ({
                   </FormControl>
                   <FormDescription>
                     The minimum quantity a customer must order for this product
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="order_cutoff_time"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Order Cutoff Time</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="time"
+                      placeholder="Select cutoff time"
+                      {...field}
+                      value={field.value || ''}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Time of day after which this product cannot be ordered
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

@@ -1,6 +1,6 @@
 import { UseFormReturn } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { FormControl, FormDescription, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Clock } from 'lucide-react';
@@ -34,6 +34,24 @@ export const BusinessHoursSection = ({ form }: BusinessHoursSectionProps) => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          <FormField
+            control={form.control}
+            name="delivery_enabled"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel>Enable Delivery</FormLabel>
+                  <FormDescription>
+                    Turn off to force all customers to use Pickup.
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
           {/* Header */}
           <div className="hidden sm:grid sm:grid-cols-4 gap-4 text-sm font-medium text-muted-foreground pb-2 border-b">
             <div>Day</div>

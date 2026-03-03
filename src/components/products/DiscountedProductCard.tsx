@@ -1,12 +1,13 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Heart, Star } from 'lucide-react';
+import { ShoppingCart, Heart, Star, Clock } from 'lucide-react';
 import { ProductWithDiscount } from '@/lib/discountCalculations';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { toImagesArray } from '@/lib/imageUtils';
 import { MOQBadge } from '@/components/ui/moq-badge';
+import { useMemo } from 'react';
 
 interface DiscountedProductCardProps {
   product: ProductWithDiscount;
@@ -23,6 +24,20 @@ export function DiscountedProductCard({
   isFavorite = false,
   showAddToCart = true
 }: DiscountedProductCardProps) {
+  // Check if ordering is allowed based on cutoff time
+  const isPastCutoff = useMemo(() => {
+    if (!product.order_cutoff_time) return false;
+    
+    const now = new Date();
+    const [cutoffHour, cutoffMinute] = product.order_cutoff_time.split(':').map(Number);
+    
+    // Create cutoff date object for today
+    const cutoffDate = new Date(now);
+    cutoffDate.setHours(cutoffHour, cutoffMinute, 0, 0);
+    
+    return now > cutoffDate;
+  }, [product.order_cutoff_time]);
+
   return (
     <Card className="h-full flex flex-col hover:shadow-lg transition-all duration-200 group relative overflow-hidden">
       {/* Discount Badge */}
@@ -126,12 +141,23 @@ export function DiscountedProductCard({
                 size="sm" 
                 className="w-full text-xs"
                 onClick={() => onAddToCart(product)}
+                disabled={isPastCutoff}
+                variant={isPastCutoff ? "secondary" : "default"}
               >
-                <ShoppingCart className="w-3 h-3 mr-1" />
-                {product.minimum_order_quantity && product.minimum_order_quantity > 1 
-                  ? `Add ${product.minimum_order_quantity} to Cart`
-                  : 'Add to Cart'
-                }
+                {isPastCutoff ? (
+                  <>
+                    <Clock className="w-3 h-3 mr-1" />
+                    Order Closed (Cutoff: {product.order_cutoff_time})
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="w-3 h-3 mr-1" />
+                    {product.minimum_order_quantity && product.minimum_order_quantity > 1 
+                      ? `Add ${product.minimum_order_quantity} to Cart`
+                      : 'Add to Cart'
+                    }
+                  </>
+                )}
               </Button>
             )}
           </div>

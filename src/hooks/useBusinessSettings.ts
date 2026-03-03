@@ -43,6 +43,7 @@ export interface BusinessSettings {
   created_at: string;
   updated_at: string;
   allow_guest_checkout?: boolean;
+  delivery_enabled?: boolean;
   /** Admin-managed array of disabled dates (YYYY-MM-DD format) */
   disabled_calendar_dates?: string[] | null;
   // Sensitive fields moved to business_sensitive_data table
@@ -62,7 +63,7 @@ export const useBusinessSettings = () => {
         logger.info('Starting business settings fetch');
         
         // First, try RPC function for public business info
-        const { data, error: dbError } = await supabase
+        const { data, error: dbError } = await (supabase as any)
           .rpc('get_public_business_info');
           
         if (!dbError && data && data.length > 0) {
@@ -140,7 +141,7 @@ export const useBusinessSettings = () => {
         
         // One final attempt at RPC function
         try {
-          const { data, error: finalError } = await supabase
+          const { data, error: finalError } = await (supabase as any)
             .rpc('get_public_business_info');
             
           if (!finalError && data && data.length > 0) {

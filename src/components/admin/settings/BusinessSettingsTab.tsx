@@ -31,6 +31,7 @@ const businessSettingsSchema = z.object({
   tagline: z.string().optional().nullable(),
   website_url: z.string().url('Invalid URL').optional().or(z.literal('')),
   whatsapp_support_number: z.string().optional().nullable(),
+  delivery_enabled: z.boolean().default(true),
   
   // Social Media
   facebook_url: z.string().url('Invalid URL').optional().or(z.literal('')),
@@ -89,6 +90,7 @@ export const BusinessSettingsTab = () => {
       tagline: '',
       website_url: '',
       whatsapp_support_number: '',
+      delivery_enabled: true,
       facebook_url: '',
       instagram_url: '',
       tiktok_url: '',
@@ -114,6 +116,7 @@ export const BusinessSettingsTab = () => {
         tagline: settings.tagline || '',
         website_url: settings.website_url || '',
         whatsapp_support_number: settings.whatsapp_support_number || '',
+        delivery_enabled: settings.delivery_enabled ?? true,
         facebook_url: settings.facebook_url || '',
         instagram_url: settings.instagram_url || '',
         tiktok_url: settings.tiktok_url || '',

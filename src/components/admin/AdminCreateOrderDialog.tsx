@@ -186,30 +186,20 @@ export const AdminCreateOrderDialog: React.FC<AdminCreateOrderDialogProps> = ({
         }
       };
 
-      console.log('📦 Submitting admin order:', payload);
+      console.log('📦 Submitting admin order via RPC:', payload);
 
-      // Call the edge function on Lovable Cloud (not the external Supabase project)
-      const cloudProjectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const cloudAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const functionUrl = `https://${cloudProjectId}.supabase.co/functions/v1/admin-create-order`;
-      
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${cloudAnonKey}`,
-          'apikey': cloudAnonKey,
-        },
-        body: JSON.stringify(payload),
+      // Call the RPC function directly to bypass Edge Function limits and CORS issues
+      const { data, error } = await (supabase as any).rpc('admin_create_order', {
+        p_items: payload.items,
+        p_customer: payload.customer,
+        p_fulfillment: payload.fulfillment,
+        p_delivery_schedule: payload.delivery_schedule
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Edge function error:', response.status, errorText);
-        throw new Error(errorText || 'Failed to create order');
+      if (error) {
+        console.error('❌ RPC error:', error);
+        throw new Error(error.message || 'Failed to create order');
       }
-
-      const data = await response.json();
 
       if (!data?.success) {
         console.error('❌ Order creation failed:', data);

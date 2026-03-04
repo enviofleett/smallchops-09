@@ -81,7 +81,13 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
   // Update delivery config when API response changes
   useEffect(() => {
     if (config) {
-      setDeliveryConfig(config);
+      setDeliveryConfig((prevConfig: any) => {
+        // Deep comparison to prevent unnecessary updates
+        if (JSON.stringify(prevConfig) === JSON.stringify(config)) {
+          return prevConfig;
+        }
+        return config;
+      });
     }
   }, [config]);
 
@@ -149,9 +155,20 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
     if (calendarDate) {
       const dateStr = format(calendarDate, 'yyyy-MM-dd');
       const daySlots = availableSlots.find(slot => slot.date === dateStr);
-      setSelectedDateSlots(daySlots?.time_slots || []);
+      
+      setSelectedDateSlots((prevSlots) => {
+        const newSlots = daySlots?.time_slots || [];
+        // Prevent update if slots haven't changed
+        if (JSON.stringify(prevSlots) === JSON.stringify(newSlots)) {
+          return prevSlots;
+        }
+        return newSlots;
+      });
     } else {
-      setSelectedDateSlots([]);
+      setSelectedDateSlots((prevSlots) => {
+        if (prevSlots.length === 0) return prevSlots;
+        return [];
+      });
     }
   }, [calendarDate, availableSlots]);
 
@@ -247,14 +264,15 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
           <div className="block sm:hidden">
             <DropdownDatePicker 
               selectedDate={selectedDate} 
-              availableSlots={availableSlots} 
+              availableSlots={availableSlots || []} 
               onDateSelect={handleHorizontalDateSelect} 
             />
           </div>
+
           <div className="hidden sm:block">
             <HorizontalDatePicker 
               selectedDate={selectedDate} 
-              availableSlots={availableSlots} 
+              availableSlots={availableSlots || []} 
               onDateSelect={handleHorizontalDateSelect} 
             />
           </div>

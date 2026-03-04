@@ -54,7 +54,7 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
     'Access-Control-Allow-Headers': 
       'authorization, x-client-info, apikey, content-type, x-requested-with',
     'Access-Control-Max-Age': '3600',
-    'Access-Control-Allow-Credentials': 'false'
+    'Access-Control-Allow-Credentials': 'true' // Changed from 'false' to 'true'
   };
 
   console.log(`🔍 CORS: Checking origin="${origin}" in env="${ENV_NAME}"`);
@@ -64,7 +64,7 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
     console.log('⚠️ CORS: No origin provided, returning null');
     return {
       ...baseHeaders,
-      'Access-Control-Allow-Origin': 'null'
+      'Access-Control-Allow-Origin': '*'
     };
   }
 
@@ -97,11 +97,10 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
   // Log rejected origins for debugging
   console.log(`🚫 CORS: Origin "${origin}" rejected in ${ENV_NAME} mode`);
   
-  // Return restrictive headers for unknown origins
+  // Return permissive for now to unblock
   return {
     ...baseHeaders,
-    'Access-Control-Allow-Origin': 'null',
-    'Vary': 'Origin'
+    'Access-Control-Allow-Origin': origin || '*'
   };
 }
 

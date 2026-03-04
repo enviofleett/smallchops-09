@@ -31,31 +31,39 @@ export const DropdownDatePicker: React.FC<DropdownDatePickerProps> = ({
 
   // Smart search filtering
   const filteredDates = React.useMemo(() => {
-    if (!searchQuery.trim()) return availableDates;
+    // Return all dates if no search query
+    if (!searchQuery || !searchQuery.trim()) return availableDates;
     
     const query = searchQuery.toLowerCase().trim();
     
     return availableDates.filter(slot => {
-      const date = parseISO(slot.date);
-      const dayName = format(date, 'EEEE').toLowerCase();
-      const monthName = format(date, 'MMMM').toLowerCase();
-      const shortMonth = format(date, 'MMM').toLowerCase();
-      const dateStr = format(date, 'MMM d').toLowerCase();
-      const fullDate = format(date, 'EEEE, MMMM d').toLowerCase();
+      // Safety check for invalid date
+      if (!slot.date) return false;
       
-      // Smart keyword matching
-      if (query === 'today' && isToday(date)) return true;
-      if (query === 'tomorrow' && isTomorrow(date)) return true;
-      
-      // Match day names, months, or date strings
-      return (
-        dayName.includes(query) ||
-        monthName.includes(query) ||
-        shortMonth.includes(query) ||
-        dateStr.includes(query) ||
-        fullDate.includes(query) ||
-        slot.date.includes(query)
-      );
+      try {
+        const date = parseISO(slot.date);
+        const dayName = format(date, 'EEEE').toLowerCase();
+        const monthName = format(date, 'MMMM').toLowerCase();
+        const shortMonth = format(date, 'MMM').toLowerCase();
+        const dateStr = format(date, 'MMM d').toLowerCase();
+        const fullDate = format(date, 'EEEE, MMMM d').toLowerCase();
+        
+        // Smart keyword matching
+        if (query === 'today' && isToday(date)) return true;
+        if (query === 'tomorrow' && isTomorrow(date)) return true;
+        
+        // Match day names, months, or date strings
+        return (
+          dayName.includes(query) ||
+          monthName.includes(query) ||
+          shortMonth.includes(query) ||
+          dateStr.includes(query) ||
+          fullDate.includes(query) ||
+          slot.date.includes(query)
+        );
+      } catch (e) {
+        return false;
+      }
     });
   }, [availableDates, searchQuery]);
 

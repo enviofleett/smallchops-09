@@ -16,7 +16,7 @@ serve(async (req: Request) => {
   const origin = req.headers.get('origin');
   
   if (req.method === 'OPTIONS') {
-    return handleCorsPreflightResponse(origin);
+    return new Response('ok', { headers: corsHeaders })
   }
   
   const corsHeaders = getCorsHeaders(origin);

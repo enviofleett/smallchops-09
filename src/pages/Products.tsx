@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { getProducts, createProduct, updateProduct } from '@/api/products';
 import { getOptimizedCategories } from '@/api/optimizedProducts';
@@ -166,10 +167,45 @@ const Products = () => {
   };
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportCsv = useCallback(() => {
+    const data = filteredProducts;
+    if (!data.length) {
+      toast.error('No products to export');
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const headers = ['Name', 'SKU', 'Price', 'Stock', 'Status', 'Category', 'Description'];
+      const rows = data.map(p => [
+        `"${(p.name || '').replace(/"/g, '""')}"`,
+        `"${(p.sku || '').replace(/"/g, '""')}"`,
+        p.price ?? '',
+        p.stock_quantity ?? '',
+        p.status ?? '',
+        `"${(p.categories?.name || '').replace(/"/g, '""')}"`,
+        `"${(p.description || '').replace(/"/g, '""')}"`,
+      ]);
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `products-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${data.length} products`);
+    } catch {
+      toast.error('Export failed');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [filteredProducts]);
 
   return (
     <div className="space-y-6">
-      <ProductsHeader onAddProduct={handleAddProduct} />
+      <ProductsHeader onAddProduct={handleAddProduct} onExportCsv={handleExportCsv} isExporting={isExporting} />
       
       <SimpleProductsFilters 
         categoryFilter={categoryFilter}

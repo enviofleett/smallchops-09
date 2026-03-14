@@ -362,6 +362,11 @@ export const updateProduct = async (id: string, updates: UpdatedProduct & { imag
         
         const { imageFile, ...productToUpdate } = updates;
         
+        // Sanitize time fields - convert empty strings to null for DB compatibility
+        if ('order_cutoff_time' in productToUpdate && !productToUpdate.order_cutoff_time) {
+            productToUpdate.order_cutoff_time = null;
+        }
+        
         const finalProductUpdates = {
             ...productToUpdate,
             ...(uploadAttempted && { image_url: newImageUrl }), // Only update image_url if we uploaded a new image
